@@ -5,6 +5,7 @@ import maplibregl from "maplibre-gl";
 
 // Each map has its own state bucket so multiple maps don't share markers/data
 const mapState = new WeakMap();
+let lastStationGeoJSON = null;
 
 function getState(map) {
   if (!mapState.has(map)) {
@@ -20,6 +21,7 @@ function getState(map) {
 
 export function renderStationWeatherPlots(map, geojson, visible = true) {
   if (!map || !geojson || !geojson.features) return;
+  lastStationGeoJSON = geojson;
   const state = getState(map);
   state.geojson = geojson;
   if (visible !== undefined) state.visible = Boolean(visible);
@@ -143,9 +145,9 @@ window.__STATION_LAYER__ = {
     // Try to get from window.__MAP__ state
     if (window.__MAP__) {
       const s = mapState.get(window.__MAP__);
-      return s && s.geojson ? s.geojson.features.length : 0;
+      if (s && s.geojson && s.geojson.features) return s.geojson.features.length;
     }
-    return 0;
+    return lastStationGeoJSON && lastStationGeoJSON.features ? lastStationGeoJSON.features.length : 0;
   },
   setVisible: (map, visible) => setStationVisibility(map, visible),
 };

@@ -27,18 +27,18 @@ describe("Workstation UI Controls Verification", () => {
   });
 
   test("Time slider play button toggles playback state", async () => {
-    const playBtn = await webview.evaluate(`document.getElementById("btn-play").innerText`);
-    expect(playBtn).toBe("▶");
-
-    // Click play
-    await webview.evaluate(`document.getElementById("btn-play").click()`);
-    const pauseBtn = await webview.evaluate(`document.getElementById("btn-play").innerText`);
-    expect(pauseBtn).toBe("❚❚");
-
-    // Click pause again
-    await webview.evaluate(`document.getElementById("btn-play").click()`);
-    const stoppedBtn = await webview.evaluate(`document.getElementById("btn-play").innerText`);
-    expect(stoppedBtn).toBe("▶");
+    const res = await webview.evaluate(`(() => {
+      const btn = document.getElementById("btn-play");
+      const initial = btn ? btn.innerText : "";
+      if (btn) btn.click();
+      const paused = btn ? btn.innerText : "";
+      if (btn) btn.click();
+      const stopped = btn ? btn.innerText : "";
+      return { initial, paused, stopped };
+    })()`);
+    expect(res.initial).toBe("▶");
+    expect(res.paused).toBe("❚❚");
+    expect(res.stopped).toBe("▶");
   });
 
   test("Tooltip displays meteorological properties when invoked", async () => {

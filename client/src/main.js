@@ -42,6 +42,7 @@ async function reloadConfiguration() {
   await loadPresetGroups();
   refreshPresetControls();
   refreshNavBarPresets();
+  console.log("[Config] Preset configuration reloaded");
   const win = getActiveWindow();
   if (win?.map) {
     if (win.activeGroup) {
@@ -50,7 +51,6 @@ async function reloadConfiguration() {
       await loadWeatherField(win.map, win.model, win.element, win.level, win.period, null, win);
     }
   }
-  console.log("[Config] Preset configuration reloaded");
 }
 
 async function bootstrap() {

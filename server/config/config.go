@@ -21,7 +21,7 @@ type Config struct {
 func LoadConfig() *Config {
 	cfg := &Config{
 		CassandraHost: getEnv("CASSANDRA_HOST", "159.223.110.159"),
-		CassandraPort: getEnvInt("CASSANDRA_PORT", 45060),
+		CassandraPort: getEnvInt("CASSANDRA_PORT", 45061),
 		HTTPPort:      getEnv("HTTP_PORT", "8088"),
 		EnableTunnel:  getEnvBool("ENABLE_TUNNEL", true),
 		MockMode:      getEnvBool("MOCK_MODE", false),

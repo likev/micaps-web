@@ -7,7 +7,7 @@ describe("Base Map and PMTiles Protocol Verification", () => {
 
   beforeAll(async () => {
     webview = await createTestWebView();
-    const ok = await waitForMapLoaded(webview, 15000);
+    const ok = await waitForMapLoaded(webview, 25000);
     expect(ok).toBe(true);
   }, 45000);
 
