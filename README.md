@@ -108,6 +108,8 @@ micaps-web/
 │   ├── index.html                    # Workstation HTML shell (< 30 lines)
 │   ├── package.json                  # Dependencies, build scripts & test runner
 │   ├── vite.config.js                # Vite build configuration
+│   ├── public/
+│   │   └── presets.json              # Runtime-editable composite preset configuration
 │   ├── src/
 │   │   ├── main.js                   # Application bootstrap & lifecycle orchestrator (< 160 lines)
 │   │   ├── style.css                 # Dark meteorological theme stylesheet (< 330 lines)
@@ -192,6 +194,46 @@ Open your browser at:
 ```text
 http://localhost:8088
 ```
+
+### Runtime Preset Configuration
+
+Composite presets and named colormaps are loaded from `client/public/presets.json` at startup rather than bundled into the JavaScript. Edit that JSON file, then click **Reload Config** in the workstation navbar to apply changes without rebuilding or restarting the frontend.
+
+For a production build served from `client/dist`, edit or replace `client/dist/presets.json`; Vite copies the source file there during `bun run build`. The file has this shape:
+
+```json
+{
+  "colormaps": {
+    "my-temperature": [
+      { "val": -20, "color": [0, 80, 255, 255] },
+      { "val": 20, "color": [255, 80, 0, 255] }
+    ]
+  },
+  "presets": [
+    {
+      "id": "my-group",
+      "name": "My Group",
+      "hasLevel": true,
+      "defaultLevel": 500,
+      "colormap": "my-temperature",
+      "colormapByLevel": { "850": "my-temperature" },
+      "layers": [
+        {
+          "model": "ECMWF_HR",
+          "element": "TMP",
+          "type": "contour",
+          "render": {
+            "colormap": "my-temperature",
+            "colormapByLevel": { "500": "my-temperature" }
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+`render.colormap` overrides the group setting, and `colormapByLevel` provides a level-specific override. Colormaps use sorted numeric `val` stops and RGB/RGBA channel arrays from 0–255.
 
 ---
 

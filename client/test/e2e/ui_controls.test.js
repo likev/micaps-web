@@ -1,6 +1,6 @@
 // ui_controls.test.js - Workstation UI interactivity tests
 import { test, expect, describe, beforeAll, afterAll } from "bun:test";
-import { createTestWebView, waitForMapLoaded } from "./helpers/testEnv.js";
+import { createTestWebView, waitForCondition, waitForMapLoaded } from "./helpers/testEnv.js";
 
 describe("Workstation UI Controls Verification", () => {
   let webview;
@@ -73,6 +73,23 @@ describe("Workstation UI Controls Verification", () => {
     })()`);
     expect(res.count).toBeGreaterThan(1);
     expect(res.value).toBe("composite-500hpa");
+  });
+
+  test("Preset configuration can be manually reloaded", async () => {
+    await webview.evaluate(`document.getElementById("btn-reload-config").click()`);
+    const reloaded = await waitForCondition(
+      webview,
+      `window.__LOGS__.some((log) => log === "LOG: [Config] Preset configuration reloaded")`,
+      10000
+    );
+    expect(reloaded).toBe(true);
+
+    const optionCounts = await webview.evaluate(`({
+      nav: document.getElementById("select-preset").options.length,
+      window: document.getElementById("win-preset-1-0").options.length
+    })`);
+    expect(optionCounts.nav).toBeGreaterThan(1);
+    expect(optionCounts.window).toBeGreaterThan(1);
   });
 
   test("Keyboard ArrowLeft and ArrowRight change forecast period", async () => {

@@ -38,7 +38,7 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
   }
 
   // Determine isoline levels
-  const levels = getElementLevels(element, gridData.stats.min, gridData.stats.max);
+  const levels = getElementLevels(element, gridData.stats.min, gridData.stats.max, options.colormap);
 
   // 1. Generate Isobands via griddata.contourf
   let isobandFC = { type: "FeatureCollection", features: [] };
@@ -48,7 +48,7 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
       for (const feature of features) {
         if (feature.properties && feature.properties.level) {
           const midVal = (feature.properties.level[0] + feature.properties.level[1]) / 2;
-          feature.properties.fillColor = getHexColor(midVal, element);
+          feature.properties.fillColor = getHexColor(midVal, element, options.colormap);
         }
       }
       isobandFC.features = features;
@@ -208,5 +208,4 @@ export function setContourVisibility(map, visible) {
 export function setContourOpacity(map, opacity) {
   setLayerIsobandOpacity(map, "default", opacity);
 }
-
 

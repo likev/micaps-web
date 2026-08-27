@@ -1,6 +1,6 @@
 // main.js - Application bootstrap and orchestrator
 import { getActiveMap } from "./map/mapInstance.js";
-import { initNavBar } from "./ui/navBar.js";
+import { initNavBar, refreshNavBarPresets } from "./ui/navBar.js";
 import { initCatalogDrawer } from "./ui/catalogDrawer.js";
 import { initLayerControl, addOrUpdateLayer, removeLayer } from "./ui/layerControl.js";
 import { initTimeSlider, setTimelineMode } from "./ui/timeSlider.js";
@@ -24,12 +24,13 @@ import { analyzeAndRenderSurfaceSLPContours } from "./layers/surfaceAnalysis.js"
 import { fetchGridData, fetchGridBinaryStream, fetchStationObservations } from "./api/catalogApi.js";
 import { getCSSGradient } from "./utils/colormaps.js";
 import { appState } from "./store/appState.js";
-import { PRESET_GROUPS } from "./config/presets.js";
+import { loadPresetGroups } from "./config/presets.js";
 import { setNavBarLevel, setNavBarPreset } from "./ui/navBar.js";
 import { step as timeSliderStep } from "./ui/timeSlider.js";
 import {
   initTabWindowManager,
   getActiveWindow,
+  refreshPresetControls,
 } from "./ui/tabWindowManager.js";
 
 function getMap() {
@@ -37,8 +38,29 @@ function getMap() {
   return (win && win.map) || getActiveMap();
 }
 
+async function reloadConfiguration() {
+  await loadPresetGroups();
+  refreshPresetControls();
+  refreshNavBarPresets();
+  const win = getActiveWindow();
+  if (win?.map) {
+    if (win.activeGroup) {
+      await loadPresetGroup(win.map, win.activeGroup, win.period, win.level, win);
+    } else if (!win.isObservation) {
+      await loadWeatherField(win.map, win.model, win.element, win.level, win.period, null, win);
+    }
+  }
+  console.log("[Config] Preset configuration reloaded");
+}
+
 async function bootstrap() {
   console.log("[MICAPS-Web] Initializing meteorological workstation...");
+
+  try {
+    await loadPresetGroups();
+  } catch (error) {
+    console.error("[Config] Initial preset configuration load failed:", error);
+  }
 
   // ── Tab / Window Manager ─────────────────────────────────────────────────
   const firstTab = initTabWindowManager({
@@ -85,6 +107,7 @@ async function bootstrap() {
 
   // ── Navbar ───────────────────────────────────────────────────────────────
   initNavBar("navbar", {
+    onConfigReload: reloadConfiguration,
     onPresetChange: (group) => {
       const win = getActiveWindow();
       const map = win?.map || getActiveMap();
@@ -216,6 +239,8 @@ async function loadWeatherField(map, model, element, level, period, customOption
     const gridData = await fetchGridData(path, file);
     appState.set("gridData", gridData);
     if (win) win.gridData = gridData;
+    const colormap = customOptions?.colormap || element;
+    if (win) win.colormap = colormap;
 
     renderContourLayers(map, gridData, element, {
       layerId,
@@ -223,6 +248,7 @@ async function loadWeatherField(map, model, element, level, period, customOption
       showLine: defaultShowLine,
       lineColor,
       opacity,
+      colormap,
     });
 
     // Register into Layers Manager
@@ -245,7 +271,7 @@ async function loadWeatherField(map, model, element, level, period, customOption
 
     if (appState.state.layers.raster && !isHeight) {
       const binBuffer = await fetchGridBinaryStream(path, file);
-      renderBinaryRaster(map, binBuffer, element);
+      renderBinaryRaster(map, binBuffer, element, colormap);
     }
 
     if (element === "WIND" && gridData.u && gridData.v) {
@@ -254,7 +280,7 @@ async function loadWeatherField(map, model, element, level, period, customOption
       stopWindAnimation();
     }
 
-    updateLegend(element);
+    updateLegend(element, colormap);
   } catch (err) {
     console.error(`[Bootstrap] Field load failed for ${path}/${file}:`, err);
   }
@@ -383,7 +409,7 @@ function handleLayerAction(map, action, layerId, value, layer, win = getActiveWi
         const file = `26082708.${String(period).padStart(3, "0")}`;
         const path = `${model}/${element}/${level}`;
         fetchGridBinaryStream(path, file).then((bin) => {
-          renderBinaryRaster(map, bin, element);
+          renderBinaryRaster(map, bin, element, win?.colormap || element);
         });
       } else {
         setRasterVisibility(map, value);
@@ -406,11 +432,11 @@ function handleLayerAction(map, action, layerId, value, layer, win = getActiveWi
   }
 }
 
-function updateLegend(element = "TMP") {
+function updateLegend(element = "TMP", colormap = null) {
   const panel = document.getElementById("legend-panel");
   if (!panel) return;
 
-  const grad = getCSSGradient(element);
+  const grad = getCSSGradient(element, colormap);
   panel.innerHTML = `
     <div style="font-weight: bold; margin-bottom: 2px;">${element} Legend</div>
     <div class="legend-bar" style="background: ${grad};"></div>
@@ -452,15 +478,27 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
     group.layers.map(async (layer) => {
       const targetLevel = layer.level || (group.hasLevel ? curLevel : null);
       if (layer.type === "contour" || layer.type === "wind") {
+        const render = layer.render || {};
         await loadWeatherField(map, layer.model, layer.element, targetLevel, curPeriod, {
-          ...layer.render,
+          ...render,
           keepWind: true,
+          colormap: resolveColormap(group, render, targetLevel),
         }, win);
       } else if (layer.type === "station") {
         await loadObservationProduct(map, layer.model, layer.element, targetLevel, "20260827200000.000");
       }
     })
   );
+}
+
+function resolveColormap(group, render, level) {
+  const levelKey = level === null || level === undefined ? null : String(level);
+  return render.colormapByLevel?.[levelKey]
+    || render.colormap
+    || group.colormapByLevel?.[levelKey]
+    || group.levels?.[levelKey]?.colormap
+    || group.colormap
+    || null;
 }
 
 async function changeVerticalLevel(map, direction, explicitLevel = null, win = getActiveWindow()) {

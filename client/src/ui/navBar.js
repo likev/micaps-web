@@ -5,6 +5,7 @@ import { PRESET_GROUPS } from "../config/presets.js";
 
 let onPresetChangeCallback = null;
 let onLevelChangeCallback = null;
+let onConfigReloadCallback = null;
 
 export function initNavBar(containerId = "navbar", callbacks = {}) {
   const container = document.getElementById(containerId);
@@ -12,6 +13,7 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
 
   onPresetChangeCallback = callbacks.onPresetChange;
   onLevelChangeCallback = callbacks.onLevelChange;
+  onConfigReloadCallback = callbacks.onConfigReload;
 
   const currentLevel = appState.get("level") || 500;
   const levels = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
@@ -55,6 +57,9 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
       <button id="btn-toggle-layers" class="btn">
         <span>Layers</span>
       </button>
+      <button id="btn-reload-config" class="btn" title="Reload preset configuration from the server">
+        <span>Reload Config</span>
+      </button>
     </div>
   `;
 
@@ -86,6 +91,21 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
     if (panel) panel.classList.toggle("hidden");
   });
 
+  document.getElementById("btn-reload-config").addEventListener("click", async (e) => {
+    if (!onConfigReloadCallback) return;
+    const button = e.currentTarget;
+    button.disabled = true;
+    button.textContent = "Reloading...";
+    try {
+      await onConfigReloadCallback();
+    } catch (error) {
+      console.error("[Config] Reload failed:", error);
+    } finally {
+      button.disabled = false;
+      button.textContent = "Reload Config";
+    }
+  });
+
   // Poll connection status
   updateStatus();
   setInterval(updateStatus, 15000);
@@ -103,6 +123,18 @@ export function setNavBarPreset(groupId) {
   if (select) {
     select.value = groupId || "";
   }
+}
+
+export function refreshNavBarPresets() {
+  const select = document.getElementById("select-preset");
+  if (!select) return;
+
+  const currentGroupId = select.value || appState.get("activeGroup")?.id || "";
+  select.innerHTML = `
+    <option value="">-- Presets / 组合图 --</option>
+    ${PRESET_GROUPS.map((g) => `<option value="${g.id}">${g.name}</option>`).join("")}
+  `;
+  select.value = PRESET_GROUPS.some((g) => g.id === currentGroupId) ? currentGroupId : "";
 }
 
 async function updateStatus() {

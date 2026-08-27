@@ -3,7 +3,7 @@ import { getColor } from "../utils/colormaps.js";
 
 let rasterCanvas = null;
 
-export function renderBinaryRaster(map, arrayBuffer, element = "TMP") {
+export function renderBinaryRaster(map, arrayBuffer, element = "TMP", colormap = null) {
   if (!map || !arrayBuffer || arrayBuffer.byteLength < 32) return;
 
   const view = new DataView(arrayBuffer);
@@ -38,7 +38,7 @@ export function renderBinaryRaster(map, arrayBuffer, element = "TMP") {
       if (isNaN(val) || val < -9900) {
         data[dstIdx + 3] = 0; // Transparent
       } else {
-        const [r, g, b, a] = getColor(val, element);
+        const [r, g, b, a] = getColor(val, element, colormap);
         data[dstIdx] = r;
         data[dstIdx + 1] = g;
         data[dstIdx + 2] = b;

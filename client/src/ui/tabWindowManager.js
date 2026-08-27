@@ -437,3 +437,38 @@ export function setWindowHeaderLevel(win, level) {
   const el = document.getElementById(win.levelSelectId);
   if (el) el.value = String(level);
 }
+
+export function refreshPresetControls() {
+  tabs.forEach((tab) => {
+    tab.windows.forEach((win) => {
+      const currentGroupId = win.activeGroup?.id;
+      const group = PRESET_GROUPS.find((candidate) => candidate.id === currentGroupId) || null;
+      win.activeGroup = group;
+
+      const select = document.getElementById(win.presetSelectId);
+      if (select) {
+        select.innerHTML = `
+          <option value="">-- Group --</option>
+          ${PRESET_GROUPS.map((g) => `<option value="${g.id}">${g.name}</option>`).join("")}
+        `;
+        select.value = group?.id || "";
+      }
+
+      updateWindowTitle(win, group?.name || `Window ${win.winIdx + 1}`);
+    });
+  });
+
+  const activeWin = getActiveWindow();
+  if (activeWin) {
+    appState.update({
+      activeGroup: activeWin.activeGroup,
+      level: activeWin.level,
+      period: activeWin.period,
+      model: activeWin.model,
+      element: activeWin.element,
+      obsTime: activeWin.obsTime,
+      isObservation: activeWin.isObservation,
+    });
+    callbacks.onWindowFocus?.(activeWin);
+  }
+}
