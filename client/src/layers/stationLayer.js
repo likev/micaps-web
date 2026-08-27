@@ -1,4 +1,4 @@
-// stationLayer.js - WMO & NOAA standard 9-point station weather plot model & LoD decluttering
+// stationLayer.js - WMO & NOAA standard 9-point station weather plot model
 import { getSkyCoverSVG, getWindBarbSVG, getWeatherSymbol, getPressureTendencyGlyph } from "../utils/weatherSymbols.js";
 import maplibregl from "maplibre-gl";
 
@@ -14,148 +14,95 @@ export function renderStationWeatherPlots(map, geojson, visible = true) {
   currentMap = map;
   if (visible !== undefined) stationsVisible = Boolean(visible);
 
-  clearStationMarkers();
-
-  // Create lightweight GeoJSON circle layer for low zooms
-  if (map.getSource("station-dot-source")) {
-    map.getSource("station-dot-source").setData(geojson);
-    if (map.getLayer("station-dots")) {
-      map.setLayoutProperty("station-dots", "visibility", stationsVisible && map.getZoom() < 5.5 ? "visible" : "none");
-    }
-  } else {
-    map.addSource("station-dot-source", {
-      type: "geojson",
-      data: geojson,
-    });
-
-    map.addLayer({
-      id: "station-dots",
-      type: "circle",
-      source: "station-dot-source",
-      maxzoom: 5.5,
-      layout: {
-        visibility: stationsVisible && map.getZoom() < 5.5 ? "visible" : "none",
-      },
-      paint: {
-        "circle-radius": 3.5,
-        "circle-color": "#388bfd",
-        "circle-stroke-width": 1,
-        "circle-stroke-color": "#ffffff",
-      },
-    });
-  }
-
-  function updateVisibleMarkers() {
-    clearStationMarkers();
-    if (!stationsVisible) {
-      if (map.getLayer("station-dots")) map.setLayoutProperty("station-dots", "visibility", "none");
-      return;
-    }
-
-    const zoom = map.getZoom();
-
-    // Only render full 9-position station models at zoom >= 5.5
-    if (zoom < 5.5) {
-      if (map.getLayer("station-dots")) map.setLayoutProperty("station-dots", "visibility", "visible");
-      return;
-    }
-
-    if (map.getLayer("station-dots")) map.setLayoutProperty("station-dots", "visibility", "none");
-
-
-    const bounds = map.getBounds();
-    const maxVisible = 120; // Viewport collision decluttering threshold
-    let renderedCount = 0;
-
-    for (const f of geojson.features) {
-      const [lon, lat] = f.geometry.coordinates;
-      if (!bounds.contains([lon, lat])) continue;
-
-      const p = f.properties;
-      const el = document.createElement("div");
-      el.className = "station-plot-marker";
-      el.style.position = "absolute";
-      el.style.transform = "translate(-50%, -50%)";
-      el.style.fontFamily = "'SF Mono', monospace";
-      el.style.fontSize = "10px";
-      el.style.color = "#ffffff";
-      el.style.pointerEvents = "auto";
-      el.style.cursor = "pointer";
-
-      // 9-Position Synoptic Station Model Layout
-      const tt = p.temperature > -90 ? Math.round(p.temperature) : "";
-      const td = p.dewpoint > -90 ? Math.round(p.dewpoint) : "";
-      const ppp = p.slp_encoded || "";
-      const pDiff = p.press_diff_3h > 0 ? `+${(p.press_diff_3h * 10).toFixed(0)}` : "";
-      const pTend = getPressureTendencyGlyph(p.press_tend);
-      const ww = getWeatherSymbol(p.weather_code);
-      const skySVG = getSkyCoverSVG(p.cloud_cover, 16);
-      const barbSVG = getWindBarbSVG(p.wind_speed, p.wind_dir, 32);
-
-      el.innerHTML = `
-        <div style="position: relative; width: 44px; height: 44px;">
-          <!-- Wind Barb -->
-          <div style="position: absolute; top: -14px; left: 6px; pointer-events: none;">
-            ${barbSVG}
-          </div>
-          <!-- Sky Cover Center Circle -->
-          <div style="position: absolute; top: 14px; left: 14px;">
-            ${skySVG}
-          </div>
-          <!-- TT: Temperature (Top Left) -->
-          <div style="position: absolute; top: 0px; left: -14px; color: #f85149; font-weight: bold;">
-            ${tt}
-          </div>
-          <!-- TdTd: Dewpoint (Bottom Left) -->
-          <div style="position: absolute; bottom: 0px; left: -14px; color: #56d364;">
-            ${td}
-          </div>
-          <!-- ww: Present Weather (Middle Left) -->
-          <div style="position: absolute; top: 14px; left: -6px; color: #e3b341; font-size: 13px;">
-            ${ww}
-          </div>
-          <!-- PPP: Sea-Level Pressure (Top Right) -->
-          <div style="position: absolute; top: 0px; right: -12px; color: #79c0ff; font-weight: bold;">
-            ${ppp}
-          </div>
-          <!-- ppa: 3h Pressure Tendency (Middle Right) -->
-          <div style="position: absolute; top: 14px; right: -16px; font-size: 9px; color: #a5d6ff;">
-            ${pDiff}${pTend}
-          </div>
-        </div>
-      `;
-
-      el.addEventListener("click", () => {
-        window.__SHOW_TOOLTIP__ && window.__SHOW_TOOLTIP__([lon, lat], p);
-      });
-
-      const marker = new maplibregl.Marker({ element: el })
-        .setLngLat([lon, lat])
-        .addTo(map);
-
-      markers.push(marker);
-      renderedCount++;
-      if (renderedCount >= maxVisible) break;
-    }
-  }
-
-  updateVisibleMarkers();
   if (currentMoveListener) {
-    map.off("moveend", currentMoveListener);
+    currentMap.off("moveend", currentMoveListener);
   }
   currentMoveListener = updateVisibleMarkers;
-  map.on("moveend", currentMoveListener);
+  currentMap.on("moveend", currentMoveListener);
+
+  updateVisibleMarkers();
+}
+
+export function updateVisibleMarkers() {
+  clearStationMarkers();
+  if (!stationsVisible || !currentMap || !stationGeoJSON || !stationGeoJSON.features) {
+    return;
+  }
+
+  const bounds = currentMap.getBounds();
+  const maxVisible = 3500; // Plot all stations in the active viewport
+  let renderedCount = 0;
+
+  for (const f of stationGeoJSON.features) {
+    const [lon, lat] = f.geometry.coordinates;
+    if (!bounds.contains([lon, lat])) continue;
+
+    const p = f.properties || {};
+    const el = document.createElement("div");
+    el.className = "station-plot-marker";
+    el.style.position = "absolute";
+    el.style.transform = "translate(-50%, -50%)";
+    el.style.fontFamily = "'SF Mono', -apple-system, monospace";
+    el.style.fontSize = "10px";
+    el.style.color = "#ffffff";
+    el.style.pointerEvents = "none"; // Don't create info-window or block mouse interactions
+
+    // 9-Position Synoptic Station Model Elements
+    const tt = p.temperature !== undefined && p.temperature > -90 ? Math.round(p.temperature) : "";
+    const td = p.dewpoint !== undefined && p.dewpoint > -90 ? Math.round(p.dewpoint) : "";
+    const ppp = p.slp_encoded || "";
+    const pDiff = p.press_diff_3h > 0 ? `+${(p.press_diff_3h * 10).toFixed(0)}` : "";
+    const pTend = getPressureTendencyGlyph(p.press_tend);
+    const ww = getWeatherSymbol(p.weather_code);
+    const skySVG = getSkyCoverSVG(p.cloud_cover !== undefined ? p.cloud_cover : 0, 16);
+    const barbSVG = getWindBarbSVG(p.wind_speed || 0, p.wind_dir || 0, 32);
+
+    el.innerHTML = `
+      <div style="position: relative; width: 44px; height: 44px; pointer-events: none;">
+        <!-- Wind Barb / Direction & Speed Symbol -->
+        <div style="position: absolute; top: -14px; left: 6px; pointer-events: none;">
+          ${barbSVG}
+        </div>
+        <!-- Center Sky Cover Circle -->
+        <div style="position: absolute; top: 14px; left: 14px; pointer-events: none;">
+          ${skySVG}
+        </div>
+        <!-- TT: Temperature (°C) Top-Left in Bold Red -->
+        <div style="position: absolute; top: 0px; left: -14px; color: #f85149; font-weight: bold; font-size: 10px; pointer-events: none;">
+          ${tt}
+        </div>
+        <!-- TdTd: Dew Point (°C) Bottom-Left in Green -->
+        <div style="position: absolute; bottom: 0px; left: -14px; color: #56d364; font-weight: 500; font-size: 10px; pointer-events: none;">
+          ${td}
+        </div>
+        <!-- ww: Present Weather Symbol (Middle Left) -->
+        <div style="position: absolute; top: 14px; left: -6px; color: #e3b341; font-size: 13px; pointer-events: none;">
+          ${ww}
+        </div>
+        <!-- PPP: Sea-Level Pressure (Top Right) -->
+        <div style="position: absolute; top: 0px; right: -12px; color: #79c0ff; font-weight: bold; font-size: 10px; pointer-events: none;">
+          ${ppp}
+        </div>
+        <!-- ppa: 3h Pressure Tendency (Middle Right) -->
+        <div style="position: absolute; top: 14px; right: -16px; font-size: 9px; color: #a5d6ff; pointer-events: none;">
+          ${pDiff}${pTend}
+        </div>
+      </div>
+    `;
+
+    const marker = new maplibregl.Marker({ element: el })
+      .setLngLat([lon, lat])
+      .addTo(currentMap);
+
+    markers.push(marker);
+    renderedCount++;
+    if (renderedCount >= maxVisible) break;
+  }
 }
 
 export function setStationVisibility(map, visible) {
   stationsVisible = Boolean(visible);
-  const targetMap = map || currentMap;
-  if (!targetMap) return;
-
-  if (targetMap.getLayer("station-dots")) {
-    const shouldShowDots = stationsVisible && targetMap.getZoom() < 5.5;
-    targetMap.setLayoutProperty("station-dots", "visibility", shouldShowDots ? "visible" : "none");
-  }
+  if (map) currentMap = map;
 
   if (!stationsVisible) {
     clearStationMarkers();
@@ -165,8 +112,8 @@ export function setStationVisibility(map, visible) {
 }
 
 export function clearStationMarkers() {
-  for (const m of markers) {
-    m.remove();
+  for (let i = 0; i < markers.length; i++) {
+    markers[i].remove();
   }
   markers = [];
 }
@@ -177,4 +124,5 @@ window.__STATION_LAYER__ = {
   getTotalCount: () => (stationGeoJSON && stationGeoJSON.features ? stationGeoJSON.features.length : 0),
   setVisible: (map, visible) => setStationVisibility(map, visible),
 };
+
 
