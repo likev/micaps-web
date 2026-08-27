@@ -74,12 +74,16 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
 
 function updateMapLibreContour(map, isobands, isolines, options = {}) {
   const opacity = options.opacity !== undefined ? options.opacity : 0.75;
-  const visible = options.visible !== false;
+  const visibleIsoband = options.visibleIsoband !== undefined ? options.visibleIsoband : (options.visible !== false);
+  const visibleIsoline = options.visibleIsoline !== undefined ? options.visibleIsoline : (options.visible !== false);
 
-  // --- ISOBANDS (Fills) ---
+  // --- ISOBANDS (Contour Fills) ---
   if (isobands) {
     if (map.getSource("isoband-source")) {
       map.getSource("isoband-source").setData(isobands);
+      if (map.getLayer("isoband-layer")) {
+        map.setLayoutProperty("isoband-layer", "visibility", visibleIsoband ? "visible" : "none");
+      }
     } else {
       map.addSource("isoband-source", {
         type: "geojson",
@@ -92,7 +96,7 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
           type: "fill",
           source: "isoband-source",
           layout: {
-            visibility: visible ? "visible" : "none",
+            visibility: visibleIsoband ? "visible" : "none",
           },
           paint: {
             "fill-color": ["coalesce", ["get", "fillColor"], "#388bfd"],
@@ -104,10 +108,13 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
     }
   }
 
-  // --- ISOLINES (Lines) ---
+  // --- ISOLINES (Contour Lines) ---
   if (isolines) {
     if (map.getSource("isoline-source")) {
       map.getSource("isoline-source").setData(isolines);
+      if (map.getLayer("isoline-layer")) {
+        map.setLayoutProperty("isoline-layer", "visibility", visibleIsoline ? "visible" : "none");
+      }
     } else {
       map.addSource("isoline-source", {
         type: "geojson",
@@ -119,23 +126,34 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
         type: "line",
         source: "isoline-source",
         layout: {
-          visibility: visible ? "visible" : "none",
+          visibility: visibleIsoline ? "visible" : "none",
         },
         paint: {
-          "line-color": "rgba(255, 255, 255, 0.5)",
+          "line-color": "#ffffff",
           "line-width": 1.2,
+          "line-opacity": 0.85,
         },
       });
     }
   }
 }
 
-export function setContourVisibility(map, visible) {
+export function setIsobandVisibility(map, visible) {
   const vis = visible ? "visible" : "none";
   if (map.getLayer("isoband-layer")) map.setLayoutProperty("isoband-layer", "visibility", vis);
+}
+
+export function setIsolineVisibility(map, visible) {
+  const vis = visible ? "visible" : "none";
   if (map.getLayer("isoline-layer")) map.setLayoutProperty("isoline-layer", "visibility", vis);
+}
+
+export function setContourVisibility(map, visible) {
+  setIsobandVisibility(map, visible);
+  setIsolineVisibility(map, visible);
 }
 
 export function setContourOpacity(map, opacity) {
   if (map.getLayer("isoband-layer")) map.setPaintProperty("isoband-layer", "fill-opacity", opacity);
 }
+

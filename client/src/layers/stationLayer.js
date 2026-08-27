@@ -4,16 +4,24 @@ import maplibregl from "maplibre-gl";
 
 let markers = [];
 let stationGeoJSON = null;
+let stationsVisible = true;
+let currentMap = null;
+let currentMoveListener = null;
 
-export function renderStationWeatherPlots(map, geojson) {
+export function renderStationWeatherPlots(map, geojson, visible = true) {
   if (!map || !geojson || !geojson.features) return;
   stationGeoJSON = geojson;
+  currentMap = map;
+  if (visible !== undefined) stationsVisible = Boolean(visible);
 
   clearStationMarkers();
 
   // Create lightweight GeoJSON circle layer for low zooms
   if (map.getSource("station-dot-source")) {
     map.getSource("station-dot-source").setData(geojson);
+    if (map.getLayer("station-dots")) {
+      map.setLayoutProperty("station-dots", "visibility", stationsVisible && map.getZoom() < 5.5 ? "visible" : "none");
+    }
   } else {
     map.addSource("station-dot-source", {
       type: "geojson",
@@ -25,6 +33,9 @@ export function renderStationWeatherPlots(map, geojson) {
       type: "circle",
       source: "station-dot-source",
       maxzoom: 5.5,
+      layout: {
+        visibility: stationsVisible && map.getZoom() < 5.5 ? "visible" : "none",
+      },
       paint: {
         "circle-radius": 3.5,
         "circle-color": "#388bfd",
@@ -36,6 +47,11 @@ export function renderStationWeatherPlots(map, geojson) {
 
   function updateVisibleMarkers() {
     clearStationMarkers();
+    if (!stationsVisible) {
+      if (map.getLayer("station-dots")) map.setLayoutProperty("station-dots", "visibility", "none");
+      return;
+    }
+
     const zoom = map.getZoom();
 
     // Only render full 9-position station models at zoom >= 5.5
@@ -45,6 +61,7 @@ export function renderStationWeatherPlots(map, geojson) {
     }
 
     if (map.getLayer("station-dots")) map.setLayoutProperty("station-dots", "visibility", "none");
+
 
     const bounds = map.getBounds();
     const maxVisible = 120; // Viewport collision decluttering threshold
@@ -123,7 +140,28 @@ export function renderStationWeatherPlots(map, geojson) {
   }
 
   updateVisibleMarkers();
-  map.on("moveend", updateVisibleMarkers);
+  if (currentMoveListener) {
+    map.off("moveend", currentMoveListener);
+  }
+  currentMoveListener = updateVisibleMarkers;
+  map.on("moveend", currentMoveListener);
+}
+
+export function setStationVisibility(map, visible) {
+  stationsVisible = Boolean(visible);
+  const targetMap = map || currentMap;
+  if (!targetMap) return;
+
+  if (targetMap.getLayer("station-dots")) {
+    const shouldShowDots = stationsVisible && targetMap.getZoom() < 5.5;
+    targetMap.setLayoutProperty("station-dots", "visibility", shouldShowDots ? "visible" : "none");
+  }
+
+  if (!stationsVisible) {
+    clearStationMarkers();
+  } else {
+    updateVisibleMarkers();
+  }
 }
 
 export function clearStationMarkers() {
@@ -137,4 +175,6 @@ export function clearStationMarkers() {
 window.__STATION_LAYER__ = {
   getVisibleCount: () => markers.length,
   getTotalCount: () => (stationGeoJSON && stationGeoJSON.features ? stationGeoJSON.features.length : 0),
+  setVisible: (map, visible) => setStationVisibility(map, visible),
 };
+

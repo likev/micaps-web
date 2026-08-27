@@ -3,11 +3,11 @@ import { initMap } from "./map/mapInstance.js";
 import { initNavBar } from "./ui/navBar.js";
 import { initCatalogDrawer } from "./ui/catalogDrawer.js";
 import { initLayerControl } from "./ui/layerControl.js";
-import { initTimeSlider } from "./ui/timeSlider.js";
+import { initTimeSlider, setTimelineMode } from "./ui/timeSlider.js";
 import { initTooltip } from "./ui/tooltip.js";
-import { renderContourLayers, setContourVisibility, setContourOpacity } from "./layers/contourLayer.js";
+import { renderContourLayers, setIsobandVisibility, setIsolineVisibility, setContourOpacity } from "./layers/contourLayer.js";
 import { renderBinaryRaster, setRasterVisibility } from "./layers/rasterLayer.js";
-import { renderStationWeatherPlots } from "./layers/stationLayer.js";
+import { renderStationWeatherPlots, setStationVisibility } from "./layers/stationLayer.js";
 import { renderWindStreamlines, stopWindAnimation } from "./layers/windLayer.js";
 import { fetchGridData, fetchGridBinaryStream, fetchStationObservations } from "./api/catalogApi.js";
 import { getCSSGradient } from "./utils/colormaps.js";
@@ -20,19 +20,33 @@ async function bootstrap() {
   initNavBar("navbar");
   initTooltip("tooltip");
 
-  initCatalogDrawer("catalog-drawer", async ({ model, element, level, period }) => {
-    await loadWeatherField(map, model, element, level, period);
+  initCatalogDrawer("catalog-drawer", async ({ model, element, level, period, obsTime, isObservation }) => {
+    if (isObservation) {
+      setTimelineMode("obs", { file: obsTime });
+      await loadObservationProduct(map, model, element, level, obsTime);
+    } else {
+      setTimelineMode("nwp", { period });
+      await loadWeatherField(map, model, element, level, period);
+    }
   });
 
   initLayerControl("layer-control", (layerKey, value) => {
     handleLayerToggle(map, layerKey, value);
   });
 
-  initTimeSlider("timeslider-container", async (period) => {
-    const model = appState.get("model");
-    const element = appState.get("element");
-    const level = appState.get("level");
-    await loadWeatherField(map, model, element, level, period);
+  initTimeSlider("timeslider-container", async (data) => {
+    if (typeof data === "object" && data.isObs) {
+      const model = appState.get("model") || "SURFACE";
+      const element = appState.get("element") || "PLOT_GLOBAL_3H";
+      const level = appState.get("level");
+      await loadObservationProduct(map, model, element, level, data.file);
+    } else {
+      const period = typeof data === "number" ? data : appState.get("period");
+      const model = appState.get("model");
+      const element = appState.get("element");
+      const level = appState.get("level");
+      await loadWeatherField(map, model, element, level, period);
+    }
   });
 
   const onReady = async () => {
@@ -60,7 +74,8 @@ async function loadWeatherField(map, model, element, level, period) {
     const gridData = await fetchGridData(path, file);
     appState.set("gridData", gridData);
     renderContourLayers(map, gridData, element, {
-      visible: appState.state.layers.contourf,
+      visibleIsoband: appState.state.layers.contourf,
+      visibleIsoline: appState.state.layers.contour,
       opacity: appState.state.opacity.contourf,
     });
 
@@ -81,13 +96,34 @@ async function loadWeatherField(map, model, element, level, period) {
   }
 }
 
+async function loadObservationProduct(map, model, element, level, file) {
+  let path = "";
+  if (model === "SURFACE") {
+    path = `SURFACE/${element}`;
+  } else if (model === "UPPER_AIR") {
+    path = `UPPER_AIR/${element}/${level || 500}`;
+  } else {
+    path = `${model}/${element}`;
+  }
+
+  try {
+    console.log(`[Main] Fetching observation data: path=${path}, file=${file}...`);
+    const stations = await fetchStationObservations(path, file);
+    appState.set("stationData", stations);
+    renderStationWeatherPlots(map, stations, appState.state.layers.station);
+    console.log(`[Main] Observation stations rendered (${stations && stations.features ? stations.features.length : 0} stations)`);
+  } catch (err) {
+    console.error("[Main] Observation load error:", err);
+  }
+}
+
 async function loadSurfaceStations(map) {
   try {
     console.log("[Main] Starting surface stations fetch...");
-    const stations = await fetchStationObservations("SURFACE/PLOT_10MIN", "20260827174000.000");
+    const stations = await fetchStationObservations("SURFACE/PLOT_GLOBAL_3H", "20260827200000.000");
     console.log("[Main] Received stations: " + (stations && stations.features ? stations.features.length : 0));
     appState.set("stationData", stations);
-    renderStationWeatherPlots(map, stations);
+    renderStationWeatherPlots(map, stations, appState.state.layers.station);
     console.log("[Main] Finished rendering station plots");
   } catch (err) {
     console.error("[Bootstrap] Stations load failed:", err);
@@ -97,8 +133,14 @@ async function loadSurfaceStations(map) {
 function handleLayerToggle(map, key, value) {
   switch (key) {
     case "contourf":
+      setIsobandVisibility(map, value);
+      break;
     case "contour":
-      setContourVisibility(map, value);
+      setIsolineVisibility(map, value);
+      break;
+    case "station":
+    case "stations":
+      setStationVisibility(map, value);
       break;
     case "raster":
       if (value && !map.getLayer("raster-layer")) {
@@ -135,6 +177,7 @@ function handleLayerToggle(map, key, value) {
       break;
   }
 }
+
 
 function updateLegend(element = "TMP") {
   const panel = document.getElementById("legend-panel");

@@ -34,3 +34,14 @@ export function formatElementUnit(element = "TMP") {
       return "";
   }
 }
+
+export function formatObsTimestamp(fileStr = "") {
+  if (!fileStr || fileStr.length < 10) return fileStr || "--";
+  const y = fileStr.slice(0, 4);
+  const m = fileStr.slice(4, 6);
+  const d = fileStr.slice(6, 8);
+  const h = fileStr.slice(8, 10);
+  const min = fileStr.length >= 12 ? fileStr.slice(10, 12) : "00";
+  return `${y}-${m}-${d} ${h}:${min} UTC`;
+}
+

@@ -271,8 +271,8 @@ body, html {
 }
 
 .play-btn {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   background: var(--accent-blue);
   color: white;
@@ -281,28 +281,113 @@ body, html {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
 }
 
-.timeline {
+.play-btn:hover {
+  background: #58a6ff;
+}
+
+.timeline-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.step-nav-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  background: #21262d;
+  color: #c9d1d9;
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.step-nav-btn:hover {
+  background: #30363d;
+  color: #ffffff;
+}
+
+.timeline-body {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .timeline-info {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
   font-size: 12px;
   font-family: var(--font-mono);
 }
 
-.slider {
-  width: 100%;
-  accent-color: var(--accent-blue);
-  cursor: pointer;
+.mode-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(56, 139, 253, 0.2);
+  border: 1px solid var(--accent-blue);
+  color: #79c0ff;
+  font-size: 10px;
+  font-weight: bold;
 }
+
+.mode-badge.obs-badge {
+  background: rgba(46, 160, 67, 0.2);
+  border-color: #2ea043;
+  color: #56d364;
+}
+
+.valid-label {
+  margin-left: auto;
+  color: #8b949e;
+  font-size: 11px;
+}
+
+.timeline-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.chip-btn {
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: #21262d;
+  border: 1px solid var(--border-color);
+  color: #8b949e;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.chip-btn:hover {
+  background: #30363d;
+  color: #c9d1d9;
+}
+
+.chip-btn.active {
+  background: var(--accent-blue);
+  border-color: #58a6ff;
+  color: #ffffff;
+  font-weight: bold;
+  box-shadow: 0 0 8px rgba(56, 139, 253, 0.4);
+}
+
 
 .tooltip {
   position: absolute;
