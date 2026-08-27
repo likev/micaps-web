@@ -173,7 +173,7 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o micaps-server.exe ./cmd/main
 
 ### 2. Frontend Build & Development
 
-The frontend is built using Vite and bundled into `client/dist`, which is directly embedded and served by the Go backend.
+The frontend is built using Vite and bundled into `client/dist`. The Go backend serves these compiled static assets directly from the filesystem (configurable via the `-static` flag or `STATIC_DIR` environment variable, defaulting to `../client/dist`).
 
 ```bash
 cd client
