@@ -83,7 +83,7 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 			ind += 10
 		}
 
-		var temp, dewPoint, slp, height, pDiff3h, windSpeed, windDir, vis, rain1h, rain6h, rain24h float32 = -9999, -9999, -9999, -9999, 0, 0, 0, 10, 0, 0, 0
+		var temp, dewPoint, slp, stnPress, height, pDiff3h, windSpeed, windDir, vis, rain1h, rain6h, rain24h float32 = -9999, -9999, -9999, -9999, -9999, 0, 0, 0, 10, 0, 0, 0
 		var cloudCover, weatherCode, pTendency int16 = 0, 0, 0
 
 		for e := 0; e < int(numb) && ind+2 <= len(decompressed); e++ {
@@ -133,26 +133,32 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 			ind += bLen
 
 			switch elemID {
-			case 2001:
+			case 2001, 601: // Temperature TT
 				temp = valFloat
-			case 2005:
+			case 2005, 801: // Dew point Td
 				dewPoint = valFloat
-			case 1001, 1003:
+			case 1003, 401: // Sea Level Pressure (SLP)
 				slp = valFloat
-			case 1002, 1004:
+			case 1001: // Station Pressure
+				stnPress = valFloat
+				if slp <= -9000 {
+					slp = valFloat
+				}
+			case 1002, 1004: // Geopotential Height (Upper-Air)
 				height = valFloat
-			case 1005:
+			case 1005, 403: // 3-hour pressure change
 				pDiff3h = valFloat
+			case 1007: // Pressure tendency
 				pTendency = int16(valInt)
-			case 1401:
+			case 1401: // Cloud cover
 				cloudCover = int16(valInt)
-			case 1601:
+			case 1601: // Present weather code
 				weatherCode = int16(valInt)
-			case 1101:
+			case 1101, 209: // Wind direction DD
 				windDir = valFloat
-			case 1102:
+			case 1102, 211: // Wind speed FF
 				windSpeed = valFloat
-			case 1201, 1203:
+			case 1201, 1203, 1207: // Visibility
 				vis = valFloat
 			case 1301:
 				rain1h = valFloat
@@ -173,6 +179,7 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 			"dewpoint":      round1(dewPoint),
 			"height":        round1(height),
 			"slp":           round1(slp),
+			"press_stn":     round1(stnPress),
 			"slp_encoded":   encodeSLP(slp),
 			"press_diff_3h": round1(pDiff3h),
 			"press_tend":    pTendency,
