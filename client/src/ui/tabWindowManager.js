@@ -61,8 +61,10 @@ function renderTabsBar() {
     const tab = getActiveTab();
     if (!tab) return;
     tab.syncMap = !tab.syncMap;
-    const btn = document.getElementById("btn-sync-toggle");
-    if (btn) btn.classList.toggle("active", tab.syncMap);
+    updateLayoutButtons(tab.layout);
+    if (tab.syncMap) {
+      syncTabCameras(tab);
+    }
   });
 }
 
@@ -285,6 +287,11 @@ export function setTabLayout(tabId, layout = "1x1") {
         }
       }
     }
+    if (tab.syncMap) {
+      setTimeout(() => {
+        syncTabCameras(tab);
+      }, 100);
+    }
   }
 
   setTimeout(() => {
@@ -297,8 +304,39 @@ export function setTabLayout(tabId, layout = "1x1") {
 function updateLayoutButtons(layout) {
   const btn1 = document.getElementById("btn-layout-1");
   const btn4 = document.getElementById("btn-layout-4");
+  const syncBtn = document.getElementById("btn-sync-toggle");
+  const tab = getActiveTab();
+
   if (btn1) btn1.classList.toggle("active", layout === "1x1");
   if (btn4) btn4.classList.toggle("active", layout === "2x2");
+  if (syncBtn && tab) {
+    const isSync = tab.syncMap !== false;
+    syncBtn.classList.toggle("active", isSync);
+    syncBtn.textContent = isSync ? "Sync 🔗" : "Sync ✕";
+    syncBtn.title = isSync
+      ? "Camera sync enabled across windows (Click to toggle off)"
+      : "Camera sync disabled (Click to toggle on)";
+  }
+}
+
+export function syncTabCameras(tab) {
+  if (!tab || !tab.syncMap || isSyncingCamera) return;
+  const activeWin = tab.windows[tab.activeWinIdx] || tab.windows[0];
+  if (!activeWin || !activeWin.map) return;
+
+  const map = activeWin.map;
+  isSyncingCamera = true;
+  const center = map.getCenter();
+  const zoom = map.getZoom();
+  const pitch = map.getPitch();
+  const bearing = map.getBearing();
+
+  tab.windows.forEach((otherWin) => {
+    if (otherWin !== activeWin && otherWin.map && (otherWin.map.isStyleLoaded() || otherWin.map.loaded())) {
+      otherWin.map.jumpTo({ center, zoom, pitch, bearing });
+    }
+  });
+  isSyncingCamera = false;
 }
 
 export function focusWindow(tabId, winIdx) {
@@ -353,6 +391,21 @@ function initWindowMap(win) {
     });
   }
 
+  map.on("load", () => {
+    const tab = tabs.find((t) => t.id === win.tabId);
+    if (tab && tab.syncMap) {
+      const activeWin = tab.windows[tab.activeWinIdx] || tab.windows[0];
+      if (activeWin && activeWin !== win && activeWin.map) {
+        map.jumpTo({
+          center: activeWin.map.getCenter(),
+          zoom: activeWin.map.getZoom(),
+          pitch: activeWin.map.getPitch(),
+          bearing: activeWin.map.getBearing(),
+        });
+      }
+    }
+  });
+
   // Camera synchronization across windows in the same tab
   map.on("move", () => {
     const tab = tabs.find((t) => t.id === win.tabId);
@@ -365,7 +418,7 @@ function initWindowMap(win) {
     const bearing = map.getBearing();
 
     tab.windows.forEach((otherWin) => {
-      if (otherWin !== win && otherWin.map && otherWin.map.loaded()) {
+      if (otherWin !== win && otherWin.map && (otherWin.map.isStyleLoaded() || otherWin.map.loaded())) {
         otherWin.map.jumpTo({ center, zoom, pitch, bearing });
       }
     });
