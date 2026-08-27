@@ -32,8 +32,8 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
       </div>
 
       <div class="nav-control-group">
-        <label for="select-level">Level:</label>
-        <select id="select-level" class="nav-select">
+        <label for="select-nav-level">Level:</label>
+        <select id="select-nav-level" class="nav-select">
           ${levels.map((l) => `<option value="${l}" ${l === currentLevel ? "selected" : ""}>${l} hPa</option>`).join("")}
         </select>
       </div>
@@ -66,7 +66,7 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
     }
   });
 
-  document.getElementById("select-level").addEventListener("change", (e) => {
+  document.getElementById("select-nav-level").addEventListener("change", (e) => {
     const lvl = parseInt(e.target.value, 10);
     if (!isNaN(lvl)) {
       appState.set("level", lvl);
@@ -92,7 +92,7 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
 }
 
 export function setNavBarLevel(level) {
-  const select = document.getElementById("select-level");
+  const select = document.getElementById("select-nav-level");
   if (select && select.value !== String(level)) {
     select.value = String(level);
   }

@@ -16,6 +16,8 @@ export function renderWindStreamlines(map, gridData) {
   const slat = gridData.header.start_lat;
   const dlat = gridData.header.d_lat;
 
+  const container = map.getContainer();
+  let streamCanvas = container.querySelector(".streamline-canvas");
   if (!streamCanvas) {
     streamCanvas = document.createElement("canvas");
     streamCanvas.className = "streamline-canvas";
@@ -24,11 +26,11 @@ export function renderWindStreamlines(map, gridData) {
     streamCanvas.style.left = "0";
     streamCanvas.style.pointerEvents = "none";
     streamCanvas.style.zIndex = "400";
-    map.getContainer().appendChild(streamCanvas);
+    container.appendChild(streamCanvas);
   }
 
   function resize() {
-    const rect = map.getContainer().getBoundingClientRect();
+    const rect = container.getBoundingClientRect();
     streamCanvas.width = rect.width;
     streamCanvas.height = rect.height;
   }
@@ -36,7 +38,7 @@ export function renderWindStreamlines(map, gridData) {
 
   const ctx = streamCanvas.getContext("2d");
   const numParticles = 800;
-  particles = [];
+  const particles = [];
 
   for (let i = 0; i < numParticles; i++) {
     particles.push({
@@ -56,7 +58,7 @@ export function renderWindStreamlines(map, gridData) {
     return [u[idx] || 0, v[idx] || 0];
   }
 
-  if (animId) cancelAnimationFrame(animId);
+  if (map._windAnimId) cancelAnimationFrame(map._windAnimId);
 
   function animate() {
     ctx.fillStyle = "rgba(10, 13, 20, 0.08)";
@@ -85,7 +87,7 @@ export function renderWindStreamlines(map, gridData) {
     }
     ctx.stroke();
 
-    animId = requestAnimationFrame(animate);
+    map._windAnimId = requestAnimationFrame(animate);
   }
 
   animate();
@@ -93,12 +95,19 @@ export function renderWindStreamlines(map, gridData) {
   map.on("move", resize);
 }
 
-export function stopWindAnimation() {
-  if (animId) {
-    cancelAnimationFrame(animId);
-    animId = null;
-  }
-  if (streamCanvas && streamCanvas.getContext) {
-    streamCanvas.getContext("2d").clearRect(0, 0, streamCanvas.width, streamCanvas.height);
+export function stopWindAnimation(map = null) {
+  if (map) {
+    if (map._windAnimId) {
+      cancelAnimationFrame(map._windAnimId);
+      map._windAnimId = null;
+    }
+    const canvas = map.getContainer()?.querySelector(".streamline-canvas");
+    if (canvas && canvas.getContext) {
+      canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+    }
+  } else {
+    document.querySelectorAll(".streamline-canvas").forEach((canvas) => {
+      canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+    });
   }
 }

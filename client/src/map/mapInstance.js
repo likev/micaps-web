@@ -4,40 +4,62 @@ import * as pmtiles from "pmtiles";
 import { getPMTilesStyle } from "./pmtilesLayers.js";
 import { addGraticuleLayers } from "./graticule.js";
 
-let map = null;
+let protocolRegistered = false;
+let activeMap = null;
 
-export function initMap(containerId = "map-container") {
-  // Register pmtiles:// custom protocol
-  const protocol = new pmtiles.Protocol();
-  maplibregl.addProtocol("pmtiles", protocol.tile);
+export function ensurePMTilesProtocol() {
+  if (!protocolRegistered) {
+    const protocol = new pmtiles.Protocol();
+    maplibregl.addProtocol("pmtiles", protocol.tile);
+    protocolRegistered = true;
+  }
+}
+
+export function createMapInstance(containerIdOrEl, options = {}) {
+  ensurePMTilesProtocol();
 
   const pmtilesUrl = `${window.location.origin}/map-china.pmtiles`;
 
-  map = new maplibregl.Map({
-    container: containerId,
+  const mapInstance = new maplibregl.Map({
+    container: containerIdOrEl,
     style: getPMTilesStyle(pmtilesUrl),
-    center: [108.0, 34.0],
-    zoom: 4.2,
+    center: options.center || [108.0, 34.0],
+    zoom: options.zoom || 4.2,
     minZoom: 2,
     maxZoom: 14,
     attributionControl: false,
   });
 
-  map.addControl(
+  mapInstance.addControl(
     new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }),
     "top-right"
   );
 
-  map.on("load", () => {
-    console.log("[Map] MapLibre style loaded with PMTiles base map");
-    addGraticuleLayers(map);
-    window.__MAP_LOADED__ = true;
+  mapInstance.on("load", () => {
+    addGraticuleLayers(mapInstance);
   });
 
+  return mapInstance;
+}
+
+export function setActiveMap(map) {
+  activeMap = map;
   window.__MAP__ = map;
+}
+
+export function getActiveMap() {
+  return activeMap || window.__MAP__;
+}
+
+export function initMap(containerId = "map-container") {
+  const map = createMapInstance(containerId);
+  setActiveMap(map);
+  map.on("load", () => {
+    window.__MAP_LOADED__ = true;
+  });
   return map;
 }
 
 export function getMap() {
-  return map;
+  return getActiveMap();
 }

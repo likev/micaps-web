@@ -1,5 +1,5 @@
 // main.js - Application bootstrap and orchestrator
-import { initMap } from "./map/mapInstance.js";
+import { getActiveMap } from "./map/mapInstance.js";
 import { initNavBar } from "./ui/navBar.js";
 import { initCatalogDrawer } from "./ui/catalogDrawer.js";
 import { initLayerControl, addOrUpdateLayer, removeLayer } from "./ui/layerControl.js";
@@ -27,84 +27,178 @@ import { appState } from "./store/appState.js";
 import { PRESET_GROUPS } from "./config/presets.js";
 import { setNavBarLevel, setNavBarPreset } from "./ui/navBar.js";
 import { step as timeSliderStep } from "./ui/timeSlider.js";
+import {
+  initTabWindowManager,
+  getActiveWindow,
+} from "./ui/tabWindowManager.js";
+
+function getMap() {
+  const win = getActiveWindow();
+  return (win && win.map) || getActiveMap();
+}
 
 async function bootstrap() {
   console.log("[MICAPS-Web] Initializing meteorological workstation...");
 
-  const map = initMap("map-container");
-  initNavBar("navbar", {
-    onPresetChange: (group) => {
-      loadPresetGroup(map, group);
+  // ── Tab / Window Manager ─────────────────────────────────────────────────
+  const firstTab = initTabWindowManager({
+    onWindowFocus: (win) => {
+      setNavBarPreset(win.activeGroup?.id || "");
+      if (win.level)       setNavBarLevel(win.level);
+      if (win.isObservation) {
+        setTimelineMode("obs", { file: win.obsTime });
+      } else {
+        setTimelineMode("nwp", { period: win.period });
+      }
     },
-    onLevelChange: (lvl) => {
-      changeVerticalLevel(map, 0, lvl);
+    onWindowGroupChange: async (win, group) => {
+      if (!win.map) return;
+      win.activeGroup = group;
+      win.isObservation = false;
+      if (group.defaultLevel) win.level = group.defaultLevel;
+      await loadPresetGroup(win.map, group, win.period, win.level, win);
+    },
+    onWindowLevelChange: async (win, level) => {
+      if (!win.map) return;
+      win.level = level;
+      if (win.activeGroup && win.activeGroup.hasLevel) {
+        await loadPresetGroup(win.map, win.activeGroup, win.period, level, win);
+      } else {
+        await loadWeatherField(win.map, win.model, win.element, level, win.period, null, win);
+      }
+    },
+    onWindowInit: async (win) => {
+      // Lazy-init maps in split mode when style loads
+      if (!win.map) return;
+      const onLoad = async () => {
+        if (win.activeGroup) {
+          await loadPresetGroup(win.map, win.activeGroup, win.period, win.level, win);
+        }
+      };
+      if (win.map.isStyleLoaded() || win.map.loaded()) {
+        await onLoad();
+      } else {
+        win.map.once("load", onLoad);
+      }
     },
   });
-  initTooltip("tooltip");
-  initKeyboardShortcuts(map);
 
+  // ── Navbar ───────────────────────────────────────────────────────────────
+  initNavBar("navbar", {
+    onPresetChange: (group) => {
+      const win = getActiveWindow();
+      const map = win?.map || getActiveMap();
+      if (!win || !map) return;
+      win.activeGroup = group;
+      win.isObservation = false;
+      if (group.defaultLevel) win.level = group.defaultLevel;
+      loadPresetGroup(map, group, win.period, win.level, win);
+    },
+    onLevelChange: (lvl) => {
+      const win = getActiveWindow();
+      const map = win?.map || getActiveMap();
+      if (!win || !map) return;
+      win.level = lvl;
+      changeVerticalLevel(map, 0, lvl, win);
+    },
+  });
+
+  initTooltip("tooltip");
+  initKeyboardShortcuts();
+
+  // ── Catalog Drawer ───────────────────────────────────────────────────────
   initCatalogDrawer("catalog-drawer", async ({ model, element, level, period, obsTime, isObservation }) => {
-    appState.set("activeGroup", null);
+    const map = getMap();
+    const win = getActiveWindow();
+    if (!win || !map) return;
+    Object.assign(win, {
+      activeGroup: null,
+      model,
+      element,
+      level: level !== null ? level : win.level,
+      period: period !== null ? period : win.period,
+      obsTime,
+      isObservation,
+    });
+    appState.update({
+      activeGroup: null,
+      model,
+      element,
+      level: win.level,
+      period: win.period,
+      obsTime,
+      isObservation,
+    });
     setNavBarPreset("");
     if (isObservation) {
       setTimelineMode("obs", { file: obsTime });
       if (model === "UPPER_AIR") {
-        await loadUpperAirComposite(map, level || 500, obsTime);
+        await loadUpperAirComposite(map, win.level || 500, obsTime);
       } else {
-        await loadObservationProduct(map, model, element, level, obsTime);
+        await loadObservationProduct(map, model, element, win.level, obsTime);
       }
     } else {
-      setTimelineMode("nwp", { period });
-      await loadWeatherField(map, model, element, level, period);
+      setTimelineMode("nwp", { period: win.period });
+      await loadWeatherField(map, model, element, win.level, win.period, null, win);
     }
   });
 
+  // ── Layer Control ────────────────────────────────────────────────────────
   initLayerControl("layer-control", (action, layerId, value, layer) => {
-    handleLayerAction(map, action, layerId, value, layer);
+    handleLayerAction(getMap(), action, layerId, value, layer, getActiveWindow());
   });
 
+  // ── Time Slider ──────────────────────────────────────────────────────────
   initTimeSlider("timeslider-container", async (data) => {
+    const win = getActiveWindow();
+    const map = getMap();
+    if (!win || !map) return;
     if (typeof data === "object" && data.isObs) {
-      const model = appState.get("model") || "SURFACE";
-      const element = appState.get("element") || "PLOT_GLOBAL_3H";
-      const level = appState.get("level");
+      win.obsTime = data.file;
+      const model = win.model || "SURFACE";
+      const element = win.element || "PLOT_GLOBAL_3H";
+      const level = win.level;
       if (model === "UPPER_AIR") {
         await loadUpperAirComposite(map, level || 500, data.file);
       } else {
         await loadObservationProduct(map, model, element, level, data.file);
       }
     } else {
-      const period = typeof data === "number" ? data : appState.get("period");
-      const activeGroup = appState.get("activeGroup");
+      const period = typeof data === "number" ? data : win.period;
+      win.period = period;
+      const activeGroup = win.activeGroup;
       if (activeGroup) {
-        await loadPresetGroup(map, activeGroup, period, appState.get("level"));
+        await loadPresetGroup(map, activeGroup, period, win.level, win);
       } else {
-        const model = appState.get("model");
-        const element = appState.get("element");
-        const level = appState.get("level");
-        await loadWeatherField(map, model, element, level, period);
+        await loadWeatherField(map, win.model, win.element, win.level, period, null, win);
       }
     }
   });
 
+  // ── Boot First Window Map ────────────────────────────────────────────────
+  const firstWin = firstTab?.windows[0];
+  const map = firstWin?.map;
+
   const onReady = async () => {
-    console.log("[Main] Map ready, loading initial weather fields and station observations...");
+    console.log("[Main] Map ready, loading initial weather fields...");
     updateLegend("TMP");
     await Promise.all([
-      loadWeatherField(map, "ECMWF_HR", "TMP", 850, 24),
+      loadWeatherField(map, "ECMWF_HR", "TMP", 850, 24, null, firstWin),
       loadSurfaceStations(map),
     ]);
     window.__WEATHER_FIELD_LOADED__ = true;
   };
 
-  if (map.isStyleLoaded() || map.loaded()) {
-    onReady();
-  } else {
-    map.once("load", onReady);
+  if (map) {
+    if (map.isStyleLoaded() || map.loaded()) {
+      onReady();
+    } else {
+      map.once("load", onReady);
+    }
   }
 }
 
-async function loadWeatherField(map, model, element, level, period, customOptions = null) {
+async function loadWeatherField(map, model, element, level, period, customOptions = null, win = null) {
   const file = `26082708.${String(period).padStart(3, "0")}`;
   const path = `${model}/${element}/${level}`;
   const layerId = `contour-${element}-${level}`;
@@ -121,6 +215,7 @@ async function loadWeatherField(map, model, element, level, period, customOption
   try {
     const gridData = await fetchGridData(path, file);
     appState.set("gridData", gridData);
+    if (win) win.gridData = gridData;
 
     renderContourLayers(map, gridData, element, {
       layerId,
@@ -253,7 +348,7 @@ async function loadSurfaceStations(map) {
   }
 }
 
-function handleLayerAction(map, action, layerId, value, layer) {
+function handleLayerAction(map, action, layerId, value, layer, win = getActiveWindow()) {
   if (action === "visibility") {
     if (layer.type === "contour") {
       setLayerIsobandVisibility(map, layerId, value && layer.config.showFill);
@@ -281,10 +376,10 @@ function handleLayerAction(map, action, layerId, value, layer) {
   } else if (action === "aux") {
     if (layerId === "raster") {
       if (value && !map.getLayer("raster-layer")) {
-        const model = appState.get("model") || "ECMWF_HR";
-        const element = appState.get("element") || "TMP";
-        const level = appState.get("level") || 850;
-        const period = appState.get("period") || 24;
+        const model = win?.model || "ECMWF_HR";
+        const element = win?.element || "TMP";
+        const level = win?.level || 850;
+        const period = win?.period ?? 24;
         const file = `26082708.${String(period).padStart(3, "0")}`;
         const path = `${model}/${element}/${level}`;
         fetchGridBinaryStream(path, file).then((bin) => {
@@ -295,7 +390,7 @@ function handleLayerAction(map, action, layerId, value, layer) {
       }
     } else if (layerId === "wind") {
       if (value) {
-        let grid = appState.get("gridData");
+        let grid = win?.gridData || appState.get("gridData");
         if (!grid || !grid.u || !grid.v) {
           grid = {
             header: (grid && grid.header) ? grid.header : { start_lon: 60, d_lon: 0.5, n_lon: 100, start_lat: 10, d_lat: 0.5, n_lat: 80 },
@@ -327,19 +422,29 @@ function updateLegend(element = "TMP") {
   `;
 }
 
-async function loadPresetGroup(map, group, period = null, level = null) {
+async function loadPresetGroup(map, group, period = null, level = null, win = null) {
   if (!group || !group.layers) return;
-  appState.set("activeGroup", group);
-  setNavBarPreset(group.id);
 
-  const curPeriod = period !== null ? period : (appState.get("period") !== undefined ? appState.get("period") : 24);
-  const curLevel = level !== null ? level : (group.hasLevel ? (group.defaultLevel || appState.get("level") || 500) : null);
+  const curPeriod = period !== null ? period : (win?.period ?? 24);
+  const curLevel = level !== null ? level : (group.hasLevel ? (group.defaultLevel || win?.level || 500) : null);
 
   if (curLevel !== null) {
-    appState.set("level", curLevel);
-    setNavBarLevel(curLevel);
+    if (win) win.level = curLevel;
+    if (win && getActiveWindow() === win) setNavBarLevel(curLevel);
   }
-  appState.set("period", curPeriod);
+  if (win) win.period = curPeriod;
+  if (win && getActiveWindow() === win) {
+    appState.update({
+      activeGroup: group,
+      level: win.level,
+      period: curPeriod,
+      model: win.model,
+      element: win.element,
+      obsTime: win.obsTime,
+      isObservation: win.isObservation,
+    });
+    setNavBarPreset(group.id);
+  }
 
   console.log(`[PresetGroup] Loading "${group.name}" at level=${curLevel}hPa, period=+${curPeriod}h...`);
 
@@ -350,7 +455,7 @@ async function loadPresetGroup(map, group, period = null, level = null) {
         await loadWeatherField(map, layer.model, layer.element, targetLevel, curPeriod, {
           ...layer.render,
           keepWind: true,
-        });
+        }, win);
       } else if (layer.type === "station") {
         await loadObservationProduct(map, layer.model, layer.element, targetLevel, "20260827200000.000");
       }
@@ -358,12 +463,12 @@ async function loadPresetGroup(map, group, period = null, level = null) {
   );
 }
 
-async function changeVerticalLevel(map, direction, explicitLevel = null) {
+async function changeVerticalLevel(map, direction, explicitLevel = null, win = getActiveWindow()) {
   const levels = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
   let targetLevel = explicitLevel;
 
   if (targetLevel === null) {
-    const curLevel = appState.get("level") || 500;
+    const curLevel = win?.level || 500;
     let idx = levels.indexOf(curLevel);
     if (idx === -1) idx = 4;
 
@@ -375,24 +480,27 @@ async function changeVerticalLevel(map, direction, explicitLevel = null) {
   }
 
   console.log(`[Level] Setting vertical level to ${targetLevel} hPa`);
-  appState.set("level", targetLevel);
+  if (win) win.level = targetLevel;
+  if (win && getActiveWindow() === win) appState.set("level", targetLevel);
   setNavBarLevel(targetLevel);
 
-  const activeGroup = appState.get("activeGroup");
+  const activeGroup = win?.activeGroup;
   if (activeGroup && activeGroup.hasLevel) {
-    await loadPresetGroup(map, activeGroup, appState.get("period"), targetLevel);
+    await loadPresetGroup(map, activeGroup, win.period, targetLevel, win);
   } else {
-    const model = appState.get("model") || "ECMWF_HR";
-    const element = appState.get("element") || "TMP";
-    const period = appState.get("period") || 24;
-    await loadWeatherField(map, model, element, targetLevel, period);
+    const model = win?.model || "ECMWF_HR";
+    const element = win?.element || "TMP";
+    const period = win?.period ?? 24;
+    await loadWeatherField(map, model, element, targetLevel, period, null, win);
   }
 }
 
-function initKeyboardShortcuts(map) {
+function initKeyboardShortcuts() {
   window.addEventListener("keydown", async (e) => {
     const tag = e.target && e.target.tagName;
     if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
+
+    const map = getMap();
 
     if (e.key === "ArrowLeft") {
       e.preventDefault();

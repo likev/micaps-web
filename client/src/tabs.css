@@ -1,0 +1,292 @@
+/* tabs.css - Multi-Tab and 4-Split Window Layout Styling */
+
+#tabs-bar {
+  height: 36px;
+  background: var(--bg-secondary, #161b22);
+  border-bottom: 1px solid var(--border-color, #30363d);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  z-index: 900;
+  user-select: none;
+}
+
+.tabs-list {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.tab-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color, #30363d);
+  border-radius: 6px 6px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary, #8b949e);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tab-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary, #c9d1d9);
+}
+
+.tab-item.active {
+  background: #21262d;
+  color: #58a6ff;
+  border-color: #58a6ff;
+  border-bottom-color: #21262d;
+  font-weight: 600;
+}
+
+.tab-close-btn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+  border-radius: 3px;
+  opacity: 0.7;
+}
+
+.tab-close-btn:hover {
+  opacity: 1;
+  background: rgba(248, 81, 73, 0.2);
+  color: #f85149;
+}
+
+.btn-add-tab {
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px dashed var(--border-color, #30363d);
+  color: var(--text-secondary, #8b949e);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: all 0.15s ease;
+}
+
+.btn-add-tab:hover {
+  background: rgba(56, 139, 253, 0.15);
+  border-color: #58a6ff;
+  color: #58a6ff;
+}
+
+.layout-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.layout-label {
+  font-size: 11px;
+  color: var(--text-secondary, #8b949e);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.layout-btn {
+  padding: 3px 8px;
+  background: #21262d;
+  border: 1px solid var(--border-color, #30363d);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-secondary, #8b949e);
+  cursor: pointer;
+  font-family: var(--font-mono, monospace);
+  transition: all 0.15s ease;
+}
+
+.layout-btn:hover {
+  border-color: #58a6ff;
+  color: var(--text-primary, #c9d1d9);
+}
+
+.layout-btn.active {
+  background: rgba(56, 139, 253, 0.2);
+  border-color: #58a6ff;
+  color: #58a6ff;
+  font-weight: 600;
+}
+
+/* Workspace Container */
+#workspace-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+
+.tab-workspace {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: none;
+}
+
+.tab-workspace.active {
+  display: block;
+}
+
+/* Windows Grid */
+.windows-grid {
+  width: 100%;
+  height: 100%;
+  background: #010409;
+}
+
+/* 1x1 Single Window Mode */
+.windows-grid.layout-1x1 {
+  display: block;
+}
+
+.windows-grid.layout-1x1 .window-panel {
+  width: 100%;
+  height: 100%;
+  display: none;
+}
+
+.windows-grid.layout-1x1 .window-panel.active-single {
+  display: flex;
+}
+
+/* 2x2 4-Split Windows Mode */
+.windows-grid.layout-2x2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 2px;
+}
+
+.windows-grid.layout-2x2 .window-panel {
+  display: flex;
+}
+
+/* Window Panel */
+.window-panel {
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  box-sizing: border-box;
+}
+
+.window-panel.active {
+  border: 2px solid #58a6ff !important;
+}
+
+.window-panel.maximized {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 100 !important;
+}
+
+.win-header {
+  height: 28px;
+  min-height: 28px;
+  background: #161b22;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  border-bottom: 1px solid #30363d;
+  z-index: 10;
+  user-select: none;
+}
+
+.win-title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.win-badge {
+  font-size: 10px;
+  background: #238636;
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+}
+
+.window-panel.active .win-badge {
+  background: #1f6feb;
+}
+
+.win-title {
+  font-size: 11px;
+  color: #c9d1d9;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.win-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.win-preset-select,
+.win-level-select {
+  background: #21262d;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  border-radius: 3px;
+  font-size: 11px;
+  padding: 1px 4px;
+  outline: none;
+  cursor: pointer;
+  max-width: 140px;
+}
+
+.win-preset-select:focus,
+.win-level-select:focus {
+  border-color: #58a6ff;
+}
+
+.win-btn-max {
+  background: transparent;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px;
+  border-radius: 3px;
+}
+
+.win-btn-max:hover {
+  color: #58a6ff;
+  background: rgba(56, 139, 253, 0.15);
+}
+
+.map-viewport {
+  flex: 1;
+  width: 100%;
+  height: calc(100% - 28px);
+  position: relative;
+}

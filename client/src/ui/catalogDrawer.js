@@ -39,7 +39,7 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
 
       <div class="form-group" id="group-level">
         <label>Isobaric Level (hPa)</label>
-        <select id="select-level" class="form-select">
+        <select id="select-catalog-level" class="form-select">
           <option value="1000">1000 hPa</option>
           <option value="925">925 hPa</option>
           <option value="850" selected>850 hPa</option>
@@ -88,7 +88,7 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
 
   const selectModel = document.getElementById("select-model");
   const selectElement = document.getElementById("select-element");
-  const selectLevel = document.getElementById("select-level");
+  const selectLevel = document.getElementById("select-catalog-level");
   const selectPeriod = document.getElementById("select-period");
   const selectObsTime = document.getElementById("select-obs-time");
   const groupLevel = document.getElementById("group-level");
@@ -189,4 +189,3 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
     }
   });
 }
-

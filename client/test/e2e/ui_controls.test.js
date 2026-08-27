@@ -91,11 +91,11 @@ describe("Workstation UI Controls Verification", () => {
 
   test("Keyboard ArrowUp and ArrowDown change vertical level", async () => {
     const res = await webview.evaluate(`(() => {
-      const startLevel = document.getElementById("select-level").value;
+      const startLevel = document.getElementById("select-nav-level").value;
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
-      const upLevel = document.getElementById("select-level").value;
+      const upLevel = document.getElementById("select-nav-level").value;
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
-      const downLevel = document.getElementById("select-level").value;
+      const downLevel = document.getElementById("select-nav-level").value;
       return { startLevel, upLevel, downLevel };
     })()`);
 

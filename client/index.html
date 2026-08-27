@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MICAPS-Web Meteorological Workstation</title>
   <link rel="stylesheet" href="./src/style.css" />
+  <link rel="stylesheet" href="./src/tabs.css" />
   <link rel="stylesheet" href="./node_modules/maplibre-gl/dist/maplibre-gl.css" />
   <script>
     window.__LOGS__ = [];
@@ -18,8 +19,9 @@
 <body>
   <div id="app">
     <header id="navbar"></header>
+    <div id="tabs-bar"></div>
     <main id="main-content">
-      <div id="map-container"></div>
+      <div id="workspace-container"></div>
       <aside id="catalog-drawer" class="drawer hidden"></aside>
       <div id="layer-control" class="panel"></div>
       <div id="tooltip" class="tooltip hidden"></div>

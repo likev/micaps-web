@@ -1,39 +1,48 @@
 // stationLayer.js - WMO & NOAA standard 9-point station weather plot model
+// Per-map-instance state via WeakMap — safe for multi-tab / 4-split windows
 import { getSkyCoverSVG, getWindBarbSVG, getWeatherSymbol, getPressureTendencyGlyph } from "../utils/weatherSymbols.js";
 import maplibregl from "maplibre-gl";
 
-let markers = [];
-let stationGeoJSON = null;
-let stationsVisible = true;
-let currentMap = null;
-let currentMoveListener = null;
+// Each map has its own state bucket so multiple maps don't share markers/data
+const mapState = new WeakMap();
+
+function getState(map) {
+  if (!mapState.has(map)) {
+    mapState.set(map, {
+      markers: [],
+      geojson: null,
+      visible: true,
+      moveListener: null,
+    });
+  }
+  return mapState.get(map);
+}
 
 export function renderStationWeatherPlots(map, geojson, visible = true) {
   if (!map || !geojson || !geojson.features) return;
-  stationGeoJSON = geojson;
-  currentMap = map;
-  if (visible !== undefined) stationsVisible = Boolean(visible);
+  const state = getState(map);
+  state.geojson = geojson;
+  if (visible !== undefined) state.visible = Boolean(visible);
 
-  if (currentMoveListener) {
-    currentMap.off("moveend", currentMoveListener);
+  if (state.moveListener) {
+    map.off("moveend", state.moveListener);
   }
-  currentMoveListener = updateVisibleMarkers;
-  currentMap.on("moveend", currentMoveListener);
+  state.moveListener = () => updateVisibleMarkersForMap(map);
+  map.on("moveend", state.moveListener);
 
-  updateVisibleMarkers();
+  updateVisibleMarkersForMap(map);
 }
 
-export function updateVisibleMarkers() {
-  clearStationMarkers();
-  if (!stationsVisible || !currentMap || !stationGeoJSON || !stationGeoJSON.features) {
-    return;
-  }
+export function updateVisibleMarkersForMap(map) {
+  const state = getState(map);
+  clearStationMarkersForMap(map);
+  if (!state.visible || !state.geojson || !state.geojson.features) return;
 
-  const bounds = currentMap.getBounds();
-  const maxVisible = 3500; // Plot all stations in the active viewport
+  const bounds = map.getBounds();
+  const maxVisible = 3500;
   let renderedCount = 0;
 
-  for (const f of stationGeoJSON.features) {
+  for (const f of state.geojson.features) {
     const [lon, lat] = f.geometry.coordinates;
     if (!bounds.contains([lon, lat])) continue;
 
@@ -45,7 +54,7 @@ export function updateVisibleMarkers() {
     el.style.fontFamily = "'SF Mono', -apple-system, monospace";
     el.style.fontSize = "10px";
     el.style.color = "#ffffff";
-    el.style.pointerEvents = "none"; // Don't create info-window or block mouse interactions
+    el.style.pointerEvents = "none";
 
     // 9-Position Synoptic Station Model Elements
     const tt = p.temperature !== undefined && p.temperature > -90 ? Math.round(p.temperature) : "";
@@ -92,37 +101,51 @@ export function updateVisibleMarkers() {
 
     const marker = new maplibregl.Marker({ element: el })
       .setLngLat([lon, lat])
-      .addTo(currentMap);
+      .addTo(map);
 
-    markers.push(marker);
+    state.markers.push(marker);
     renderedCount++;
     if (renderedCount >= maxVisible) break;
   }
 }
 
+// Legacy export alias for backward compatibility
+export function updateVisibleMarkers() {
+  // noop when called without context — per-map listeners call updateVisibleMarkersForMap
+}
+
 export function setStationVisibility(map, visible) {
-  stationsVisible = Boolean(visible);
-  if (map) currentMap = map;
-
-  if (!stationsVisible) {
-    clearStationMarkers();
+  if (!map) return;
+  const state = getState(map);
+  state.visible = Boolean(visible);
+  if (!state.visible) {
+    clearStationMarkersForMap(map);
   } else {
-    updateVisibleMarkers();
+    updateVisibleMarkersForMap(map);
   }
 }
 
-export function clearStationMarkers() {
-  for (let i = 0; i < markers.length; i++) {
-    markers[i].remove();
-  }
-  markers = [];
+export function clearStationMarkersForMap(map) {
+  const state = getState(map);
+  for (const m of state.markers) m.remove();
+  state.markers = [];
 }
 
-// Expose station layer controller for automated testing
+// Expose station layer controller for automated testing (uses active map fallback)
 window.__STATION_LAYER__ = {
-  getVisibleCount: () => markers.length,
-  getTotalCount: () => (stationGeoJSON && stationGeoJSON.features ? stationGeoJSON.features.length : 0),
+  getVisibleCount: () => {
+    // Count markers from all maps
+    let total = 0;
+    document.querySelectorAll(".station-plot-marker").forEach(() => total++);
+    return total;
+  },
+  getTotalCount: () => {
+    // Try to get from window.__MAP__ state
+    if (window.__MAP__) {
+      const s = mapState.get(window.__MAP__);
+      return s && s.geojson ? s.geojson.features.length : 0;
+    }
+    return 0;
+  },
   setVisible: (map, visible) => setStationVisibility(map, visible),
 };
-
-

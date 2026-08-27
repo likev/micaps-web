@@ -7,8 +7,12 @@ class AppState {
       model: "ECMWF_HR",
       element: "TMP",
       level: 850,
+      activeGroup: null,
+      activeWinId: null,
       cycle: "26082708.024",
       period: 24,
+      obsTime: null,
+      isObservation: false,
       availableLevels: [1000, 925, 850, 700, 500, 400, 300, 200, 100],
       availableFiles: [],
 
