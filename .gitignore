@@ -1,0 +1,51 @@
+# Binaries & Executables
+server/micaps-server
+server/micaps-server.exe
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.out
+
+# Go Build & Test Artifacts
+*.test
+*.prof
+coverage.txt
+coverage.out
+vendor/
+
+# Node & Bun Dependencies
+node_modules/
+.bun/
+.bun-cache/
+bun.lockb
+
+# Frontend Build Outputs & Caches
+client/dist/
+.vite/
+dist/
+dist-ssr/
+
+# Logs & Temporary Files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# OS & Editor Files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+*.swp
+*.swo
+*~
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local

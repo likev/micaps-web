@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MICAPS-Web Meteorological Workstation</title>
+  <link rel="stylesheet" href="./src/style.css" />
+  <link rel="stylesheet" href="./node_modules/maplibre-gl/dist/maplibre-gl.css" />
+  <script>
+    window.__LOGS__ = [];
+    window.addEventListener('error', e => window.__LOGS__.push('ERR: ' + e.message + ' at ' + e.filename + ':' + e.lineno));
+    window.addEventListener('unhandledrejection', e => window.__LOGS__.push('REJECT: ' + (e.reason ? (e.reason.stack || e.reason) : e)));
+    const _origLog = console.log, _origErr = console.error;
+    console.log = (...args) => { window.__LOGS__.push('LOG: ' + args.join(' ')); _origLog(...args); };
+    console.error = (...args) => { window.__LOGS__.push('CERR: ' + args.join(' ')); _origErr(...args); };
+  </script>
+</head>
+<body>
+  <div id="app">
+    <header id="navbar"></header>
+    <main id="main-content">
+      <div id="map-container"></div>
+      <aside id="catalog-drawer" class="drawer hidden"></aside>
+      <div id="layer-control" class="panel"></div>
+      <div id="tooltip" class="tooltip hidden"></div>
+      <div id="legend-panel" class="legend-panel"></div>
+    </main>
+    <footer id="timeslider-container"></footer>
+  </div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

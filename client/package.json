@@ -1,0 +1,22 @@
+{
+  "name": "micaps-client",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "bun ./test/run_all.js"
+  },
+  "dependencies": {
+    "@deck.gl/core": "^9.0.38",
+    "@deck.gl/layers": "^9.0.38",
+    "@deck.gl/mapbox": "^9.0.38",
+    "maplibre-gl": "^5.0.1",
+    "pmtiles": "^3.2.1"
+  },
+  "devDependencies": {
+    "vite": "^6.1.1"
+  }
+}
