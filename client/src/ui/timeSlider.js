@@ -124,7 +124,7 @@ function updateLabels() {
   }
 }
 
-function step(delta) {
+export function step(delta) {
   if (currentMode === "obs") {
     currentObsIdx = (currentObsIdx + delta + obsFiles.length) % obsFiles.length;
     updateLabels();

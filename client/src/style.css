@@ -65,6 +65,13 @@ body, html {
   font-weight: 700;
 }
 
+.nav-middle { display: flex; align-items: center; gap: 12px; }
+.nav-control-group { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+.nav-select { background: #21262d; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px; font-size: 12px; outline: none; cursor: pointer; }
+.nav-select:focus { border-color: var(--accent-blue); }
+.nav-keyboard-hint { display: flex; align-items: center; gap: 6px; }
+.kbd-pill { background: rgba(56, 139, 253, 0.15); border: 1px solid rgba(56, 139, 253, 0.4); border-radius: 4px; padding: 2px 6px; font-size: 11px; font-family: var(--font-mono); color: #79c0ff; }
+
 .nav-controls {
   display: flex;
   align-items: center;

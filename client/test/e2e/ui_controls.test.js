@@ -60,4 +60,47 @@ describe("Workstation UI Controls Verification", () => {
     expect(tooltipText).toContain("26.5 °C");
     expect(tooltipText).toContain("1012.4 hPa");
   });
+
+  test("Preset group selector changes active preset group", async () => {
+    const res = await webview.evaluate(`(() => {
+      const el = document.getElementById("select-preset");
+      const count = el ? el.options.length : 0;
+      if (el) {
+        el.value = "composite-500hpa";
+        el.dispatchEvent(new Event("change"));
+      }
+      return { count, value: el ? el.value : "" };
+    })()`);
+    expect(res.count).toBeGreaterThan(1);
+    expect(res.value).toBe("composite-500hpa");
+  });
+
+  test("Keyboard ArrowLeft and ArrowRight change forecast period", async () => {
+    const res = await webview.evaluate(`(() => {
+      const initialLead = document.getElementById("time-lead-label").innerText;
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+      const nextLead = document.getElementById("time-lead-label").innerText;
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+      const prevLead = document.getElementById("time-lead-label").innerText;
+      return { initialLead, nextLead, prevLead };
+    })()`);
+
+    expect(res.nextLead).not.toBe(res.initialLead);
+    expect(res.prevLead).toBe(res.initialLead);
+  });
+
+  test("Keyboard ArrowUp and ArrowDown change vertical level", async () => {
+    const res = await webview.evaluate(`(() => {
+      const startLevel = document.getElementById("select-level").value;
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+      const upLevel = document.getElementById("select-level").value;
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+      const downLevel = document.getElementById("select-level").value;
+      return { startLevel, upLevel, downLevel };
+    })()`);
+
+    expect(res.startLevel).toBe("500");
+    expect(res.upLevel).toBe("400");
+    expect(res.downLevel).toBe("500");
+  });
 });

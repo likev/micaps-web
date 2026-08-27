@@ -24,15 +24,28 @@ import { analyzeAndRenderSurfaceSLPContours } from "./layers/surfaceAnalysis.js"
 import { fetchGridData, fetchGridBinaryStream, fetchStationObservations } from "./api/catalogApi.js";
 import { getCSSGradient } from "./utils/colormaps.js";
 import { appState } from "./store/appState.js";
+import { PRESET_GROUPS } from "./config/presets.js";
+import { setNavBarLevel, setNavBarPreset } from "./ui/navBar.js";
+import { step as timeSliderStep } from "./ui/timeSlider.js";
 
 async function bootstrap() {
   console.log("[MICAPS-Web] Initializing meteorological workstation...");
 
   const map = initMap("map-container");
-  initNavBar("navbar");
+  initNavBar("navbar", {
+    onPresetChange: (group) => {
+      loadPresetGroup(map, group);
+    },
+    onLevelChange: (lvl) => {
+      changeVerticalLevel(map, 0, lvl);
+    },
+  });
   initTooltip("tooltip");
+  initKeyboardShortcuts(map);
 
   initCatalogDrawer("catalog-drawer", async ({ model, element, level, period, obsTime, isObservation }) => {
+    appState.set("activeGroup", null);
+    setNavBarPreset("");
     if (isObservation) {
       setTimelineMode("obs", { file: obsTime });
       if (model === "UPPER_AIR") {
@@ -62,10 +75,15 @@ async function bootstrap() {
       }
     } else {
       const period = typeof data === "number" ? data : appState.get("period");
-      const model = appState.get("model");
-      const element = appState.get("element");
-      const level = appState.get("level");
-      await loadWeatherField(map, model, element, level, period);
+      const activeGroup = appState.get("activeGroup");
+      if (activeGroup) {
+        await loadPresetGroup(map, activeGroup, period, appState.get("level"));
+      } else {
+        const model = appState.get("model");
+        const element = appState.get("element");
+        const level = appState.get("level");
+        await loadWeatherField(map, model, element, level, period);
+      }
     }
   });
 
@@ -307,6 +325,93 @@ function updateLegend(element = "TMP") {
       <span>High</span>
     </div>
   `;
+}
+
+async function loadPresetGroup(map, group, period = null, level = null) {
+  if (!group || !group.layers) return;
+  appState.set("activeGroup", group);
+  setNavBarPreset(group.id);
+
+  const curPeriod = period !== null ? period : (appState.get("period") !== undefined ? appState.get("period") : 24);
+  const curLevel = level !== null ? level : (group.hasLevel ? (group.defaultLevel || appState.get("level") || 500) : null);
+
+  if (curLevel !== null) {
+    appState.set("level", curLevel);
+    setNavBarLevel(curLevel);
+  }
+  appState.set("period", curPeriod);
+
+  console.log(`[PresetGroup] Loading "${group.name}" at level=${curLevel}hPa, period=+${curPeriod}h...`);
+
+  await Promise.allSettled(
+    group.layers.map(async (layer) => {
+      const targetLevel = layer.level || (group.hasLevel ? curLevel : null);
+      if (layer.type === "contour" || layer.type === "wind") {
+        await loadWeatherField(map, layer.model, layer.element, targetLevel, curPeriod, {
+          ...layer.render,
+          keepWind: true,
+        });
+      } else if (layer.type === "station") {
+        await loadObservationProduct(map, layer.model, layer.element, targetLevel, "20260827200000.000");
+      }
+    })
+  );
+}
+
+async function changeVerticalLevel(map, direction, explicitLevel = null) {
+  const levels = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
+  let targetLevel = explicitLevel;
+
+  if (targetLevel === null) {
+    const curLevel = appState.get("level") || 500;
+    let idx = levels.indexOf(curLevel);
+    if (idx === -1) idx = 4;
+
+    let newIdx = idx + direction;
+    if (newIdx < 0) newIdx = 0;
+    if (newIdx >= levels.length) newIdx = levels.length - 1;
+    targetLevel = levels[newIdx];
+    if (targetLevel === curLevel) return;
+  }
+
+  console.log(`[Level] Setting vertical level to ${targetLevel} hPa`);
+  appState.set("level", targetLevel);
+  setNavBarLevel(targetLevel);
+
+  const activeGroup = appState.get("activeGroup");
+  if (activeGroup && activeGroup.hasLevel) {
+    await loadPresetGroup(map, activeGroup, appState.get("period"), targetLevel);
+  } else {
+    const model = appState.get("model") || "ECMWF_HR";
+    const element = appState.get("element") || "TMP";
+    const period = appState.get("period") || 24;
+    await loadWeatherField(map, model, element, targetLevel, period);
+  }
+}
+
+function initKeyboardShortcuts(map) {
+  window.addEventListener("keydown", async (e) => {
+    const tag = e.target && e.target.tagName;
+    if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
+
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      console.log("[Keyboard] ArrowLeft: Step to previous forecast period");
+      timeSliderStep(-1);
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      console.log("[Keyboard] ArrowRight: Step to next forecast period");
+      timeSliderStep(1);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      console.log("[Keyboard] ArrowUp: Step to higher vertical level");
+      await changeVerticalLevel(map, 1);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      console.log("[Keyboard] ArrowDown: Step to lower vertical level");
+      await changeVerticalLevel(map, -1);
+    }
+  });
 }
 
 if (document.readyState === "loading") {
