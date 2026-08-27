@@ -72,29 +72,45 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
   updateMapLibreContour(map, isobandFC, isolineFC, options);
 }
 
+function getLayerDOMIds(layerId = "default") {
+  const isDefault = layerId === "default" || layerId === "contour-TMP-850";
+  return {
+    isobandSrcId: isDefault ? "isoband-source" : `${layerId}-isoband-source`,
+    isobandLayerId: isDefault ? "isoband-layer" : `${layerId}-isoband-layer`,
+    isolineSrcId: isDefault ? "isoline-source" : `${layerId}-isoline-source`,
+    isolineLayerId: isDefault ? "isoline-layer" : `${layerId}-isoline-layer`,
+  };
+}
+
 function updateMapLibreContour(map, isobands, isolines, options = {}) {
+  const layerId = options.layerId || "default";
   const opacity = options.opacity !== undefined ? options.opacity : 0.75;
-  const visibleIsoband = options.visibleIsoband !== undefined ? options.visibleIsoband : (options.visible !== false);
-  const visibleIsoline = options.visibleIsoline !== undefined ? options.visibleIsoline : (options.visible !== false);
+  const visibleIsoband = options.visibleIsoband !== undefined ? options.visibleIsoband : (options.showFill !== false && options.visible !== false);
+  const visibleIsoline = options.visibleIsoline !== undefined ? options.visibleIsoline : (options.showLine !== false && options.visible !== false);
+  const lineColor = options.lineColor || "#ffffff";
+  const lineWidth = options.lineWidth || 1.4;
+
+  const { isobandSrcId, isobandLayerId, isolineSrcId, isolineLayerId } = getLayerDOMIds(layerId);
 
   // --- ISOBANDS (Contour Fills) ---
   if (isobands) {
-    if (map.getSource("isoband-source")) {
-      map.getSource("isoband-source").setData(isobands);
-      if (map.getLayer("isoband-layer")) {
-        map.setLayoutProperty("isoband-layer", "visibility", visibleIsoband ? "visible" : "none");
+    if (map.getSource(isobandSrcId)) {
+      map.getSource(isobandSrcId).setData(isobands);
+      if (map.getLayer(isobandLayerId)) {
+        map.setLayoutProperty(isobandLayerId, "visibility", visibleIsoband ? "visible" : "none");
+        map.setPaintProperty(isobandLayerId, "fill-opacity", opacity);
       }
     } else {
-      map.addSource("isoband-source", {
+      map.addSource(isobandSrcId, {
         type: "geojson",
         data: isobands,
       });
 
       map.addLayer(
         {
-          id: "isoband-layer",
+          id: isobandLayerId,
           type: "fill",
-          source: "isoband-source",
+          source: isobandSrcId,
           layout: {
             visibility: visibleIsoband ? "visible" : "none",
           },
@@ -110,27 +126,29 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
 
   // --- ISOLINES (Contour Lines) ---
   if (isolines) {
-    if (map.getSource("isoline-source")) {
-      map.getSource("isoline-source").setData(isolines);
-      if (map.getLayer("isoline-layer")) {
-        map.setLayoutProperty("isoline-layer", "visibility", visibleIsoline ? "visible" : "none");
+    if (map.getSource(isolineSrcId)) {
+      map.getSource(isolineSrcId).setData(isolines);
+      if (map.getLayer(isolineLayerId)) {
+        map.setLayoutProperty(isolineLayerId, "visibility", visibleIsoline ? "visible" : "none");
+        map.setPaintProperty(isolineLayerId, "line-color", lineColor);
+        map.setPaintProperty(isolineLayerId, "line-width", lineWidth);
       }
     } else {
-      map.addSource("isoline-source", {
+      map.addSource(isolineSrcId, {
         type: "geojson",
         data: isolines,
       });
 
       map.addLayer({
-        id: "isoline-layer",
+        id: isolineLayerId,
         type: "line",
-        source: "isoline-source",
+        source: isolineSrcId,
         layout: {
           visibility: visibleIsoline ? "visible" : "none",
         },
         paint: {
-          "line-color": "#ffffff",
-          "line-width": 1.2,
+          "line-color": lineColor,
+          "line-width": lineWidth,
           "line-opacity": 0.85,
         },
       });
@@ -138,14 +156,44 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
   }
 }
 
-export function setIsobandVisibility(map, visible) {
+export function setLayerIsobandVisibility(map, layerId, visible) {
+  const { isobandLayerId } = getLayerDOMIds(layerId);
   const vis = visible ? "visible" : "none";
-  if (map.getLayer("isoband-layer")) map.setLayoutProperty("isoband-layer", "visibility", vis);
+  if (map.getLayer(isobandLayerId)) map.setLayoutProperty(isobandLayerId, "visibility", vis);
+}
+
+export function setLayerIsolineVisibility(map, layerId, visible) {
+  const { isolineLayerId } = getLayerDOMIds(layerId);
+  const vis = visible ? "visible" : "none";
+  if (map.getLayer(isolineLayerId)) map.setLayoutProperty(isolineLayerId, "visibility", vis);
+}
+
+export function setLayerIsolineColor(map, layerId, color) {
+  const { isolineLayerId } = getLayerDOMIds(layerId);
+  if (map.getLayer(isolineLayerId)) map.setPaintProperty(isolineLayerId, "line-color", color);
+}
+
+export function setLayerIsobandOpacity(map, layerId, opacity) {
+  const { isobandLayerId } = getLayerDOMIds(layerId);
+  if (map.getLayer(isobandLayerId)) map.setPaintProperty(isobandLayerId, "fill-opacity", opacity);
+}
+
+export function removeContourLayer(map, layerId) {
+  const { isobandSrcId, isobandLayerId, isolineSrcId, isolineLayerId } = getLayerDOMIds(layerId);
+
+  if (map.getLayer(isolineLayerId)) map.removeLayer(isolineLayerId);
+  if (map.getSource(isolineSrcId)) map.removeSource(isolineSrcId);
+  if (map.getLayer(isobandLayerId)) map.removeLayer(isobandLayerId);
+  if (map.getSource(isobandSrcId)) map.removeSource(isobandSrcId);
+}
+
+
+export function setIsobandVisibility(map, visible) {
+  setLayerIsobandVisibility(map, "default", visible);
 }
 
 export function setIsolineVisibility(map, visible) {
-  const vis = visible ? "visible" : "none";
-  if (map.getLayer("isoline-layer")) map.setLayoutProperty("isoline-layer", "visibility", vis);
+  setLayerIsolineVisibility(map, "default", visible);
 }
 
 export function setContourVisibility(map, visible) {
@@ -154,6 +202,7 @@ export function setContourVisibility(map, visible) {
 }
 
 export function setContourOpacity(map, opacity) {
-  if (map.getLayer("isoband-layer")) map.setPaintProperty("isoband-layer", "fill-opacity", opacity);
+  setLayerIsobandOpacity(map, "default", opacity);
 }
+
 

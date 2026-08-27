@@ -2,10 +2,20 @@
 import { initMap } from "./map/mapInstance.js";
 import { initNavBar } from "./ui/navBar.js";
 import { initCatalogDrawer } from "./ui/catalogDrawer.js";
-import { initLayerControl } from "./ui/layerControl.js";
+import { initLayerControl, addOrUpdateLayer, removeLayer } from "./ui/layerControl.js";
 import { initTimeSlider, setTimelineMode } from "./ui/timeSlider.js";
 import { initTooltip } from "./ui/tooltip.js";
-import { renderContourLayers, setIsobandVisibility, setIsolineVisibility, setContourOpacity } from "./layers/contourLayer.js";
+import {
+  renderContourLayers,
+  setLayerIsobandVisibility,
+  setLayerIsolineVisibility,
+  setLayerIsolineColor,
+  setLayerIsobandOpacity,
+  removeContourLayer,
+  setIsobandVisibility,
+  setIsolineVisibility,
+  setContourOpacity,
+} from "./layers/contourLayer.js";
 import { renderBinaryRaster, setRasterVisibility } from "./layers/rasterLayer.js";
 import { renderStationWeatherPlots, setStationVisibility } from "./layers/stationLayer.js";
 import { renderWindStreamlines, stopWindAnimation } from "./layers/windLayer.js";
@@ -23,15 +33,19 @@ async function bootstrap() {
   initCatalogDrawer("catalog-drawer", async ({ model, element, level, period, obsTime, isObservation }) => {
     if (isObservation) {
       setTimelineMode("obs", { file: obsTime });
-      await loadObservationProduct(map, model, element, level, obsTime);
+      if (model === "UPPER_AIR") {
+        await loadUpperAirComposite(map, level || 500, obsTime);
+      } else {
+        await loadObservationProduct(map, model, element, level, obsTime);
+      }
     } else {
       setTimelineMode("nwp", { period });
       await loadWeatherField(map, model, element, level, period);
     }
   });
 
-  initLayerControl("layer-control", (layerKey, value) => {
-    handleLayerToggle(map, layerKey, value);
+  initLayerControl("layer-control", (action, layerId, value, layer) => {
+    handleLayerAction(map, action, layerId, value, layer);
   });
 
   initTimeSlider("timeslider-container", async (data) => {
@@ -39,7 +53,11 @@ async function bootstrap() {
       const model = appState.get("model") || "SURFACE";
       const element = appState.get("element") || "PLOT_GLOBAL_3H";
       const level = appState.get("level");
-      await loadObservationProduct(map, model, element, level, data.file);
+      if (model === "UPPER_AIR") {
+        await loadUpperAirComposite(map, level || 500, data.file);
+      } else {
+        await loadObservationProduct(map, model, element, level, data.file);
+      }
     } else {
       const period = typeof data === "number" ? data : appState.get("period");
       const model = appState.get("model");
@@ -50,7 +68,7 @@ async function bootstrap() {
   });
 
   const onReady = async () => {
-    console.log("[Main] Map ready, loading weather fields and station observations in parallel...");
+    console.log("[Main] Map ready, loading initial weather fields and station observations...");
     updateLegend("TMP");
     await Promise.all([
       loadWeatherField(map, "ECMWF_HR", "TMP", 850, 24),
@@ -66,34 +84,95 @@ async function bootstrap() {
   }
 }
 
-async function loadWeatherField(map, model, element, level, period) {
+async function loadWeatherField(map, model, element, level, period, customOptions = null) {
   const file = `26082708.${String(period).padStart(3, "0")}`;
   const path = `${model}/${element}/${level}`;
+  const layerId = `contour-${element}-${level}`;
+  const name = `${level} hPa ${element} (${model})`;
+
+  const isHeight = element === "HGT";
+  const isTemp = element === "TMP";
+  const defaultLineColor = isHeight ? "#58a6ff" : (isTemp ? "#f85149" : "#ffffff");
+  const defaultShowFill = customOptions?.showFill !== undefined ? customOptions.showFill : !isHeight;
+  const defaultShowLine = customOptions?.showLine !== undefined ? customOptions.showLine : true;
+  const lineColor = customOptions?.lineColor || defaultLineColor;
+  const opacity = customOptions?.opacity !== undefined ? customOptions.opacity : 0.75;
 
   try {
     const gridData = await fetchGridData(path, file);
     appState.set("gridData", gridData);
+
     renderContourLayers(map, gridData, element, {
-      visibleIsoband: appState.state.layers.contourf,
-      visibleIsoline: appState.state.layers.contour,
-      opacity: appState.state.opacity.contourf,
+      layerId,
+      showFill: defaultShowFill,
+      showLine: defaultShowLine,
+      lineColor,
+      opacity,
     });
 
-    if (appState.state.layers.raster) {
+    // Register into Layers Manager
+    addOrUpdateLayer({
+      id: layerId,
+      name,
+      type: "contour",
+      element,
+      level,
+      model,
+      color: lineColor,
+      config: {
+        showFill: defaultShowFill,
+        showLine: defaultShowLine,
+        lineColor,
+        opacity,
+        lineWidth: 1.4,
+      },
+    });
+
+    if (appState.state.layers.raster && !isHeight) {
       const binBuffer = await fetchGridBinaryStream(path, file);
       renderBinaryRaster(map, binBuffer, element);
     }
 
     if (element === "WIND" && gridData.u && gridData.v) {
       renderWindStreamlines(map, gridData);
-    } else {
+    } else if (!customOptions?.keepWind) {
       stopWindAnimation();
     }
 
     updateLegend(element);
   } catch (err) {
-    console.error("[Bootstrap] Field load failed:", err);
+    console.error(`[Bootstrap] Field load failed for ${path}/${file}:`, err);
   }
+}
+
+// When upper plot is loaded, display plot and draw 500hPa height and temp contour lines by default
+async function loadUpperAirComposite(map, level = 500, obsTime = "20260827200000.000") {
+  console.log(`[UpperAir] Loading composite upper chart for ${level} hPa...`);
+
+  // 1. Load Upper Air Sounding Plots
+  await loadObservationProduct(map, "UPPER_AIR", "PLOT", level, obsTime);
+  addOrUpdateLayer({
+    id: `station-upper-${level}`,
+    name: `Upper Air ${level}hPa Soundings`,
+    type: "station",
+    color: "#e3b341",
+    visible: true,
+    removable: true,
+  });
+
+  // 2. Draw Height contour lines (blue) and Temperature contour lines (red)
+  await Promise.allSettled([
+    loadWeatherField(map, "ECMWF_HR", "HGT", level, 24, {
+      showFill: false,
+      showLine: true,
+      lineColor: "#58a6ff", // Blue geopotential height isolines
+    }),
+    loadWeatherField(map, "ECMWF_HR", "TMP", level, 24, {
+      showFill: false,
+      showLine: true,
+      lineColor: "#f85149", // Red temperature isotherms
+    }),
+  ]);
 }
 
 async function loadObservationProduct(map, model, element, level, file) {
@@ -124,30 +203,44 @@ async function loadSurfaceStations(map) {
     console.log("[Main] Received stations: " + (stations && stations.features ? stations.features.length : 0));
     appState.set("stationData", stations);
     renderStationWeatherPlots(map, stations, appState.state.layers.station);
-    console.log("[Main] Finished rendering station plots");
+    console.log("[Main] Finished rendering surface station plots");
   } catch (err) {
-    console.error("[Bootstrap] Stations load failed:", err);
+    console.error("[Bootstrap] Surface stations load failed:", err);
   }
 }
 
-function handleLayerToggle(map, key, value) {
-  switch (key) {
-    case "contourf":
-      setIsobandVisibility(map, value);
-      break;
-    case "contour":
-      setIsolineVisibility(map, value);
-      break;
-    case "station":
-    case "stations":
+function handleLayerAction(map, action, layerId, value, layer) {
+  if (action === "visibility") {
+    if (layer.type === "contour") {
+      setLayerIsobandVisibility(map, layerId, value && layer.config.showFill);
+      setLayerIsolineVisibility(map, layerId, value && layer.config.showLine);
+    } else if (layer.type === "station") {
       setStationVisibility(map, value);
-      break;
-    case "raster":
+    } else if (layer.type === "pmtiles") {
+      const vis = value ? "visible" : "none";
+      if (map.getLayer("provinces-boundary")) map.setLayoutProperty("provinces-boundary", "visibility", vis);
+      if (map.getLayer("graticule-layer")) map.setLayoutProperty("graticule-layer", "visibility", vis);
+    }
+  } else if (action === "config") {
+    if (layer.type === "contour") {
+      setLayerIsobandVisibility(map, layerId, layer.visible && value.showFill);
+      setLayerIsolineVisibility(map, layerId, layer.visible && value.showLine);
+      setLayerIsobandOpacity(map, layerId, value.opacity);
+      setLayerIsolineColor(map, layerId, value.lineColor);
+    }
+  } else if (action === "remove") {
+    if (layer.type === "contour") {
+      removeContourLayer(map, layerId);
+    } else if (layer.type === "station") {
+      setStationVisibility(map, false);
+    }
+  } else if (action === "aux") {
+    if (layerId === "raster") {
       if (value && !map.getLayer("raster-layer")) {
-        const model = appState.get("model");
-        const element = appState.get("element");
-        const level = appState.get("level");
-        const period = appState.get("period");
+        const model = appState.get("model") || "ECMWF_HR";
+        const element = appState.get("element") || "TMP";
+        const level = appState.get("level") || 850;
+        const period = appState.get("period") || 24;
         const file = `26082708.${String(period).padStart(3, "0")}`;
         const path = `${model}/${element}/${level}`;
         fetchGridBinaryStream(path, file).then((bin) => {
@@ -156,8 +249,7 @@ function handleLayerToggle(map, key, value) {
       } else {
         setRasterVisibility(map, value);
       }
-      break;
-    case "wind":
+    } else if (layerId === "wind") {
       if (value) {
         let grid = appState.get("gridData");
         if (!grid || !grid.u || !grid.v) {
@@ -171,13 +263,9 @@ function handleLayerToggle(map, key, value) {
       } else {
         stopWindAnimation();
       }
-      break;
-    case "opacity":
-      setContourOpacity(map, value);
-      break;
+    }
   }
 }
-
 
 function updateLegend(element = "TMP") {
   const panel = document.getElementById("legend-panel");
