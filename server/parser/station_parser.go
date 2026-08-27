@@ -83,7 +83,7 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 			ind += 10
 		}
 
-		var temp, dewPoint, slp, pDiff3h, windSpeed, windDir, vis, rain1h, rain6h, rain24h float32 = -9999, -9999, -9999, 0, 0, 0, 10, 0, 0, 0
+		var temp, dewPoint, slp, height, pDiff3h, windSpeed, windDir, vis, rain1h, rain6h, rain24h float32 = -9999, -9999, -9999, -9999, 0, 0, 0, 10, 0, 0, 0
 		var cloudCover, weatherCode, pTendency int16 = 0, 0, 0
 
 		for e := 0; e < int(numb) && ind+2 <= len(decompressed); e++ {
@@ -139,6 +139,8 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 				dewPoint = valFloat
 			case 1001, 1003:
 				slp = valFloat
+			case 1002, 1004:
+				height = valFloat
 			case 1005:
 				pDiff3h = valFloat
 				pTendency = int16(valInt)
@@ -169,6 +171,7 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 			"station_id":    stationID,
 			"temperature":   round1(temp),
 			"dewpoint":      round1(dewPoint),
+			"height":        round1(height),
 			"slp":           round1(slp),
 			"slp_encoded":   encodeSLP(slp),
 			"press_diff_3h": round1(pDiff3h),

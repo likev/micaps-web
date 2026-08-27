@@ -156,6 +156,7 @@ func GenerateMockStations() *model.GeoJSONFeatureCollection {
 				"name":          s.Name,
 				"temperature":   s.T,
 				"dewpoint":      s.Td,
+				"height":        float32(math.Round(float64(5500.0+(s.T+15.0)*25.0)*10) / 10),
 				"slp":           s.SLP,
 				"slp_encoded":   encodeSLP(s.SLP),
 				"press_diff_3h": 1.2,

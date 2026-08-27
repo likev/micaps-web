@@ -19,6 +19,7 @@ import {
 import { renderBinaryRaster, setRasterVisibility } from "./layers/rasterLayer.js";
 import { renderStationWeatherPlots, setStationVisibility } from "./layers/stationLayer.js";
 import { renderWindStreamlines, stopWindAnimation } from "./layers/windLayer.js";
+import { analyzeAndRenderSoundingContours } from "./layers/soundingAnalysis.js";
 import { fetchGridData, fetchGridBinaryStream, fetchStationObservations } from "./api/catalogApi.js";
 import { getCSSGradient } from "./utils/colormaps.js";
 import { appState } from "./store/appState.js";
@@ -145,12 +146,16 @@ async function loadWeatherField(map, model, element, level, period, customOption
   }
 }
 
-// When upper plot is loaded, display plot and draw 500hPa height and temp contour lines by default
+// When upper plot is loaded, display plot and calculate height & temp contour lines from sounding plot data
 async function loadUpperAirComposite(map, level = 500, obsTime = "20260827200000.000") {
-  console.log(`[UpperAir] Loading composite upper chart for ${level} hPa...`);
+  console.log(`[UpperAir] Loading upper soundings and calculating contour lines for ${level} hPa...`);
 
   // 1. Load Upper Air Sounding Plots
-  await loadObservationProduct(map, "UPPER_AIR", "PLOT", level, obsTime);
+  const path = `UPPER_AIR/PLOT/${level || 500}`;
+  const stations = await fetchStationObservations(path, obsTime);
+  appState.set("stationData", stations);
+  renderStationWeatherPlots(map, stations, appState.state.layers.station);
+
   addOrUpdateLayer({
     id: `station-upper-${level}`,
     name: `Upper Air ${level}hPa Soundings`,
@@ -160,19 +165,11 @@ async function loadUpperAirComposite(map, level = 500, obsTime = "20260827200000
     removable: true,
   });
 
-  // 2. Draw Height contour lines (blue) and Temperature contour lines (red)
-  await Promise.allSettled([
-    loadWeatherField(map, "ECMWF_HR", "HGT", level, 24, {
-      showFill: false,
-      showLine: true,
-      lineColor: "#58a6ff", // Blue geopotential height isolines
-    }),
-    loadWeatherField(map, "ECMWF_HR", "TMP", level, 24, {
-      showFill: false,
-      showLine: true,
-      lineColor: "#f85149", // Red temperature isotherms
-    }),
-  ]);
+  // 2. Calculate Height contour lines and Temperature contour lines from sounding plot data
+  if (stations && stations.features && stations.features.length >= 3) {
+    console.log(`[UpperAir] Calculating objective analysis contours from ${stations.features.length} sounding stations...`);
+    analyzeAndRenderSoundingContours(map, stations, level);
+  }
 }
 
 async function loadObservationProduct(map, model, element, level, file) {

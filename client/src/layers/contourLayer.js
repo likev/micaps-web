@@ -188,6 +188,10 @@ export function removeContourLayer(map, layerId) {
 }
 
 
+export function renderCustomContourGeoJSON(map, isobands, isolines, options = {}) {
+  updateMapLibreContour(map, isobands, isolines, options);
+}
+
 export function setIsobandVisibility(map, visible) {
   setLayerIsobandVisibility(map, "default", visible);
 }
