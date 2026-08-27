@@ -20,6 +20,7 @@ import { renderBinaryRaster, setRasterVisibility } from "./layers/rasterLayer.js
 import { renderStationWeatherPlots, setStationVisibility } from "./layers/stationLayer.js";
 import { renderWindStreamlines, stopWindAnimation } from "./layers/windLayer.js";
 import { analyzeAndRenderSoundingContours } from "./layers/soundingAnalysis.js";
+import { analyzeAndRenderSurfaceSLPContours } from "./layers/surfaceAnalysis.js";
 import { fetchGridData, fetchGridBinaryStream, fetchStationObservations } from "./api/catalogApi.js";
 import { getCSSGradient } from "./utils/colormaps.js";
 import { appState } from "./store/appState.js";
@@ -188,6 +189,20 @@ async function loadObservationProduct(map, model, element, level, file) {
     appState.set("stationData", stations);
     renderStationWeatherPlots(map, stations, appState.state.layers.station);
     console.log(`[Main] Observation stations rendered (${stations && stations.features ? stations.features.length : 0} stations)`);
+
+    addOrUpdateLayer({
+      id: `station-${model.toLowerCase()}`,
+      name: `${model === "SURFACE" ? "Surface" : "Upper Air"} Station Observations`,
+      type: "station",
+      color: "#e3b341",
+      visible: true,
+      removable: true,
+    });
+
+    if (model === "SURFACE" && stations && stations.features && stations.features.length >= 3) {
+      console.log(`[Main] Calculating SLP isobars from ${stations.features.length} surface stations...`);
+      analyzeAndRenderSurfaceSLPContours(map, stations);
+    }
   } catch (err) {
     console.error("[Main] Observation load error:", err);
   }
@@ -200,7 +215,21 @@ async function loadSurfaceStations(map) {
     console.log("[Main] Received stations: " + (stations && stations.features ? stations.features.length : 0));
     appState.set("stationData", stations);
     renderStationWeatherPlots(map, stations, appState.state.layers.station);
-    console.log("[Main] Finished rendering surface station plots");
+
+    addOrUpdateLayer({
+      id: "station-surface",
+      name: "Surface Station Observations",
+      type: "station",
+      color: "#e3b341",
+      visible: true,
+      removable: true,
+    });
+
+    if (stations && stations.features && stations.features.length >= 3) {
+      console.log(`[Bootstrap] Calculating SLP isobars from ${stations.features.length} surface stations...`);
+      analyzeAndRenderSurfaceSLPContours(map, stations);
+    }
+    console.log("[Main] Finished rendering surface station plots and SLP contours");
   } catch (err) {
     console.error("[Bootstrap] Surface stations load failed:", err);
   }
