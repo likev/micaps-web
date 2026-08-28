@@ -136,34 +136,35 @@ export function updateVisibleMarkersForMap(map) {
   const curZoom = map.getZoom();
   const scale = curZoom < 4.5 ? 0.75 : (curZoom < 6.5 ? 0.88 : 1.0);
 
-  // 1. Group in-bounds stations into 1° x 1° spatial grid bins
-  const gridBins = new Map();
+  // 1. Group in-bounds stations into 100x100px screen pixel grid bins
+  const screenBins = new Map();
   for (const f of state.geojson.features) {
     const [lon, lat] = f.geometry.coordinates;
     if (!isPointInBounds(bounds, lon, lat)) continue;
 
-    const gridKey = `${Math.floor(lon)},${Math.floor(lat)}`;
-    let list = gridBins.get(gridKey);
+    const pt = map.project([lon, lat]);
+    const binKey = `${Math.floor(pt.x / 100)},${Math.floor(pt.y / 100)}`;
+    let list = screenBins.get(binKey);
     if (!list) {
       list = [];
-      gridBins.set(gridKey, list);
+      screenBins.set(binKey, list);
     }
     list.push(f);
   }
 
-  // 2. In each 1° x 1° grid cell, show at most 10 stations (randomly sampled)
+  // 2. In each 100x100px screen cell, show at most 5 stations (randomly sampled)
   const selectedFeatures = [];
-  for (const list of gridBins.values()) {
-    if (list.length <= 10) {
+  for (const list of screenBins.values()) {
+    if (list.length <= 5) {
       for (let i = 0; i < list.length; i++) selectedFeatures.push(list[i]);
     } else {
-      // Sort by stable pseudorandom hash to pick top 10 without visual jitter
+      // Sort by stable pseudorandom hash to pick top 5 without visual jitter
       list.sort((a, b) => {
         const ha = hashStation(a.properties?.station_id, a.geometry.coordinates[0], a.geometry.coordinates[1]);
         const hb = hashStation(b.properties?.station_id, b.geometry.coordinates[0], b.geometry.coordinates[1]);
         return ha - hb;
       });
-      for (let i = 0; i < 10; i++) selectedFeatures.push(list[i]);
+      for (let i = 0; i < 5; i++) selectedFeatures.push(list[i]);
     }
   }
 
@@ -209,16 +210,16 @@ export function updateVisibleMarkersForMap(map) {
 
     const ww = getWeatherSymbol(weatherCode);
     const skySVG = getSkyCoverSVG(cloudCover, 16);
-    const barbSVG = getWindBarbSVG(ws, wd, 48);
+    const barbSVG = getWindBarbSVG(ws, wd, 144);
 
     el.innerHTML = `
       <div style="position: relative; width: 48px; height: 48px; pointer-events: none;">
-        <!-- Wind Barb / Direction & Speed (Centered at 24, 24) -->
-        <div style="position: absolute; top: 0px; left: 0px; width: 48px; height: 48px; pointer-events: none;">
+        <!-- Wind Barb / Direction & Speed (3X Size centered at 24, 24) -->
+        <div style="position: absolute; top: -48px; left: -48px; width: 144px; height: 144px; pointer-events: none; z-index: 1;">
           ${barbSVG}
         </div>
         <!-- Center Sky Cover Circle (16x16 at 16, 16) -->
-        <div style="position: absolute; top: 16px; left: 16px; width: 16px; height: 16px; pointer-events: none;">
+        <div style="position: absolute; top: 16px; left: 16px; width: 16px; height: 16px; pointer-events: none; z-index: 2;">
           ${skySVG}
         </div>
         <!-- TT: Temperature (°C) Top-Left in Bold Red/Orange -->

@@ -38,25 +38,23 @@ export function getSkyCoverSVG(octas = 0, size = 18) {
   `;
 }
 
-export function getWindBarbSVG(speed = 0, dir = 0, size = 48) {
+export function getWindBarbSVG(speed = 0, dir = 0, size = 144) {
   const cx = size / 2;
   const cy = size / 2;
 
-  // Convert speed from m/s to knots if needed (1 m/s ~ 1.94 kts)
-  const kts = speed < 0.8 ? 0 : Math.round(speed * 1.94384);
-
-  if (kts < 3) {
-    // Calm: concentric light ring around center circle
+  // Speed in m/s (CMA / Chinese Standard: 4 m/s full barb, 2 m/s half barb, 20 m/s pennant flag)
+  if (speed < 1.5) {
+    // Calm: concentric light ring around center
     return `
       <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-        <circle cx="${cx}" cy="${cy}" r="11" fill="none" stroke="#58a6ff" stroke-width="1.2" stroke-dasharray="2,2"/>
+        <circle cx="${cx}" cy="${cy}" r="14" fill="none" stroke="#58a6ff" stroke-width="1.8" stroke-dasharray="3,3"/>
       </svg>
     `;
   }
 
-  // Draw staff pointing into the wind from the outer edge of sky cover circle (r = 8)
-  const skyRadius = 8;
-  const staffLength = size * 0.45;
+  // 3X dimensions:
+  const skyRadius = 10;
+  const staffLength = 58;
   const angleRad = ((dir - 90) * Math.PI) / 180;
   const xStart = cx + skyRadius * Math.cos(angleRad);
   const yStart = cy + skyRadius * Math.sin(angleRad);
@@ -64,48 +62,49 @@ export function getWindBarbSVG(speed = 0, dir = 0, size = 48) {
   const yEnd = cy + staffLength * Math.sin(angleRad);
 
   let barbsSVG = "";
-  let remKts = kts;
+  let remSpeed = Math.round(speed);
   let pos = staffLength;
+  const barbAngle = angleRad + (Math.PI * 0.38); // ~68 degrees to the left of staff
 
-  // 50-knot pennant flags
-  while (remKts >= 48) {
+  // 1. Pennant flag (20 m/s each)
+  while (remSpeed >= 18) {
     const pX = cx + pos * Math.cos(angleRad);
     const pY = cy + pos * Math.sin(angleRad);
-    const barbAngle = angleRad + Math.PI / 2.5;
-    const fX = pX + 8.5 * Math.cos(barbAngle);
-    const fY = pY + 8.5 * Math.sin(barbAngle);
-    const pX2 = cx + (pos - 5) * Math.cos(angleRad);
-    const pY2 = cy + (pos - 5) * Math.sin(angleRad);
-    barbsSVG += `<polygon points="${pX},${pY} ${fX},${fY} ${pX2},${pY2}" fill="#58a6ff"/>`;
-    pos -= 6;
-    remKts -= 50;
+    const fX = pX + 24 * Math.cos(barbAngle);
+    const fY = pY + 24 * Math.sin(barbAngle);
+    const posNext = pos - 14;
+    const pX2 = cx + posNext * Math.cos(angleRad);
+    const pY2 = cy + posNext * Math.sin(angleRad);
+    barbsSVG += `<polygon points="${pX},${pY} ${fX},${fY} ${pX2},${pY2}" fill="#58a6ff" stroke="#58a6ff" stroke-width="1.2"/>`;
+    pos -= 16;
+    remSpeed -= 20;
   }
 
-  // 10-knot full barbs
-  while (remKts >= 8) {
+  // 2. Full barb / long feather (4 m/s each)
+  while (remSpeed >= 3.5) {
     const pX = cx + pos * Math.cos(angleRad);
     const pY = cy + pos * Math.sin(angleRad);
-    const barbAngle = angleRad + Math.PI / 2.5;
-    const bX = pX + 7.5 * Math.cos(barbAngle);
-    const bY = pY + 7.5 * Math.sin(barbAngle);
-    barbsSVG += `<line x1="${pX}" y1="${pY}" x2="${bX}" y2="${bY}" stroke="#58a6ff" stroke-width="1.6"/>`;
-    pos -= 4.5;
-    remKts -= 10;
+    const bX = pX + 22 * Math.cos(barbAngle);
+    const bY = pY + 22 * Math.sin(barbAngle);
+    barbsSVG += `<line x1="${pX}" y1="${pY}" x2="${bX}" y2="${bY}" stroke="#58a6ff" stroke-width="2.6" stroke-linecap="round"/>`;
+    pos -= 10;
+    remSpeed -= 4;
   }
 
-  // 5-knot half barb
-  if (remKts >= 3) {
+  // 3. Half barb / short feather (2 m/s)
+  if (remSpeed >= 1.5) {
     const pX = cx + pos * Math.cos(angleRad);
     const pY = cy + pos * Math.sin(angleRad);
-    const barbAngle = angleRad + Math.PI / 2.5;
-    const bX = pX + 4 * Math.cos(barbAngle);
-    const bY = pY + 4 * Math.sin(barbAngle);
-    barbsSVG += `<line x1="${pX}" y1="${pY}" x2="${bX}" y2="${bY}" stroke="#58a6ff" stroke-width="1.6"/>`;
+    const bX = pX + 11 * Math.cos(barbAngle);
+    const bY = pY + 11 * Math.sin(barbAngle);
+    barbsSVG += `<line x1="${pX}" y1="${pY}" x2="${bX}" y2="${bY}" stroke="#58a6ff" stroke-width="2.6" stroke-linecap="round"/>`;
   }
 
   return `
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <line x1="${xStart}" y1="${yStart}" x2="${xEnd}" y2="${yEnd}" stroke="#58a6ff" stroke-width="1.6"/>
+      <!-- Wind Staff (3X size) -->
+      <line x1="${xStart}" y1="${yStart}" x2="${xEnd}" y2="${yEnd}" stroke="#58a6ff" stroke-width="2.6" stroke-linecap="round"/>
+      <!-- Feathers & Flags (4 m/s full, 2 m/s half, 20 m/s pennant) -->
       ${barbsSVG}
     </svg>
   `;
