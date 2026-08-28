@@ -145,7 +145,7 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 					slp = stnPress
 				}
 			case 1002, 1004, 1: // Geopotential Height (Upper-Air)
-				height = valFloat
+				height = normalizeHeight(valFloat)
 			case 1005, 403, 6: // 3-hour pressure change
 				pDiff3h = valFloat
 			case 1007, 7, 404: // Pressure tendency
@@ -215,7 +215,7 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 }
 
 func normalizeTemp(val float32) float32 {
-	if val < -9000 || val > 9000 {
+	if val < -9000 || val > 9000 || val == 9999.0 || val == 999.0 || val == -999.0 {
 		return -9999
 	}
 	if val > 150 && val < 373.15 { // Kelvin
@@ -231,14 +231,37 @@ func normalizeTemp(val float32) float32 {
 }
 
 func normalizePress(val float32) float32 {
-	if val < -9000 || val > 9000 || val <= 0 {
+	if val < -9000 || val > 9000 || val <= 0 || val == 9999.0 || val == 999.0 {
 		return -9999
 	}
-	if val > 8000 && val < 110000 { // Pascals to hPa (e.g. 101325 Pa -> 1013.25 hPa)
-		return val / 100.0
+	// MICAPS Diamond 1 / 3 standard 3-digit sea-level pressure decoding:
+	// If val <= 600: val/10 + 1000 (e.g. 124 -> 1012.4 hPa, 36 -> 1003.6 hPa)
+	// If val > 600 and < 800: val/10 + 900 (e.g. 984 -> 998.4 hPa, 850 -> 985.0 hPa)
+	if val > 0 && val <= 600 {
+		return val/10.0 + 1000.0
+	}
+	if val > 600 && val < 800 {
+		return val/10.0 + 900.0
+	}
+	if val >= 800 && val <= 1100 { // Standard hPa
+		return val
 	}
 	if val > 8000 && val < 11000 { // Tenths of hPa (e.g. 10124 -> 1012.4 hPa)
 		return val / 10.0
+	}
+	if val >= 80000 && val <= 110000 { // Pascals to hPa (e.g. 101325 Pa -> 1013.25 hPa)
+		return val / 100.0
+	}
+	return val
+}
+
+func normalizeHeight(val float32) float32 {
+	if val < -9000 || val > 90000 || val == 9999.0 || val == 999.0 {
+		return -9999
+	}
+	// MICAPS decameters (e.g. 588 decameters -> 5880 gpm)
+	if val > 100 && val < 1000 {
+		return val * 10.0
 	}
 	return val
 }
