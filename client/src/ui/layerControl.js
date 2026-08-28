@@ -1,18 +1,16 @@
-// layerControl.js - Interactive multi-layer management panel (layers-manage)
+// layerControl.js - Interactive per-window multi-layer management panel
 import { appState } from "../store/appState.js";
 
-let layers = [];
+const windowLayersMap = new Map();
+let currentActiveWinId = "default";
+let currentActiveWinTitle = "";
 let onLayerActionCallback = null;
 
-export function initLayerControl(containerId = "layer-control", onLayerAction) {
-  onLayerActionCallback = onLayerAction;
-  const panel = document.getElementById(containerId);
-  if (!panel) return;
-
-  // Initialize with default base layers
-  layers = [
+function createDefaultLayers(winId = "default") {
+  return [
     {
-      id: "layer-pmtiles",
+      id: `layer-pmtiles-${winId}`,
+      rawId: "pmtiles",
       name: "China Vector Basemap",
       type: "pmtiles",
       visible: true,
@@ -22,7 +20,8 @@ export function initLayerControl(containerId = "layer-control", onLayerAction) {
       config: {},
     },
     {
-      id: "layer-station",
+      id: `layer-station-${winId}`,
+      rawId: "station",
       name: "Surface Station Plots",
       type: "station",
       visible: true,
@@ -32,19 +31,45 @@ export function initLayerControl(containerId = "layer-control", onLayerAction) {
       config: {},
     },
   ];
+}
 
+export function initLayerControl(containerId = "layer-control", onLayerAction) {
+  onLayerActionCallback = onLayerAction;
+  const panel = document.getElementById(containerId);
+  if (!panel) return;
   renderLayersManager(panel);
 }
 
-export function addOrUpdateLayer(layerDef) {
+export function getLayersForWindow(winOrId) {
+  const winId = typeof winOrId === "object" ? (winOrId?.id || "default") : (winOrId || currentActiveWinId || "default");
+  if (!windowLayersMap.has(winId)) {
+    windowLayersMap.set(winId, createDefaultLayers(winId));
+  }
+  return windowLayersMap.get(winId);
+}
+
+export function clearWindowWeatherLayers(winOrId) {
+  const winId = typeof winOrId === "object" ? (winOrId?.id || "default") : (winOrId || currentActiveWinId || "default");
+  const current = getLayersForWindow(winId);
+  const baseLayers = current.filter((l) => !l.removable);
+  windowLayersMap.set(winId, baseLayers.length ? baseLayers : createDefaultLayers(winId));
+  if (winId === currentActiveWinId) {
+    const panel = document.getElementById("layer-control");
+    if (panel) renderLayersManager(panel);
+  }
+}
+
+export function addOrUpdateLayer(layerDef, winOrId = null) {
+  const winId = typeof winOrId === "object" ? (winOrId?.id || currentActiveWinId) : (winOrId || currentActiveWinId || "default");
+  const layers = getLayersForWindow(winId);
+
   const existingIdx = layers.findIndex((l) => l.id === layerDef.id);
   if (existingIdx >= 0) {
     layers[existingIdx] = { ...layers[existingIdx], ...layerDef };
   } else {
-    // Insert new weather layers near the top (above basemap)
     layers.unshift({
-      removable: true,
-      visible: true,
+      removable: layerDef.removable !== undefined ? layerDef.removable : true,
+      visible: layerDef.visible !== undefined ? layerDef.visible : true,
       isExpanded: false,
       color: layerDef.color || (layerDef.element === "HGT" ? "#58a6ff" : layerDef.element === "TMP" ? "#f85149" : "#388bfd"),
       config: {
@@ -58,29 +83,47 @@ export function addOrUpdateLayer(layerDef) {
     });
   }
 
-  const panel = document.getElementById("layer-control");
-  if (panel) renderLayersManager(panel);
-}
-
-export function removeLayer(layerId) {
-  const idx = layers.findIndex((l) => l.id === layerId);
-  if (idx >= 0) {
-    layers.splice(idx, 1);
+  if (winId === currentActiveWinId) {
     const panel = document.getElementById("layer-control");
     if (panel) renderLayersManager(panel);
   }
 }
 
+export function removeLayer(layerId, winOrId = null) {
+  const winId = typeof winOrId === "object" ? (winOrId?.id || currentActiveWinId) : (winOrId || currentActiveWinId || "default");
+  const layers = getLayersForWindow(winId);
+  const idx = layers.findIndex((l) => l.id === layerId);
+  if (idx >= 0) {
+    layers.splice(idx, 1);
+    if (winId === currentActiveWinId) {
+      const panel = document.getElementById("layer-control");
+      if (panel) renderLayersManager(panel);
+    }
+  }
+}
+
+export function syncLayerControlForWindow(win) {
+  if (!win) return;
+  currentActiveWinId = win.id || "default";
+  currentActiveWinTitle = win.activeGroup ? `W${win.winIdx + 1}: ${win.activeGroup.name}` : `Window ${win.winIdx + 1}`;
+  const panel = document.getElementById("layer-control");
+  if (panel) renderLayersManager(panel);
+}
+
 export function getLayers() {
-  return layers;
+  return getLayersForWindow(currentActiveWinId);
 }
 
 function renderLayersManager(panel) {
+  const layers = getLayersForWindow(currentActiveWinId);
   const count = layers.length;
 
   panel.innerHTML = `
     <div class="panel-title">
-      <span>Layers Manager</span>
+      <div style="display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden;">
+        <span style="white-space: nowrap;">Layers</span>
+        ${currentActiveWinTitle ? `<span class="win-target-badge" title="${currentActiveWinTitle}">${currentActiveWinTitle}</span>` : ""}
+      </div>
       <span class="badge" id="layer-count">${count}</span>
     </div>
 
@@ -124,7 +167,7 @@ function renderLayersManager(panel) {
         layer.visible = !layer.visible;
         visBtn.classList.toggle("active", layer.visible);
         visBtn.innerHTML = layer.visible ? "👁" : "👁‍🗨";
-        if (onLayerActionCallback) onLayerActionCallback("visibility", layer.id, layer.visible, layer);
+        if (onLayerActionCallback) onLayerActionCallback("visibility", layer.id, layer.visible, layer, currentActiveWinId);
       });
     }
 
@@ -133,8 +176,8 @@ function renderLayersManager(panel) {
     if (removeBtn) {
       removeBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        removeLayer(layer.id);
-        if (onLayerActionCallback) onLayerActionCallback("remove", layer.id, null, layer);
+        removeLayer(layer.id, currentActiveWinId);
+        if (onLayerActionCallback) onLayerActionCallback("remove", layer.id, null, layer, currentActiveWinId);
       });
     }
 
@@ -162,7 +205,7 @@ function renderLayersManager(panel) {
         chkFill.addEventListener("click", (e) => e.stopPropagation());
         chkFill.addEventListener("change", (e) => {
           layer.config.showFill = e.target.checked;
-          if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer);
+          if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer, currentActiveWinId);
         });
       }
 
@@ -170,7 +213,7 @@ function renderLayersManager(panel) {
         chkLine.addEventListener("click", (e) => e.stopPropagation());
         chkLine.addEventListener("change", (e) => {
           layer.config.showLine = e.target.checked;
-          if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer);
+          if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer, currentActiveWinId);
         });
       }
 
@@ -178,7 +221,7 @@ function renderLayersManager(panel) {
         sliderOpacity.addEventListener("click", (e) => e.stopPropagation());
         sliderOpacity.addEventListener("input", (e) => {
           layer.config.opacity = parseInt(e.target.value, 10) / 100;
-          if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer);
+          if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer, currentActiveWinId);
         });
       }
 
@@ -186,7 +229,7 @@ function renderLayersManager(panel) {
         colorPicker.addEventListener("click", (e) => e.stopPropagation());
         colorPicker.addEventListener("change", (e) => {
           layer.config.lineColor = e.target.value;
-          if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer);
+          if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer, currentActiveWinId);
         });
       }
     }
@@ -202,17 +245,17 @@ function renderLayerRow(layer) {
 
   return `
     <div class="layer-item" data-layer-id="${layer.id}">
-      <div class="layer-row" data-layer-id="${layer.id}" title="Click to configure ${layer.name}">
+      <div class="layer-row" data-layer-id="${layer.id}" title="${layer.name} (Click to configure)">
         <!-- Visibility Eye Toggle Button -->
         <button class="btn-vis ${layer.visible ? "active" : ""}" data-layer-id="${layer.id}" title="Toggle Visibility">
           ${layer.visible ? "👁" : "👁‍🗨"}
         </button>
 
         <!-- Layer Color Dot -->
-        <span class="layer-color-dot" style="background: ${layer.color};"></span>
+        <span class="layer-color-dot" style="background: ${layer.color || "#58a6ff"};"></span>
 
-        <!-- Layer Name (one layer per row) -->
-        <span class="layer-name">${layer.name}</span>
+        <!-- Layer Name (single row, guaranteed no overlap) -->
+        <span class="layer-name" title="${layer.name}">${layer.name}</span>
 
         <!-- Config Button -->
         <button class="btn-config ${layer.isExpanded ? "open" : ""}" data-layer-id="${layer.id}" title="Configure Layer">
@@ -223,7 +266,7 @@ function renderLayerRow(layer) {
         ${
           layer.removable
             ? `<button class="btn-remove" data-layer-id="${layer.id}" title="Remove Layer">✕</button>`
-            : `<span style="width: 20px;"></span>`
+            : `<span style="width: 22px; flex-shrink: 0;"></span>`
         }
       </div>
 
@@ -264,7 +307,7 @@ function bindAuxCheckbox(elementId, layerKey) {
   if (!el) return;
   el.addEventListener("change", (e) => {
     appState.setLayer(layerKey, e.target.checked);
-    if (onLayerActionCallback) onLayerActionCallback("aux", layerKey, e.target.checked);
+    if (onLayerActionCallback) onLayerActionCallback("aux", layerKey, e.target.checked, null, currentActiveWinId);
   });
 }
 

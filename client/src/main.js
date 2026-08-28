@@ -2,7 +2,13 @@
 import { getActiveMap } from "./map/mapInstance.js";
 import { initNavBar, refreshNavBarPresets } from "./ui/navBar.js";
 import { initCatalogDrawer } from "./ui/catalogDrawer.js";
-import { initLayerControl, addOrUpdateLayer, removeLayer } from "./ui/layerControl.js";
+import {
+  initLayerControl,
+  addOrUpdateLayer,
+  removeLayer,
+  syncLayerControlForWindow,
+  clearWindowWeatherLayers,
+} from "./ui/layerControl.js";
 import { initTimeSlider, setTimelineMode } from "./ui/timeSlider.js";
 import { initTooltip } from "./ui/tooltip.js";
 import {
@@ -73,6 +79,7 @@ async function bootstrap() {
       } else {
         setTimelineMode("nwp", { period: win.period });
       }
+      syncLayerControlForWindow(win);
     },
     onWindowGroupChange: async (win, group) => {
       if (!win.map) return;
@@ -252,7 +259,7 @@ async function loadWeatherField(map, model, element, level, period, customOption
       colormap,
     });
 
-    // Register into Layers Manager
+    // Register into Layers Manager for this window
     addOrUpdateLayer({
       id: layerId,
       name,
@@ -268,7 +275,7 @@ async function loadWeatherField(map, model, element, level, period, customOption
         opacity,
         lineWidth: 1.4,
       },
-    });
+    }, win);
 
     if (appState.state.layers.raster && !isHeight) {
       const binBuffer = await fetchGridBinaryStream(path, file);
@@ -278,7 +285,7 @@ async function loadWeatherField(map, model, element, level, period, customOption
     if (element === "WIND" && gridData.u && gridData.v) {
       renderWindStreamlines(map, gridData);
     } else if (!customOptions?.keepWind) {
-      stopWindAnimation();
+      stopWindAnimation(map);
     }
 
     updateLegend(element, colormap);
@@ -288,7 +295,7 @@ async function loadWeatherField(map, model, element, level, period, customOption
 }
 
 // When upper plot is loaded, display plot and calculate height & temp contour lines from sounding plot data
-async function loadUpperAirComposite(map, level = 500, obsTime = "20260827200000.000") {
+async function loadUpperAirComposite(map, level = 500, obsTime = "20260827200000.000", win = getActiveWindow()) {
   console.log(`[UpperAir] Loading upper soundings and calculating contour lines for ${level} hPa...`);
 
   // 1. Load Upper Air Sounding Plots
@@ -304,7 +311,7 @@ async function loadUpperAirComposite(map, level = 500, obsTime = "20260827200000
     color: "#e3b341",
     visible: true,
     removable: true,
-  });
+  }, win);
 
   // 2. Calculate Height contour lines and Temperature contour lines from sounding plot data
   if (stations && stations.features && stations.features.length >= 3) {
@@ -313,7 +320,7 @@ async function loadUpperAirComposite(map, level = 500, obsTime = "20260827200000
   }
 }
 
-async function loadObservationProduct(map, model, element, level, file) {
+async function loadObservationProduct(map, model, element, level, file, win = getActiveWindow()) {
   let path = "";
   if (model === "SURFACE") {
     path = `SURFACE/${element}`;
@@ -337,7 +344,7 @@ async function loadObservationProduct(map, model, element, level, file) {
       color: "#e3b341",
       visible: true,
       removable: true,
-    });
+    }, win);
 
     if (model === "SURFACE" && stations && stations.features && stations.features.length >= 3) {
       console.log(`[Main] Calculating SLP isobars from ${stations.features.length} surface stations...`);
@@ -348,7 +355,7 @@ async function loadObservationProduct(map, model, element, level, file) {
   }
 }
 
-async function loadSurfaceStations(map) {
+async function loadSurfaceStations(map, win = getActiveWindow()) {
   try {
     console.log("[Main] Starting surface stations fetch...");
     const stations = await fetchStationObservations("SURFACE/PLOT_GLOBAL_3H", "20260827200000.000");
@@ -363,7 +370,7 @@ async function loadSurfaceStations(map) {
       color: "#e3b341",
       visible: true,
       removable: true,
-    });
+    }, win);
 
     if (stations && stations.features && stations.features.length >= 3) {
       console.log(`[Bootstrap] Calculating SLP isobars from ${stations.features.length} surface stations...`);
@@ -427,7 +434,7 @@ function handleLayerAction(map, action, layerId, value, layer, win = getActiveWi
         }
         renderWindStreamlines(map, grid);
       } else {
-        stopWindAnimation();
+        stopWindAnimation(map);
       }
     }
   }
@@ -451,6 +458,7 @@ function updateLegend(element = "TMP", colormap = null) {
 
 async function loadPresetGroup(map, group, period = null, level = null, win = null) {
   if (!group || !group.layers) return;
+  if (win) clearWindowWeatherLayers(win);
 
   const curPeriod = period !== null ? period : (win?.period ?? 24);
   const curLevel = level !== null ? level : (group.hasLevel ? (group.defaultLevel || win?.level || 500) : null);

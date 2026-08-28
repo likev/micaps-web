@@ -68,36 +68,71 @@ func GenerateMockGrid(element string, level float32, period int32) *model.GridRe
 	centerLon := 115.0 + float64(period)*0.1
 	centerLat := 35.0 + float64(period)*0.05
 
-	for j := 0; j < int(nLat); j++ {
-		lat := resp.Y[j]
-		for i := 0; i < int(nLon); i++ {
-			lon := resp.X[i]
-			idx := j*int(nLon) + i
+	if element == "WIND" {
+		resp.U = make([]float32, total)
+		resp.V = make([]float32, total)
+		resp.Header.DataType = 11
+		for j := 0; j < int(nLat); j++ {
+			lat := resp.Y[j]
+			for i := 0; i < int(nLon); i++ {
+				lon := resp.X[i]
+				idx := j*int(nLon) + i
 
-			// Base temperature: colder north, warmer south
-			val := float32(32.0 - (lat-15.0)*0.9)
+				// Westerly Jet stream peaking around 35°N-42°N
+				latDist := math.Abs(lat - 38.0)
+				jetBase := 24.0 * math.Exp(-latDist*latDist/60.0)
 
-			// Cyclone wave depression
-			dist := math.Hypot(lon-centerLon, lat-centerLat)
-			wave := float32(math.Sin(dist*0.3) * 8.0)
-			val += wave
+				// Atmospheric Rossby wave (meandering westerly flow)
+				wavePhase := (lon-90.0)*0.12 - float64(period)*0.05
+				uComp := float32(jetBase + 8.0*math.Cos(wavePhase))
+				vComp := float32(10.0 * math.Sin(wavePhase) * math.Exp(-latDist/10.0))
 
-			// Additional perturbation based on element
-			if element == "HGT" {
-				val = float32(5000.0 + float64(val)*10.0) // 500hPa height in gpm
-			} else if element == "RAIN" {
-				rain := float32(math.Max(0, float64(15.0-dist*2.0)))
-				val = rain
+				resp.U[idx] = uComp
+				resp.V[idx] = vComp
+				speed := float32(math.Hypot(float64(uComp), float64(vComp)))
+				resp.Values[idx] = speed
+
+				if speed < minVal {
+					minVal = speed
+				}
+				if speed > maxVal {
+					maxVal = speed
+				}
+				sumVal += speed
 			}
+		}
+	} else {
+		for j := 0; j < int(nLat); j++ {
+			lat := resp.Y[j]
+			for i := 0; i < int(nLon); i++ {
+				lon := resp.X[i]
+				idx := j*int(nLon) + i
 
-			resp.Values[idx] = val
-			if val < minVal {
-				minVal = val
+				// Base temperature: colder north, warmer south
+				val := float32(32.0 - (lat-15.0)*0.9)
+
+				// Cyclone wave depression
+				dist := math.Hypot(lon-centerLon, lat-centerLat)
+				wave := float32(math.Sin(dist*0.3) * 8.0)
+				val += wave
+
+				// Additional perturbation based on element
+				if element == "HGT" {
+					val = float32(5000.0 + float64(val)*10.0) // 500hPa height in gpm
+				} else if element == "RAIN" {
+					rain := float32(math.Max(0, float64(15.0-dist*2.0)))
+					val = rain
+				}
+
+				resp.Values[idx] = val
+				if val < minVal {
+					minVal = val
+				}
+				if val > maxVal {
+					maxVal = val
+				}
+				sumVal += val
 			}
-			if val > maxVal {
-				maxVal = val
-			}
-			sumVal += val
 		}
 	}
 

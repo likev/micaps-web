@@ -1,40 +1,15 @@
 :root {
-  --bg-primary: #0a0d14;
-  --bg-secondary: #121824;
-  --bg-panel: rgba(18, 24, 36, 0.88);
-  --border-color: rgba(255, 255, 255, 0.12);
-  --text-primary: #e6edf3;
-  --text-secondary: #8b949e;
-  --accent-blue: #388bfd;
-  --accent-cyan: #39c5bb;
-  --accent-green: #2ea043;
-  --accent-orange: #d29922;
-  --accent-red: #f85149;
+  --bg-primary: #0a0d14; --bg-secondary: #121824; --bg-panel: rgba(18, 24, 36, 0.88);
+  --border-color: rgba(255, 255, 255, 0.12); --text-primary: #e6edf3; --text-secondary: #8b949e;
+  --accent-blue: #388bfd; --accent-cyan: #39c5bb; --accent-green: #2ea043;
+  --accent-orange: #d29922; --accent-red: #f85149;
   --font-mono: "SF Mono", "Fira Code", monospace;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-body, html {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background-color: var(--bg-primary);
-  font-family: var(--font-sans);
-  color: var(--text-primary);
-}
-
-#app {
-  display: flex;
-  flex-direction: column;
-  width: 100vw;
-  height: 100vh;
-}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(--bg-primary); font-family: var(--font-sans); color: var(--text-primary); }
+#app { display: flex; flex-direction: column; width: 100vw; height: 100vh; }
 
 #navbar {
   height: 48px;
@@ -235,6 +210,22 @@ body, html {
   color: var(--text-secondary);
 }
 
+.win-target-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  padding: 1px 6px;
+  background: rgba(88, 166, 255, 0.15);
+  border: 1px solid rgba(88, 166, 255, 0.35);
+  border-radius: 4px;
+  color: #79c0ff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
 .panel-title .badge {
   background: rgba(56, 139, 253, 0.2);
   color: #79c0ff;
@@ -247,16 +238,17 @@ body, html {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 380px;
+  max-height: 400px;
   overflow-y: auto;
 }
 
 .layer-item {
-  background: rgba(22, 27, 34, 0.7);
+  background: rgba(22, 27, 34, 0.85);
   border: 1px solid var(--border-color);
   border-radius: 6px;
   overflow: hidden;
   transition: border-color 0.15s ease;
+  box-sizing: border-box;
 }
 
 .layer-item:hover { border-color: #58a6ff; }
@@ -264,10 +256,12 @@ body, html {
 .layer-row {
   display: flex;
   align-items: center;
-  padding: 7px 9px;
+  padding: 8px 10px;
   gap: 8px;
+  min-height: 38px;
   cursor: pointer;
   user-select: none;
+  box-sizing: border-box;
 }
 
 .layer-row:hover { background: rgba(255, 255, 255, 0.04); }
@@ -285,6 +279,7 @@ body, html {
   width: 22px;
   height: 22px;
   border-radius: 4px;
+  flex-shrink: 0;
 }
 
 .btn-vis.active { color: #58a6ff; }
@@ -300,12 +295,15 @@ body, html {
 
 .layer-name {
   flex: 1;
+  min-width: 0;
   font-size: 12px;
+  line-height: 1.3;
   font-weight: 500;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: block;
 }
 
 .btn-config {
@@ -316,6 +314,7 @@ body, html {
   font-size: 13px;
   padding: 2px;
   border-radius: 4px;
+  flex-shrink: 0;
   transition: transform 0.2s ease, color 0.15s ease;
 }
 
@@ -332,6 +331,7 @@ body, html {
   font-size: 12px;
   padding: 2px 4px;
   border-radius: 4px;
+  flex-shrink: 0;
 }
 
 .btn-remove:hover {

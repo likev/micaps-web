@@ -384,8 +384,14 @@ export function focusWindow(tabId, winIdx) {
     btn.classList.toggle("active", btn.dataset.winIdx === String(winIdx));
   });
 
-  if (activeWin.map) {
+  if (!activeWin.map) {
+    initWindowMap(activeWin);
+    callbacks.onWindowInit?.(activeWin);
+  } else {
     setActiveMap(activeWin.map);
+    setTimeout(() => {
+      activeWin.map.resize();
+    }, 50);
   }
 
   appState.set("activeWinId", activeWin.id);
@@ -399,9 +405,7 @@ export function focusWindow(tabId, winIdx) {
     isObservation: activeWin.isObservation,
   });
 
-  if (callbacks.onWindowFocus) {
-    callbacks.onWindowFocus(activeWin);
-  }
+  callbacks.onWindowFocus?.(activeWin);
 }
 
 export function renderWindowTabs(tab) {
