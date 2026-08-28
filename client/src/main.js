@@ -31,6 +31,7 @@ import {
   initTabWindowManager,
   getActiveWindow,
   refreshPresetControls,
+  toggleTabsAndSplit,
 } from "./ui/tabWindowManager.js";
 
 function getMap() {
@@ -556,6 +557,10 @@ function initKeyboardShortcuts() {
       e.preventDefault();
       console.log("[Keyboard] ArrowDown: Step to lower vertical level");
       await changeVerticalLevel(map, -1);
+    } else if (e.key === "F4" || (e.altKey && (e.key === "s" || e.key === "S"))) {
+      e.preventDefault();
+      console.log("[Keyboard] F4: Toggle between Tabs and 4-Split mode");
+      toggleTabsAndSplit();
     }
   });
 }

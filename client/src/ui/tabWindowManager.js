@@ -37,16 +37,22 @@ function renderTabsBar() {
     <div class="tabs-list" id="tabs-list">
       <button class="btn-add-tab" id="btn-add-tab" title="Add new tab">+</button>
     </div>
+    <div class="window-tabs-group" id="window-tabs-group"></div>
     <div class="layout-controls" id="layout-controls">
+      <button id="btn-toggle-mode" class="layout-btn mode-toggle-btn" title="Toggle between Tabs Mode and 4-Split Mode">⇋ Toggle Split/Tabs</button>
       <span class="layout-label">Layout:</span>
-      <button id="btn-layout-1" class="layout-btn active" title="Single full window (1x1)">1x1</button>
-      <button id="btn-layout-4" class="layout-btn" title="4-Split windows (2x2)">2x2</button>
+      <button id="btn-layout-1" class="layout-btn active" title="Single full window tab (1x1)">⊟ Tabs</button>
+      <button id="btn-layout-4" class="layout-btn" title="4-Split windows (2x2)">⊞ 4-Split</button>
       <button id="btn-sync-toggle" class="layout-btn active" title="Sync pan & zoom across windows">Sync 🔗</button>
     </div>
   `;
 
   document.getElementById("btn-add-tab").addEventListener("click", () => {
     createNewTab();
+  });
+
+  document.getElementById("btn-toggle-mode").addEventListener("click", () => {
+    toggleTabsAndSplit();
   });
 
   document.getElementById("btn-layout-1").addEventListener("click", () => {
@@ -99,8 +105,7 @@ export function createNewTab(customName = null) {
   // 3. Create 4 windows, each with completely unique DOM IDs
   for (let wIdx = 0; wIdx < 4; wIdx++) {
     const winObj = {
-      tabId,
-      winIdx: wIdx,
+      tabId, winIdx: wIdx,
       id: `tab-${tabId}-win-${wIdx}`,
       panelId: `win-panel-${tabId}-${wIdx}`,
       headerId: `win-header-${tabId}-${wIdx}`,
@@ -110,14 +115,10 @@ export function createNewTab(customName = null) {
       levelSelectId: `win-level-${tabId}-${wIdx}`,
       maxBtnId: `win-max-${tabId}-${wIdx}`,
       domId: `map-viewport-${tabId}-${wIdx}`,
-      map: null,
-      activeGroup: null,
-      level: 500,
-      period: 24,
+      map: null, activeGroup: null, level: 500, period: 24,
       model: appState.get("model") || "ECMWF_HR",
       element: appState.get("element") || "TMP",
-      isObservation: false,
-      obsTime: null,
+      isObservation: false, obsTime: null,
     };
 
     const defaultGId = DEFAULT_GROUP_IDS[wIdx] || "composite-500hpa";
@@ -227,8 +228,9 @@ export function switchTab(tabId) {
   // 3. Update layout buttons
   updateLayoutButtons(targetTab.layout);
 
-  // 4. Focus active window
+  // 4. Focus active window and render window tabs
   focusWindow(targetTab.id, targetTab.activeWinIdx);
+  renderWindowTabs(targetTab);
 
   // 5. Resize visible maps
   setTimeout(() => {
@@ -239,29 +241,25 @@ export function switchTab(tabId) {
 }
 
 export function closeTab(tabId) {
-  if (tabs.length <= 1) return; // Keep at least one tab
-
+  if (tabs.length <= 1) return;
   const idx = tabs.findIndex((t) => t.id === tabId);
   if (idx === -1) return;
-  const tab = tabs[idx];
-
-  // Destroy all maps in tab
+  const [tab] = tabs.splice(idx, 1);
   tab.windows.forEach((win) => {
-    if (win.map) {
-      win.map.remove();
-      win.map = null;
-    }
+    win.map?.remove();
+    win.map = null;
   });
-
-  // Remove DOM elements
   document.getElementById(`tab-item-${tabId}`)?.remove();
   document.getElementById(`tab-workspace-${tabId}`)?.remove();
-
-  tabs.splice(idx, 1);
-
-  // Switch to previous or first tab
   const nextTab = tabs[Math.max(0, idx - 1)];
   if (nextTab) switchTab(nextTab.id);
+}
+
+export function toggleTabsAndSplit(tabId = activeTabId) {
+  const tab = tabs.find((t) => t.id === tabId) || getActiveTab();
+  if (!tab) return;
+  const newLayout = tab.layout === "2x2" ? "1x1" : "2x2";
+  setTabLayout(tab.id, newLayout);
 }
 
 export function setTabLayout(tabId, layout = "1x1") {
@@ -275,6 +273,14 @@ export function setTabLayout(tabId, layout = "1x1") {
   }
 
   updateLayoutButtons(layout);
+
+  tab.windows.forEach((win) => {
+    const btn = document.getElementById(win.maxBtnId);
+    if (btn) {
+      btn.textContent = layout === "2x2" ? "⛶" : "🗗";
+      btn.title = layout === "2x2" ? "Expand to Tab (Full window)" : "Restore to 4-Split Grid";
+    }
+  });
 
   if (layout === "2x2") {
     // Initialize maps for windows 1, 2, 3 if not yet initialized
@@ -292,7 +298,17 @@ export function setTabLayout(tabId, layout = "1x1") {
         syncTabCameras(tab);
       }, 100);
     }
+  } else {
+    // In 1x1 tabs mode, ensure active window map is initialized
+    const activeWin = tab.windows[tab.activeWinIdx] || tab.windows[0];
+    if (activeWin && !activeWin.map) {
+      initWindowMap(activeWin);
+      if (callbacks.onWindowInit) callbacks.onWindowInit(activeWin);
+    }
   }
+
+  focusWindow(tab.id, tab.activeWinIdx);
+  renderWindowTabs(tab);
 
   setTimeout(() => {
     tab.windows.forEach((win) => {
@@ -304,11 +320,18 @@ export function setTabLayout(tabId, layout = "1x1") {
 function updateLayoutButtons(layout) {
   const btn1 = document.getElementById("btn-layout-1");
   const btn4 = document.getElementById("btn-layout-4");
+  const btnToggle = document.getElementById("btn-toggle-mode");
   const syncBtn = document.getElementById("btn-sync-toggle");
   const tab = getActiveTab();
 
   if (btn1) btn1.classList.toggle("active", layout === "1x1");
   if (btn4) btn4.classList.toggle("active", layout === "2x2");
+  if (btnToggle) {
+    btnToggle.textContent = layout === "2x2" ? "⊟ Switch to Tabs" : "⊞ Switch to Split";
+    btnToggle.title = layout === "2x2"
+      ? "Switch to single-tab full view (F4 or Alt+S)"
+      : "Switch to 4-split grid view (F4 or Alt+S)";
+  }
   if (syncBtn && tab) {
     const isSync = tab.syncMap !== false;
     syncBtn.classList.toggle("active", isSync);
@@ -356,6 +379,11 @@ export function focusWindow(tabId, winIdx) {
     }
   });
 
+  // Update window tab buttons in tabs bar
+  document.querySelectorAll(".win-tab-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.winIdx === String(winIdx));
+  });
+
   if (activeWin.map) {
     setActiveMap(activeWin.map);
   }
@@ -374,6 +402,36 @@ export function focusWindow(tabId, winIdx) {
   if (callbacks.onWindowFocus) {
     callbacks.onWindowFocus(activeWin);
   }
+}
+
+export function renderWindowTabs(tab) {
+  const container = document.getElementById("window-tabs-group");
+  if (!container || !tab) return;
+
+  container.innerHTML = tab.windows
+    .map((w, idx) => {
+      const isFocused = idx === tab.activeWinIdx;
+      const title = w.activeGroup ? w.activeGroup.name : `Window ${idx + 1}`;
+      return `
+        <button class="win-tab-btn ${isFocused ? "active" : ""}" id="win-tab-${tab.id}-${idx}" data-tab-id="${tab.id}" data-win-idx="${idx}" title="${title} (Click to select, Double-click to toggle Split/Tabs)">
+          <span class="win-tab-badge">W${idx + 1}</span>
+          <span class="win-tab-name">${title}</span>
+        </button>
+      `;
+    })
+    .join("");
+
+  tab.windows.forEach((w, idx) => {
+    const btn = document.getElementById(`win-tab-${tab.id}-${idx}`);
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      focusWindow(tab.id, idx);
+    });
+    btn.addEventListener("dblclick", () => {
+      focusWindow(tab.id, idx);
+      toggleTabsAndSplit(tab.id);
+    });
+  });
 }
 
 function initWindowMap(win) {
@@ -440,9 +498,7 @@ function setupWindowControls(tab) {
           win.activeGroup = g;
           updateWindowTitle(win, g.name);
           focusWindow(win.tabId, win.winIdx);
-          if (callbacks.onWindowGroupChange) {
-            callbacks.onWindowGroupChange(win, g);
-          }
+          callbacks.onWindowGroupChange?.(win, g);
         }
       });
     }
@@ -453,24 +509,25 @@ function setupWindowControls(tab) {
         if (!isNaN(lvl)) {
           win.level = lvl;
           focusWindow(win.tabId, win.winIdx);
-          if (callbacks.onWindowLevelChange) {
-            callbacks.onWindowLevelChange(win, lvl);
-          }
+          callbacks.onWindowLevelChange?.(win, lvl);
         }
+      });
+    }
+
+    const header = document.getElementById(win.headerId);
+    if (header) {
+      header.addEventListener("dblclick", (e) => {
+        if (e.target.tagName === "SELECT" || e.target.tagName === "BUTTON") return;
+        focusWindow(win.tabId, win.winIdx);
+        toggleTabsAndSplit(win.tabId);
       });
     }
 
     if (maxBtn) {
       maxBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        const panel = document.getElementById(win.panelId);
-        if (panel) {
-          panel.classList.toggle("maximized");
-          maxBtn.textContent = panel.classList.contains("maximized") ? "🗗" : "⛶";
-          setTimeout(() => {
-            if (win.map) win.map.resize();
-          }, 50);
-        }
+        focusWindow(win.tabId, win.winIdx);
+        toggleTabsAndSplit(win.tabId);
       });
     }
   });
@@ -479,6 +536,8 @@ function setupWindowControls(tab) {
 export function updateWindowTitle(win, text) {
   const el = document.getElementById(win.titleId);
   if (el) el.textContent = text;
+  const tabName = document.querySelector(`#win-tab-${win.tabId}-${win.winIdx} .win-tab-name`);
+  if (tabName) tabName.textContent = text;
 }
 
 export function setWindowHeaderPreset(win, groupId) {
