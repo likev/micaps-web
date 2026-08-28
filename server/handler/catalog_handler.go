@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"micaps-web/db"
 )
@@ -29,6 +30,22 @@ func (h *CatalogHandler) TreeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.MockMode || h.Client == nil {
+		isObs := strings.HasPrefix(dataPath, "SURFACE") || strings.HasPrefix(dataPath, "UPPER_AIR")
+		if isObs {
+			mockObsFiles := []map[string]interface{}{
+				{"name": "20260828170000.000", "size": 133979},
+				{"name": "20260828140000.000", "size": 169853},
+				{"name": "20260828110000.000", "size": 183551},
+				{"name": "20260828080000.000", "size": 207819},
+				{"name": "20260828050000.000", "size": 180591},
+				{"name": "20260828020000.000", "size": 249496},
+				{"name": "20260827200000.000", "size": 241557},
+				{"name": "20260827170000.000", "size": 125870},
+			}
+			json.NewEncoder(w).Encode(mockObsFiles)
+			return
+		}
+
 		mockFiles := []map[string]interface{}{
 			{"name": "26082708.000", "size": 405764},
 			{"name": "26082708.012", "size": 405764},

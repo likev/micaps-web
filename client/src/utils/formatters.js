@@ -3,8 +3,9 @@
 export function formatDateTime(isoString) {
   if (!isoString) return "--";
   const d = new Date(isoString);
+  const bjtDate = new Date(d.getTime() + 8 * 3600 * 1000);
   const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:00 UTC`;
+  return `${bjtDate.getUTCFullYear()}-${pad(bjtDate.getUTCMonth() + 1)}-${pad(bjtDate.getUTCDate())} ${pad(bjtDate.getUTCHours())}:00 (UTC+8)`;
 }
 
 export function formatLeadTime(hours = 0) {
@@ -47,9 +48,12 @@ export function formatObsTimestamp(fileStr = "") {
   const bjtTimestamp = Date.UTC(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10), parseInt(h, 10), parseInt(min, 10));
   const utcDate = new Date(bjtTimestamp - 8 * 3600 * 1000);
   const pad = (n) => String(n).padStart(2, "0");
+  const utcY = utcDate.getUTCFullYear();
+  const utcM = pad(utcDate.getUTCMonth() + 1);
+  const utcD = pad(utcDate.getUTCDate());
   const utcH = pad(utcDate.getUTCHours());
-  const utcM = pad(utcDate.getUTCMinutes());
+  const utcMin = pad(utcDate.getUTCMinutes());
 
-  return `${y}-${m}-${d} ${h}:${min} BJT (${utcH}:${utcM} UTC)`;
+  return `${y}-${m}-${d} ${h}:${min} BJT (${utcY}-${utcM}-${utcD} ${utcH}:${utcMin} UTC)`;
 }
 

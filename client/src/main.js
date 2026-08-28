@@ -33,7 +33,8 @@ import { fetchGridData, fetchGridBinaryStream, fetchStationObservations, fetchTr
 import { updateLegend } from "./ui/legend.js";
 import { initKeyboardShortcuts } from "./ui/keyboardShortcuts.js";
 import { appState } from "./store/appState.js";
-import { loadPresetGroups } from "./config/presets.js";
+import { loadPresetGroups, DEFAULT_MOCK_OBS_FILES } from "./config/presets.js";
+import { resolveColormap } from "./utils/colormaps.js";
 import { setNavBarLevel, setNavBarPreset } from "./ui/navBar.js";
 import { step as timeSliderStep } from "./ui/timeSlider.js";
 import {
@@ -77,7 +78,8 @@ async function bootstrap() {
 
   // ── Tab / Window Manager ─────────────────────────────────────────────────
   const firstTab = initTabWindowManager({
-    onWindowFocus: async (win) => {
+    onWindowFocus: (win) => {
+      if (!win) return;
       setNavBarPreset(win.activeGroup?.id || "");
       if (win.level) setNavBarLevel(win.level);
 
@@ -92,17 +94,22 @@ async function bootstrap() {
         winTitle = `W${win.winIdx + 1}: ${name}`;
       }
 
+      // Synchronously update layer panel for focused window
+      syncLayerControlForWindow(win);
+
       const isObs = Boolean(win.isObservation || win.activeGroup?.isObservation || win.model === "SURFACE" || win.model === "UPPER_AIR");
       if (isObs) {
         const obsPath = win.model === "UPPER_AIR"
           ? `UPPER_AIR/${win.element || "PLOT"}/${win.level || 500}`
           : (win.model === "SURFACE" ? `SURFACE/${win.element || "PLOT_GLOBAL_3H"}` : "SURFACE/PLOT_GLOBAL_3H");
-        const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle);
-        win.obsTime = latestFile;
+        syncObservationTimeline(obsPath, win.obsTime, winTitle, win).then((latestFile) => {
+          if (getActiveWindow() === win) {
+            win.obsTime = latestFile;
+          }
+        });
       } else {
         setTimelineMode("nwp", { period: win.period ?? 24, winTitle });
       }
-      syncLayerControlForWindow(win);
     },
     onWindowGroupChange: async (win, group) => {
       if (!win.map || !group) return;
@@ -370,28 +377,44 @@ async function loadWeatherField(map, model, element, level, period, customOption
   }
 }
 
-async function syncObservationTimeline(path, currentFile = null, winTitle = "") {
+async function syncObservationTimeline(path, currentFile = null, winTitle = "", win = null) {
   try {
     const fileEntries = await fetchTree(path);
     if (Array.isArray(fileEntries) && fileEntries.length > 0) {
-      const validFiles = fileEntries
-        .filter((f) => f.name && f.name.endsWith(".000") && (f.size > 200 || f.size === 0))
+      let validFiles = fileEntries
+        .filter((f) => f.name && (f.size > 100 || f.size === 0))
         .map((f) => f.name);
+
+      const hasObsFormat = validFiles.some((f) => f.length >= 14 && f.endsWith(".000"));
+      if (hasObsFormat) {
+        validFiles = validFiles.filter((f) => f.length >= 14 && f.endsWith(".000"));
+      } else {
+        validFiles = DEFAULT_MOCK_OBS_FILES;
+      }
+
       if (validFiles.length > 0) {
-        // Treeview returns newest first; take latest 10 files and reverse to oldest->newest for timeline stepper
-        const recentFiles = validFiles.slice(0, 10).reverse();
+        // Treeview returns newest first; take latest 10 files and reverse to oldest->newest for stepper
+        const recentFiles = validFiles.length >= 2 && validFiles !== DEFAULT_MOCK_OBS_FILES
+          ? validFiles.slice(0, 10).reverse()
+          : DEFAULT_MOCK_OBS_FILES;
         const targetFile = currentFile && recentFiles.includes(currentFile)
           ? currentFile
           : recentFiles[recentFiles.length - 1]; // latest observation time
-        setTimelineMode("obs", { file: targetFile, files: recentFiles, winTitle });
+
+        if (!win || getActiveWindow() === win) {
+          setTimelineMode("obs", { file: targetFile, files: recentFiles, winTitle });
+        }
         return targetFile;
       }
     }
   } catch (err) {
     console.warn("[Main] Failed to query observation file tree for timeline:", err);
   }
-  setTimelineMode("obs", { file: currentFile || "20260828170000.000", winTitle });
-  return currentFile || "20260828170000.000";
+  const fallbackFile = currentFile || DEFAULT_MOCK_OBS_FILES[DEFAULT_MOCK_OBS_FILES.length - 1];
+  if (!win || getActiveWindow() === win) {
+    setTimelineMode("obs", { file: fallbackFile, files: DEFAULT_MOCK_OBS_FILES, winTitle });
+  }
+  return fallbackFile;
 }
 
 // When upper plot is loaded, display plot and calculate height & temp contour lines from sounding plot data
@@ -531,15 +554,7 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
   );
 }
 
-function resolveColormap(group, render, level) {
-  const levelKey = level === null || level === undefined ? null : String(level);
-  return render.colormapByLevel?.[levelKey]
-    || render.colormap
-    || group.colormapByLevel?.[levelKey]
-    || group.levels?.[levelKey]?.colormap
-    || group.colormap
-    || null;
-}
+
 
 async function changeVerticalLevel(map, direction, explicitLevel = null, win = getActiveWindow()) {
   const levels = [1000, 925, 850, 700, 500, 400, 300, 200, 100];

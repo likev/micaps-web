@@ -83,3 +83,13 @@ export function getCSSGradient(element = "TMP", colormap = null) {
   const stops = palette.map((stop) => `rgb(${stop.color.slice(0, 3).join(",")})`).join(", ");
   return `linear-gradient(to right, ${stops})`;
 }
+
+export function resolveColormap(group, render, level) {
+  const levelKey = level === null || level === undefined ? null : String(level);
+  return render?.colormapByLevel?.[levelKey]
+    || render?.colormap
+    || group?.colormapByLevel?.[levelKey]
+    || group?.levels?.[levelKey]?.colormap
+    || group?.colormap
+    || null;
+}

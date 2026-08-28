@@ -174,9 +174,6 @@ export function updateVisibleMarkersForMap(map) {
     const p = f.properties || {};
     const el = document.createElement("div");
     el.className = "station-plot-marker";
-    el.style.position = "absolute";
-    el.style.transform = `translate(-50%, -50%) scale(${scale})`;
-    el.style.transformOrigin = "center center";
     el.style.fontFamily = "'SF Mono', -apple-system, monospace";
     el.style.fontSize = "10px";
     el.style.color = "#ffffff";
@@ -213,7 +210,7 @@ export function updateVisibleMarkersForMap(map) {
     const barbSVG = getWindBarbSVG(ws, wd, 144);
 
     el.innerHTML = `
-      <div style="position: relative; width: 48px; height: 48px; pointer-events: none;">
+      <div style="position: relative; width: 48px; height: 48px; pointer-events: none; transform: scale(${scale}); transform-origin: center center;">
         <!-- Wind Barb / Direction & Speed (3X Size centered at 24, 24) -->
         <div style="position: absolute; top: -48px; left: -48px; width: 144px; height: 144px; pointer-events: none; z-index: 1;">
           ${barbSVG}
