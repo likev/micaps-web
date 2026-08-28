@@ -58,8 +58,24 @@ function extractNumber(props, keys, minValid = -90, maxValid = 90) {
   return null;
 }
 
-function extractPressure(props) {
+function extractPressureOrHeight(props) {
   if (!props) return "";
+  // 1. If upper-air sounding with geopotential height
+  if (props.height !== undefined && props.height !== null && props.height !== -9999 && props.height !== "-9999") {
+    let num = typeof props.height === "number" ? props.height : parseFloat(props.height);
+    if (!isNaN(num) && num > 0 && num < 40000) {
+      if (num > 1000) {
+        // Upper-air standard decameters (dam): e.g. 5880 gpm -> 588, 5674 gpm -> 567, 1480 gpm -> 148
+        const dam = Math.round(num / 10);
+        return String(dam % 1000).padStart(3, "0");
+      } else if (num > 100 && num < 1000) {
+        return String(Math.round(num)).padStart(3, "0");
+      }
+      return Math.round(num).toString();
+    }
+  }
+
+  // 2. Surface observation with SLP / station pressure
   const keys = ["slp", "SLP", "press_slp", "PRS_Sea", "slp_encoded", "press_stn", "stn_press", "PRS"];
   for (const k of keys) {
     const v = props[k];
@@ -111,7 +127,7 @@ export function updateVisibleMarkersForMap(map) {
     const rawTd = extractNumber(p, ["dewpoint", "dew_point", "DPT", "TD", "Td", "td", "dew", "dpt"]);
     const td = rawTd !== null ? Math.round(rawTd).toString() : "";
 
-    const ppp = extractPressure(p);
+    const ppp = extractPressureOrHeight(p);
 
     const rawWs = extractNumber(p, ["wind_speed", "windSpeed", "ws", "WIN_S_Avg", "WIN_S", "FF", "ff", "speed"], 0, 150);
     const ws = rawWs !== null ? (rawWs > 100 ? rawWs / 10.0 : rawWs) : 0;
