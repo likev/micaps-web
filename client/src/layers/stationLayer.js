@@ -116,6 +116,17 @@ function extractPressureOrHeight(props) {
   return "";
 }
 
+// Deterministic pseudorandom hash for stable sampling per station
+function hashStation(id, lon, lat) {
+  let h = 2166136261;
+  const str = `${id || ""}_${lon.toFixed(4)}_${lat.toFixed(4)}`;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0);
+}
+
 export function updateVisibleMarkersForMap(map) {
   const state = getState(map);
   clearStationMarkersForMap(map);
@@ -125,10 +136,40 @@ export function updateVisibleMarkersForMap(map) {
   const curZoom = map.getZoom();
   const scale = curZoom < 4.5 ? 0.75 : (curZoom < 6.5 ? 0.88 : 1.0);
 
+  // 1. Group in-bounds stations into 1° x 1° spatial grid bins
+  const gridBins = new Map();
   for (const f of state.geojson.features) {
     const [lon, lat] = f.geometry.coordinates;
     if (!isPointInBounds(bounds, lon, lat)) continue;
 
+    const gridKey = `${Math.floor(lon)},${Math.floor(lat)}`;
+    let list = gridBins.get(gridKey);
+    if (!list) {
+      list = [];
+      gridBins.set(gridKey, list);
+    }
+    list.push(f);
+  }
+
+  // 2. In each 1° x 1° grid cell, show at most 10 stations (randomly sampled)
+  const selectedFeatures = [];
+  for (const list of gridBins.values()) {
+    if (list.length <= 10) {
+      for (let i = 0; i < list.length; i++) selectedFeatures.push(list[i]);
+    } else {
+      // Sort by stable pseudorandom hash to pick top 10 without visual jitter
+      list.sort((a, b) => {
+        const ha = hashStation(a.properties?.station_id, a.geometry.coordinates[0], a.geometry.coordinates[1]);
+        const hb = hashStation(b.properties?.station_id, b.geometry.coordinates[0], b.geometry.coordinates[1]);
+        return ha - hb;
+      });
+      for (let i = 0; i < 10; i++) selectedFeatures.push(list[i]);
+    }
+  }
+
+  // 3. Render markers for the selected features
+  for (const f of selectedFeatures) {
+    const [lon, lat] = f.geometry.coordinates;
     const p = f.properties || {};
     const el = document.createElement("div");
     el.className = "station-plot-marker";
