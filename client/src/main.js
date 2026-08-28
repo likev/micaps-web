@@ -80,7 +80,17 @@ async function bootstrap() {
       setNavBarPreset(win.activeGroup?.id || "");
       if (win.level) setNavBarLevel(win.level);
 
-      const winTitle = win.activeGroup ? `W${win.winIdx + 1}: ${win.activeGroup.name}` : "";
+      let winTitle = "";
+      if (win.activeGroup) {
+        winTitle = `W${win.winIdx + 1}: ${win.activeGroup.name}`;
+      } else if (win.model && win.element) {
+        const isUpper = win.model === "UPPER_AIR" || win.element.includes("UPPER");
+        const name = win.isObservation
+          ? (isUpper ? `${win.level || 500} hPa Sounding (${win.model})` : `${win.element} (${win.model})`)
+          : `${win.level ? `${win.level} hPa ` : ""}${win.element} (${win.model})`;
+        winTitle = `W${win.winIdx + 1}: ${name}`;
+      }
+
       const isObs = Boolean(win.isObservation || win.activeGroup?.isObservation || win.model === "SURFACE" || win.model === "UPPER_AIR");
       if (isObs) {
         setTimelineMode("obs", { file: win.obsTime || "20260827200000.000", winTitle });
@@ -198,15 +208,31 @@ async function bootstrap() {
       isObservation,
     });
     setNavBarPreset("");
+
+    const isUpper = model === "UPPER_AIR" || (element && element.includes("UPPER"));
+    const catalogTitle = isObservation
+      ? (isUpper ? `${win.level || 500} hPa Sounding (${model})` : `${element} (${model})`)
+      : `${win.level ? `${win.level} hPa ` : ""}${element} (${model})`;
+
+    updateWindowTitle(win, catalogTitle);
+    setWindowHeaderPreset(win, "");
+    if (win.level) {
+      setWindowHeaderLevel(win, win.level);
+      setNavBarLevel(win.level);
+    }
+
+    const winBannerTitle = `W${win.winIdx + 1}: ${catalogTitle}`;
+    clearAllWeatherLayersFromMap(map, win);
+
     if (isObservation) {
-      setTimelineMode("obs", { file: obsTime });
+      setTimelineMode("obs", { file: obsTime || win.obsTime || "20260827200000.000", winTitle: winBannerTitle });
       if (model === "UPPER_AIR") {
-        await loadUpperAirComposite(map, win.level || 500, obsTime);
+        await loadUpperAirComposite(map, win.level || 500, obsTime, win);
       } else {
-        await loadObservationProduct(map, model, element, win.level, obsTime);
+        await loadObservationProduct(map, model, element, win.level, obsTime, win);
       }
     } else {
-      setTimelineMode("nwp", { period: win.period });
+      setTimelineMode("nwp", { period: win.period ?? 24, winTitle: winBannerTitle });
       await loadWeatherField(map, model, element, win.level, win.period, null, win);
     }
   });
@@ -387,32 +413,7 @@ async function loadObservationProduct(map, model, element, level, file, win = ge
   }
 }
 
-async function loadSurfaceStations(map, win = getActiveWindow()) {
-  try {
-    console.log("[Main] Starting surface stations fetch...");
-    const stations = await fetchStationObservations("SURFACE/PLOT_GLOBAL_3H", "20260827200000.000");
-    console.log("[Main] Received stations: " + (stations && stations.features ? stations.features.length : 0));
-    appState.set("stationData", stations);
-    renderStationWeatherPlots(map, stations, appState.state.layers.station);
 
-    addOrUpdateLayer({
-      id: "station-surface",
-      name: "Surface Station Observations",
-      type: "station",
-      color: "#e3b341",
-      visible: true,
-      removable: true,
-    }, win);
-
-    if (stations && stations.features && stations.features.length >= 3) {
-      console.log(`[Bootstrap] Calculating SLP isobars from ${stations.features.length} surface stations...`);
-      analyzeAndRenderSurfaceSLPContours(map, stations);
-    }
-    console.log("[Main] Finished rendering surface station plots and SLP contours");
-  } catch (err) {
-    console.error("[Bootstrap] Surface stations load failed:", err);
-  }
-}
 
 function handleLayerAction(map, action, layerId, value, layer, win = getActiveWindow()) {
   if (action === "visibility") {
