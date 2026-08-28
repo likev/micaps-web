@@ -224,7 +224,7 @@ async function bootstrap() {
     updateLegend("TMP");
     await Promise.all([
       loadWeatherField(map, "ECMWF_HR", "TMP", 850, 24, null, firstWin),
-      loadSurfaceStations(map),
+      loadSurfaceStations(map, firstWin),
     ]);
     window.__WEATHER_FIELD_LOADED__ = true;
   };
@@ -503,7 +503,7 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
           colormap: resolveColormap(group, render, targetLevel),
         }, win);
       } else if (layer.type === "station") {
-        await loadObservationProduct(map, layer.model, layer.element, targetLevel, "20260827200000.000");
+        await loadObservationProduct(map, layer.model, layer.element, targetLevel, win?.obsTime || "20260827200000.000", win);
       }
     })
   );

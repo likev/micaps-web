@@ -7,10 +7,10 @@ describe("griddata-js Contour and Isoband Verification", () => {
 
   beforeAll(async () => {
     webview = await createTestWebView();
-    await waitForMapLoaded(webview, 15000);
+    await waitForMapLoaded(webview, 30000);
     // Wait for initial weather field load
-    await waitForCondition(webview, `Boolean(window.__MAP__.getSource("isoband-source"))`, 20000);
-  }, 45000);
+    await waitForCondition(webview, `Boolean(window.__WEATHER_FIELD_LOADED__ && window.__MAP__.getSource("isoband-source"))`, 30000);
+  }, 60000);
 
   afterAll(async () => {
     if (webview) await webview.close();

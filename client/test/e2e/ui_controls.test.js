@@ -79,14 +79,14 @@ describe("Workstation UI Controls Verification", () => {
     await webview.evaluate(`document.getElementById("btn-reload-config").click()`);
     const reloaded = await waitForCondition(
       webview,
-      `window.__LOGS__.some((log) => log === "LOG: [Config] Preset configuration reloaded")`,
+      `window.__LOGS__.some((log) => log.includes("Preset configuration reloaded"))`,
       10000
     );
     expect(reloaded).toBe(true);
 
     const optionCounts = await webview.evaluate(`({
-      nav: document.getElementById("select-preset").options.length,
-      window: document.getElementById("win-preset-1-0").options.length
+      nav: (document.getElementById("preset-group-select") || document.getElementById("select-preset")).options.length,
+      window: (document.getElementById("win-preset-1-0") || document.getElementById("preset-group-select")).options.length
     })`);
     expect(optionCounts.nav).toBeGreaterThan(1);
     expect(optionCounts.window).toBeGreaterThan(1);

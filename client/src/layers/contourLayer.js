@@ -73,7 +73,7 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
 }
 
 function getLayerDOMIds(layerId = "default") {
-  const isDefault = layerId === "default" || layerId === "contour-TMP-850";
+  const isDefault = layerId === "default" || layerId === "contour-TMP-850" || layerId === "contour-ECMWF_HR-TMP-850";
   return {
     isobandSrcId: isDefault ? "isoband-source" : `${layerId}-isoband-source`,
     isobandLayerId: isDefault ? "isoband-layer" : `${layerId}-isoband-layer`,

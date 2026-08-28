@@ -35,6 +35,52 @@ export function renderStationWeatherPlots(map, geojson, visible = true) {
   updateVisibleMarkersForMap(map);
 }
 
+function extractNumber(props, keys, minValid = -90, maxValid = 90) {
+  if (!props) return null;
+  for (const k of keys) {
+    const v = props[k];
+    if (v !== undefined && v !== null && v !== "" && v !== -9999 && v !== "-9999") {
+      let num = typeof v === "number" ? v : parseFloat(v);
+      if (!isNaN(num) && num > -9000 && num < 9000) {
+        if (num > 150 && num < 373.15) {
+          num = num - 273.15; // Kelvin to Celsius
+        } else if ((num > 60 && num <= 600) || (num < -60 && num >= -600)) {
+          num = num / 10.0; // Tenths of °C
+        } else if (num > 600 && num <= 6000) {
+          num = num / 100.0; // Hundredths of °C
+        }
+        if (num >= minValid && num <= maxValid) {
+          return num;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function extractPressure(props) {
+  if (!props) return "";
+  const keys = ["slp", "SLP", "press_slp", "PRS_Sea", "slp_encoded", "press_stn", "stn_press", "PRS"];
+  for (const k of keys) {
+    const v = props[k];
+    if (v !== undefined && v !== null && v !== "" && v !== "---" && v !== -9999 && v !== "-9999") {
+      if (typeof v === "string" && v.length === 3 && !isNaN(parseInt(v, 10))) {
+        return v;
+      }
+      let num = typeof v === "number" ? v : parseFloat(v);
+      if (!isNaN(num) && num > 0 && num < 110000) {
+        if (num > 8000 && num < 110000) num = num / 100.0;
+        else if (num > 8000 && num < 11000) num = num / 10.0;
+        if (num >= 800 && num <= 1100) {
+          const val = Math.round(num * 10);
+          return String(val % 1000).padStart(3, "0");
+        }
+      }
+    }
+  }
+  return "";
+}
+
 export function updateVisibleMarkersForMap(map) {
   const state = getState(map);
   clearStationMarkersForMap(map);
@@ -59,43 +105,61 @@ export function updateVisibleMarkersForMap(map) {
     el.style.pointerEvents = "none";
 
     // 9-Position Synoptic Station Model Elements
-    const tt = p.temperature !== undefined && p.temperature > -90 ? Math.round(p.temperature) : "";
-    const td = p.dewpoint !== undefined && p.dewpoint > -90 ? Math.round(p.dewpoint) : "";
-    const ppp = p.slp_encoded || "";
-    const pDiff = p.press_diff_3h > 0 ? `+${(p.press_diff_3h * 10).toFixed(0)}` : "";
-    const pTend = getPressureTendencyGlyph(p.press_tend);
-    const ww = getWeatherSymbol(p.weather_code);
-    const skySVG = getSkyCoverSVG(p.cloud_cover !== undefined ? p.cloud_cover : 0, 16);
-    const barbSVG = getWindBarbSVG(p.wind_speed || 0, p.wind_dir || 0, 32);
+    const rawT = extractNumber(p, ["temperature", "temp", "TEM", "TT", "T", "TMP", "t", "temp_max", "tem"]);
+    const tt = rawT !== null ? Math.round(rawT).toString() : "";
+
+    const rawTd = extractNumber(p, ["dewpoint", "dew_point", "DPT", "TD", "Td", "td", "dew", "dpt"]);
+    const td = rawTd !== null ? Math.round(rawTd).toString() : "";
+
+    const ppp = extractPressure(p);
+
+    const rawWs = extractNumber(p, ["wind_speed", "windSpeed", "ws", "WIN_S_Avg", "WIN_S", "FF", "ff", "speed"], 0, 150);
+    const ws = rawWs !== null ? (rawWs > 100 ? rawWs / 10.0 : rawWs) : 0;
+    const wd = extractNumber(p, ["wind_dir", "windDir", "wd", "WIN_D_Avg", "WIN_D", "DD", "dd", "dir"], 0, 360) || 0;
+
+    const rawCloud = extractNumber(p, ["cloud_cover", "cloudCover", "cloud", "CLO_Cov", "N", "n"], 0, 9);
+    const cloudCover = rawCloud !== null ? Math.round(rawCloud) : 0;
+
+    const weatherCode = extractNumber(p, ["weather_code", "weatherCode", "weather", "Ww", "ww", "WEA"], 0, 99) || 0;
+
+    const pDiffRaw = extractNumber(p, ["press_diff_3h", "pDiff3h", "press_diff", "PRS_Change_3h", "p3"], -50, 50);
+    const pDiff = pDiffRaw !== null && Math.abs(pDiffRaw) > 0.05 ? `${pDiffRaw > 0 ? "+" : ""}${(pDiffRaw * 10).toFixed(0)}` : "";
+
+    const pTendCode = extractNumber(p, ["press_tend", "pTend", "PRS_Tendency", "a"], 0, 8);
+    const pTend = pTendCode !== null ? getPressureTendencyGlyph(pTendCode) : "";
+
+    const ww = getWeatherSymbol(weatherCode);
+    const skySVG = getSkyCoverSVG(cloudCover, 16);
+    const barbSVG = getWindBarbSVG(ws, wd, 48);
 
     el.innerHTML = `
-      <div style="position: relative; width: 44px; height: 44px; pointer-events: none;">
-        <!-- Wind Barb / Direction & Speed Symbol -->
-        <div style="position: absolute; top: -14px; left: 6px; pointer-events: none;">
+      <div style="position: relative; width: 48px; height: 48px; pointer-events: none;">
+        <!-- Wind Barb / Direction & Speed (Centered at 24, 24) -->
+        <div style="position: absolute; top: 0px; left: 0px; width: 48px; height: 48px; pointer-events: none;">
           ${barbSVG}
         </div>
-        <!-- Center Sky Cover Circle -->
-        <div style="position: absolute; top: 14px; left: 14px; pointer-events: none;">
+        <!-- Center Sky Cover Circle (16x16 at 16, 16) -->
+        <div style="position: absolute; top: 16px; left: 16px; width: 16px; height: 16px; pointer-events: none;">
           ${skySVG}
         </div>
-        <!-- TT: Temperature (°C) Top-Left in Bold Red -->
-        <div style="position: absolute; top: 0px; left: -14px; color: #f85149; font-weight: bold; font-size: 10px; pointer-events: none;">
+        <!-- TT: Temperature (°C) Top-Left in Bold Red/Orange -->
+        <div style="position: absolute; top: 4px; left: 0px; width: 18px; text-align: right; color: #f85149; font-weight: 700; font-size: 11px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
           ${tt}
         </div>
-        <!-- TdTd: Dew Point (°C) Bottom-Left in Green -->
-        <div style="position: absolute; bottom: 0px; left: -14px; color: #56d364; font-weight: 500; font-size: 10px; pointer-events: none;">
+        <!-- TdTd: Dew Point (°C) Bottom-Left in Emerald Green -->
+        <div style="position: absolute; bottom: 4px; left: 0px; width: 18px; text-align: right; color: #56d364; font-weight: 600; font-size: 11px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
           ${td}
         </div>
         <!-- ww: Present Weather Symbol (Middle Left) -->
-        <div style="position: absolute; top: 14px; left: -6px; color: #e3b341; font-size: 13px; pointer-events: none;">
+        <div style="position: absolute; top: 16px; left: -2px; width: 16px; text-align: center; color: #e3b341; font-size: 13px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
           ${ww}
         </div>
-        <!-- PPP: Sea-Level Pressure (Top Right) -->
-        <div style="position: absolute; top: 0px; right: -12px; color: #79c0ff; font-weight: bold; font-size: 10px; pointer-events: none;">
+        <!-- PPP: Sea-Level Pressure (Top Right in Cyan/Blue) -->
+        <div style="position: absolute; top: 4px; left: 30px; width: 22px; text-align: left; color: #79c0ff; font-weight: 700; font-size: 11px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
           ${ppp}
         </div>
-        <!-- ppa: 3h Pressure Tendency (Middle Right) -->
-        <div style="position: absolute; top: 14px; right: -16px; font-size: 9px; color: #a5d6ff; pointer-events: none;">
+        <!-- ppa: 3h Pressure Tendency & Diff (Bottom Right in Light Blue) -->
+        <div style="position: absolute; bottom: 4px; left: 30px; width: 24px; text-align: left; font-size: 9px; font-weight: 500; color: #a5d6ff; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
           ${pDiff}${pTend}
         </div>
       </div>

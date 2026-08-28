@@ -133,38 +133,38 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 			ind += bLen
 
 			switch elemID {
-			case 2001, 601: // Temperature TT
-				temp = valFloat
-			case 2005, 801: // Dew point Td
-				dewPoint = valFloat
-			case 1003, 401: // Sea Level Pressure (SLP)
-				slp = valFloat
-			case 1001: // Station Pressure
-				stnPress = valFloat
-				if slp <= -9000 {
-					slp = valFloat
+			case 2001, 601, 23, 201, 202, 203, 204, 205, 2002, 2003, 2004: // Temperature TT
+				temp = normalizeTemp(valFloat)
+			case 2005, 801, 24, 301, 302, 303, 304, 305, 2006, 802: // Dew point Td
+				dewPoint = normalizeTemp(valFloat)
+			case 1003, 401, 5, 101: // Sea Level Pressure (SLP)
+				slp = normalizePress(valFloat)
+			case 1001, 402: // Station Pressure
+				stnPress = normalizePress(valFloat)
+				if slp <= -9000 || slp <= 0 {
+					slp = stnPress
 				}
-			case 1002, 1004: // Geopotential Height (Upper-Air)
+			case 1002, 1004, 1: // Geopotential Height (Upper-Air)
 				height = valFloat
-			case 1005, 403: // 3-hour pressure change
+			case 1005, 403, 6: // 3-hour pressure change
 				pDiff3h = valFloat
-			case 1007: // Pressure tendency
+			case 1007, 7, 404: // Pressure tendency
 				pTendency = int16(valInt)
-			case 1401: // Cloud cover
+			case 1401, 20, 701, 702, 1402: // Cloud cover (0-8)
 				cloudCover = int16(valInt)
-			case 1601: // Present weather code
+			case 1601, 12, 901, 902: // Present weather code
 				weatherCode = int16(valInt)
-			case 1101, 209: // Wind direction DD
+			case 1101, 209, 21, 501: // Wind direction DD (0-360)
 				windDir = valFloat
-			case 1102, 211: // Wind speed FF
+			case 1102, 211, 22, 502: // Wind speed FF (m/s)
 				windSpeed = valFloat
-			case 1201, 1203, 1207: // Visibility
+			case 1201, 1203, 1207, 27: // Visibility
 				vis = valFloat
-			case 1301:
+			case 1301, 11:
 				rain1h = valFloat
-			case 1302:
+			case 1302, 8:
 				rain6h = valFloat
-			case 1303:
+			case 1303, 9:
 				rain24h = valFloat
 			}
 		}
@@ -214,8 +214,37 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 	}, nil
 }
 
+func normalizeTemp(val float32) float32 {
+	if val < -9000 || val > 9000 {
+		return -9999
+	}
+	if val > 150 && val < 373.15 { // Kelvin
+		return val - 273.15
+	}
+	if (val > 60 && val <= 600) || (val < -60 && val >= -600) { // Tenths of °C
+		return val / 10.0
+	}
+	if val > 600 && val <= 6000 { // Hundredths of °C
+		return val / 100.0
+	}
+	return val
+}
+
+func normalizePress(val float32) float32 {
+	if val < -9000 || val > 9000 || val <= 0 {
+		return -9999
+	}
+	if val > 8000 && val < 110000 { // Pascals to hPa (e.g. 101325 Pa -> 1013.25 hPa)
+		return val / 100.0
+	}
+	if val > 8000 && val < 11000 { // Tenths of hPa (e.g. 10124 -> 1012.4 hPa)
+		return val / 10.0
+	}
+	return val
+}
+
 func encodeSLP(slp float32) string {
-	if slp <= 0 || slp > 1100 {
+	if slp <= 0 || slp > 1100 || slp < 800 {
 		return "---"
 	}
 	val := int(math.Round(float64(slp * 10)))

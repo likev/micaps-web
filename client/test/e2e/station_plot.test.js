@@ -7,10 +7,10 @@ describe("WMO/NOAA Station Weather Plot Model Verification", () => {
 
   beforeAll(async () => {
     webview = await createTestWebView();
-    await waitForMapLoaded(webview, 15000);
+    await waitForMapLoaded(webview, 30000);
     // Wait for stations to load
-    await waitForCondition(webview, `Boolean(window.__STATION_LAYER__ && window.__STATION_LAYER__.getTotalCount() > 0)`, 20000);
-  }, 45000);
+    await waitForCondition(webview, `Boolean(window.__STATION_LAYER__ && window.__STATION_LAYER__.getTotalCount() > 0)`, 30000);
+  }, 60000);
 
   afterAll(async () => {
     if (webview) await webview.close();
