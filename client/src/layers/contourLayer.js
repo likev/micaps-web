@@ -188,6 +188,33 @@ export function removeContourLayer(map, layerId) {
 }
 
 
+export function removeAllContourLayers(map) {
+  if (!map || !map.getStyle) return;
+  const style = map.getStyle();
+  if (!style) return;
+
+  if (style.layers) {
+    for (const l of style.layers) {
+      const id = l.id;
+      if (id.includes("isoband") || id.includes("isoline") || id.startsWith("contour-") || id.startsWith("sounding-") || id.startsWith("surface-")) {
+        if (map.getLayer(id)) {
+          map.removeLayer(id);
+        }
+      }
+    }
+  }
+
+  if (style.sources) {
+    for (const srcId of Object.keys(style.sources)) {
+      if (srcId.includes("isoband") || srcId.includes("isoline") || srcId.startsWith("contour-") || srcId.startsWith("sounding-") || srcId.startsWith("surface-")) {
+        if (map.getSource(srcId)) {
+          map.removeSource(srcId);
+        }
+      }
+    }
+  }
+}
+
 export function renderCustomContourGeoJSON(map, isobands, isolines, options = {}) {
   updateMapLibreContour(map, isobands, isolines, options);
 }

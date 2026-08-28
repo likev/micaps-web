@@ -299,7 +299,6 @@ export function setTabLayout(tabId, layout = "1x1") {
   }
 
   focusWindow(tab.id, tab.activeWinIdx);
-  renderWindowTabs(tab);
 
   setTimeout(() => {
     tab.windows.forEach((win) => {
@@ -453,13 +452,10 @@ function setupWindowControls(tab) {
     if (presetSelect) {
       presetSelect.addEventListener("change", (e) => {
         const gid = e.target.value;
-        const g = PRESET_GROUPS.find((grp) => grp.id === gid);
-        if (g) {
-          win.activeGroup = g;
-          updateWindowTitle(win, g.name);
-          focusWindow(win.tabId, win.winIdx);
-          callbacks.onWindowGroupChange?.(win, g);
-        }
+        const g = PRESET_GROUPS.find((grp) => grp.id === gid) || null;
+        win.activeGroup = g;
+        updateWindowTitle(win, g ? g.name : "");
+        focusWindow(win.tabId, win.winIdx);
       });
     }
 
@@ -469,7 +465,6 @@ function setupWindowControls(tab) {
         if (!isNaN(lvl)) {
           win.level = lvl;
           focusWindow(win.tabId, win.winIdx);
-          callbacks.onWindowLevelChange?.(win, lvl);
         }
       });
     }

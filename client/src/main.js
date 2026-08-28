@@ -18,17 +18,19 @@ import {
   setLayerIsolineColor,
   setLayerIsobandOpacity,
   removeContourLayer,
+  removeAllContourLayers,
   setIsobandVisibility,
   setIsolineVisibility,
   setContourOpacity,
 } from "./layers/contourLayer.js";
-import { renderBinaryRaster, setRasterVisibility } from "./layers/rasterLayer.js";
-import { renderStationWeatherPlots, setStationVisibility } from "./layers/stationLayer.js";
+import { renderBinaryRaster, setRasterVisibility, removeRasterLayer } from "./layers/rasterLayer.js";
+import { renderStationWeatherPlots, setStationVisibility, removeStationLayer } from "./layers/stationLayer.js";
 import { renderWindStreamlines, stopWindAnimation } from "./layers/windLayer.js";
 import { analyzeAndRenderSoundingContours } from "./layers/soundingAnalysis.js";
 import { analyzeAndRenderSurfaceSLPContours } from "./layers/surfaceAnalysis.js";
 import { fetchGridData, fetchGridBinaryStream, fetchStationObservations } from "./api/catalogApi.js";
-import { getCSSGradient } from "./utils/colormaps.js";
+import { updateLegend } from "./ui/legend.js";
+import { initKeyboardShortcuts } from "./ui/keyboardShortcuts.js";
 import { appState } from "./store/appState.js";
 import { loadPresetGroups } from "./config/presets.js";
 import { setNavBarLevel, setNavBarPreset } from "./ui/navBar.js";
@@ -40,6 +42,7 @@ import {
   toggleTabsAndSplit,
   updateWindowTitle,
   setWindowHeaderPreset,
+  setWindowHeaderLevel,
 } from "./ui/tabWindowManager.js";
 
 function getMap() {
@@ -129,13 +132,29 @@ async function bootstrap() {
   // ── Navbar ───────────────────────────────────────────────────────────────
   initNavBar("navbar", {
     onConfigReload: reloadConfiguration,
-    onPresetChange: async (group) => {
+    onPresetSelect: (group) => {
+      const win = getActiveWindow();
+      if (!win) return;
+      win.activeGroup = group;
+      win.isObservation = Boolean(group?.isObservation);
+      if (group?.defaultLevel) win.level = group.defaultLevel;
+      updateWindowTitle(win, group ? group.name : "");
+      setWindowHeaderPreset(win, group?.id || "");
+      if (group?.defaultLevel) setWindowHeaderLevel(win, group.defaultLevel);
+    },
+    onLevelSelect: (lvl) => {
+      const win = getActiveWindow();
+      if (!win) return;
+      win.level = lvl;
+      setWindowHeaderLevel(win, lvl);
+    },
+    onLoadData: async (group) => {
       const win = getActiveWindow();
       const map = win?.map || getActiveMap();
       if (!win || !map || !group) return;
       win.activeGroup = group;
       win.isObservation = Boolean(group.isObservation);
-      if (group.defaultLevel) win.level = group.defaultLevel;
+      if (group.defaultLevel && !win.level) win.level = group.defaultLevel;
       const winTitle = `W${win.winIdx + 1}: ${group.name}`;
       updateWindowTitle(win, group.name);
       setWindowHeaderPreset(win, group.id);
@@ -146,17 +165,14 @@ async function bootstrap() {
       }
       await loadPresetGroup(map, group, win.period, win.level, win);
     },
-    onLevelChange: (lvl) => {
-      const win = getActiveWindow();
-      const map = win?.map || getActiveMap();
-      if (!win || !map) return;
-      win.level = lvl;
-      changeVerticalLevel(map, 0, lvl, win);
-    },
   });
 
   initTooltip("tooltip");
-  initKeyboardShortcuts();
+  initKeyboardShortcuts({
+    onPeriodStep: (dir) => timeSliderStep(dir),
+    onLevelStep: (dir) => changeVerticalLevel(getMap(), dir),
+    onToggleSplit: () => toggleTabsAndSplit(),
+  });
 
   // ── Catalog Drawer ───────────────────────────────────────────────────────
   initCatalogDrawer("catalog-drawer", async ({ model, element, level, period, obsTime, isObservation }) => {
@@ -456,25 +472,24 @@ function handleLayerAction(map, action, layerId, value, layer, win = getActiveWi
   }
 }
 
-function updateLegend(element = "TMP", colormap = null) {
-  const panel = document.getElementById("legend-panel");
-  if (!panel) return;
-
-  const grad = getCSSGradient(element, colormap);
-  panel.innerHTML = `
-    <div style="font-weight: bold; margin-bottom: 2px;">${element} Legend</div>
-    <div class="legend-bar" style="background: ${grad};"></div>
-    <div class="legend-ticks">
-      <span>Low</span>
-      <span>Mid</span>
-      <span>High</span>
-    </div>
-  `;
+export function clearAllWeatherLayersFromMap(map, win = null) {
+  if (!map) return;
+  try {
+    removeAllContourLayers(map);
+    stopWindAnimation(map);
+    removeStationLayer(map);
+    removeRasterLayer(map);
+  } catch (err) {
+    console.warn("[Main] Error cleaning up weather layers:", err);
+  }
+  if (win) {
+    clearWindowWeatherLayers(win);
+  }
 }
 
 async function loadPresetGroup(map, group, period = null, level = null, win = null) {
   if (!group || !group.layers) return;
-  if (win) clearWindowWeatherLayers(win);
+  clearAllWeatherLayersFromMap(map, win);
 
   const curPeriod = period !== null ? period : (win?.period ?? 24);
   const curLevel = level !== null ? level : (group.hasLevel ? (group.defaultLevel || win?.level || 500) : null);
@@ -482,8 +497,13 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
   if (curLevel !== null) {
     if (win) win.level = curLevel;
     if (win && getActiveWindow() === win) setNavBarLevel(curLevel);
+    if (win) setWindowHeaderLevel(win, curLevel);
   }
   if (win) win.period = curPeriod;
+  if (win) {
+    updateWindowTitle(win, group.name);
+    setWindowHeaderPreset(win, group.id);
+  }
   if (win && getActiveWindow() === win) {
     appState.update({
       activeGroup: group,
@@ -556,37 +576,6 @@ async function changeVerticalLevel(map, direction, explicitLevel = null, win = g
     const period = win?.period ?? 24;
     await loadWeatherField(map, model, element, targetLevel, period, null, win);
   }
-}
-
-function initKeyboardShortcuts() {
-  window.addEventListener("keydown", async (e) => {
-    const tag = e.target && e.target.tagName;
-    if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
-
-    const map = getMap();
-
-    if (e.key === "ArrowLeft") {
-      e.preventDefault();
-      console.log("[Keyboard] ArrowLeft: Step to previous forecast period");
-      timeSliderStep(-1);
-    } else if (e.key === "ArrowRight") {
-      e.preventDefault();
-      console.log("[Keyboard] ArrowRight: Step to next forecast period");
-      timeSliderStep(1);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      console.log("[Keyboard] ArrowUp: Step to higher vertical level");
-      await changeVerticalLevel(map, 1);
-    } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      console.log("[Keyboard] ArrowDown: Step to lower vertical level");
-      await changeVerticalLevel(map, -1);
-    } else if (e.key === "F4" || (e.altKey && (e.key === "s" || e.key === "S"))) {
-      e.preventDefault();
-      console.log("[Keyboard] F4: Toggle between Tabs and 4-Split mode");
-      toggleTabsAndSplit();
-    }
-  });
 }
 
 if (document.readyState === "loading") {

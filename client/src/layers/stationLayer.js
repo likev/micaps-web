@@ -213,6 +213,18 @@ export function clearStationMarkersForMap(map) {
   state.markers = [];
 }
 
+export function removeStationLayer(map) {
+  if (!map) return;
+  const state = getState(map);
+  clearStationMarkersForMap(map);
+  state.geojson = null;
+  state.visible = false;
+  if (state.moveListener) {
+    map.off("moveend", state.moveListener);
+    state.moveListener = null;
+  }
+}
+
 // Expose station layer controller for automated testing (uses active map fallback)
 window.__STATION_LAYER__ = {
   getVisibleCount: () => {

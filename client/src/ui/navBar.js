@@ -3,16 +3,18 @@ import { appState } from "../store/appState.js";
 import { fetchStatus } from "../api/catalogApi.js";
 import { PRESET_GROUPS } from "../config/presets.js";
 
-let onPresetChangeCallback = null;
-let onLevelChangeCallback = null;
+let onPresetSelectCallback = null;
+let onLevelSelectCallback = null;
+let onLoadDataCallback = null;
 let onConfigReloadCallback = null;
 
 export function initNavBar(containerId = "navbar", callbacks = {}) {
   const container = document.getElementById(containerId);
   if (!container) return;
 
-  onPresetChangeCallback = callbacks.onPresetChange;
-  onLevelChangeCallback = callbacks.onLevelChange;
+  onPresetSelectCallback = callbacks.onPresetSelect || callbacks.onPresetChange;
+  onLevelSelectCallback = callbacks.onLevelSelect || callbacks.onLevelChange;
+  onLoadDataCallback = callbacks.onLoadData || callbacks.onPresetChange;
   onConfigReloadCallback = callbacks.onConfigReload;
 
   const currentLevel = appState.get("level") || 500;
@@ -68,9 +70,9 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
 
   document.getElementById("select-preset").addEventListener("change", (e) => {
     const groupId = e.target.value;
-    const group = PRESET_GROUPS.find((g) => g.id === groupId);
-    if (group && onPresetChangeCallback) {
-      onPresetChangeCallback(group);
+    const group = PRESET_GROUPS.find((g) => g.id === groupId) || null;
+    if (onPresetSelectCallback) {
+      onPresetSelectCallback(group);
     }
   });
 
@@ -78,9 +80,9 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
     const select = document.getElementById("select-preset");
     const groupId = select ? select.value : "";
     const group = PRESET_GROUPS.find((g) => g.id === groupId) || PRESET_GROUPS[0];
-    if (group && onPresetChangeCallback) {
+    if (group && onLoadDataCallback) {
       if (select && !select.value) select.value = group.id;
-      onPresetChangeCallback(group);
+      onLoadDataCallback(group);
     }
   });
 
@@ -88,8 +90,8 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
     const lvl = parseInt(e.target.value, 10);
     if (!isNaN(lvl)) {
       appState.set("level", lvl);
-      if (onLevelChangeCallback) {
-        onLevelChangeCallback(lvl);
+      if (onLevelSelectCallback) {
+        onLevelSelectCallback(lvl);
       }
     }
   });

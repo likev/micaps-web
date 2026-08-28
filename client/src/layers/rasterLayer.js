@@ -89,3 +89,9 @@ export function setRasterVisibility(map, visible) {
     map.setLayoutProperty("raster-layer", "visibility", visible ? "visible" : "none");
   }
 }
+
+export function removeRasterLayer(map) {
+  if (!map) return;
+  if (map.getLayer("raster-layer")) map.removeLayer("raster-layer");
+  if (map.getSource("raster-source")) map.removeSource("raster-source");
+}

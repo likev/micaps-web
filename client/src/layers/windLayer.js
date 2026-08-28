@@ -203,12 +203,14 @@ export function stopWindAnimation(map = null) {
       map._windAnimId = null;
     }
     const canvas = map.getContainer()?.querySelector(".streamline-canvas");
-    if (canvas && canvas.getContext) {
-      canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+    if (canvas) {
+      canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+      canvas.remove();
     }
   } else {
     document.querySelectorAll(".streamline-canvas").forEach((canvas) => {
       canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+      canvas.remove();
     });
   }
 }
