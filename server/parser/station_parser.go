@@ -84,6 +84,7 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 		}
 
 		var temp, dewPoint, slp, stnPress, height, pDiff3h, windSpeed, windDir, vis, rain1h, rain6h, rain24h float32 = -9999, -9999, -9999, -9999, -9999, 0, 0, 0, 10, 0, 0, 0
+		var dewDepression float32 = -9999
 		var cloudCover, weatherCode, pTendency int16 = 0, 0, 0
 
 		for e := 0; e < int(numb) && ind+2 <= len(decompressed); e++ {
@@ -133,10 +134,16 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 			ind += bLen
 
 			switch elemID {
-			case 2001, 601, 23, 201, 202, 203, 204, 205, 2002, 2003, 2004: // Temperature TT
+			case 601, 2001, 23: // Temperature TT (°C)
 				temp = normalizeTemp(valFloat)
-			case 2005, 801, 24, 301, 302, 303, 304, 305, 2006, 802: // Dew point Td
+			case 801, 2005, 24, 301, 302, 303, 304, 305, 2006: // Dew point Td (°C)
 				dewPoint = normalizeTemp(valFloat)
+			case 803, 802: // Dew point depression T - Td (Upper Air)
+				if valFloat >= 0 && valFloat < 100 {
+					dewDepression = valFloat
+				}
+			case 421, 1002, 1004, 1: // Geopotential Height (Upper Air decameters or gpm)
+				height = normalizeHeight(valFloat)
 			case 1003, 401, 5, 101: // Sea Level Pressure (SLP)
 				slp = normalizePress(valFloat)
 			case 1001, 402: // Station Pressure
@@ -144,8 +151,6 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 				if slp <= -9000 || slp <= 0 {
 					slp = stnPress
 				}
-			case 1002, 1004, 1: // Geopotential Height (Upper-Air)
-				height = normalizeHeight(valFloat)
 			case 1005, 403, 6: // 3-hour pressure change
 				pDiff3h = valFloat
 			case 1007, 7, 404: // Pressure tendency
@@ -154,9 +159,9 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 				cloudCover = int16(valInt)
 			case 1601, 12, 901, 902: // Present weather code
 				weatherCode = int16(valInt)
-			case 1101, 209, 21, 501: // Wind direction DD (0-360)
+			case 201, 1101, 209, 21, 501: // Wind direction DD (0-360)
 				windDir = valFloat
-			case 1102, 211, 22, 502: // Wind speed FF (m/s)
+			case 203, 1102, 211, 22, 502: // Wind speed FF (m/s)
 				windSpeed = valFloat
 			case 1201, 1203, 1207, 27: // Visibility
 				vis = valFloat
@@ -166,6 +171,13 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 				rain6h = valFloat
 			case 1303, 9:
 				rain24h = valFloat
+			}
+		}
+
+		// In upper air soundings, compute dewpoint from temperature and dewpoint depression (Td = T - depression)
+		if dewDepression >= 0 && temp > -9000 {
+			if dewPoint <= -9000 || dewPoint > temp {
+				dewPoint = temp - dewDepression
 			}
 		}
 
