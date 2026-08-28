@@ -71,8 +71,10 @@ function renderChips() {
     obsFiles.forEach((file, idx) => {
       const btn = document.createElement("button");
       btn.className = `chip-btn ${idx === currentObsIdx ? "active" : ""}`;
-      // Extract HH:MM UTC
-      const timeLabel = file.length >= 12 ? `${file.slice(8, 10)}:${file.slice(10, 12)}Z` : file;
+      // Extract MM-DD HH:MM BJT
+      const timeLabel = file.length >= 10
+        ? `${file.slice(4, 6)}/${file.slice(6, 8)} ${file.slice(8, 10)}:${file.slice(10, 12) || "00"}`
+        : file;
       btn.textContent = timeLabel;
       btn.title = formatObsTimestamp(file);
       btn.addEventListener("click", () => {
@@ -126,9 +128,9 @@ function updateLabels() {
   if (currentMode === "obs") {
     badge.textContent = "OBSERVATION";
     badge.className = "mode-badge obs-badge";
-    const curFile = obsFiles[currentObsIdx];
+    const curFile = obsFiles[currentObsIdx] || "";
     leadWrapper.innerHTML = `Observation Time: <strong id="time-lead-label">${formatObsTimestamp(curFile)}</strong>`;
-    validLabel.textContent = "Instantaneous Station Analysis (No Forecast Offset)";
+    validLabel.textContent = "Real-time Observation Analysis (UTC+8 / BJT)";
   } else {
     badge.textContent = "NWP FORECAST";
     badge.className = "mode-badge";
@@ -140,6 +142,7 @@ function updateLabels() {
 
 export function step(delta) {
   if (currentMode === "obs") {
+    if (obsFiles.length === 0) return;
     currentObsIdx = (currentObsIdx + delta + obsFiles.length) % obsFiles.length;
     updateLabels();
     renderChips();
@@ -179,9 +182,16 @@ export function setTimelineMode(mode, customData = {}) {
   if (customData.winTitle !== undefined) {
     currentWinTitle = customData.winTitle;
   }
-  if (currentMode === "obs" && customData.file) {
-    const idx = obsFiles.indexOf(customData.file);
-    if (idx !== -1) currentObsIdx = idx;
+  if (currentMode === "obs") {
+    if (Array.isArray(customData.files) && customData.files.length > 0) {
+      obsFiles = customData.files;
+    }
+    if (customData.file) {
+      const idx = obsFiles.indexOf(customData.file);
+      currentObsIdx = idx !== -1 ? idx : obsFiles.length - 1;
+    } else {
+      currentObsIdx = obsFiles.length - 1;
+    }
   } else if (currentMode === "nwp" && customData.period !== undefined) {
     const idx = discretePeriods.indexOf(customData.period);
     if (idx !== -1) currentPeriodIdx = idx;

@@ -10,6 +10,7 @@ import {
   clearWindowWeatherLayers,
 } from "./ui/layerControl.js";
 import { initTimeSlider, setTimelineMode } from "./ui/timeSlider.js";
+import { handleLayerAction } from "./ui/layerActions.js";
 import { initTooltip } from "./ui/tooltip.js";
 import {
   renderContourLayers,
@@ -28,7 +29,7 @@ import { renderStationWeatherPlots, setStationVisibility, removeStationLayer } f
 import { renderWindStreamlines, stopWindAnimation } from "./layers/windLayer.js";
 import { analyzeAndRenderSoundingContours } from "./layers/soundingAnalysis.js";
 import { analyzeAndRenderSurfaceSLPContours } from "./layers/surfaceAnalysis.js";
-import { fetchGridData, fetchGridBinaryStream, fetchStationObservations } from "./api/catalogApi.js";
+import { fetchGridData, fetchGridBinaryStream, fetchStationObservations, fetchTree } from "./api/catalogApi.js";
 import { updateLegend } from "./ui/legend.js";
 import { initKeyboardShortcuts } from "./ui/keyboardShortcuts.js";
 import { appState } from "./store/appState.js";
@@ -76,7 +77,7 @@ async function bootstrap() {
 
   // ── Tab / Window Manager ─────────────────────────────────────────────────
   const firstTab = initTabWindowManager({
-    onWindowFocus: (win) => {
+    onWindowFocus: async (win) => {
       setNavBarPreset(win.activeGroup?.id || "");
       if (win.level) setNavBarLevel(win.level);
 
@@ -93,7 +94,11 @@ async function bootstrap() {
 
       const isObs = Boolean(win.isObservation || win.activeGroup?.isObservation || win.model === "SURFACE" || win.model === "UPPER_AIR");
       if (isObs) {
-        setTimelineMode("obs", { file: win.obsTime || "20260827200000.000", winTitle });
+        const obsPath = win.model === "UPPER_AIR"
+          ? `UPPER_AIR/${win.element || "PLOT"}/${win.level || 500}`
+          : (win.model === "SURFACE" ? `SURFACE/${win.element || "PLOT_GLOBAL_3H"}` : "SURFACE/PLOT_GLOBAL_3H");
+        const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle);
+        win.obsTime = latestFile;
       } else {
         setTimelineMode("nwp", { period: win.period ?? 24, winTitle });
       }
@@ -108,7 +113,9 @@ async function bootstrap() {
       updateWindowTitle(win, group.name);
       setWindowHeaderPreset(win, group.id);
       if (win.isObservation) {
-        setTimelineMode("obs", { file: win.obsTime || "20260827200000.000", winTitle });
+        const obsPath = group.id?.includes("upper") ? "UPPER_AIR/PLOT/500" : "SURFACE/PLOT_GLOBAL_3H";
+        const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle);
+        win.obsTime = latestFile;
       } else {
         setTimelineMode("nwp", { period: win.period ?? 24, winTitle });
       }
@@ -169,7 +176,9 @@ async function bootstrap() {
       updateWindowTitle(win, group.name);
       setWindowHeaderPreset(win, group.id);
       if (win.isObservation) {
-        setTimelineMode("obs", { file: win.obsTime || "20260827200000.000", winTitle });
+        const obsPath = group.id?.includes("upper") ? "UPPER_AIR/PLOT/500" : "SURFACE/PLOT_GLOBAL_3H";
+        const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle);
+        win.obsTime = latestFile;
       } else {
         setTimelineMode("nwp", { period: win.period ?? 24, winTitle });
       }
@@ -225,11 +234,15 @@ async function bootstrap() {
     clearAllWeatherLayersFromMap(map, win);
 
     if (isObservation) {
-      setTimelineMode("obs", { file: obsTime || win.obsTime || "20260827200000.000", winTitle: winBannerTitle });
+      const obsPath = model === "SURFACE"
+        ? `SURFACE/${element}`
+        : (model === "UPPER_AIR" ? `UPPER_AIR/${element}/${win.level || 500}` : `${model}/${element}`);
+      const latestFile = await syncObservationTimeline(obsPath, obsTime || win.obsTime, winBannerTitle);
+      win.obsTime = latestFile;
       if (model === "UPPER_AIR") {
-        await loadUpperAirComposite(map, win.level || 500, obsTime, win);
+        await loadUpperAirComposite(map, win.level || 500, latestFile, win);
       } else {
-        await loadObservationProduct(map, model, element, win.level, obsTime, win);
+        await loadObservationProduct(map, model, element, win.level, latestFile, win);
       }
     } else {
       setTimelineMode("nwp", { period: win.period ?? 24, winTitle: winBannerTitle });
@@ -249,13 +262,18 @@ async function bootstrap() {
     if (!win || !map) return;
     if (typeof data === "object" && data.isObs) {
       win.obsTime = data.file;
-      const model = win.model || "SURFACE";
-      const element = win.element || "PLOT_GLOBAL_3H";
-      const level = win.level;
-      if (model === "UPPER_AIR") {
-        await loadUpperAirComposite(map, level || 500, data.file);
+      clearAllWeatherLayersFromMap(map, win);
+      if (win.activeGroup) {
+        await loadPresetGroup(map, win.activeGroup, win.period, win.level, win);
       } else {
-        await loadObservationProduct(map, model, element, level, data.file);
+        const model = win.model || "SURFACE";
+        const element = win.element || "PLOT_GLOBAL_3H";
+        const level = win.level;
+        if (model === "UPPER_AIR") {
+          await loadUpperAirComposite(map, level || 500, data.file, win);
+        } else {
+          await loadObservationProduct(map, model, element, level, data.file, win);
+        }
       }
     } else {
       const period = typeof data === "number" ? data : win.period;
@@ -352,8 +370,32 @@ async function loadWeatherField(map, model, element, level, period, customOption
   }
 }
 
+async function syncObservationTimeline(path, currentFile = null, winTitle = "") {
+  try {
+    const fileEntries = await fetchTree(path);
+    if (Array.isArray(fileEntries) && fileEntries.length > 0) {
+      const validFiles = fileEntries
+        .filter((f) => f.name && f.name.endsWith(".000") && (f.size > 200 || f.size === 0))
+        .map((f) => f.name);
+      if (validFiles.length > 0) {
+        // Treeview returns newest first; take latest 10 files and reverse to oldest->newest for timeline stepper
+        const recentFiles = validFiles.slice(0, 10).reverse();
+        const targetFile = currentFile && recentFiles.includes(currentFile)
+          ? currentFile
+          : recentFiles[recentFiles.length - 1]; // latest observation time
+        setTimelineMode("obs", { file: targetFile, files: recentFiles, winTitle });
+        return targetFile;
+      }
+    }
+  } catch (err) {
+    console.warn("[Main] Failed to query observation file tree for timeline:", err);
+  }
+  setTimelineMode("obs", { file: currentFile || "20260828170000.000", winTitle });
+  return currentFile || "20260828170000.000";
+}
+
 // When upper plot is loaded, display plot and calculate height & temp contour lines from sounding plot data
-async function loadUpperAirComposite(map, level = 500, obsTime = "20260827200000.000", win = getActiveWindow()) {
+async function loadUpperAirComposite(map, level = 500, obsTime = "20260828170000.000", win = getActiveWindow()) {
   console.log(`[UpperAir] Loading upper soundings and calculating contour lines for ${level} hPa...`);
 
   // 1. Load Upper Air Sounding Plots
@@ -415,71 +457,7 @@ async function loadObservationProduct(map, model, element, level, file, win = ge
 
 
 
-function handleLayerAction(map, action, layerId, value, layer, win = getActiveWindow()) {
-  if (action === "visibility") {
-    if (layer.type === "contour") {
-      setLayerIsobandVisibility(map, layerId, value && layer.config.showFill);
-      setLayerIsolineVisibility(map, layerId, value && layer.config.showLine);
-    } else if (layer.type === "station") {
-      setStationVisibility(map, value);
-    } else if (layer.type === "pmtiles") {
-      const vis = value ? "visible" : "none";
-      const pmtilesLayerIds = [
-        "china-fill", "china-boundary",
-        "provinces-bg-fill", "provinces-boundary",
-        "provinces-fill", "provinces-detail-boundary",
-        "citys-fill", "citys-boundary",
-        "graticule-lines",
-      ];
-      pmtilesLayerIds.forEach((id) => {
-        if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", vis);
-      });
-    }
-  } else if (action === "config") {
-    if (layer.type === "contour") {
-      setLayerIsobandVisibility(map, layerId, layer.visible && value.showFill);
-      setLayerIsolineVisibility(map, layerId, layer.visible && value.showLine);
-      setLayerIsobandOpacity(map, layerId, value.opacity);
-      setLayerIsolineColor(map, layerId, value.lineColor);
-    }
-  } else if (action === "remove") {
-    if (layer.type === "contour") {
-      removeContourLayer(map, layerId);
-    } else if (layer.type === "station") {
-      setStationVisibility(map, false);
-    }
-  } else if (action === "aux") {
-    if (layerId === "raster") {
-      if (value && !map.getLayer("raster-layer")) {
-        const model = win?.model || "ECMWF_HR";
-        const element = win?.element || "TMP";
-        const level = win?.level || 850;
-        const period = win?.period ?? 24;
-        const file = `26082708.${String(period).padStart(3, "0")}`;
-        const path = `${model}/${element}/${level}`;
-        fetchGridBinaryStream(path, file).then((bin) => {
-          renderBinaryRaster(map, bin, element, win?.colormap || element);
-        });
-      } else {
-        setRasterVisibility(map, value);
-      }
-    } else if (layerId === "wind") {
-      if (value) {
-        let grid = win?.gridData || appState.get("gridData");
-        if (!grid || !grid.u || !grid.v) {
-          grid = {
-            header: (grid && grid.header) ? grid.header : { start_lon: 60, d_lon: 0.5, n_lon: 100, start_lat: 10, d_lat: 0.5, n_lat: 80 },
-            u: new Float32Array(8000).fill(6),
-            v: new Float32Array(8000).fill(4),
-          };
-        }
-        renderWindStreamlines(map, grid);
-      } else {
-        stopWindAnimation(map);
-      }
-    }
-  }
-}
+
 
 export function clearAllWeatherLayersFromMap(map, win = null) {
   if (!map) return;
@@ -539,7 +517,15 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
           colormap: resolveColormap(group, render, targetLevel),
         }, win);
       } else if (layer.type === "station") {
-        await loadObservationProduct(map, layer.model, layer.element, targetLevel, win?.obsTime || "20260827200000.000", win);
+        const obsPath = layer.model === "UPPER_AIR"
+          ? `UPPER_AIR/${layer.element}/${targetLevel || 500}`
+          : `${layer.model}/${layer.element}`;
+        let file = win?.obsTime;
+        if (!file) {
+          file = await syncObservationTimeline(obsPath, null, `W${(win?.winIdx ?? 0) + 1}: ${group.name}`);
+          if (win) win.obsTime = file;
+        }
+        await loadObservationProduct(map, layer.model, layer.element, targetLevel, file, win);
       }
     })
   );

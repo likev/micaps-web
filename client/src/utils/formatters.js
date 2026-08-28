@@ -42,6 +42,14 @@ export function formatObsTimestamp(fileStr = "") {
   const d = fileStr.slice(6, 8);
   const h = fileStr.slice(8, 10);
   const min = fileStr.length >= 12 ? fileStr.slice(10, 12) : "00";
-  return `${y}-${m}-${d} ${h}:${min} UTC`;
+
+  // Calculate UTC equivalent: BJT (UTC+8) minus 8 hours
+  const bjtTimestamp = Date.UTC(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10), parseInt(h, 10), parseInt(min, 10));
+  const utcDate = new Date(bjtTimestamp - 8 * 3600 * 1000);
+  const pad = (n) => String(n).padStart(2, "0");
+  const utcH = pad(utcDate.getUTCHours());
+  const utcM = pad(utcDate.getUTCMinutes());
+
+  return `${y}-${m}-${d} ${h}:${min} BJT (${utcH}:${utcM} UTC)`;
 }
 
