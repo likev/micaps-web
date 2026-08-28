@@ -28,11 +28,30 @@ export function renderStationWeatherPlots(map, geojson, visible = true) {
 
   if (state.moveListener) {
     map.off("moveend", state.moveListener);
+    map.off("zoomend", state.moveListener);
   }
   state.moveListener = () => updateVisibleMarkersForMap(map);
   map.on("moveend", state.moveListener);
+  map.on("zoomend", state.moveListener);
 
   updateVisibleMarkersForMap(map);
+}
+
+function isPointInBounds(bounds, lon, lat) {
+  if (!bounds) return true;
+  const s = bounds.getSouth();
+  const n = bounds.getNorth();
+  if (lat < s - 1.5 || lat > n + 1.5) return false;
+
+  const w = bounds.getWest();
+  const e = bounds.getEast();
+  if (e - w >= 360) return true;
+
+  let normLon = lon;
+  while (normLon < w) normLon += 360;
+  while (normLon > e) normLon -= 360;
+
+  return normLon >= w && normLon <= e;
 }
 
 function extractNumber(props, keys, minValid = -90, maxValid = 90) {
@@ -103,18 +122,19 @@ export function updateVisibleMarkersForMap(map) {
   if (!state.visible || !state.geojson || !state.geojson.features) return;
 
   const bounds = map.getBounds();
-  const maxVisible = 3500;
-  let renderedCount = 0;
+  const curZoom = map.getZoom();
+  const scale = curZoom < 4.5 ? 0.75 : (curZoom < 6.5 ? 0.88 : 1.0);
 
   for (const f of state.geojson.features) {
     const [lon, lat] = f.geometry.coordinates;
-    if (!bounds.contains([lon, lat])) continue;
+    if (!isPointInBounds(bounds, lon, lat)) continue;
 
     const p = f.properties || {};
     const el = document.createElement("div");
     el.className = "station-plot-marker";
     el.style.position = "absolute";
-    el.style.transform = "translate(-50%, -50%)";
+    el.style.transform = `translate(-50%, -50%) scale(${scale})`;
+    el.style.transformOrigin = "center center";
     el.style.fontFamily = "'SF Mono', -apple-system, monospace";
     el.style.fontSize = "10px";
     el.style.color = "#ffffff";
@@ -138,8 +158,10 @@ export function updateVisibleMarkersForMap(map) {
 
     const weatherCode = extractNumber(p, ["weather_code", "weatherCode", "weather", "Ww", "ww", "WEA"], 0, 99) || 0;
 
-    const pDiffRaw = extractNumber(p, ["press_diff_3h", "pDiff3h", "press_diff", "PRS_Change_3h", "p3"], -50, 50);
-    const pDiff = pDiffRaw !== null && Math.abs(pDiffRaw) > 0.05 ? `${pDiffRaw > 0 ? "+" : ""}${(pDiffRaw * 10).toFixed(0)}` : "";
+    const pDiffRaw = extractNumber(p, ["press_diff_3h", "pDiff3h", "press_diff", "PRS_Change_3h", "p3"], -500, 500);
+    const pDiff = pDiffRaw !== null && Math.abs(pDiffRaw) > 0.05
+      ? `${pDiffRaw > 0 ? "+" : ""}${Math.abs(pDiffRaw) > 30 ? Math.round(pDiffRaw) : Math.round(pDiffRaw * 10)}`
+      : "";
 
     const pTendCode = extractNumber(p, ["press_tend", "pTend", "PRS_Tendency", "a"], 0, 8);
     const pTend = pTendCode !== null ? getPressureTendencyGlyph(pTendCode) : "";
@@ -186,8 +208,6 @@ export function updateVisibleMarkersForMap(map) {
       .addTo(map);
 
     state.markers.push(marker);
-    renderedCount++;
-    if (renderedCount >= maxVisible) break;
   }
 }
 
