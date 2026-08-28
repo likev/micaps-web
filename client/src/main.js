@@ -38,6 +38,8 @@ import {
   getActiveWindow,
   refreshPresetControls,
   toggleTabsAndSplit,
+  updateWindowTitle,
+  setWindowHeaderPreset,
 } from "./ui/tabWindowManager.js";
 
 function getMap() {
@@ -75,7 +77,7 @@ async function bootstrap() {
       setNavBarPreset(win.activeGroup?.id || "");
       if (win.level) setNavBarLevel(win.level);
 
-      const winTitle = win.activeGroup ? `W${win.winIdx + 1}: ${win.activeGroup.name}` : `Window ${win.winIdx + 1}`;
+      const winTitle = win.activeGroup ? `W${win.winIdx + 1}: ${win.activeGroup.name}` : "";
       const isObs = Boolean(win.isObservation || win.activeGroup?.isObservation || win.model === "SURFACE" || win.model === "UPPER_AIR");
       if (isObs) {
         setTimelineMode("obs", { file: win.obsTime || "20260827200000.000", winTitle });
@@ -85,11 +87,13 @@ async function bootstrap() {
       syncLayerControlForWindow(win);
     },
     onWindowGroupChange: async (win, group) => {
-      if (!win.map) return;
+      if (!win.map || !group) return;
       win.activeGroup = group;
       win.isObservation = Boolean(group.isObservation);
       if (group.defaultLevel) win.level = group.defaultLevel;
       const winTitle = `W${win.winIdx + 1}: ${group.name}`;
+      updateWindowTitle(win, group.name);
+      setWindowHeaderPreset(win, group.id);
       if (win.isObservation) {
         setTimelineMode("obs", { file: win.obsTime || "20260827200000.000", winTitle });
       } else {
@@ -125,14 +129,22 @@ async function bootstrap() {
   // ── Navbar ───────────────────────────────────────────────────────────────
   initNavBar("navbar", {
     onConfigReload: reloadConfiguration,
-    onPresetChange: (group) => {
+    onPresetChange: async (group) => {
       const win = getActiveWindow();
       const map = win?.map || getActiveMap();
-      if (!win || !map) return;
+      if (!win || !map || !group) return;
       win.activeGroup = group;
-      win.isObservation = false;
+      win.isObservation = Boolean(group.isObservation);
       if (group.defaultLevel) win.level = group.defaultLevel;
-      loadPresetGroup(map, group, win.period, win.level, win);
+      const winTitle = `W${win.winIdx + 1}: ${group.name}`;
+      updateWindowTitle(win, group.name);
+      setWindowHeaderPreset(win, group.id);
+      if (win.isObservation) {
+        setTimelineMode("obs", { file: win.obsTime || "20260827200000.000", winTitle });
+      } else {
+        setTimelineMode("nwp", { period: win.period ?? 24, winTitle });
+      }
+      await loadPresetGroup(map, group, win.period, win.level, win);
     },
     onLevelChange: (lvl) => {
       const win = getActiveWindow();
@@ -219,14 +231,9 @@ async function bootstrap() {
   const firstWin = firstTab?.windows[0];
   const map = firstWin?.map;
 
-  const onReady = async () => {
-    console.log("[Main] Map ready, loading initial weather fields...");
-    updateLegend("TMP");
-    await Promise.all([
-      loadWeatherField(map, "ECMWF_HR", "TMP", 850, 24, null, firstWin),
-      loadSurfaceStations(map, firstWin),
-    ]);
-    window.__WEATHER_FIELD_LOADED__ = true;
+  const onReady = () => {
+    console.log("[Main] Map ready, workstation initialized with clean base canvas.");
+    window.__WEATHER_FIELD_LOADED__ = false;
   };
 
   if (map) {

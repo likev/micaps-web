@@ -115,17 +115,10 @@ export function createNewTab(customName = null) {
       maxBtnId: `win-max-${tabId}-${wIdx}`,
       domId: `map-viewport-${tabId}-${wIdx}`,
       map: null, activeGroup: null, level: 500, period: 24,
-      model: appState.get("model") || "ECMWF_HR",
-      element: appState.get("element") || "TMP",
+      model: null,
+      element: null,
       isObservation: false, obsTime: null,
     };
-
-    const defaultGId = DEFAULT_GROUP_IDS[wIdx] || "composite-500hpa";
-    const defaultGroup = PRESET_GROUPS.find((g) => g.id === defaultGId);
-    if (defaultGroup) {
-      winObj.activeGroup = defaultGroup;
-      if (defaultGroup.defaultLevel) winObj.level = defaultGroup.defaultLevel;
-    }
 
     const panelEl = document.createElement("div");
     panelEl.className = `window-panel ${wIdx === 0 ? "active active-single" : ""}`;
@@ -137,12 +130,12 @@ export function createNewTab(customName = null) {
       <div class="win-header" id="${winObj.headerId}">
         <div class="win-title-group">
           <span class="win-badge" id="${winObj.badgeId}">W${wIdx + 1}</span>
-          <span class="win-title" id="${winObj.titleId}">${winObj.activeGroup ? winObj.activeGroup.name : `Window ${wIdx + 1}`}</span>
+          <span class="win-title" id="${winObj.titleId}"></span>
         </div>
         <div class="win-actions">
           <select class="win-preset-select" id="${winObj.presetSelectId}">
             <option value="">-- Group --</option>
-            ${PRESET_GROUPS.map((g) => `<option value="${g.id}" ${g.id === winObj.activeGroup?.id ? "selected" : ""}>${g.name}</option>`).join("")}
+            ${PRESET_GROUPS.map((g) => `<option value="${g.id}">${g.name}</option>`).join("")}
           </select>
           <select class="win-level-select" id="${winObj.levelSelectId}">
             ${DEFAULT_LEVELS.map((l) => `<option value="${l}" ${l === winObj.level ? "selected" : ""}>${l} hPa</option>`).join("")}
@@ -531,7 +524,7 @@ export function refreshPresetControls() {
         select.value = group?.id || "";
       }
 
-      updateWindowTitle(win, group?.name || `Window ${win.winIdx + 1}`);
+      updateWindowTitle(win, group ? group.name : "");
     });
   });
 

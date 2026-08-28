@@ -31,6 +31,9 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
           <option value="">-- Presets / 组合图 --</option>
           ${PRESET_GROUPS.map((g) => `<option value="${g.id}">${g.name}</option>`).join("")}
         </select>
+        <button id="btn-load-data" class="btn btn-primary nav-load-btn" title="Load selected preset group data">
+          <span>Load Data</span>
+        </button>
       </div>
 
       <div class="nav-control-group">
@@ -71,6 +74,16 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
     }
   });
 
+  document.getElementById("btn-load-data").addEventListener("click", () => {
+    const select = document.getElementById("select-preset");
+    const groupId = select ? select.value : "";
+    const group = PRESET_GROUPS.find((g) => g.id === groupId) || PRESET_GROUPS[0];
+    if (group && onPresetChangeCallback) {
+      if (select && !select.value) select.value = group.id;
+      onPresetChangeCallback(group);
+    }
+  });
+
   document.getElementById("select-nav-level").addEventListener("change", (e) => {
     const lvl = parseInt(e.target.value, 10);
     if (!isNaN(lvl)) {
@@ -86,9 +99,12 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
     if (drawer) drawer.classList.toggle("hidden");
   });
 
-  document.getElementById("btn-toggle-layers").addEventListener("click", () => {
+  document.getElementById("btn-toggle-layers").addEventListener("click", (e) => {
     const panel = document.getElementById("layer-control");
-    if (panel) panel.classList.toggle("hidden");
+    if (panel) {
+      panel.classList.toggle("hidden");
+      e.currentTarget.classList.toggle("active", !panel.classList.contains("hidden"));
+    }
   });
 
   document.getElementById("btn-reload-config").addEventListener("click", async (e) => {

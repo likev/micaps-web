@@ -19,17 +19,6 @@ function createDefaultLayers(winId = "default") {
       isExpanded: false,
       config: {},
     },
-    {
-      id: `layer-station-${winId}`,
-      rawId: "station",
-      name: "Surface Station Plots",
-      type: "station",
-      visible: true,
-      removable: true,
-      color: "#e3b341",
-      isExpanded: false,
-      config: {},
-    },
   ];
 }
 
