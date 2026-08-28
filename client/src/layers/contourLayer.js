@@ -119,7 +119,7 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
             "fill-opacity": opacity,
           },
         },
-        map.getLayer("provinces-boundary") ? "provinces-boundary" : undefined
+        map.getLayer("citys-boundary") ? "citys-boundary" : (map.getLayer("provinces-boundary") ? "provinces-boundary" : undefined)
       );
     }
   }

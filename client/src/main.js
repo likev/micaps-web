@@ -423,8 +423,16 @@ function handleLayerAction(map, action, layerId, value, layer, win = getActiveWi
       setStationVisibility(map, value);
     } else if (layer.type === "pmtiles") {
       const vis = value ? "visible" : "none";
-      if (map.getLayer("provinces-boundary")) map.setLayoutProperty("provinces-boundary", "visibility", vis);
-      if (map.getLayer("graticule-layer")) map.setLayoutProperty("graticule-layer", "visibility", vis);
+      const pmtilesLayerIds = [
+        "china-fill", "china-boundary",
+        "provinces-bg-fill", "provinces-boundary",
+        "provinces-fill", "provinces-detail-boundary",
+        "citys-fill", "citys-boundary",
+        "graticule-lines",
+      ];
+      pmtilesLayerIds.forEach((id) => {
+        if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", vis);
+      });
     }
   } else if (action === "config") {
     if (layer.type === "contour") {
