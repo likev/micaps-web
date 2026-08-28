@@ -33,6 +33,7 @@ export function initTimeSlider(containerId = "timeslider-container", onTimeChang
     <div class="timeline-body">
       <div class="timeline-info">
         <span id="time-badge" class="mode-badge">NWP FORECAST</span>
+        <span id="time-win-badge" class="win-target-badge" style="display:none;"></span>
         <span id="time-lead-wrapper">Forecast Lead: <strong id="time-lead-label">+024h</strong></span>
         <span id="time-valid-label" class="valid-label">Analysis + 24h</span>
       </div>
@@ -101,13 +102,26 @@ function renderChips() {
   }
 }
 
+let currentWinTitle = "";
+
 function updateLabels() {
   const badge = document.getElementById("time-badge");
+  const winBadge = document.getElementById("time-win-badge");
   const leadWrapper = document.getElementById("time-lead-wrapper");
   const leadLabel = document.getElementById("time-lead-label");
   const validLabel = document.getElementById("time-valid-label");
 
   if (!badge || !leadLabel || !validLabel) return;
+
+  if (winBadge) {
+    if (currentWinTitle) {
+      winBadge.textContent = currentWinTitle;
+      winBadge.style.display = "inline-block";
+      winBadge.title = currentWinTitle;
+    } else {
+      winBadge.style.display = "none";
+    }
+  }
 
   if (currentMode === "obs") {
     badge.textContent = "OBSERVATION";
@@ -162,6 +176,9 @@ function pausePlayback() {
 
 export function setTimelineMode(mode, customData = {}) {
   currentMode = mode === "obs" ? "obs" : "nwp";
+  if (customData.winTitle !== undefined) {
+    currentWinTitle = customData.winTitle;
+  }
   if (currentMode === "obs" && customData.file) {
     const idx = obsFiles.indexOf(customData.file);
     if (idx !== -1) currentObsIdx = idx;

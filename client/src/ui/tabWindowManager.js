@@ -37,7 +37,6 @@ function renderTabsBar() {
     <div class="tabs-list" id="tabs-list">
       <button class="btn-add-tab" id="btn-add-tab" title="Add new tab">+</button>
     </div>
-    <div class="window-tabs-group" id="window-tabs-group"></div>
     <div class="layout-controls" id="layout-controls">
       <button id="btn-toggle-mode" class="layout-btn mode-toggle-btn" title="Toggle between Tabs Mode and 4-Split Mode">⇋ Toggle Split/Tabs</button>
       <span class="layout-label">Layout:</span>
@@ -228,9 +227,8 @@ export function switchTab(tabId) {
   // 3. Update layout buttons
   updateLayoutButtons(targetTab.layout);
 
-  // 4. Focus active window and render window tabs
+  // 4. Focus active window
   focusWindow(targetTab.id, targetTab.activeWinIdx);
-  renderWindowTabs(targetTab);
 
   // 5. Resize visible maps
   setTimeout(() => {
@@ -379,11 +377,6 @@ export function focusWindow(tabId, winIdx) {
     }
   });
 
-  // Update window tab buttons in tabs bar
-  document.querySelectorAll(".win-tab-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.winIdx === String(winIdx));
-  });
-
   if (!activeWin.map) {
     initWindowMap(activeWin);
     callbacks.onWindowInit?.(activeWin);
@@ -406,36 +399,6 @@ export function focusWindow(tabId, winIdx) {
   });
 
   callbacks.onWindowFocus?.(activeWin);
-}
-
-export function renderWindowTabs(tab) {
-  const container = document.getElementById("window-tabs-group");
-  if (!container || !tab) return;
-
-  container.innerHTML = tab.windows
-    .map((w, idx) => {
-      const isFocused = idx === tab.activeWinIdx;
-      const title = w.activeGroup ? w.activeGroup.name : `Window ${idx + 1}`;
-      return `
-        <button class="win-tab-btn ${isFocused ? "active" : ""}" id="win-tab-${tab.id}-${idx}" data-tab-id="${tab.id}" data-win-idx="${idx}" title="${title} (Click to select, Double-click to toggle Split/Tabs)">
-          <span class="win-tab-badge">W${idx + 1}</span>
-          <span class="win-tab-name">${title}</span>
-        </button>
-      `;
-    })
-    .join("");
-
-  tab.windows.forEach((w, idx) => {
-    const btn = document.getElementById(`win-tab-${tab.id}-${idx}`);
-    if (!btn) return;
-    btn.addEventListener("click", () => {
-      focusWindow(tab.id, idx);
-    });
-    btn.addEventListener("dblclick", () => {
-      focusWindow(tab.id, idx);
-      toggleTabsAndSplit(tab.id);
-    });
-  });
 }
 
 function initWindowMap(win) {
@@ -540,8 +503,6 @@ function setupWindowControls(tab) {
 export function updateWindowTitle(win, text) {
   const el = document.getElementById(win.titleId);
   if (el) el.textContent = text;
-  const tabName = document.querySelector(`#win-tab-${win.tabId}-${win.winIdx} .win-tab-name`);
-  if (tabName) tabName.textContent = text;
 }
 
 export function setWindowHeaderPreset(win, groupId) {

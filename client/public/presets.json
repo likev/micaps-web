@@ -145,6 +145,7 @@
     "category": "Surface Observations",
     "defaultLevel": null,
     "hasLevel": false,
+    "isObservation": true,
     "layers": [
       {
         "id": "surface-obs",

@@ -73,19 +73,28 @@ async function bootstrap() {
   const firstTab = initTabWindowManager({
     onWindowFocus: (win) => {
       setNavBarPreset(win.activeGroup?.id || "");
-      if (win.level)       setNavBarLevel(win.level);
-      if (win.isObservation) {
-        setTimelineMode("obs", { file: win.obsTime });
+      if (win.level) setNavBarLevel(win.level);
+
+      const winTitle = win.activeGroup ? `W${win.winIdx + 1}: ${win.activeGroup.name}` : `Window ${win.winIdx + 1}`;
+      const isObs = Boolean(win.isObservation || win.activeGroup?.isObservation || win.model === "SURFACE" || win.model === "UPPER_AIR");
+      if (isObs) {
+        setTimelineMode("obs", { file: win.obsTime || "20260827200000.000", winTitle });
       } else {
-        setTimelineMode("nwp", { period: win.period });
+        setTimelineMode("nwp", { period: win.period ?? 24, winTitle });
       }
       syncLayerControlForWindow(win);
     },
     onWindowGroupChange: async (win, group) => {
       if (!win.map) return;
       win.activeGroup = group;
-      win.isObservation = false;
+      win.isObservation = Boolean(group.isObservation);
       if (group.defaultLevel) win.level = group.defaultLevel;
+      const winTitle = `W${win.winIdx + 1}: ${group.name}`;
+      if (win.isObservation) {
+        setTimelineMode("obs", { file: win.obsTime || "20260827200000.000", winTitle });
+      } else {
+        setTimelineMode("nwp", { period: win.period ?? 24, winTitle });
+      }
       await loadPresetGroup(win.map, group, win.period, win.level, win);
     },
     onWindowLevelChange: async (win, level) => {
