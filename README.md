@@ -18,11 +18,7 @@
 
 ## Quick Start
 
-### 1. Configure & Run Backend Server
-
-The Go backend binary runs as a standalone server and automatically serves the compiled frontend.
-
-#### Configuration Options:
+### 1. Configuration Options
 - **Auto-Detection**: Place your existing `MICAPS.exe.config` in the same directory as the executable. The server will automatically detect it and randomly select a `ClusterIPAddress`.
 - **CLI Flags**:
   - `-host <ip>`: Cassandra cluster host IP
@@ -32,36 +28,22 @@ The Go backend binary runs as a standalone server and automatically serves the c
   - `-pmtiles <path>`: Path to `map-china.pmtiles` file (default `../client/public/map-china.pmtiles`)
   - `-mock`: Enable offline synthetic mock data generator (default `false`)
 
-#### Run on Linux / macOS:
+### 2. Run Server
+
+#### On Linux / macOS:
 ```bash
 cd server
 ./micaps-server -host 159.223.110.159 -cport 45061 -port 8088
 ```
 
-#### Run on Windows 10/11:
+#### On Windows 10/11:
 Run the pre-compiled 64-bit Windows binary:
 ```cmd
 cd server
 micaps-server.exe -host 159.223.110.159 -cport 45061 -port 8088
 ```
 
----
-
-### 2. Frontend Development & Build
-
-```bash
-cd client
-
-# Install dependencies (requires Bun)
-bun install
-
-# Build production bundle
-bun run build
-
-# Or launch local Vite development server
-bun run dev
-```
-
+### 3. Open Workstation
 Open your browser at:
 ```text
 http://localhost:8088
@@ -71,4 +53,4 @@ http://localhost:8088
 
 ## Architecture & Technical Reference
 
-For detailed architecture diagrams, directory structure, runtime `config.json` schema, Bun unit testing, and API references, see [**Architecture.md**](Architecture.md).
+For detailed architecture diagrams, directory structure, runtime `config.json` schema, build workflows, Bun unit testing, and API references, see [**Architecture.md**](Architecture.md).

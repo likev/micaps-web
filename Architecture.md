@@ -1,6 +1,6 @@
 # MICAPS-Web Architecture & Technical Reference
 
-This document provides in-depth technical documentation for the architecture, data pipeline, API specifications, and directory structure of **MICAPS-Web**.
+This document provides in-depth technical documentation for the architecture, data pipeline, API specifications, build workflows, and directory structure of **MICAPS-Web**.
 
 ---
 
@@ -111,7 +111,43 @@ micaps-web/
 
 ---
 
-## 3. Runtime Configuration Schema (config.json)
+## 3. Development & Build Workflows
+
+### Frontend Development & Build (Client)
+
+The frontend is built using Vite and bundled into `client/dist`. The Go backend serves these compiled static assets directly from filesystem or embedded distribution.
+
+```bash
+cd client
+
+# Install dependencies (requires Bun 1.4)
+bun install
+
+# Launch local Vite dev server with hot reload
+bun run dev
+
+# Build production distribution and client.zip package
+bun run build:all
+```
+
+### Backend Build (Server)
+
+```bash
+cd server
+
+# Run Go package unit tests
+go test ./...
+
+# Build Linux binary
+go build -o micaps-server cmd/main.go
+
+# Cross-compile Windows 10/11 x86-64 binary
+GOOS=windows GOARCH=amd64 go build -o micaps-server.exe cmd/main.go
+```
+
+---
+
+## 4. Runtime Configuration Schema (config.json)
 
 Composite presets and named colormaps are loaded from `client/public/config.json` at startup rather than bundled into the JavaScript. The file structure is:
 
@@ -152,7 +188,7 @@ Composite presets and named colormaps are loaded from `client/public/config.json
 
 ---
 
-## 4. Meteorological Unit Testing (Bun Test)
+## 5. Meteorological Unit Testing (Bun Test)
 
 Run the entire suite of meteorological algorithms, colormap calculations, WMO symbol rendering, and configuration formatting tests:
 
@@ -171,7 +207,7 @@ Individual test suites:
 
 ---
 
-## 5. API Reference Summary
+## 6. API Reference Summary
 
 | Endpoint | Method | Description |
 | :--- | :--- | :--- |
@@ -188,7 +224,7 @@ Individual test suites:
 
 ---
 
-## 6. Standards & References
+## 7. Standards & References
 
 - **CMA MICAPS 4 Cassandra Architecture**: `../help/micaps4-cassandra.md`
 - **MICAPS 4 File Format**: [nmcdev/nmc_met_io](https://github.com/nmcdev/nmc_met_io/blob/master/nmc_met_io/retrieve_cassandraDB.py)
