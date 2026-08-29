@@ -82,6 +82,15 @@ export function renderGridRaster(map, gridData, element = "TMP", colormap = null
   renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat, element, colormap, zMin, zMax, options);
 }
 
+function latToMercatorY(lat) {
+  const rad = (Math.max(-85.05112878, Math.min(85.05112878, lat)) * Math.PI) / 180;
+  return Math.log(Math.tan(Math.PI / 4 + rad / 2));
+}
+
+function mercatorYToLat(y) {
+  return (2 * Math.atan(Math.exp(y)) - Math.PI / 2) * (180 / Math.PI);
+}
+
 function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat, element, colormap, zMin = undefined, zMax = undefined, options = {}) {
   if (!map || !floatValues || nlon <= 0 || nlat <= 0) return;
 
@@ -90,24 +99,77 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
   const opacity = opts.opacity !== undefined ? opts.opacity : 0.85;
   const visible = opts.visible !== false;
 
+  // Geographic extents
+  const topLatRaw = Math.max(slat, elat);
+  const bottomLatRaw = Math.min(slat, elat);
+  const leftLonRaw = Math.min(slon, elon);
+  const rightLonRaw = Math.max(slon, elon);
+
+  const dLon = nlon > 1 ? Math.abs(elon - slon) / (nlon - 1) : 0;
+  const dLat = nlat > 1 ? Math.abs(elat - slat) / (nlat - 1) : 0;
+  const halfDLon = dLon / 2;
+  const halfDLat = dLat / 2;
+
+  // Bounding box with half-cell margin
+  const topLat = Math.min(85.05112878, topLatRaw + halfDLat);
+  const bottomLat = Math.max(-85.05112878, bottomLatRaw - halfDLat);
+  const leftLon = leftLonRaw - halfDLon;
+  const rightLon = rightLonRaw + halfDLon;
+
+  // Mercator Y bounds (EPSG:3857)
+  const yTop = latToMercatorY(topLat);
+  const yBottom = latToMercatorY(bottomLat);
+  const ySpan = yTop - yBottom;
+
+  const outWidth = nlon;
+  const outHeight = Math.max(nlat, 256);
+
   if (!rasterCanvas) {
     rasterCanvas = document.createElement("canvas");
   }
-  rasterCanvas.width = nlon;
-  rasterCanvas.height = nlat;
+  rasterCanvas.width = outWidth;
+  rasterCanvas.height = outHeight;
   const ctx = rasterCanvas.getContext("2d");
-  const imgData = ctx.createImageData(nlon, nlat);
+  const imgData = ctx.createImageData(outWidth, outHeight);
   const data = imgData.data;
 
   const is2D = Array.isArray(floatValues) && Array.isArray(floatValues[0]);
-  const isDescendingLat = slat > elat; // True if data row 0 is North (e.g. 60° down to -10°)
+  const isDescendingLat = slat > elat; // True if data row 0 is North
+  const latSpanRaw = topLatRaw - bottomLatRaw || 1;
 
-  // Render pixels via color palette mapping
-  for (let j = 0; j < nlat; j++) {
-    const srcRow = isDescendingLat ? j : (nlat - 1 - j);
-    for (let i = 0; i < nlon; i++) {
-      const dstIdx = (j * nlon + i) * 4;
-      const val = is2D ? floatValues[srcRow][i] : floatValues[srcRow * nlon + i];
+  // Reproject rows from Plate Carrée (EPSG:4326) to Web Mercator (EPSG:3857) so MapLibre quad texture aligns exactly
+  for (let j = 0; j < outHeight; j++) {
+    const yMerc = yTop - ((j + 0.5) / outHeight) * ySpan;
+    const latGeo = mercatorYToLat(yMerc);
+
+    // Compute fractional source row in Plate Carrée data
+    let rowFrac;
+    if (isDescendingLat) {
+      rowFrac = ((topLatRaw - latGeo) / latSpanRaw) * (nlat - 1);
+    } else {
+      rowFrac = ((latGeo - bottomLatRaw) / latSpanRaw) * (nlat - 1);
+    }
+
+    const r0 = Math.max(0, Math.min(nlat - 1, Math.floor(rowFrac)));
+    const r1 = Math.max(0, Math.min(nlat - 1, Math.ceil(rowFrac)));
+    const ry = rowFrac - r0;
+
+    for (let i = 0; i < outWidth; i++) {
+      const dstIdx = (j * outWidth + i) * 4;
+      const srcCol = outWidth === nlon ? i : Math.max(0, Math.min(nlon - 1, Math.round((i / (outWidth - 1)) * (nlon - 1))));
+
+      let val;
+      if (r0 === r1 || ry === 0) {
+        val = is2D ? floatValues[r0][srcCol] : floatValues[r0 * nlon + srcCol];
+      } else {
+        const v0 = is2D ? floatValues[r0][srcCol] : floatValues[r0 * nlon + srcCol];
+        const v1 = is2D ? floatValues[r1][srcCol] : floatValues[r1 * nlon + srcCol];
+        if (v0 !== undefined && v1 !== undefined && !isNaN(v0) && !isNaN(v1) && v0 > -9900 && v1 > -9900) {
+          val = v0 * (1 - ry) + v1 * ry;
+        } else {
+          val = v0 !== undefined && v0 > -9900 ? v0 : v1;
+        }
+      }
 
       if (val === undefined || val === null || isNaN(val) || val < -9900) {
         data[dstIdx + 3] = 0; // Transparent
@@ -123,17 +185,6 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
 
   ctx.putImageData(imgData, 0, 0);
   const dataUrl = rasterCanvas.toDataURL();
-
-  // Half-cell margin so pixel centers align exactly with vector contour and station coordinates
-  const dLon = nlon > 1 ? Math.abs(elon - slon) / (nlon - 1) : 0;
-  const dLat = nlat > 1 ? Math.abs(elat - slat) / (nlat - 1) : 0;
-  const halfDLon = dLon / 2;
-  const halfDLat = dLat / 2;
-
-  const topLat = Math.max(slat, elat) + halfDLat;
-  const bottomLat = Math.min(slat, elat) - halfDLat;
-  const leftLon = Math.min(slon, elon) - halfDLon;
-  const rightLon = Math.max(slon, elon) + halfDLon;
 
   const coordinates = [
     [leftLon, topLat],     // Top-left
