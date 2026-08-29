@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"micaps-web/config"
@@ -80,14 +81,27 @@ func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == http.MethodPost || r.Method == http.MethodPut {
-		var raw json.RawMessage
-		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+		var obj any
+		if err := json.NewDecoder(r.Body).Decode(&obj); err != nil {
 			http.Error(w, `{"error":"Invalid JSON: `+err.Error()+`"}`, http.StatusBadRequest)
 			return
 		}
-		_ = os.WriteFile(filepath.Join(distDir, "config.json"), raw, 0644)
-		_ = os.WriteFile("client/public/config.json", raw, 0644)
-		_ = os.WriteFile("../client/public/config.json", raw, 0644)
+
+		formatted, err := json.MarshalIndent(obj, "", "  ")
+		if err != nil {
+			http.Error(w, `{"error":"Format error: `+err.Error()+`"}`, http.StatusInternalServerError)
+			return
+		}
+
+		str := string(formatted)
+		reColor := regexp.MustCompile(`"color":\s*\[\s*(-?\d+),\s*(-?\d+),\s*(-?\d+),\s*(-?\d+)\s*\]`)
+		str = reColor.ReplaceAllString(str, `"color": [$1, $2, $3, $4]`)
+		reValColor := regexp.MustCompile(`\{\s*"val":\s*(-?[\d.]+),\s*"color":\s*(\[[^\]]+\])\s*\}`)
+		str = reValColor.ReplaceAllString(str, `{ "val": $1, "color": $2 }`)
+
+		_ = os.WriteFile(filepath.Join(distDir, "config.json"), []byte(str), 0644)
+		_ = os.WriteFile("client/public/config.json", []byte(str), 0644)
+		_ = os.WriteFile("../client/public/config.json", []byte(str), 0644)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok","message":"Configuration saved successfully"}`))

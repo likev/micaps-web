@@ -1,4 +1,5 @@
 // stationFilterControl.js - Interactive Station Multi-Filter Rule Builder Component
+import { autoSaveLayerConfig } from "../config/presets.js";
 
 const PRESETS = {
   clear: [],
@@ -142,6 +143,7 @@ export function bindStationFilterEvents(configDrawer, layer, onAction, winId) {
   if (!configDrawer || !layer) return;
 
   const triggerUpdate = () => {
+    autoSaveLayerConfig(layer);
     if (onAction) onAction("config", layer.id, layer.config, layer, winId);
   };
 
