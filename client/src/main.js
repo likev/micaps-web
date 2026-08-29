@@ -13,7 +13,7 @@ import { renderWindStreamlines, stopWindAnimation, renderGridWindBarbs, removeGr
 import { analyzeAndRenderSoundingContours } from "./layers/soundingAnalysis.js";
 import { analyzeAndRenderSurfaceSLPContours } from "./layers/surfaceAnalysis.js";
 import { fetchGridData, fetchGridBinaryStream, fetchStationObservations } from "./api/catalogApi.js";
-import { updateLegend } from "./ui/legend.js";
+import { updateLegend, clearLegends, syncLegendForWindow } from "./ui/legend.js";
 import { initKeyboardShortcuts } from "./ui/keyboardShortcuts.js";
 import { initConfigEditor, openConfigTab } from "./ui/configEditor.js";
 import { appState } from "./store/appState.js";
@@ -77,8 +77,9 @@ async function bootstrap() {
         winTitle = `W${win.winIdx + 1}: ${name}`;
       }
 
-      // Synchronously update layer panel for focused window
+      // Synchronously update layer panel and legends for focused window
       syncLayerControlForWindow(win);
+      syncLegendForWindow(win);
       setNavBarPreset(win.activeGroup?.id || "");
 
       const hasData = Boolean(win.activeGroup || win.model || win.isObservation || win.gridData || win.obsTime);
@@ -405,7 +406,7 @@ async function loadWeatherField(map, model, element, level, period, customOption
       }
     }
 
-    updateLegend(element, colormap);
+    updateLegend(element, colormap, gridData.stats?.min, gridData.stats?.max, win);
   } catch (err) {
     console.error(`[Bootstrap] Field load failed for ${path}/${file}:`, err);
   }
@@ -452,6 +453,7 @@ export function clearAllWeatherLayersFromMap(map, win = null) {
     removeGridWindBarbs(map);
     removeStationLayer(map);
     removeRasterLayer(map);
+    clearLegends(win);
   } catch (err) {
     console.warn("[Main] Error cleaning up weather layers:", err);
   }

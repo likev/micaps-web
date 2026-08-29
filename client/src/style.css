@@ -435,8 +435,9 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
   padding: 8px 12px;
   z-index: 500;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 16px;
   font-size: 11px;
   font-family: var(--font-mono);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
@@ -447,15 +448,32 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
   display: none;
 }
 
+.legend-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 170px;
+}
+
+.legend-header {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--text-primary);
+}
+
 .legend-bar {
-  height: 12px;
-  width: 220px;
+  height: 10px;
+  width: 100%;
   border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .legend-ticks {
   display: flex;
   justify-content: space-between;
+  font-size: 10px;
   color: var(--text-secondary);
 }
 
@@ -540,46 +558,11 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
   color: #56d364;
 }
 
-.valid-label {
-  margin-left: auto;
-  color: #8b949e;
-  font-size: 11px;
-}
-
-.timeline-chips {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-}
-
-.chip-btn {
-  padding: 4px 10px;
-  border-radius: 12px;
-  background: #21262d;
-  border: 1px solid var(--border-color);
-  color: #8b949e;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s ease;
-}
-
-.chip-btn:hover {
-  background: #30363d;
-  color: #c9d1d9;
-}
-
-.chip-btn.active {
-  background: var(--accent-blue);
-  border-color: #58a6ff;
-  color: #ffffff;
-  font-weight: bold;
-  box-shadow: 0 0 8px rgba(56, 139, 253, 0.4);
-}
-
+.valid-label { margin-left: auto; color: #8b949e; font-size: 11px; }
+.timeline-chips { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.chip-btn { padding: 4px 10px; border-radius: 12px; background: #21262d; border: 1px solid var(--border-color); color: #8b949e; font-family: var(--font-mono); font-size: 11px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease; }
+.chip-btn:hover { background: #30363d; color: #c9d1d9; }
+.chip-btn.active { background: var(--accent-blue); border-color: #58a6ff; color: #ffffff; font-weight: bold; box-shadow: 0 0 8px rgba(56, 139, 253, 0.4); }
 .tooltip { position: absolute; pointer-events: none; background: rgba(10, 14, 22, 0.95); border: 1px solid var(--accent-blue); border-radius: 6px; padding: 8px 12px; font-size: 12px; font-family: var(--font-mono); box-shadow: 0 4px 16px rgba(0,0,0,0.6); z-index: 2000; transition: opacity 0.1s ease; }
 .tooltip.hidden { opacity: 0; }
 .station-glyph { transform: translate(-50%, -50%); }
