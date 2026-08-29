@@ -22,7 +22,7 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
 
   container.innerHTML = `
     <div class="nav-brand">
-      <span>MICAPS-Web</span>
+      <a href="https://github.com/likev/micaps-web" target="_blank" rel="noopener noreferrer" class="brand-link" title="MICAPS-Web on GitHub">MICAPS-Web</a>
       <span class="brand-badge">PRO</span>
     </div>
 

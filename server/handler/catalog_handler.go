@@ -29,7 +29,7 @@ func (h *CatalogHandler) TreeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.MockMode || h.Client == nil {
+	if h.MockMode {
 		isObs := strings.HasPrefix(dataPath, "SURFACE") || strings.HasPrefix(dataPath, "UPPER_AIR")
 		if isObs {
 			mockObsFiles := []map[string]interface{}{
@@ -57,6 +57,11 @@ func (h *CatalogHandler) TreeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.Client == nil {
+		http.Error(w, `{"error":"CQL client not connected"}`, http.StatusServiceUnavailable)
+		return
+	}
+
 	files, err := db.GetFileList(h.Client, dataPath)
 	if err != nil {
 		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
@@ -74,8 +79,13 @@ func (h *CatalogHandler) LevelsHandler(w http.ResponseWriter, r *http.Request) {
 		dataPath = "ECMWF_HR/TMP"
 	}
 
-	if h.MockMode || h.Client == nil {
+	if h.MockMode {
 		json.NewEncoder(w).Encode([]int{1000, 925, 850, 700, 500, 400, 300, 250, 200, 100})
+		return
+	}
+
+	if h.Client == nil {
+		http.Error(w, `{"error":"CQL client not connected"}`, http.StatusServiceUnavailable)
 		return
 	}
 
@@ -102,11 +112,16 @@ func (h *CatalogHandler) LatestHandler(w http.ResponseWriter, r *http.Request) {
 		suffix = "*.024"
 	}
 
-	if h.MockMode || h.Client == nil {
+	if h.MockMode {
 		json.NewEncoder(w).Encode(map[string]string{
 			"dataPath": dataPath,
 			"latest":   "26082708.024",
 		})
+		return
+	}
+
+	if h.Client == nil {
+		http.Error(w, `{"error":"CQL client not connected"}`, http.StatusServiceUnavailable)
 		return
 	}
 

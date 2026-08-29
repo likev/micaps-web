@@ -31,6 +31,19 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
   letter-spacing: 0.5px;
 }
 
+.brand-link {
+  color: var(--text-primary);
+  text-decoration: none;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  transition: color 0.15s ease;
+}
+
+.brand-link:hover {
+  color: var(--accent-blue);
+  text-decoration: underline;
+}
+
 .brand-badge {
   background: var(--accent-blue);
   color: white;
@@ -482,24 +495,8 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
   flex-shrink: 0;
 }
 
-.step-nav-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  background: #21262d;
-  color: #c9d1d9;
-  border: 1px solid var(--border-color);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 11px;
-}
-
-.step-nav-btn:hover {
-  background: #30363d;
-  color: #ffffff;
-}
+.step-nav-btn { width: 28px; height: 28px; border-radius: 4px; background: #21262d; color: #c9d1d9; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 11px; }
+.step-nav-btn:hover { background: #30363d; color: #ffffff; }
 
 .step-length-control { display: flex; align-items: center; gap: 4px; margin-left: 6px; font-size: 11px; color: var(--text-secondary); }
 .step-length-label { font-size: 11px; color: #8b949e; font-weight: 500; }
