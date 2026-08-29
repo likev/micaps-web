@@ -263,11 +263,16 @@ func normalizePress(val float32) float32 {
 }
 
 func normalizeHeight(val float32) float32 {
-	if val < -9000 || val > 90000 || val == 9999.0 || val == 999.0 {
+	if val < -9000 || val > 90000 || val == 9999.0 || val == 999.0 || val == -999.0 {
 		return -9999
 	}
-	// MICAPS decameters (e.g. 588 decameters -> 5880 gpm)
-	if val > 100 && val < 1000 {
+	// In upper-air sounding observation transmissions (Element 421 / 1002 / 1004 / 1):
+	// Values are transmitted in decameters (dam):
+	// - 1000hPa & 925hPa: -20 to 120 dam (e.g. 15.2 dam -> 152 gpm, 81.1 dam -> 811 gpm)
+	// - 850hPa to 300hPa: 120 to 1000 dam (e.g. 151.4 dam -> 1514 gpm, 571 dam -> 5710 gpm)
+	// - 200hPa to 10hPa: 1000 to 3500 dam (e.g. 1202 dam -> 12020 gpm, 1633 dam -> 16330 gpm)
+	// Therefore, any value in range -100 to 3500 dam is scaled by 10 to standard geopotential meters (gpm).
+	if val > -100 && val < 3500 {
 		return val * 10.0
 	}
 	return val

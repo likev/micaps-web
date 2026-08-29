@@ -118,18 +118,22 @@ function extractTemp(props, keys, minValid = -90, maxValid = 90) {
   return null;
 }
 
-function extractPressureOrHeight(props) {
+export function extractPressureOrHeight(props) {
   if (!props) return "";
   // 1. If upper-air sounding with geopotential height
   if (props.height !== undefined && props.height !== null && props.height !== -9999 && props.height !== "-9999") {
     let num = typeof props.height === "number" ? props.height : parseFloat(props.height);
-    if (!isNaN(num) && num > 0 && num < 40000) {
-      if (num > 1000) {
-        // Upper-air standard decameters (dam): e.g. 5880 gpm -> 588, 5674 gpm -> 567, 1480 gpm -> 148
+    if (!isNaN(num) && num > -500 && num < 45000) {
+      if (num >= 1000) {
+        // Upper-air standard decameters (dam): e.g. 5880 gpm -> 588, 7360 gpm -> 736, 12020 gpm -> 202, 16330 gpm -> 633, 1514 gpm -> 151
         const dam = Math.round(num / 10);
         return String(dam % 1000).padStart(3, "0");
-      } else if (num > 100 && num < 1000) {
+      } else if (num >= 100) {
+        // 925hPa / 1000hPa heights (e.g. 811 gpm -> 811, 152 gpm -> 152)
         return String(Math.round(num)).padStart(3, "0");
+      } else if (num >= 0) {
+        // Decameter fallback if < 100 (e.g. 15.2 dam -> 152 gpm)
+        return String(Math.round(num * 10)).padStart(3, "0");
       }
       return Math.round(num).toString();
     }
@@ -203,7 +207,7 @@ function getFieldValue(p, field) {
     }
     case "Height":
     case "HGT": {
-      return extractRawNumber(p, ["height", "HGT", "hgt", "Height", "GH"], 0, 40000);
+      return extractRawNumber(p, ["height", "HGT", "hgt", "Height", "GH"], -500, 45000);
     }
     default:
       return null;

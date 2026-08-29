@@ -3,6 +3,7 @@ package mock
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"micaps-web/model"
@@ -147,6 +148,11 @@ func GenerateMockGrid(element string, level float32, period int32) *model.GridRe
 
 // GenerateMockStations generates realistic Chinese AWS station observations
 func GenerateMockStations() *model.GeoJSONFeatureCollection {
+	return GenerateMockStationsForPath("")
+}
+
+// GenerateMockStationsForPath generates realistic observations for a given path/level
+func GenerateMockStationsForPath(dataPath string) *model.GeoJSONFeatureCollection {
 	type StationDef struct {
 		ID   int32
 		Name string
@@ -237,16 +243,11 @@ func GenerateMockStations() *model.GeoJSONFeatureCollection {
 		{46749, "Kaohsiung", 120.30, 22.62, 32.2, 26.0, 1006.1, 5, 2, 4.0, 150, -1.3, 8},
 
 		// Southwest China
-		{56294, "Chengdu", 104.07, 30.67, 26.8, 21.0, 1011.0, 8, 51, 2.1, 45, -0.2, 3},
-		{57516, "Chongqing", 106.55, 29.56, 30.2, 23.5, 1008.0, 7, 10, 2.5, 160, -0.8, 7},
-		{56778, "Kunming", 102.71, 25.04, 22.5, 16.0, 1013.2, 6, 80, 3.4, 220, -0.5, 3},
-		{57816, "Guiyang", 106.71, 26.57, 26.0, 20.5, 1010.5, 7, 61, 2.8, 150, -0.7, 6},
-		{55591, "Lhasa", 91.13, 29.65, 18.2, 6.0, 1022.0, 4, 15, 6.1, 195, 0.5, 2},
-		{56196, "Mianyang", 104.74, 31.47, 27.2, 20.8, 1011.4, 7, 10, 2.0, 60, 0.0, 3},
-		{56492, "Yibin", 104.62, 28.77, 28.8, 22.5, 1009.6, 7, 61, 2.3, 110, -0.5, 6},
-		{56571, "Xichang", 102.26, 27.90, 25.0, 17.5, 1012.0, 5, 2, 3.2, 180, -0.3, 3},
-		{56751, "Dali", 100.23, 25.59, 21.8, 15.2, 1013.8, 6, 80, 4.0, 210, -0.4, 3},
-		{56651, "Lijiang", 100.23, 26.87, 19.5, 13.0, 1015.0, 7, 61, 3.5, 200, -0.2, 3},
+		{56294, "Chengdu", 104.02, 30.67, 26.0, 21.5, 1012.0, 7, 60, 2.1, 30, 0.2, 3},
+		{57516, "Chongqing", 106.55, 29.57, 28.5, 22.8, 1010.5, 6, 2, 2.5, 60, -0.1, 4},
+		{56778, "Kunming", 102.73, 25.04, 22.0, 16.0, 1015.8, 5, 61, 3.5, 210, 0.6, 2},
+		{57816, "Guiyang", 106.71, 26.57, 24.5, 19.8, 1013.5, 6, 2, 3.0, 180, 0.3, 3},
+		{55591, "Lhasa", 91.13, 29.65, 18.0, 5.5, 1021.0, 2, 0, 6.2, 240, 1.0, 1},
 		{55578, "Shigatse", 88.88, 29.27, 16.5, 4.2, 1023.5, 3, 0, 5.8, 220, 0.8, 1},
 		{56312, "Nyingchi", 94.36, 29.65, 19.0, 11.2, 1018.5, 6, 61, 3.0, 170, 0.1, 3},
 
@@ -268,8 +269,41 @@ func GenerateMockStations() *model.GeoJSONFeatureCollection {
 		{51431, "Yining", 81.33, 43.92, 23.8, 10.2, 1017.2, 2, 0, 3.8, 260, 1.8, 1},
 	}
 
+	baseHgt := float64(5700.0)
+	tempOffset := float32(0.0)
+	if strings.Contains(dataPath, "1000") {
+		baseHgt = 150.0
+		tempOffset = 0.0
+	} else if strings.Contains(dataPath, "925") {
+		baseHgt = 800.0
+		tempOffset = -5.0
+	} else if strings.Contains(dataPath, "850") {
+		baseHgt = 1500.0
+		tempOffset = -12.0
+	} else if strings.Contains(dataPath, "700") {
+		baseHgt = 3050.0
+		tempOffset = -22.0
+	} else if strings.Contains(dataPath, "500") {
+		baseHgt = 5700.0
+		tempOffset = -38.0
+	} else if strings.Contains(dataPath, "400") {
+		baseHgt = 7300.0
+		tempOffset = -48.0
+	} else if strings.Contains(dataPath, "300") {
+		baseHgt = 9300.0
+		tempOffset = -62.0
+	} else if strings.Contains(dataPath, "200") {
+		baseHgt = 12000.0
+		tempOffset = -75.0
+	} else if strings.Contains(dataPath, "100") {
+		baseHgt = 16300.0
+		tempOffset = -80.0
+	}
+
 	features := make([]model.GeoJSONFeature, len(stations))
 	for i, s := range stations {
+		stnT := s.T + tempOffset
+		stnTd := s.Td + tempOffset
 		features[i] = model.GeoJSONFeature{
 			Type: "Feature",
 			Geometry: model.GeoJSONGeometry{
@@ -279,9 +313,9 @@ func GenerateMockStations() *model.GeoJSONFeatureCollection {
 			Properties: map[string]interface{}{
 				"station_id":    s.ID,
 				"name":          s.Name,
-				"temperature":   s.T,
-				"dewpoint":      s.Td,
-				"height":        float32(math.Round(float64(5500.0+(s.T+15.0)*25.0)*10) / 10),
+				"temperature":   stnT,
+				"dewpoint":      stnTd,
+				"height":        float32(math.Round(float64(baseHgt+(float64(s.T)-25.0)*15.0)*10) / 10),
 				"slp":           s.SLP,
 				"slp_encoded":   encodeSLP(s.SLP),
 				"press_diff_3h": s.P3,

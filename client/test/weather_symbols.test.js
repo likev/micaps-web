@@ -88,4 +88,23 @@ describe("WMO Meteorological Symbol & Wind Barb Verification", () => {
     expect(grid.v).toBeInstanceOf(Float32Array);
     expect(grid.u.length).toBe(grid.header.n_lon * grid.header.n_lat);
   });
+
+  test("extractPressureOrHeight correctly decodes and formats heights across all upper-air levels", async () => {
+    const { extractPressureOrHeight } = await import("../src/layers/stationLayer.js");
+
+    // 1000 hPa & 925 hPa
+    expect(extractPressureOrHeight({ height: 152 })).toBe("152");
+    expect(extractPressureOrHeight({ height: 811 })).toBe("811");
+
+    // 850 hPa, 700 hPa, 500 hPa, 400 hPa, 300 hPa
+    expect(extractPressureOrHeight({ height: 1514 })).toBe("151");
+    expect(extractPressureOrHeight({ height: 3093 })).toBe("309");
+    expect(extractPressureOrHeight({ height: 5710 })).toBe("571");
+    expect(extractPressureOrHeight({ height: 7360 })).toBe("736");
+    expect(extractPressureOrHeight({ height: 9390 })).toBe("939");
+
+    // 200 hPa & 100 hPa
+    expect(extractPressureOrHeight({ height: 12020 })).toBe("202");
+    expect(extractPressureOrHeight({ height: 16330 })).toBe("633");
+  });
 });

@@ -11,15 +11,27 @@ export function analyzeAndRenderSoundingContours(map, stationsGeoJSON, level = 5
 
   // 1. Calculate Geopotential Height Contours from Soundings
   const standardHgtLevels = {
-    500: [5200, 5240, 5280, 5320, 5360, 5400, 5440, 5480, 5520, 5560, 5600, 5640, 5680, 5720, 5760, 5800, 5840, 5880, 5920, 5960, 6000],
-    700: [2800, 2840, 2880, 2920, 2960, 3000, 3040, 3080, 3120, 3160, 3200],
+    1000: [0, 40, 80, 120, 160, 200, 240, 280],
+    925: [640, 680, 720, 760, 800, 840, 880, 920, 960],
     850: [1320, 1360, 1400, 1440, 1480, 1520, 1560, 1600, 1640],
-    200: [11200, 11400, 11600, 11800, 12000, 12200, 12400, 12600],
+    700: [2800, 2840, 2880, 2920, 2960, 3000, 3040, 3080, 3120, 3160, 3200],
+    500: [5200, 5240, 5280, 5320, 5360, 5400, 5440, 5480, 5520, 5560, 5600, 5640, 5680, 5720, 5760, 5800, 5840, 5880, 5920, 5960, 6000],
+    400: [6800, 6880, 6960, 7040, 7120, 7200, 7280, 7360, 7440, 7520, 7600],
     300: [8800, 8900, 9000, 9100, 9200, 9300, 9400, 9500, 9600],
+    250: [9800, 10000, 10200, 10400, 10600, 10800, 11000, 11200],
+    200: [11200, 11400, 11600, 11800, 12000, 12200, 12400, 12600],
+    150: [13200, 13400, 13600, 13800, 14000, 14200, 14400],
+    100: [15600, 15800, 16000, 16200, 16400, 16600, 16800, 17000],
+    70: [17800, 18000, 18200, 18400, 18600, 18800, 19000],
+    50: [20000, 20200, 20400, 20600, 20800, 21000, 21200],
+    30: [23200, 23400, 23600, 23800, 24000, 24200],
+    10: [30000, 30400, 30800, 31200, 31600, 32000],
   };
 
   const hgtResult = calculateFieldContours(stationsGeoJSON, (p) => {
-    if (typeof p.height === "number" && p.height > 100 && p.height < 35000) return p.height;
+    if (typeof p.height === "number" && !isNaN(p.height) && p.height > -200 && p.height < 45000) {
+      return p.height;
+    }
     if (typeof p.slp === "number" && p.slp > 2000) return p.slp;
     if (typeof p.slp === "number" && p.slp > 300 && p.slp < 1000) return p.slp * 10;
     return null;
@@ -47,7 +59,18 @@ export function analyzeAndRenderSoundingContours(map, stationsGeoJSON, level = 5
 
   // 3. Render Height Contour Lines (classic blue isolines, default 2px, 5880 bold 4px)
   if (hgtResult && hgtResult.lines && hgtResult.lines.length > 0) {
-    const boldValues = level === 500 ? [5880, 588] : (level === 700 ? [3120, 312] : (level === 850 ? [1520, 152] : []));
+    const boldMap = {
+      500: [5880, 588],
+      700: [3120, 312],
+      850: [1520, 152],
+      925: [800, 80],
+      1000: [120, 12],
+      400: [7200, 720],
+      300: [9600, 960],
+      200: [12000, 1200],
+      100: [16600, 1660],
+    };
+    const boldValues = boldMap[level] || [];
     for (const f of hgtResult.lines) {
       const val = f.value ?? f.properties?.value ?? 0;
       f.properties.isBold = isFeatureBold(val, boldValues);

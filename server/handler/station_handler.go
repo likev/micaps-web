@@ -26,7 +26,7 @@ func (h *StationHandler) StationGeoJSONHandler(w http.ResponseWriter, r *http.Re
 	if err != nil {
 		if h.MockMode {
 			log.Printf("[StationHandler] Error fetching stations: %v. Mock fallback.", err)
-			stations = mock.GenerateMockStations()
+			stations = mock.GenerateMockStationsForPath(r.URL.Query().Get("path"))
 		} else {
 			log.Printf("[StationHandler] Station data not found: %v", err)
 			w.WriteHeader(http.StatusNotFound)
@@ -48,13 +48,13 @@ func (h *StationHandler) fetchStations(r *http.Request) (*model.GeoJSONFeatureCo
 
 	if h.Client == nil || dataPath == "" || file == "" {
 		if h.MockMode {
-			return mock.GenerateMockStations(), nil
+			return mock.GenerateMockStationsForPath(dataPath), nil
 		}
 		return nil, fmt.Errorf("missing query parameter 'path' or 'file' (or CQL client not connected)")
 	}
 
 	if h.MockMode {
-		return mock.GenerateMockStations(), nil
+		return mock.GenerateMockStationsForPath(dataPath), nil
 	}
 
 	rawBlob, err := db.GetBlob(h.Client, dataPath, file)
