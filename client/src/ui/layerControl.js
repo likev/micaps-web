@@ -30,7 +30,11 @@ function createDefaultLayers(winId = "default") {
       removable: false,
       color: "#238636",
       isExpanded: false,
-      config: {},
+      config: {
+        showGraticule: true,
+        showProvinces: true,
+        showCities: true,
+      },
     },
   ];
 }
@@ -300,6 +304,25 @@ function renderLayersManager(panel) {
 
       bindStationFilterEvents(configDrawer, layer, onLayerActionCallback, currentActiveWinId);
     }
+
+    // Config controls for basemap (PMTiles & Graticule)
+    if (layer.type === "pmtiles" && configDrawer) {
+      const bindBasemapCheckbox = (selector, key) => {
+        const chk = configDrawer.querySelector(selector);
+        if (chk) {
+          chk.addEventListener("click", (e) => e.stopPropagation());
+          chk.addEventListener("change", (e) => {
+            if (!layer.config) layer.config = {};
+            layer.config[key] = e.target.checked;
+            if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer, currentActiveWinId);
+          });
+        }
+      };
+
+      bindBasemapCheckbox(".chk-basemap-graticule", "showGraticule");
+      bindBasemapCheckbox(".chk-basemap-provinces", "showProvinces");
+      bindBasemapCheckbox(".chk-basemap-cities", "showCities");
+    }
   });
 
   // Bind auxiliary checkboxes for compatibility
@@ -447,8 +470,23 @@ function renderLayerRow(layer) {
             ${renderStationFilterSection(layer)}
             `
             : `
-            <div class="config-row" style="color: #8b949e; font-size: 11px;">
-              <span>China standard vector basemap layer.</span>
+            <div class="config-row">
+              <label>
+                <input type="checkbox" class="chk-basemap-graticule" ${layer.config?.showGraticule !== false ? "checked" : ""} />
+                <span>10° Lon/Lat Graticule Lines</span>
+              </label>
+            </div>
+            <div class="config-row">
+              <label>
+                <input type="checkbox" class="chk-basemap-provinces" ${layer.config?.showProvinces !== false ? "checked" : ""} />
+                <span>Province Boundaries</span>
+              </label>
+            </div>
+            <div class="config-row">
+              <label>
+                <input type="checkbox" class="chk-basemap-cities" ${layer.config?.showCities !== false ? "checked" : ""} />
+                <span>City Boundaries</span>
+              </label>
             </div>
             `))
         }

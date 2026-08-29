@@ -48,8 +48,8 @@ export function addGraticuleLayers(map) {
     type: "line",
     source: "graticule-source",
     paint: {
-      "line-color": "rgba(255, 255, 255, 0.08)",
-      "line-width": 0.5,
+      "line-color": "rgba(255, 255, 255, 0.16)",
+      "line-width": 0.75,
       "line-dasharray": [4, 4],
     },
   });

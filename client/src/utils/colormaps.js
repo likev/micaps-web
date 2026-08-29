@@ -48,20 +48,49 @@ export function getColormap(reference = null, element = "TMP") {
   return COLORMAPS[element] || COLORMAPS.TMP || COLORMAPS.default || FALLBACK_COLORMAP;
 }
 
-export function getColor(val, element = "TMP", colormap = null) {
+export function getColor(val, element = "TMP", colormap = null, zMin = undefined, zMax = undefined) {
   const palette = getColormap(colormap, element);
+  if (!palette || palette.length === 0) return [100, 150, 240, 255];
+  if (palette.length === 1) return palette[0].color;
+
   let checkVal = val;
-  if (element === "HGT" && val < 1500 && palette[0].val > 1500) {
+  const palMin = palette[0].val;
+  const palMax = palette[palette.length - 1].val;
+
+  // Handle HGT decameter (dagpm) vs meter (gpm) scaling
+  if (element === "HGT" && val < 2500 && palMax > 2500) {
     checkVal = val * 10;
   }
-  if (checkVal <= palette[0].val) return palette[0].color;
-  if (checkVal >= palette[palette.length - 1].val) return palette[palette.length - 1].color;
+
+  // 1. Dynamic / Normalized range mapping if data is outside static palette bounds or relative mapping requested
+  if (zMin !== undefined && zMax !== undefined && zMax > zMin && (checkVal < palMin || checkVal > palMax)) {
+    const effMin = (element === "HGT" && zMax < 2500 && palMax > 2500) ? zMin * 10 : zMin;
+    const effMax = (element === "HGT" && zMax < 2500 && palMax > 2500) ? zMax * 10 : zMax;
+    const fraction = Math.max(0, Math.min(1, (checkVal - effMin) / (effMax - effMin)));
+    const targetIdx = fraction * (palette.length - 1);
+    const i0 = Math.floor(targetIdx);
+    const i1 = Math.min(i0 + 1, palette.length - 1);
+    const t = targetIdx - i0;
+    const c0 = palette[i0].color;
+    const c1 = palette[i1].color;
+    return [
+      Math.round(c0[0] + t * (c1[0] - c0[0])),
+      Math.round(c0[1] + t * (c1[1] - c0[1])),
+      Math.round(c0[2] + t * (c1[2] - c0[2])),
+      Math.round(c0[3] + t * (c1[3] - c0[3])),
+    ];
+  }
+
+  // 2. Direct physical value interpolation across palette stops
+  if (checkVal <= palMin) return palette[0].color;
+  if (checkVal >= palMax) return palette[palette.length - 1].color;
 
   for (let i = 0; i < palette.length - 1; i++) {
     const c0 = palette[i];
     const c1 = palette[i + 1];
     if (checkVal >= c0.val && checkVal <= c1.val) {
-      const t = (checkVal - c0.val) / (c1.val - c0.val);
+      const denom = c1.val - c0.val;
+      const t = denom > 0 ? (checkVal - c0.val) / denom : 0;
       return [
         Math.round(c0.color[0] + t * (c1.color[0] - c0.color[0])),
         Math.round(c0.color[1] + t * (c1.color[1] - c0.color[1])),
@@ -73,31 +102,75 @@ export function getColor(val, element = "TMP", colormap = null) {
   return palette[0].color;
 }
 
-export function getHexColor(val, element = "TMP", colormap = null) {
-  const [r, g, b] = getColor(val, element, colormap);
+export function getHexColor(val, element = "TMP", colormap = null, zMin = undefined, zMax = undefined) {
+  const [r, g, b] = getColor(val, element, colormap, zMin, zMax);
   return `rgb(${r},${g},${b})`;
 }
 
 export function getElementLevels(element = "TMP", zMin, zMax, colormap = null) {
   const palette = getColormap(colormap, element);
-  let levels = palette.map((stop) => stop.val);
-  if (element === "HGT" && zMin !== undefined && zMax !== undefined) {
-    const isDam = zMax < 1500;
-    const step = isDam ? 4 : 40;
+
+  if (zMin !== undefined && zMax !== undefined && zMax > zMin) {
+    const span = zMax - zMin;
+
+    if (element === "HGT") {
+      // Determine if height is in dagpm (e.g. 0..2000) or gpm (e.g. > 2000)
+      const isDam = zMax < 2500;
+      let step;
+      if (isDam) {
+        if (span <= 15) step = 1;
+        else if (span <= 30) step = 2;
+        else if (span <= 90) step = 4; // Standard synoptic 4 dagpm interval
+        else if (span <= 180) step = 8;
+        else step = 10;
+      } else {
+        if (span <= 150) step = 10;
+        else if (span <= 300) step = 20;
+        else if (span <= 900) step = 40; // Standard synoptic 40 gpm interval
+        else if (span <= 1800) step = 80;
+        else step = 100;
+      }
+
+      const start = Math.floor(zMin / step) * step;
+      const end = Math.ceil(zMax / step) * step;
+      const denseLevels = [];
+      for (let v = start; v <= end; v += step) {
+        denseLevels.push(Math.round(v * 100) / 100);
+      }
+      if (denseLevels.length >= 2) {
+        return denseLevels;
+      }
+    }
+
+    // If palette stops are within [zMin, zMax], use them
+    const palMin = palette[0].val;
+    const palMax = palette[palette.length - 1].val;
+    if (palMin <= zMin && palMax >= zMax) {
+      return palette.map((stop) => stop.val);
+    }
+
+    // Auto-generate 8~12 nice levels across [zMin, zMax] (e.g. for 10 colors)
+    const rawStep = span / 10;
+    const power = Math.pow(10, Math.floor(Math.log10(rawStep)));
+    const fraction = rawStep / power;
+    let step;
+    if (fraction <= 1.5) step = 1 * power;
+    else if (fraction <= 3.5) step = 2 * power;
+    else if (fraction <= 7.5) step = 5 * power;
+    else step = 10 * power;
+
     const start = Math.floor(zMin / step) * step;
     const end = Math.ceil(zMax / step) * step;
-    const denseLevels = [];
+    const autoLevels = [];
     for (let v = start; v <= end; v += step) {
-      denseLevels.push(v);
+      autoLevels.push(Math.round(v * 100) / 100);
     }
-    if (denseLevels.length >= 2) {
-      return denseLevels;
-    }
-    if (isDam && levels[0] > 1500) {
-      levels = levels.map((v) => v / 10);
+    if (autoLevels.length >= 2) {
+      return autoLevels;
     }
   }
-  return levels;
+
+  return palette.map((stop) => stop.val);
 }
 
 export function getCSSGradient(element = "TMP", colormap = null) {

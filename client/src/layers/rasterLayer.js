@@ -18,7 +18,9 @@ export function renderBinaryRaster(map, arrayBuffer, element = "TMP", colormap =
 
   // Float32 values start at byte offset 32
   const floatValues = new Float32Array(arrayBuffer, 32);
-  renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat, element, colormap);
+  const zMin = view.getFloat32(24, true);
+  const zMax = view.getFloat32(28, true);
+  renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat, element, colormap, zMin, zMax);
 }
 
 export function renderGridRaster(map, gridData, element = "TMP", colormap = null) {
@@ -31,11 +33,13 @@ export function renderGridRaster(map, gridData, element = "TMP", colormap = null
   const slat = h.start_lat ?? h.StartLatitude ?? 60.0;
   const elat = h.end_lat ?? h.EndLatitude ?? (slat + (nlat - 1) * (h.d_lat || h.LatitudeGridSpace || -0.25));
   const floatValues = gridData.values;
+  const zMin = gridData.stats?.min;
+  const zMax = gridData.stats?.max;
 
-  renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat, element, colormap);
+  renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat, element, colormap, zMin, zMax);
 }
 
-function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat, element, colormap) {
+function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat, element, colormap, zMin = undefined, zMax = undefined) {
   if (!map || !floatValues || nlon <= 0 || nlat <= 0) return;
 
   if (!rasterCanvas) {
@@ -60,7 +64,7 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
       if (val === undefined || val === null || isNaN(val) || val < -9900) {
         data[dstIdx + 3] = 0; // Transparent
       } else {
-        const [r, g, b, a] = getColor(val, element, colormap);
+        const [r, g, b, a] = getColor(val, element, colormap, zMin, zMax);
         data[dstIdx] = r;
         data[dstIdx + 1] = g;
         data[dstIdx + 2] = b;

@@ -48,7 +48,7 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
       for (const feature of features) {
         if (feature.properties && feature.properties.level) {
           const midVal = (feature.properties.level[0] + feature.properties.level[1]) / 2;
-          feature.properties.fillColor = getHexColor(midVal, element, options.colormap);
+          feature.properties.fillColor = getHexColor(midVal, element, options.colormap, gridData.stats?.min, gridData.stats?.max);
         }
       }
       isobandFC.features = features;

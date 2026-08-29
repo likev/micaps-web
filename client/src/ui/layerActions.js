@@ -38,20 +38,39 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
     } else if (layer.type === "station") {
       setStationVisibility(map, value);
     } else if (layer.type === "pmtiles") {
-      const vis = value ? "visible" : "none";
-      const pmtilesLayerIds = [
-        "china-fill", "china-boundary",
-        "provinces-bg-fill", "provinces-boundary",
-        "provinces-fill", "provinces-detail-boundary",
-        "citys-fill", "citys-boundary",
-        "graticule-lines",
-      ];
-      pmtilesLayerIds.forEach((id) => {
-        if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", vis);
-      });
+      const showGraticule = value && (layer.config?.showGraticule !== false);
+      const showProvinces = value && (layer.config?.showProvinces !== false);
+      const showCities = value && (layer.config?.showCities !== false);
+
+      const chinaLayers = ["china-fill", "china-boundary"];
+      const provLayers = ["provinces-bg-fill", "provinces-boundary", "provinces-fill", "provinces-detail-boundary"];
+      const cityLayers = ["citys-fill", "citys-boundary"];
+
+      chinaLayers.forEach((id) => { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", value ? "visible" : "none"); });
+      provLayers.forEach((id) => { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", showProvinces ? "visible" : "none"); });
+      cityLayers.forEach((id) => { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", showCities ? "visible" : "none"); });
+      if (map.getLayer("graticule-lines")) map.setLayoutProperty("graticule-lines", "visibility", showGraticule ? "visible" : "none");
     }
   } else if (action === "config") {
-    if (layer.type === "contour" || layer.type === "wind") {
+    if (layer.type === "pmtiles") {
+      if (value.showGraticule !== undefined) {
+        if (map.getLayer("graticule-lines")) {
+          map.setLayoutProperty("graticule-lines", "visibility", (layer.visible && value.showGraticule !== false) ? "visible" : "none");
+        }
+      }
+      if (value.showProvinces !== undefined) {
+        const provLayers = ["provinces-bg-fill", "provinces-boundary", "provinces-fill", "provinces-detail-boundary"];
+        provLayers.forEach((id) => {
+          if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", (layer.visible && value.showProvinces !== false) ? "visible" : "none");
+        });
+      }
+      if (value.showCities !== undefined) {
+        const cityLayers = ["citys-fill", "citys-boundary"];
+        cityLayers.forEach((id) => {
+          if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", (layer.visible && value.showCities !== false) ? "visible" : "none");
+        });
+      }
+    } else if (layer.type === "contour" || layer.type === "wind") {
       if (value.showFill !== undefined) setLayerIsobandVisibility(map, layerId, layer.visible && value.showFill);
       if (value.showLine !== undefined) setLayerIsolineVisibility(map, layerId, layer.visible && value.showLine);
       if (value.opacity !== undefined) setLayerIsobandOpacity(map, layerId, value.opacity);
