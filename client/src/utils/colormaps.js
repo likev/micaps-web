@@ -58,27 +58,35 @@ export function getColor(val, element = "TMP", colormap = null, zMin = undefined
   const palMax = palette[palette.length - 1].val;
 
   // Handle HGT decameter (dagpm) vs meter (gpm) scaling
-  if (element === "HGT" && val < 2500 && palMax > 2500) {
+  const isHGT = element === "HGT" || (typeof colormap === "string" && colormap.toLowerCase().includes("hgt"));
+  if (isHGT && val < 2500 && palMax > 2500) {
     checkVal = val * 10;
   }
 
-  // 1. Dynamic / Normalized range mapping if data is outside static palette bounds or relative mapping requested
-  if (zMin !== undefined && zMax !== undefined && zMax > zMin && (checkVal < palMin || checkVal > palMax)) {
-    const effMin = (element === "HGT" && zMax < 2500 && palMax > 2500) ? zMin * 10 : zMin;
-    const effMax = (element === "HGT" && zMax < 2500 && palMax > 2500) ? zMax * 10 : zMax;
-    const fraction = Math.max(0, Math.min(1, (checkVal - effMin) / (effMax - effMin)));
-    const targetIdx = fraction * (palette.length - 1);
-    const i0 = Math.floor(targetIdx);
-    const i1 = Math.min(i0 + 1, palette.length - 1);
-    const t = targetIdx - i0;
-    const c0 = palette[i0].color;
-    const c1 = palette[i1].color;
-    return [
-      Math.round(c0[0] + t * (c1[0] - c0[0])),
-      Math.round(c0[1] + t * (c1[1] - c0[1])),
-      Math.round(c0[2] + t * (c1[2] - c0[2])),
-      Math.round(c0[3] + t * (c1[3] - c0[3])),
-    ];
+  // 1. Dynamic / Relative range mapping:
+  // - Always for HGT (height ranges like 5340..5910 at 500hPa cluster tightly in a narrow level-specific altitude band)
+  // - Or when values fall outside static palette bounds
+  // - Or when data dynamic range (zMax - zMin) is much narrower than a broad general palette (< 35% of palette span)
+  const isRelativeCandidate = isHGT || (zMin !== undefined && zMax !== undefined && (zMax - zMin > 0) && ((checkVal < palMin || checkVal > palMax) || ((zMax - zMin) < 0.35 * (palMax - palMin))));
+
+  if (isRelativeCandidate && zMin !== undefined && zMax !== undefined && zMax > zMin) {
+    const effMin = (isHGT && zMax < 2500 && palMax > 2500) ? zMin * 10 : zMin;
+    const effMax = (isHGT && zMax < 2500 && palMax > 2500) ? zMax * 10 : zMax;
+    if (effMax > effMin) {
+      const fraction = Math.max(0, Math.min(1, (checkVal - effMin) / (effMax - effMin)));
+      const targetIdx = fraction * (palette.length - 1);
+      const i0 = Math.floor(targetIdx);
+      const i1 = Math.min(i0 + 1, palette.length - 1);
+      const t = targetIdx - i0;
+      const c0 = palette[i0].color;
+      const c1 = palette[i1].color;
+      return [
+        Math.round(c0[0] + t * (c1[0] - c0[0])),
+        Math.round(c0[1] + t * (c1[1] - c0[1])),
+        Math.round(c0[2] + t * (c1[2] - c0[2])),
+        Math.round(c0[3] + t * (c1[3] - c0[3])),
+      ];
+    }
   }
 
   // 2. Direct physical value interpolation across palette stops
