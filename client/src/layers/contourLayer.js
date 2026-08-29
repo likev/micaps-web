@@ -2,6 +2,38 @@
 import * as griddata from "griddata";
 import { getElementLevels, getHexColor } from "../utils/colormaps.js";
 
+export function parseBoldValues(boldInput, element = null) {
+  if (!boldInput) {
+    if (element === "HGT") return [5880, 588];
+    if (element === "SLP") return [1010, 1000, 1020];
+    if (element === "TMP") return [0];
+    return [];
+  }
+  if (Array.isArray(boldInput)) {
+    return boldInput.map((v) => Number(v)).filter((v) => Number.isFinite(v));
+  }
+  if (typeof boldInput === "string") {
+    return boldInput.split(/[,;\s]+/).map((v) => Number(v)).filter((v) => Number.isFinite(v));
+  }
+  if (typeof boldInput === "number") {
+    return [boldInput];
+  }
+  return [];
+}
+
+export function isFeatureBold(val, boldValues) {
+  if (!boldValues || !Array.isArray(boldValues) || boldValues.length === 0) return false;
+  const numVal = Math.round(Number(val));
+  return boldValues.some((b) => {
+    const numB = Number(b);
+    if (!Number.isFinite(numB)) return false;
+    if (numVal === numB) return true;
+    if (Math.round(numVal * 10) === numB) return true;
+    if (Math.round(numVal / 10) === numB) return true;
+    return false;
+  });
+}
+
 export function renderContourLayers(map, gridData, element = "TMP", options = {}) {
   if (!map || !gridData || !gridData.values || !gridData.header) {
     return;
@@ -38,7 +70,7 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
   }
 
   // Determine isoline levels
-  const levels = getElementLevels(element, gridData.stats.min, gridData.stats.max, options.colormap);
+  const levels = getElementLevels(element, gridData.stats?.min, gridData.stats?.max, options.colormap);
 
   // 1. Generate Isobands via griddata.contourf
   let isobandFC = { type: "FeatureCollection", features: [] };
@@ -57,7 +89,8 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
     console.error("[Contour] contourf failed:", err);
   }
 
-  // 2. Generate Isolines via griddata.contour
+  // 2. Generate Isolines via griddata.contour with characteristic bold tagging
+  const boldValues = parseBoldValues(options.boldValues, element);
   let isolineFC = { type: "FeatureCollection", features: [] };
   try {
     const lines = griddata.contour(Z, { x, y, levels });
@@ -67,6 +100,7 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
         const val = f.value ?? f.properties.value ?? f.properties.level ?? 0;
         f.properties.value = val;
         f.properties.label = String(Math.round(val));
+        f.properties.isBold = isFeatureBold(val, boldValues);
       }
       isolineFC.features = lines;
     }
@@ -75,7 +109,7 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
   }
 
   // Update MapLibre sources
-  updateMapLibreContour(map, isobandFC, isolineFC, options);
+  updateMapLibreContour(map, isobandFC, isolineFC, { ...options, element, boldValues });
 }
 
 function getLayerDOMIds(layerId = "default") {
@@ -95,7 +129,22 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
   const visibleIsoband = options.visibleIsoband !== undefined ? options.visibleIsoband : (options.showFill !== false && options.visible !== false);
   const visibleIsoline = options.visibleIsoline !== undefined ? options.visibleIsoline : (options.showLine !== false && options.visible !== false);
   const lineColor = options.lineColor || "#ffffff";
-  const lineWidth = options.lineWidth || 1.4;
+  const lineWidth = typeof options.lineWidth === "number" ? options.lineWidth : 2.0;
+  const boldLineWidth = typeof options.boldLineWidth === "number" ? options.boldLineWidth : 4.0;
+  const boldLineColor = options.boldLineColor || lineColor;
+
+  const lineWidthExp = [
+    "case",
+    ["boolean", ["get", "isBold"], false],
+    boldLineWidth,
+    lineWidth,
+  ];
+  const lineColorExp = [
+    "case",
+    ["boolean", ["get", "isBold"], false],
+    boldLineColor,
+    lineColor,
+  ];
 
   const { isobandSrcId, isobandLayerId, isolineSrcId, isolineLayerId, isolineLabelLayerId } = getLayerDOMIds(layerId);
 
@@ -137,8 +186,8 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
       map.getSource(isolineSrcId).setData(isolines);
       if (map.getLayer(isolineLayerId)) {
         map.setLayoutProperty(isolineLayerId, "visibility", visibleIsoline ? "visible" : "none");
-        map.setPaintProperty(isolineLayerId, "line-color", lineColor);
-        map.setPaintProperty(isolineLayerId, "line-width", lineWidth);
+        map.setPaintProperty(isolineLayerId, "line-color", lineColorExp);
+        map.setPaintProperty(isolineLayerId, "line-width", lineWidthExp);
       }
       if (map.getLayer(isolineLabelLayerId)) {
         map.setLayoutProperty(isolineLabelLayerId, "visibility", visibleIsoline ? "visible" : "none");
@@ -158,8 +207,8 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
           visibility: visibleIsoline ? "visible" : "none",
         },
         paint: {
-          "line-color": lineColor,
-          "line-width": lineWidth,
+          "line-color": lineColorExp,
+          "line-width": lineWidthExp,
           "line-opacity": 0.85,
         },
       });
@@ -201,10 +250,54 @@ export function setLayerIsolineVisibility(map, layerId, visible) {
   if (map.getLayer(isolineLabelLayerId)) map.setLayoutProperty(isolineLabelLayerId, "visibility", vis);
 }
 
+export function setLayerIsolineStyle(map, layerId, config = {}) {
+  const { isolineLayerId, isolineLabelLayerId, isolineSrcId } = getLayerDOMIds(layerId);
+  const lineWidth = typeof config.lineWidth === "number" ? config.lineWidth : 2.0;
+  const boldLineWidth = typeof config.boldLineWidth === "number" ? config.boldLineWidth : 4.0;
+  const lineColor = config.lineColor || "#ffffff";
+  const boldLineColor = config.boldLineColor || lineColor;
+
+  if (config.boldValues !== undefined && map.getSource(isolineSrcId)) {
+    const src = map.getSource(isolineSrcId);
+    if (src._data && Array.isArray(src._data.features)) {
+      const parsed = parseBoldValues(config.boldValues);
+      for (const f of src._data.features) {
+        if (f.properties) {
+          f.properties.isBold = isFeatureBold(f.properties.value, parsed);
+        }
+      }
+      src.setData(src._data);
+    }
+  }
+
+  const lineWidthExp = [
+    "case",
+    ["boolean", ["get", "isBold"], false],
+    boldLineWidth,
+    lineWidth,
+  ];
+  const lineColorExp = [
+    "case",
+    ["boolean", ["get", "isBold"], false],
+    boldLineColor,
+    lineColor,
+  ];
+
+  if (map.getLayer(isolineLayerId)) {
+    map.setPaintProperty(isolineLayerId, "line-color", lineColorExp);
+    map.setPaintProperty(isolineLayerId, "line-width", lineWidthExp);
+  }
+  if (map.getLayer(isolineLabelLayerId)) {
+    map.setPaintProperty(isolineLabelLayerId, "text-color", lineColor);
+  }
+}
+
 export function setLayerIsolineColor(map, layerId, color) {
-  const { isolineLayerId, isolineLabelLayerId } = getLayerDOMIds(layerId);
-  if (map.getLayer(isolineLayerId)) map.setPaintProperty(isolineLayerId, "line-color", color);
-  if (map.getLayer(isolineLabelLayerId)) map.setPaintProperty(isolineLabelLayerId, "text-color", color);
+  setLayerIsolineStyle(map, layerId, { lineColor: color });
+}
+
+export function setLayerIsolineWidth(map, layerId, width) {
+  setLayerIsolineStyle(map, layerId, { lineWidth: width });
 }
 
 export function setLayerIsobandOpacity(map, layerId, opacity) {

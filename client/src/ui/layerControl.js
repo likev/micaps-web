@@ -1,6 +1,8 @@
 // layerControl.js - Interactive per-window multi-layer management panel
 import { appState } from "../store/appState.js";
 import { renderStationFilterSection, bindStationFilterEvents } from "./stationFilterControl.js";
+import { autoSaveLayerConfig } from "../config/presets.js";
+import { parseBoldValues } from "../layers/contourLayer.js";
 
 const windowLayersMap = new Map();
 let currentActiveWinId = "default";
@@ -127,7 +129,9 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
         showLine: layerDef.config?.showLine !== undefined ? layerDef.config.showLine : true,
         opacity: layerDef.config?.opacity || 0.75,
         lineColor: layerDef.config?.lineColor || (layerDef.element === "HGT" ? "#58a6ff" : layerDef.element === "TMP" ? "#f85149" : "#ffffff"),
-        lineWidth: layerDef.config?.lineWidth || 1.4,
+        lineWidth: layerDef.config?.lineWidth !== undefined ? layerDef.config.lineWidth : 2.0,
+        boldValues: layerDef.config?.boldValues || (layerDef.element === "HGT" ? [5880, 588] : layerDef.element === "SLP" ? [1010] : layerDef.element === "TMP" ? [0] : []),
+        boldLineWidth: layerDef.config?.boldLineWidth !== undefined ? layerDef.config.boldLineWidth : 4.0,
         showWind: layerDef.config?.showWind !== undefined ? layerDef.config.showWind : false,
         showBarbs: layerDef.config?.showBarbs !== undefined ? layerDef.config.showBarbs : false,
         showRaster: layerDef.config?.showRaster !== undefined ? layerDef.config.showRaster : false,
@@ -267,15 +271,21 @@ function renderLayersManager(panel) {
         if (dot) dot.style.background = e.target.value;
       };
 
-      bindProp(".chk-show-fill", "change", (e) => { layer.config.showFill = e.target.checked; });
-      bindProp(".chk-show-line", "change", (e) => { layer.config.showLine = e.target.checked; });
-      bindProp(".slider-fill-opacity", "input", (e) => { layer.config.opacity = parseInt(e.target.value, 10) / 100; });
-      bindProp(".slider-fill-opacity", "change", (e) => { layer.config.opacity = parseInt(e.target.value, 10) / 100; });
-      bindProp(".color-picker-line", "input", updateColor);
-      bindProp(".color-picker-line", "change", updateColor);
-      bindProp(".chk-show-raster", "change", (e) => { layer.config.showRaster = e.target.checked; });
-      bindProp(".chk-show-wind", "change", (e) => { layer.config.showWind = e.target.checked; });
-      bindProp(".chk-show-barbs", "change", (e) => { layer.config.showBarbs = e.target.checked; });
+      bindProp(".chk-show-fill", "change", (e) => { layer.config.showFill = e.target.checked; autoSaveLayerConfig(layer); });
+      bindProp(".chk-show-line", "change", (e) => { layer.config.showLine = e.target.checked; autoSaveLayerConfig(layer); });
+      bindProp(".slider-fill-opacity", "input", (e) => { layer.config.opacity = parseInt(e.target.value, 10) / 100; autoSaveLayerConfig(layer); });
+      bindProp(".slider-fill-opacity", "change", (e) => { layer.config.opacity = parseInt(e.target.value, 10) / 100; autoSaveLayerConfig(layer); });
+      bindProp(".color-picker-line", "input", (e) => { updateColor(e); autoSaveLayerConfig(layer); });
+      bindProp(".color-picker-line", "change", (e) => { updateColor(e); autoSaveLayerConfig(layer); });
+      bindProp(".input-line-width", "input", (e) => { layer.config.lineWidth = parseFloat(e.target.value) || 2.0; autoSaveLayerConfig(layer); });
+      bindProp(".input-line-width", "change", (e) => { layer.config.lineWidth = parseFloat(e.target.value) || 2.0; autoSaveLayerConfig(layer); });
+      bindProp(".input-bold-values", "input", (e) => { layer.config.boldValues = parseBoldValues(e.target.value); autoSaveLayerConfig(layer); });
+      bindProp(".input-bold-values", "change", (e) => { layer.config.boldValues = parseBoldValues(e.target.value); autoSaveLayerConfig(layer); });
+      bindProp(".input-bold-line-width", "input", (e) => { layer.config.boldLineWidth = parseFloat(e.target.value) || 4.0; autoSaveLayerConfig(layer); });
+      bindProp(".input-bold-line-width", "change", (e) => { layer.config.boldLineWidth = parseFloat(e.target.value) || 4.0; autoSaveLayerConfig(layer); });
+      bindProp(".chk-show-raster", "change", (e) => { layer.config.showRaster = e.target.checked; autoSaveLayerConfig(layer); });
+      bindProp(".chk-show-wind", "change", (e) => { layer.config.showWind = e.target.checked; autoSaveLayerConfig(layer); });
+      bindProp(".chk-show-barbs", "change", (e) => { layer.config.showBarbs = e.target.checked; autoSaveLayerConfig(layer); });
     }
 
     // Config controls for station layers
@@ -287,6 +297,7 @@ function renderLayersManager(panel) {
           chk.addEventListener("change", (e) => {
             if (!layer.config) layer.config = {};
             layer.config[key] = e.target.checked;
+            autoSaveLayerConfig(layer);
             if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer, currentActiveWinId);
           });
         }
@@ -314,6 +325,7 @@ function renderLayersManager(panel) {
           chk.addEventListener("change", (e) => {
             if (!layer.config) layer.config = {};
             layer.config[key] = e.target.checked;
+            autoSaveLayerConfig(layer);
             if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer, currentActiveWinId);
           });
         }
@@ -394,12 +406,28 @@ function renderLayerRow(layer) {
               <input type="range" class="slider-fill-opacity" min="10" max="100" value="${Math.round((layer.config?.opacity || 0.75) * 100)}" title="Opacity" />
             </div>
 
-            <div class="config-row">
-              <label>
-                <input type="checkbox" class="chk-show-line" ${layer.config?.showLine ? "checked" : ""} />
-                <span>Contour Lines (isoline)</span>
-              </label>
-              <input type="color" class="color-picker-line" value="${layer.config?.lineColor || "#ffffff"}" title="Line Color" />
+            <div class="config-row" style="flex-wrap: wrap; gap: 4px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                <label style="display: flex; align-items: center; gap: 4px;">
+                  <input type="checkbox" class="chk-show-line" ${layer.config?.showLine ? "checked" : ""} />
+                  <span>Contour Lines</span>
+                </label>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                  <input type="color" class="color-picker-line" value="${layer.config?.lineColor || (layer.element === 'HGT' ? '#58a6ff' : layer.element === 'TMP' ? '#f85149' : '#ffffff')}" title="Line Color" />
+                  <span style="font-size: 11px; color: #8b949e;">Width</span>
+                  <input type="number" class="input-line-width" min="0.5" max="10" step="0.5" value="${layer.config?.lineWidth !== undefined ? layer.config.lineWidth : 2.0}" style="width: 44px; height: 20px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; text-align: center; font-size: 11px;" title="Standard Line Width" />
+                  <span style="font-size: 11px; color: #8b949e;">px</span>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding-left: 20px; font-size: 11px;">
+                <span style="color: #8b949e;">Bold (5880m, 1010hPa):</span>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                  <input type="text" class="input-bold-values" placeholder="5880, 1010" value="${(layer.config?.boldValues || (layer.element === 'HGT' ? [5880, 588] : layer.element === 'SLP' ? [1010] : layer.element === 'TMP' ? [0] : [])).join(', ')}" style="width: 76px; height: 20px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; padding: 0 4px; font-size: 11px;" title="Values to render in bold (comma-separated)" />
+                  <span style="color: #8b949e;">Width</span>
+                  <input type="number" class="input-bold-line-width" min="1" max="12" step="0.5" value="${layer.config?.boldLineWidth !== undefined ? layer.config.boldLineWidth : 4.0}" style="width: 40px; height: 20px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; text-align: center; font-size: 11px;" title="Bold Line Width" />
+                  <span style="color: #8b949e;">px</span>
+                </div>
+              </div>
             </div>
 
             <div class="config-row">

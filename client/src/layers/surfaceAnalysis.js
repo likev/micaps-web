@@ -1,6 +1,6 @@
 // surfaceAnalysis.js - In-browser objective analysis & contour calculation for surface stations
 import * as griddata from "griddata";
-import { renderCustomContourGeoJSON } from "./contourLayer.js";
+import { renderCustomContourGeoJSON, isFeatureBold } from "./contourLayer.js";
 import { addOrUpdateLayer } from "../ui/layerControl.js";
 
 export function analyzeAndRenderSurfaceSLPContours(map, stationsGeoJSON, options = {}, win = null) {
@@ -70,18 +70,26 @@ export function analyzeAndRenderSurfaceSLPContours(map, stationsGeoJSON, options
   }
   const fills = griddata.contourf({ data: interpolated, rows: y.length, cols: x.length }, { x, y, levels });
 
+  const boldValues = [1010, 1000, 1020];
+  for (const f of lines) {
+    const val = f.value ?? f.properties?.value ?? 0;
+    f.properties.isBold = isFeatureBold(val, boldValues);
+  }
+
   const isolineFC = { type: "FeatureCollection", features: lines };
   const isobandFC = { type: "FeatureCollection", features: fills };
 
   const layerId = "contour-surface-slp";
-  const lineColor = options.lineColor || "#388bfd";
+  const lineColor = options.lineColor || "#58a6ff";
 
   renderCustomContourGeoJSON(map, isobandFC, isolineFC, {
     layerId,
     showFill: false,
     showLine: true,
     lineColor,
-    lineWidth: 1.5,
+    lineWidth: 2.0,
+    boldLineWidth: 4.0,
+    boldValues,
     element: "SLP",
   });
 
@@ -111,7 +119,9 @@ export function analyzeAndRenderSurfaceSLPContours(map, stationsGeoJSON, options
       showLine: true,
       lineColor,
       opacity: 0.75,
-      lineWidth: 1.5,
+      lineWidth: 2.0,
+      boldLineWidth: 4.0,
+      boldValues,
     },
   }, win);
 

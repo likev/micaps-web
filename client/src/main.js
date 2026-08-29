@@ -351,6 +351,9 @@ async function loadWeatherField(map, model, element, level, period, customOption
         showFill: isVisible && showFill,
         showLine: isVisible && showLine,
         lineColor,
+        lineWidth,
+        boldValues: customOptions?.boldValues,
+        boldLineWidth: customOptions?.boldLineWidth,
         opacity,
         colormap,
       });
@@ -376,6 +379,8 @@ async function loadWeatherField(map, model, element, level, period, customOption
         lineColor,
         opacity,
         lineWidth,
+        boldValues: customOptions?.boldValues,
+        boldLineWidth: customOptions?.boldLineWidth,
         showRaster,
         showWind: false,
         showBarbs: false,

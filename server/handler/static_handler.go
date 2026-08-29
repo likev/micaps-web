@@ -49,10 +49,10 @@ func (h *StaticHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// PresetsConfigHandler reads or updates presets.json
-func (h *StaticHandler) PresetsConfigHandler(w http.ResponseWriter, r *http.Request) {
+// ConfigHandler reads or updates config.json (and legacy presets.json)
+func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
 	if r.Method == http.MethodOptions {
@@ -61,25 +61,38 @@ func (h *StaticHandler) PresetsConfigHandler(w http.ResponseWriter, r *http.Requ
 	}
 
 	distDir := h.Cfg.StaticDir
-	presetsPath := filepath.Join(distDir, "presets.json")
-	if _, err := os.Stat(presetsPath); os.IsNotExist(err) {
-		altPath := filepath.Join(distDir, "config/presets.json")
-		if _, aErr := os.Stat(altPath); aErr == nil {
-			presetsPath = altPath
-		} else {
-			presetsPath = "client/public/presets.json"
-		}
+	candidates := []string{
+		filepath.Join(distDir, "config.json"),
+		filepath.Join(distDir, "config/config.json"),
+		"client/public/config.json",
+		"../client/public/config.json",
+		filepath.Join(distDir, "presets.json"),
+		"client/public/presets.json",
+		"../client/public/presets.json",
 	}
 
-	if r.Method == http.MethodPost {
+	var configPath string
+	for _, p := range candidates {
+		if _, err := os.Stat(p); err == nil {
+			configPath = p
+			break
+		}
+	}
+	if configPath == "" {
+		configPath = "client/public/config.json"
+	}
+
+	if r.Method == http.MethodPost || r.Method == http.MethodPut {
 		var raw json.RawMessage
 		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 			http.Error(w, `{"error":"Invalid JSON: `+err.Error()+`"}`, http.StatusBadRequest)
 			return
 		}
+		_ = os.WriteFile(filepath.Join(distDir, "config.json"), raw, 0644)
+		_ = os.WriteFile("client/public/config.json", raw, 0644)
+		_ = os.WriteFile("../client/public/config.json", raw, 0644)
 		_ = os.WriteFile(filepath.Join(distDir, "presets.json"), raw, 0644)
 		_ = os.WriteFile("client/public/presets.json", raw, 0644)
-		_ = os.WriteFile("../client/public/presets.json", raw, 0644)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok","message":"Configuration saved successfully"}`))
@@ -87,13 +100,18 @@ func (h *StaticHandler) PresetsConfigHandler(w http.ResponseWriter, r *http.Requ
 	}
 
 	// GET
-	data, err := os.ReadFile(presetsPath)
+	data, err := os.ReadFile(configPath)
 	if err != nil {
-		http.Error(w, `{"error":"Could not read presets file: `+err.Error()+`"}`, http.StatusInternalServerError)
+		http.Error(w, `{"error":"Could not read config file: `+err.Error()+`"}`, http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(data)
+}
+
+// Legacy alias
+func (h *StaticHandler) PresetsConfigHandler(w http.ResponseWriter, r *http.Request) {
+	h.ConfigHandler(w, r)
 }
 
 // SPAHandler serves frontend static files with SPA fallback

@@ -63,7 +63,7 @@ export function openConfigTab() {
         </div>
       </div>
       <div class="config-editor-body">
-        <textarea id="config-json-textarea" class="config-editor-textarea" spellcheck="false" placeholder="Loading presets.json..."></textarea>
+        <textarea id="config-json-textarea" class="config-editor-textarea" spellcheck="false" placeholder="Loading config.json..."></textarea>
         <div class="config-editor-msg" id="config-editor-msg"></div>
       </div>
     `;
@@ -118,13 +118,14 @@ async function loadCurrentConfigIntoEditor() {
 
   try {
     if (badge) { badge.className = "config-editor-status"; badge.textContent = "Fetching..."; }
-    const res = await fetch(`/api/config/presets?_t=${Date.now()}`);
+    let res = await fetch(`/api/config?_t=${Date.now()}`);
+    if (!res.ok) res = await fetch(`/api/config/presets?_t=${Date.now()}`);
     let text = "";
     if (res.ok) {
       const data = await res.json();
       text = formatCompactJSON(data);
     } else {
-      const fallbackRes = await fetch("./presets.json");
+      const fallbackRes = await fetch("./config.json");
       const data = await fallbackRes.json();
       text = formatCompactJSON(data);
     }

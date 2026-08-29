@@ -63,6 +63,7 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
       <button id="btn-open-config" class="btn" title="Open Configuration Editor Tab">
         <span>⚙ Config</span>
       </button>
+      <button id="btn-reload-config" style="display:none;" title="Reload Configuration"></button>
     </div>
   `;
 
@@ -106,8 +107,15 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
   document.getElementById("btn-open-config").addEventListener("click", () => {
     if (onOpenConfigCallback) {
       onOpenConfigCallback();
-    } else if (onConfigReloadCallback) {
-      onConfigReloadCallback();
+    }
+  });
+
+  document.getElementById("btn-reload-config")?.addEventListener("click", async () => {
+    try {
+      await PRESET_GROUPS;
+      if (callbacks.onConfigReload) callbacks.onConfigReload();
+    } catch (e) {
+      console.error(e);
     }
   });
 

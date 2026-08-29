@@ -1,6 +1,6 @@
 // soundingAnalysis.js - In-browser objective analysis & contour calculation from sounding stations
 import * as griddata from "griddata";
-import { renderCustomContourGeoJSON } from "./contourLayer.js";
+import { renderCustomContourGeoJSON, isFeatureBold } from "./contourLayer.js";
 import { addOrUpdateLayer } from "../ui/layerControl.js";
 
 export function analyzeAndRenderSoundingContours(map, stationsGeoJSON, level = 500, options = {}, win = null) {
@@ -45,15 +45,22 @@ export function analyzeAndRenderSoundingContours(map, stationsGeoJSON, level = 5
   const hgtLayerId = `contour-sounding-hgt-${level}`;
   const tmpLayerId = `contour-sounding-tmp-${level}`;
 
-  // 3. Render Height Contour Lines (classic blue isolines)
+  // 3. Render Height Contour Lines (classic blue isolines, default 2px, 5880 bold 4px)
   if (hgtResult && hgtResult.lines && hgtResult.lines.length > 0) {
+    const boldValues = level === 500 ? [5880, 588] : (level === 700 ? [3120, 312] : (level === 850 ? [1520, 152] : []));
+    for (const f of hgtResult.lines) {
+      const val = f.value ?? f.properties?.value ?? 0;
+      f.properties.isBold = isFeatureBold(val, boldValues);
+    }
     const hgtFC = { type: "FeatureCollection", features: hgtResult.lines };
     renderCustomContourGeoJSON(map, null, hgtFC, {
       layerId: hgtLayerId,
       showFill: false,
       showLine: true,
       lineColor: options.hgtColor || "#58a6ff",
-      lineWidth: 1.5,
+      lineWidth: 2.0,
+      boldLineWidth: 4.0,
+      boldValues,
     });
 
     addOrUpdateLayer({
@@ -70,20 +77,29 @@ export function analyzeAndRenderSoundingContours(map, stationsGeoJSON, level = 5
         showLine: true,
         lineColor: options.hgtColor || "#58a6ff",
         opacity: 0.75,
-        lineWidth: 1.5,
+        lineWidth: 2.0,
+        boldLineWidth: 4.0,
+        boldValues,
       },
     }, win);
   }
 
-  // 4. Render Temperature Contour Lines (classic red isotherms)
+  // 4. Render Temperature Contour Lines (classic red isotherms, 0°C bold)
   if (tmpResult && tmpResult.lines && tmpResult.lines.length > 0) {
+    const boldValues = [0, -20];
+    for (const f of tmpResult.lines) {
+      const val = f.value ?? f.properties?.value ?? 0;
+      f.properties.isBold = isFeatureBold(val, boldValues);
+    }
     const tmpFC = { type: "FeatureCollection", features: tmpResult.lines };
     renderCustomContourGeoJSON(map, null, tmpFC, {
       layerId: tmpLayerId,
       showFill: false,
       showLine: true,
       lineColor: options.tmpColor || "#f85149",
-      lineWidth: 1.5,
+      lineWidth: 2.0,
+      boldLineWidth: 4.0,
+      boldValues,
     });
 
     addOrUpdateLayer({
@@ -100,7 +116,9 @@ export function analyzeAndRenderSoundingContours(map, stationsGeoJSON, level = 5
         showLine: true,
         lineColor: options.tmpColor || "#f85149",
         opacity: 0.75,
-        lineWidth: 1.5,
+        lineWidth: 2.0,
+        boldLineWidth: 4.0,
+        boldValues,
       },
     }, win);
   }

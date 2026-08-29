@@ -4,6 +4,7 @@ import {
   setLayerIsolineVisibility,
   setLayerIsobandOpacity,
   setLayerIsolineColor,
+  setLayerIsolineStyle,
   removeContourLayer,
 } from "../layers/contourLayer.js";
 import { setStationVisibility, setStationConfig } from "../layers/stationLayer.js";
@@ -74,7 +75,14 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
       if (value.showFill !== undefined) setLayerIsobandVisibility(map, layerId, layer.visible && value.showFill);
       if (value.showLine !== undefined) setLayerIsolineVisibility(map, layerId, layer.visible && value.showLine);
       if (value.opacity !== undefined) setLayerIsobandOpacity(map, layerId, value.opacity);
-      if (value.lineColor !== undefined) setLayerIsolineColor(map, layerId, value.lineColor);
+      if (value.lineWidth !== undefined || value.lineColor !== undefined || value.boldValues !== undefined || value.boldLineWidth !== undefined) {
+        setLayerIsolineStyle(map, layerId, {
+          lineWidth: layer.config?.lineWidth,
+          lineColor: layer.config?.lineColor,
+          boldValues: layer.config?.boldValues,
+          boldLineWidth: layer.config?.boldLineWidth,
+        });
+      }
 
       if (value.showRaster !== undefined) {
         if (value.showRaster && layer.visible) {
