@@ -133,14 +133,12 @@ export function renderWindStreamlines(map, gridData) {
         continue;
       }
 
-      // Physical displacement with zoom-adaptive velocity normalization:
-      // When zoomed in, scale down dt so screen velocity does not explode.
-      // When zoomed out, scale up dt so streamlines do not freeze.
+      // Physical displacement with zoom-adaptive velocity normalization (2x faster animation):
       const latRad = (p.lat * Math.PI) / 180;
       const cosLat = Math.max(0.1, Math.cos(latRad));
       const currentZoom = typeof map.getZoom === "function" ? map.getZoom() : 4.5;
       const zoomFactor = Math.pow(2, (4.5 - currentZoom) * 0.85);
-      const dt = 0.055 * zoomFactor;
+      const dt = 0.11 * zoomFactor;
 
       const dLng = (uVal * dt * 1000) / (111320 * cosLat);
       const dLat = (vVal * dt * 1000) / 110574;
