@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/xml"
 	"flag"
+	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -98,6 +99,16 @@ func FindRandomClusterIP() (string, string, error) {
 	return "", "", os.ErrNotExist
 }
 
+// ExitWithError logs a fatal error message, informs the user, waits 30 seconds, and then exits.
+// This prevents command windows (e.g. on Windows 10) from closing immediately before errors can be read.
+func ExitWithError(format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	log.Printf("[MICAPS-Web] FATAL ERROR: %s", msg)
+	log.Printf("[MICAPS-Web] Waiting 30 seconds before exiting (so error messages can be read)...")
+	time.Sleep(30 * time.Second)
+	os.Exit(1)
+}
+
 // LoadConfig parses flags, environment variables, and applies sensible defaults
 func LoadConfig() *Config {
 	defaultHost := getEnv("CASSANDRA_HOST", "")
@@ -118,16 +129,20 @@ func LoadConfig() *Config {
 		PMTilesPath:   getEnv("PMTILES_PATH", "../client/public/map-china.pmtiles"),
 	}
 
-	hostFlag := flag.String("host", cfg.CassandraHost, "Cassandra host IP or hostname (no default, auto-detects from MICAPS.exe.config if present)")
-	cportFlag := flag.Int("cport", cfg.CassandraPort, "Cassandra CQL port")
-	httpPortFlag := flag.String("port", cfg.HTTPPort, "HTTP server listening port")
-	tunnelFlag := flag.Bool("tunnel", cfg.EnableTunnel, "Enable reverse proxy tunnel mode")
-	mockFlag := flag.Bool("mock", cfg.MockMode, "Enable offline mock data generator (default: false, product mode)")
-	staticDirFlag := flag.String("static", cfg.StaticDir, "Path to static frontend dist directory")
-	pmtilesFlag := flag.String("pmtiles", cfg.PMTilesPath, "Path to local map-china.pmtiles file")
+	fs := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	hostFlag := fs.String("host", cfg.CassandraHost, "Cassandra host IP or hostname (auto-detects from MICAPS.exe.config if present)")
+	cportFlag := fs.Int("cport", cfg.CassandraPort, "Cassandra CQL port")
+	httpPortFlag := fs.String("port", cfg.HTTPPort, "HTTP server listening port")
+	tunnelFlag := fs.Bool("tunnel", cfg.EnableTunnel, "Enable reverse proxy tunnel mode")
+	mockFlag := fs.Bool("mock", cfg.MockMode, "Enable offline mock data generator (default: false, product mode)")
+	staticDirFlag := fs.String("static", cfg.StaticDir, "Path to static frontend dist directory")
+	pmtilesFlag := fs.String("pmtiles", cfg.PMTilesPath, "Path to local map-china.pmtiles file")
 
-	if !flag.Parsed() {
-		flag.Parse()
+	if err := fs.Parse(os.Args[1:]); err != nil {
+		if err == flag.ErrHelp {
+			os.Exit(0)
+		}
+		ExitWithError("Invalid command-line argument: %v", err)
 	}
 
 	cfg.CassandraHost = *hostFlag
@@ -144,6 +159,17 @@ func LoadConfig() *Config {
 	cfg.MockMode = *mockFlag
 	cfg.StaticDir = *staticDirFlag
 	cfg.PMTilesPath = *pmtilesFlag
+
+	// Validate HTTP port
+	portNum, err := strconv.Atoi(cfg.HTTPPort)
+	if err != nil || portNum <= 0 || portNum > 65535 {
+		ExitWithError("Invalid HTTP port configured: '%s' (must be an integer between 1 and 65535)", cfg.HTTPPort)
+	}
+
+	// Validate Cassandra port
+	if cfg.CassandraPort <= 0 || cfg.CassandraPort > 65535 {
+		ExitWithError("Invalid Cassandra port configured: %d (must be an integer between 1 and 65535)", cfg.CassandraPort)
+	}
 
 	return cfg
 }

@@ -41,15 +41,13 @@ func main() {
 
 	if !cfg.MockMode {
 		if cfg.CassandraHost == "" {
-			log.Printf("[MICAPS-Web] WARNING: No Cassandra -host specified in product mode. Running in mock fallback mode. Specify -host <ip> to connect to Cassandra.")
-			cfg.MockMode = true
+			config.ExitWithError("No Cassandra host configured. Specify -host <ip>, place MICAPS.exe.config in the executable directory, or run with -mock for offline mock data.")
 		} else {
 			addr := fmt.Sprintf("%s:%d", cfg.CassandraHost, cfg.CassandraPort)
 			log.Printf("[MICAPS-Web] Connecting to Cassandra CQL v4 at %s (Tunnel=%t)...", addr, cfg.EnableTunnel)
 			cqlClient, err = db.NewCQLClient(addr, 10*time.Second)
 			if err != nil {
-				log.Printf("[MICAPS-Web] WARNING: Could not connect to Cassandra at %s: %v. Running in mock fallback mode.", addr, err)
-				cfg.MockMode = true
+				config.ExitWithError("Could not connect to Cassandra cluster at %s: %v", addr, err)
 			} else {
 				log.Printf("[MICAPS-Web] SUCCESS: Connected to Cassandra cluster at %s", addr)
 				defer cqlClient.Close()
@@ -92,19 +90,24 @@ func main() {
 	stopChan := make(chan os.Signal, 1)
 	signal.Notify(stopChan, os.Interrupt, syscall.SIGTERM)
 
+	listenErrChan := make(chan error, 1)
 	go func() {
 		log.Printf("[MICAPS-Web] Server listening on http://localhost:%s", cfg.HTTPPort)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("[MICAPS-Web] Listen error: %v", err)
+			listenErrChan <- err
 		}
 	}()
 
-	<-stopChan
-	log.Println("[MICAPS-Web] Shutting down server gracefully...")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
-		log.Printf("[MICAPS-Web] Server forced shutdown: %v", err)
+	select {
+	case sig := <-stopChan:
+		log.Printf("[MICAPS-Web] Received signal %v. Shutting down server gracefully...", sig)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Printf("[MICAPS-Web] Server forced shutdown: %v", err)
+		}
+		log.Println("[MICAPS-Web] Server exiting")
+	case err := <-listenErrChan:
+		config.ExitWithError("Port :%s is not available or listen failed: %v", cfg.HTTPPort, err)
 	}
-	log.Println("[MICAPS-Web] Server exiting")
 }
