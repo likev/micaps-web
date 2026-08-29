@@ -45,11 +45,6 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
           ${levels.map((l) => `<option value="${l}" ${l === currentLevel ? "selected" : ""}>${l} hPa</option>`).join("")}
         </select>
       </div>
-
-      <div class="nav-keyboard-hint" title="Use Left/Right arrow keys to step forecast periods, Up/Down to step pressure levels">
-        <span class="kbd-pill">← / → Period</span>
-        <span class="kbd-pill">↑ / ↓ Level</span>
-      </div>
     </div>
 
     <div class="nav-controls">
@@ -69,6 +64,10 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
 
   document.getElementById("select-preset").addEventListener("change", (e) => {
     const groupId = e.target.value;
+    const levelSelect = document.getElementById("select-nav-level");
+    if (levelSelect) levelSelect.value = "";
+    appState.set("level", null);
+
     const group = PRESET_GROUPS.find((g) => g.id === groupId) || null;
     if (onPresetSelectCallback) {
       onPresetSelectCallback(group);

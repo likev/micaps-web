@@ -151,26 +151,17 @@ async function bootstrap() {
       const win = getActiveWindow();
       if (!win) return;
       win.activeGroup = group;
+      win.level = null;
       win.isObservation = Boolean(group?.isObservation);
       updateWindowTitle(win, group ? group.name : "");
       setWindowHeaderPreset(win, group?.id || "");
+      setWindowHeaderLevel(win, null);
     },
-    onLevelSelect: async (lvl) => {
+    onLevelSelect: (lvl) => {
       const win = getActiveWindow();
-      const map = win?.map || getActiveMap();
-      if (!win || !map) return;
-      if (lvl !== null) win.level = lvl;
-      if (win.activeGroup) {
-        await loadPresetGroup(map, win.activeGroup, win.period, lvl, win);
-      } else if (win.model && win.element && lvl !== null) {
-        if (win.isObservation) {
-          if (win.model === "UPPER_AIR") {
-            await loadUpperAirComposite(map, lvl, win.obsTime, win);
-          }
-        } else {
-          await loadWeatherField(map, win.model, win.element, lvl, win.period, null, win);
-        }
-      }
+      if (!win) return;
+      win.level = lvl;
+      setWindowHeaderLevel(win, lvl);
     },
     onLoadData: async (group, overrideLevel = null) => {
       const win = getActiveWindow();
