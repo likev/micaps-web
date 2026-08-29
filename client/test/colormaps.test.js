@@ -55,4 +55,18 @@ describe("Colormap & Dynamic Scale Calculation", () => {
     const c100 = getHexColor(100, "TEST_CMAP");
     expect(c100).toBe("rgb(255,255,255)");
   });
+
+  test("RH and WIND retain strict physical scale without distortion", () => {
+    // RH standard levels
+    const rhLevels = getElementLevels("RH", 0, 102);
+    expect(rhLevels).toEqual([50, 60, 70, 80, 90, 100]);
+
+    // WIND standard levels
+    const windLevels = getElementLevels("WIND", 0, 45);
+    expect(windLevels).toEqual([4, 8, 12, 16, 20, 24, 28, 32, 40]);
+
+    // RH and WIND should return valid rgb colors for values
+    expect(getHexColor(70, "RH")).toMatch(/^rgb\(\d+,\s*\d+,\s*\d+\)$/);
+    expect(getHexColor(18, "WIND")).toMatch(/^rgb\(\d+,\s*\d+,\s*\d+\)$/);
+  });
 });

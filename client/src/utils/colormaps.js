@@ -53,23 +53,54 @@ export function getColor(val, element = "TMP", colormap = null, zMin = undefined
   if (!palette || palette.length === 0) return [100, 150, 240, 255];
   if (palette.length === 1) return palette[0].color;
 
+  const elUpper = (element || "").toUpperCase();
+  const cmUpper = (typeof colormap === "string" ? colormap : "").toUpperCase();
+
+  // Fixed physical scale fields must NEVER be dynamically stretched:
+  // RH (0..100%), WIND (0..45 m/s), TMP (-40..40 C), RAIN (0..250 mm)
+  const isFixedPhysical = elUpper === "RH" || cmUpper.includes("RH") ||
+                          elUpper === "WIND" || cmUpper.includes("WIND") ||
+                          elUpper === "TMP" || cmUpper.includes("TMP") ||
+                          elUpper === "RAIN" || cmUpper.includes("RAIN");
+
+  const isHGT = elUpper === "HGT" || cmUpper.includes("HGT");
+  const isSLP = elUpper === "SLP" || cmUpper.includes("SLP");
+
   let checkVal = val;
   const palMin = palette[0].val;
   const palMax = palette[palette.length - 1].val;
 
   // Handle HGT decameter (dagpm) vs meter (gpm) scaling
-  const isHGT = element === "HGT" || (typeof colormap === "string" && colormap.toLowerCase().includes("hgt"));
   if (isHGT && val < 2500 && palMax > 2500) {
     checkVal = val * 10;
   }
 
-  // 1. Dynamic / Relative range mapping:
-  // - Always for HGT (height ranges like 5340..5910 at 500hPa cluster tightly in a narrow level-specific altitude band)
-  // - Or when values fall outside static palette bounds
-  // - Or when data dynamic range (zMax - zMin) is much narrower than a broad general palette (< 35% of palette span)
-  const isRelativeCandidate = isHGT || (zMin !== undefined && zMax !== undefined && (zMax - zMin > 0) && ((checkVal < palMin || checkVal > palMax) || ((zMax - zMin) < 0.35 * (palMax - palMin))));
+  // 1. Fixed physical scale elements (RH, WIND, TMP, RAIN):
+  // Cleanly clamp to physical bounds [palMin, palMax] and interpolate directly across defined stops
+  if (isFixedPhysical) {
+    if (checkVal <= palMin) return palette[0].color;
+    if (checkVal >= palMax) return palette[palette.length - 1].color;
 
-  if (isRelativeCandidate && zMin !== undefined && zMax !== undefined && zMax > zMin) {
+    for (let i = 0; i < palette.length - 1; i++) {
+      const c0 = palette[i];
+      const c1 = palette[i + 1];
+      if (checkVal >= c0.val && checkVal <= c1.val) {
+        const denom = c1.val - c0.val;
+        const t = denom > 0 ? (checkVal - c0.val) / denom : 0;
+        return [
+          Math.round(c0.color[0] + t * (c1.color[0] - c0.color[0])),
+          Math.round(c0.color[1] + t * (c1.color[1] - c0.color[1])),
+          Math.round(c0.color[2] + t * (c1.color[2] - c0.color[2])),
+          Math.round(c0.color[3] + t * (c1.color[3] - c0.color[3])),
+        ];
+      }
+    }
+    return palette[0].color;
+  }
+
+  // 2. Relative Level-Adaptive elements (HGT, SLP, or unspecified broad-range fields):
+  // Stretch palette across actual field range [zMin, zMax] so narrow height/pressure bands have rich contrast.
+  if ((isHGT || isSLP || (checkVal < palMin || checkVal > palMax)) && zMin !== undefined && zMax !== undefined && zMax > zMin) {
     const effMin = (isHGT && zMax < 2500 && palMax > 2500) ? zMin * 10 : zMin;
     const effMax = (isHGT && zMax < 2500 && palMax > 2500) ? zMax * 10 : zMax;
     if (effMax > effMin) {
@@ -89,7 +120,7 @@ export function getColor(val, element = "TMP", colormap = null, zMin = undefined
     }
   }
 
-  // 2. Direct physical value interpolation across palette stops
+  // 3. Fallback direct physical value interpolation across palette stops
   if (checkVal <= palMin) return palette[0].color;
   if (checkVal >= palMax) return palette[palette.length - 1].color;
 
@@ -117,11 +148,19 @@ export function getHexColor(val, element = "TMP", colormap = null, zMin = undefi
 
 export function getElementLevels(element = "TMP", zMin, zMax, colormap = null) {
   const palette = getColormap(colormap, element);
+  const elUpper = (element || "").toUpperCase();
+
+  if (elUpper === "RH") {
+    return [50, 60, 70, 80, 90, 100];
+  }
+  if (elUpper === "WIND") {
+    return [4, 8, 12, 16, 20, 24, 28, 32, 40];
+  }
 
   if (zMin !== undefined && zMax !== undefined && zMax > zMin) {
     const span = zMax - zMin;
 
-    if (element === "HGT") {
+    if (elUpper === "HGT") {
       // Determine if height is in dagpm (e.g. 0..2000) or gpm (e.g. > 2000)
       const isDam = zMax < 2500;
       let step;

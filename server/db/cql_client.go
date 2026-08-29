@@ -122,16 +122,28 @@ func (c *CQLClient) execute(queryStr string) ([]Row, error) {
 	hdr = binary.BigEndian.AppendUint32(hdr, uint32(body.Len()))
 
 	if _, err := c.conn.Write(append(hdr, body.Bytes()...)); err != nil {
+		c.conn.Close()
+		c.conn = nil
 		return nil, err
 	}
 
 	resHdr := make([]byte, 9)
 	if _, err := io.ReadFull(c.conn, resHdr); err != nil {
+		c.conn.Close()
+		c.conn = nil
 		return nil, err
 	}
 	bodyLen := binary.BigEndian.Uint32(resHdr[5:9])
+	if bodyLen > 64*1024*1024 { // Guard against corrupted frames (max 64MB)
+		c.conn.Close()
+		c.conn = nil
+		return nil, fmt.Errorf("corrupted CQL frame: body length %d exceeds 64MB limit", bodyLen)
+	}
+
 	resBody := make([]byte, bodyLen)
 	if _, err := io.ReadFull(c.conn, resBody); err != nil {
+		c.conn.Close()
+		c.conn = nil
 		return nil, err
 	}
 
