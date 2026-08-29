@@ -71,7 +71,7 @@ func ParseGridData(decompressed []byte) (*model.GridResponse, error) {
 			Max:  maxVal,
 			Mean: sumVal / float32(totalPoints),
 		}
-	} else if header.DataType == 11 { // Vector U and V wind components
+	} else if header.DataType == 11 { // Vector Wind grid (Speed and Direction or U and V)
 		expectedBytes := totalPoints * 8
 		if len(payload) < expectedBytes {
 			return nil, fmt.Errorf("insufficient payload bytes for vector grid: got %d, expected %d", len(payload), expectedBytes)
@@ -81,16 +81,49 @@ func ParseGridData(decompressed []byte) (*model.GridResponse, error) {
 		resp.V = make([]float32, totalPoints)
 		resp.Values = make([]float32, totalPoints) // wind speed magnitude
 
+		// Detect if Block 1 is Speed and Block 2 is Direction in degrees [0, 360]
+		isSpeedDir := true
+		validSamples := 0
+		for i := 0; i < totalPoints; i += 50 {
+			b1 := math.Float32frombits(binary.LittleEndian.Uint32(payload[i*4 : (i+1)*4]))
+			b2 := math.Float32frombits(binary.LittleEndian.Uint32(payload[totalPoints*4+i*4 : totalPoints*4+(i+1)*4]))
+			if math.IsNaN(float64(b1)) || math.IsNaN(float64(b2)) || b1 < -9000 || b2 < -9000 {
+				continue
+			}
+			if b1 < -0.01 || b2 < -0.01 || b2 > 360.5 {
+				isSpeedDir = false
+				break
+			}
+			validSamples++
+		}
+		if validSamples < 5 {
+			isSpeedDir = false
+		}
+
 		var maxSpeed float32 = 0
 		for i := 0; i < totalPoints; i++ {
-			uBits := binary.LittleEndian.Uint32(payload[i*4 : (i+1)*4])
-			vBits := binary.LittleEndian.Uint32(payload[totalPoints*4+i*4 : totalPoints*4+(i+1)*4])
-			u := math.Float32frombits(uBits)
-			v := math.Float32frombits(vBits)
+			b1 := math.Float32frombits(binary.LittleEndian.Uint32(payload[i*4 : (i+1)*4]))
+			b2 := math.Float32frombits(binary.LittleEndian.Uint32(payload[totalPoints*4+i*4 : totalPoints*4+(i+1)*4]))
+
+			var u, v, speed float32
+			if isSpeedDir {
+				speed = b1
+				rad := float64(b2) * math.Pi / 180.0
+				// In MICAPS / MDFS Diamond 11 vector grid:
+				// Block 1 is Speed (magnitude).
+				// Block 2 is mathematical polar angle theta in degrees (0° = East / +X, 90° = North / +Y, 180° = West / -X, 270° = South / -Y):
+				// u = speed * cos(theta) (eastward physical velocity component)
+				// v = speed * sin(theta) (northward physical velocity component)
+				u = float32(float64(speed) * math.Cos(rad))
+				v = float32(float64(speed) * math.Sin(rad))
+			} else {
+				u = b1
+				v = b2
+				speed = float32(math.Hypot(float64(u), float64(v)))
+			}
+
 			resp.U[i] = u
 			resp.V[i] = v
-
-			speed := float32(math.Hypot(float64(u), float64(v)))
 			resp.Values[i] = speed
 			if speed > maxSpeed {
 				maxSpeed = speed

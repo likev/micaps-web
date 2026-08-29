@@ -14,16 +14,16 @@ describe("Workstation UI Controls Verification", () => {
     if (webview) await webview.close();
   });
 
-  test("Catalog button opens and closes catalog drawer", async () => {
-    // Click catalog button to open
-    await webview.evaluate(`document.getElementById("btn-toggle-catalog").click()`);
-    let isHidden = await webview.evaluate(`document.getElementById("catalog-drawer").classList.contains("hidden")`);
-    expect(isHidden).toBe(false);
-
-    // Click catalog button to close
-    await webview.evaluate(`document.getElementById("btn-toggle-catalog").click()`);
-    isHidden = await webview.evaluate(`document.getElementById("catalog-drawer").classList.contains("hidden")`);
+  test("Layers button opens and closes layer panel", async () => {
+    // Click layers button to close
+    await webview.evaluate(`document.getElementById("btn-toggle-layers").click()`);
+    let isHidden = await webview.evaluate(`document.getElementById("layer-control").classList.contains("hidden")`);
     expect(isHidden).toBe(true);
+
+    // Click layers button to open
+    await webview.evaluate(`document.getElementById("btn-toggle-layers").click()`);
+    isHidden = await webview.evaluate(`document.getElementById("layer-control").classList.contains("hidden")`);
+    expect(isHidden).toBe(false);
   });
 
   test("Time slider play button toggles playback state", async () => {

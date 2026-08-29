@@ -50,14 +50,18 @@ export function getColormap(reference = null, element = "TMP") {
 
 export function getColor(val, element = "TMP", colormap = null) {
   const palette = getColormap(colormap, element);
-  if (val <= palette[0].val) return palette[0].color;
-  if (val >= palette[palette.length - 1].val) return palette[palette.length - 1].color;
+  let checkVal = val;
+  if (element === "HGT" && val < 1500 && palette[0].val > 1500) {
+    checkVal = val * 10;
+  }
+  if (checkVal <= palette[0].val) return palette[0].color;
+  if (checkVal >= palette[palette.length - 1].val) return palette[palette.length - 1].color;
 
   for (let i = 0; i < palette.length - 1; i++) {
     const c0 = palette[i];
     const c1 = palette[i + 1];
-    if (val >= c0.val && val <= c1.val) {
-      const t = (val - c0.val) / (c1.val - c0.val);
+    if (checkVal >= c0.val && checkVal <= c1.val) {
+      const t = (checkVal - c0.val) / (c1.val - c0.val);
       return [
         Math.round(c0.color[0] + t * (c1.color[0] - c0.color[0])),
         Math.round(c0.color[1] + t * (c1.color[1] - c0.color[1])),
@@ -75,7 +79,25 @@ export function getHexColor(val, element = "TMP", colormap = null) {
 }
 
 export function getElementLevels(element = "TMP", zMin, zMax, colormap = null) {
-  return getColormap(colormap, element).map((stop) => stop.val);
+  const palette = getColormap(colormap, element);
+  let levels = palette.map((stop) => stop.val);
+  if (element === "HGT" && zMin !== undefined && zMax !== undefined) {
+    const isDam = zMax < 1500;
+    const step = isDam ? 4 : 40;
+    const start = Math.floor(zMin / step) * step;
+    const end = Math.ceil(zMax / step) * step;
+    const denseLevels = [];
+    for (let v = start; v <= end; v += step) {
+      denseLevels.push(v);
+    }
+    if (denseLevels.length >= 2) {
+      return denseLevels;
+    }
+    if (isDam && levels[0] > 1500) {
+      levels = levels.map((v) => v / 10);
+    }
+  }
+  return levels;
 }
 
 export function getCSSGradient(element = "TMP", colormap = null) {

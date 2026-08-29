@@ -18,6 +18,25 @@ export function renderBinaryRaster(map, arrayBuffer, element = "TMP", colormap =
 
   // Float32 values start at byte offset 32
   const floatValues = new Float32Array(arrayBuffer, 32);
+  renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat, element, colormap);
+}
+
+export function renderGridRaster(map, gridData, element = "TMP", colormap = null) {
+  if (!map || !gridData || !gridData.values || !gridData.header) return;
+  const h = gridData.header;
+  const nlon = h.n_lon || h.LongitudeGridNumber || (gridData.values[0]?.length) || 0;
+  const nlat = h.n_lat || h.LatitudeGridNumber || gridData.values.length || 0;
+  const slon = h.start_lon ?? h.StartLongitude ?? 60.0;
+  const elon = h.end_lon ?? h.EndLongitude ?? (slon + (nlon - 1) * (h.d_lon || h.LongitudeGridSpace || 0.25));
+  const slat = h.start_lat ?? h.StartLatitude ?? 60.0;
+  const elat = h.end_lat ?? h.EndLatitude ?? (slat + (nlat - 1) * (h.d_lat || h.LatitudeGridSpace || -0.25));
+  const floatValues = gridData.values;
+
+  renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat, element, colormap);
+}
+
+function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat, element, colormap) {
+  if (!map || !floatValues || nlon <= 0 || nlat <= 0) return;
 
   if (!rasterCanvas) {
     rasterCanvas = document.createElement("canvas");
@@ -28,14 +47,17 @@ export function renderBinaryRaster(map, arrayBuffer, element = "TMP", colormap =
   const imgData = ctx.createImageData(nlon, nlat);
   const data = imgData.data;
 
+  const is2D = Array.isArray(floatValues) && Array.isArray(floatValues[0]);
+  const isDescendingLat = slat > elat; // True if data row 0 is North (e.g. 60° down to -10°)
+
   // Render pixels via color palette mapping
   for (let j = 0; j < nlat; j++) {
+    const srcRow = isDescendingLat ? j : (nlat - 1 - j);
     for (let i = 0; i < nlon; i++) {
-      const srcIdx = j * nlon + i;
       const dstIdx = (j * nlon + i) * 4;
-      const val = floatValues[srcIdx];
+      const val = is2D ? floatValues[srcRow][i] : floatValues[srcRow * nlon + i];
 
-      if (isNaN(val) || val < -9900) {
+      if (val === undefined || val === null || isNaN(val) || val < -9900) {
         data[dstIdx + 3] = 0; // Transparent
       } else {
         const [r, g, b, a] = getColor(val, element, colormap);
@@ -50,11 +72,22 @@ export function renderBinaryRaster(map, arrayBuffer, element = "TMP", colormap =
   ctx.putImageData(imgData, 0, 0);
   const dataUrl = rasterCanvas.toDataURL();
 
+  // Half-cell margin so pixel centers align exactly with vector contour and station coordinates
+  const dLon = nlon > 1 ? Math.abs(elon - slon) / (nlon - 1) : 0;
+  const dLat = nlat > 1 ? Math.abs(elat - slat) / (nlat - 1) : 0;
+  const halfDLon = dLon / 2;
+  const halfDLat = dLat / 2;
+
+  const topLat = Math.max(slat, elat) + halfDLat;
+  const bottomLat = Math.min(slat, elat) - halfDLat;
+  const leftLon = Math.min(slon, elon) - halfDLon;
+  const rightLon = Math.max(slon, elon) + halfDLon;
+
   const coordinates = [
-    [slon, slat], // Top-left
-    [elon, slat], // Top-right
-    [elon, elat], // Bottom-right
-    [slon, elat], // Bottom-left
+    [leftLon, topLat],     // Top-left
+    [rightLon, topLat],    // Top-right
+    [rightLon, bottomLat], // Bottom-right
+    [leftLon, bottomLat],  // Bottom-left
   ];
 
   if (map.getSource("raster-source")) {
@@ -62,6 +95,9 @@ export function renderBinaryRaster(map, arrayBuffer, element = "TMP", colormap =
       url: dataUrl,
       coordinates,
     });
+    if (map.getLayer("raster-layer")) {
+      map.setLayoutProperty("raster-layer", "visibility", "visible");
+    }
   } else {
     map.addSource("raster-source", {
       type: "image",
@@ -69,6 +105,7 @@ export function renderBinaryRaster(map, arrayBuffer, element = "TMP", colormap =
       coordinates,
     });
 
+    const beforeId = map.getLayer("citys-boundary") ? "citys-boundary" : (map.getLayer("provinces-boundary") ? "provinces-boundary" : undefined);
     map.addLayer(
       {
         id: "raster-layer",
@@ -79,7 +116,7 @@ export function renderBinaryRaster(map, arrayBuffer, element = "TMP", colormap =
           "raster-fade-duration": 0,
         },
       },
-      "provinces-boundary"
+      beforeId
     );
   }
 }

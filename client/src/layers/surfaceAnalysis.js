@@ -3,7 +3,7 @@ import * as griddata from "griddata";
 import { renderCustomContourGeoJSON } from "./contourLayer.js";
 import { addOrUpdateLayer } from "../ui/layerControl.js";
 
-export function analyzeAndRenderSurfaceSLPContours(map, stationsGeoJSON, options = {}) {
+export function analyzeAndRenderSurfaceSLPContours(map, stationsGeoJSON, options = {}, win = null) {
   if (!map || !stationsGeoJSON || !stationsGeoJSON.features || stationsGeoJSON.features.length < 3) {
     console.warn("[SurfaceAnalysis] Insufficient surface stations for SLP contour calculation");
     return null;
@@ -60,6 +60,14 @@ export function analyzeAndRenderSurfaceSLPContours(map, stationsGeoJSON, options
   }
 
   const lines = griddata.contour({ data: interpolated, rows: y.length, cols: x.length }, { x, y, levels });
+  if (Array.isArray(lines)) {
+    for (const f of lines) {
+      if (!f.properties) f.properties = {};
+      const val = f.value ?? f.properties.value ?? f.properties.level ?? 0;
+      f.properties.value = val;
+      f.properties.label = String(Math.round(val));
+    }
+  }
   const fills = griddata.contourf({ data: interpolated, rows: y.length, cols: x.length }, { x, y, levels });
 
   const isolineFC = { type: "FeatureCollection", features: lines };
@@ -82,6 +90,21 @@ export function analyzeAndRenderSurfaceSLPContours(map, stationsGeoJSON, options
     name: "Sea Level Pressure (Surface Analysis)",
     type: "contour",
     element: "SLP",
+    model: "SURFACE",
+    level: null,
+    gridData: {
+      header: {
+        start_lon: minLon,
+        end_lon: maxLon,
+        start_lat: minLat,
+        end_lat: maxLat,
+        n_lon: x.length,
+        n_lat: y.length,
+        d_lon: dDeg,
+        d_lat: dDeg,
+      },
+      values: interpolated,
+    },
     color: lineColor,
     config: {
       showFill: false,
@@ -90,7 +113,7 @@ export function analyzeAndRenderSurfaceSLPContours(map, stationsGeoJSON, options
       opacity: 0.75,
       lineWidth: 1.5,
     },
-  });
+  }, win);
 
   return { lines, levels, pointsCount: points.length };
 }

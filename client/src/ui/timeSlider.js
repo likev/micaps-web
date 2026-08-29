@@ -1,11 +1,12 @@
 // timeSlider.js - Discrete forecast lead time stepper and observation timeline
 import { appState } from "../store/appState.js";
-import { formatLeadTime, formatObsTimestamp } from "../utils/formatters.js";
+import { formatLeadTime, formatObsTimestamp, formatForecastInitTime, formatForecastValidTime } from "../utils/formatters.js";
 
 let playTimer = null;
 let currentMode = "nwp"; // "nwp" or "obs"
 let discretePeriods = [0, 12, 24, 36, 48, 72, 96, 120];
 let currentPeriodIdx = 2; // default +024h
+let currentInitCycle = "26082820";
 
 let obsFiles = [
   "20260827080000.000",
@@ -18,10 +19,17 @@ let currentObsIdx = obsFiles.length - 1;
 
 let onTimeChangeCallback = null;
 
+export function setTimeSliderVisible(visible = true) {
+  const container = document.getElementById("timeslider-container");
+  if (!container) return;
+  container.classList.toggle("hidden", !visible);
+}
+
 export function initTimeSlider(containerId = "timeslider-container", onTimeChange) {
   const container = document.getElementById(containerId);
   if (!container) return;
   onTimeChangeCallback = onTimeChange;
+  container.classList.add("hidden");
 
   container.innerHTML = `
     <div class="timeline-stepper">
@@ -34,8 +42,9 @@ export function initTimeSlider(containerId = "timeslider-container", onTimeChang
       <div class="timeline-info">
         <span id="time-badge" class="mode-badge">NWP FORECAST</span>
         <span id="time-win-badge" class="win-target-badge" style="display:none;"></span>
+        <span id="time-init-wrapper" class="init-time-wrapper">Init: <strong id="time-init-label">2026-08-28 20:00 UTC</strong></span>
         <span id="time-lead-wrapper">Forecast Lead: <strong id="time-lead-label">+024h</strong></span>
-        <span id="time-valid-label" class="valid-label">Analysis + 24h</span>
+        <span id="time-valid-label" class="valid-label">Valid: Analysis + 24h</span>
       </div>
 
       <!-- Discrete Step Chips Bar (No continuous slider track) -->
@@ -109,11 +118,12 @@ let currentWinTitle = "";
 function updateLabels() {
   const badge = document.getElementById("time-badge");
   const winBadge = document.getElementById("time-win-badge");
+  const initWrapper = document.getElementById("time-init-wrapper");
+  const initLabel = document.getElementById("time-init-label");
   const leadWrapper = document.getElementById("time-lead-wrapper");
-  const leadLabel = document.getElementById("time-lead-label");
   const validLabel = document.getElementById("time-valid-label");
 
-  if (!badge || !leadLabel || !validLabel) return;
+  if (!badge || !leadWrapper || !validLabel) return;
 
   if (winBadge) {
     if (currentWinTitle) {
@@ -126,6 +136,7 @@ function updateLabels() {
   }
 
   if (currentMode === "obs") {
+    if (initWrapper) initWrapper.style.display = "none";
     badge.textContent = "OBSERVATION";
     badge.className = "mode-badge obs-badge";
     const curFile = obsFiles[currentObsIdx] || "";
@@ -135,8 +146,12 @@ function updateLabels() {
     badge.textContent = "NWP FORECAST";
     badge.className = "mode-badge";
     const curPeriod = discretePeriods[currentPeriodIdx];
+    if (initWrapper && initLabel) {
+      initWrapper.style.display = "inline-block";
+      initLabel.textContent = formatForecastInitTime(currentInitCycle);
+    }
     leadWrapper.innerHTML = `Forecast Lead: <strong id="time-lead-label">${formatLeadTime(curPeriod)}</strong>`;
-    validLabel.textContent = `Valid: Analysis + ${curPeriod}h Discrete Horizon`;
+    validLabel.textContent = `Valid: ${formatForecastValidTime(currentInitCycle, curPeriod)}`;
   }
 }
 
@@ -182,6 +197,9 @@ export function setTimelineMode(mode, customData = {}) {
   if (customData.winTitle !== undefined) {
     currentWinTitle = customData.winTitle;
   }
+  if (customData.initCycle) {
+    currentInitCycle = customData.initCycle;
+  }
   if (currentMode === "obs") {
     if (Array.isArray(customData.files) && customData.files.length > 0) {
       obsFiles = customData.files;
@@ -199,5 +217,8 @@ export function setTimelineMode(mode, customData = {}) {
   pausePlayback();
   updateLabels();
   renderChips();
+  if (customData.visible !== false) {
+    setTimeSliderVisible(true);
+  }
 }
 

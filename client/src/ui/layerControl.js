@@ -1,10 +1,23 @@
 // layerControl.js - Interactive per-window multi-layer management panel
 import { appState } from "../store/appState.js";
+import { renderStationFilterSection, bindStationFilterEvents } from "./stationFilterControl.js";
 
 const windowLayersMap = new Map();
 let currentActiveWinId = "default";
 let currentActiveWinTitle = "";
 let onLayerActionCallback = null;
+
+function isWindRelated(layer) {
+  if (!layer) return false;
+  if (layer.type === "wind") return true;
+  const elem = (layer.element || "").toUpperCase();
+  if (elem === "WIND" || elem === "UV" || elem === "WND" || elem === "WIN" || elem === "FF" || elem === "WS") return true;
+  const id = (layer.id || "").toLowerCase();
+  if (id.includes("wind") || id.includes("streamline")) return true;
+  const name = (layer.name || "").toLowerCase();
+  if (name.includes("wind") || name.includes("streamline") || name.includes("风")) return true;
+  return false;
+}
 
 function createDefaultLayers(winId = "default") {
   return [
@@ -37,6 +50,11 @@ export function getLayersForWindow(winOrId) {
   return windowLayersMap.get(winId);
 }
 
+export function getLayerById(layerId, winOrId) {
+  const layers = getLayersForWindow(winOrId);
+  return layers.find((l) => l.id === layerId) || null;
+}
+
 export function clearWindowWeatherLayers(winOrId) {
   const winId = typeof winOrId === "object" ? (winOrId?.id || "default") : (winOrId || currentActiveWinId || "default");
   const current = getLayersForWindow(winId);
@@ -48,26 +66,68 @@ export function clearWindowWeatherLayers(winOrId) {
   }
 }
 
-export function addOrUpdateLayer(layerDef, winOrId = null) {
-  const winId = typeof winOrId === "object" ? (winOrId?.id || currentActiveWinId) : (winOrId || currentActiveWinId || "default");
-  const layers = getLayersForWindow(winId);
-
-  const existingIdx = layers.findIndex((l) => l.id === layerDef.id);
-  if (existingIdx >= 0) {
-    layers[existingIdx] = { ...layers[existingIdx], ...layerDef };
+export function addOrUpdateLayer(arg1, arg2 = null) {
+  let layerDef, winOrId;
+  if (typeof arg1 === "string" && typeof arg2 === "object" && arg2 !== null) {
+    winOrId = arg1;
+    layerDef = arg2;
   } else {
-    layers.unshift({
+    layerDef = arg1;
+    winOrId = arg2;
+  }
+
+  const winId = typeof winOrId === "object" ? (winOrId?.id || currentActiveWinId) : (winOrId || currentActiveWinId || "default");
+  if (!windowLayersMap.has(winId)) {
+    windowLayersMap.set(winId, createDefaultLayers(winId));
+  }
+
+  const layers = windowLayersMap.get(winId);
+  const existingIdx = layers.findIndex((l) => l.id === layerDef.id);
+
+  if (existingIdx >= 0) {
+    layers[existingIdx] = {
+      ...layers[existingIdx],
+      ...layerDef,
+      config: { ...layers[existingIdx].config, ...layerDef.config },
+    };
+  } else {
+    layers.push({
+      id: layerDef.id || `layer-${Date.now()}`,
+      name: layerDef.name || "Layer",
+      type: layerDef.type || "contour",
       removable: layerDef.removable !== undefined ? layerDef.removable : true,
       visible: layerDef.visible !== undefined ? layerDef.visible : true,
       isExpanded: false,
       color: layerDef.color || (layerDef.element === "HGT" ? "#58a6ff" : layerDef.element === "TMP" ? "#f85149" : "#388bfd"),
-      config: {
+      config: layerDef.type === "station" ? {
+        showTemp: layerDef.config?.showTemp !== undefined ? layerDef.config.showTemp : true,
+        showDewpoint: layerDef.config?.showDewpoint !== undefined ? layerDef.config.showDewpoint : true,
+        showWind: layerDef.config?.showWind !== undefined ? layerDef.config.showWind : true,
+        showCloud: layerDef.config?.showCloud !== undefined ? layerDef.config.showCloud : false,
+        showWeather: layerDef.config?.showWeather !== undefined ? layerDef.config.showWeather : false,
+        showPressure: layerDef.config?.showPressure !== undefined ? layerDef.config.showPressure : false,
+        showTendency: layerDef.config?.showTendency !== undefined ? layerDef.config.showTendency : false,
+        filterField1: layerDef.config?.filterField1 || "none",
+        filterOp1: layerDef.config?.filterOp1 || ">",
+        filterVal1: layerDef.config?.filterVal1 !== undefined ? layerDef.config.filterVal1 : "",
+        filterLogic: layerDef.config?.filterLogic || "none",
+        filterField2: layerDef.config?.filterField2 || "none",
+        filterOp2: layerDef.config?.filterOp2 || "<",
+        filterVal2: layerDef.config?.filterVal2 !== undefined ? layerDef.config.filterVal2 : "",
+      } : (layerDef.type === "wind" ? {
+        showWind: layerDef.config?.showWind !== undefined ? layerDef.config.showWind : true,
+        showBarbs: layerDef.config?.showBarbs !== undefined ? layerDef.config.showBarbs : false,
+        showRaster: layerDef.config?.showRaster !== undefined ? layerDef.config.showRaster : false,
+      } : {
         showFill: layerDef.config?.showFill !== undefined ? layerDef.config.showFill : true,
         showLine: layerDef.config?.showLine !== undefined ? layerDef.config.showLine : true,
         opacity: layerDef.config?.opacity || 0.75,
         lineColor: layerDef.config?.lineColor || (layerDef.element === "HGT" ? "#58a6ff" : layerDef.element === "TMP" ? "#f85149" : "#ffffff"),
         lineWidth: layerDef.config?.lineWidth || 1.4,
-      },
+        showWind: layerDef.config?.showWind !== undefined ? layerDef.config.showWind : false,
+        showBarbs: layerDef.config?.showBarbs !== undefined ? layerDef.config.showBarbs : false,
+        showRaster: layerDef.config?.showRaster !== undefined ? layerDef.config.showRaster : false,
+      }),
       ...layerDef,
     });
   }
@@ -120,27 +180,14 @@ function renderLayersManager(panel) {
       ${layers.map((layer) => renderLayerRow(layer)).join("")}
     </div>
 
-    <!-- Quick Overlays & Presets Section -->
-    <div class="quick-layers-section">
-      <div class="quick-layer-title">Auxiliary Layers</div>
-      <div class="quick-layer-toggles">
-        <label class="quick-toggle-item">
-          <input type="checkbox" id="chk-raster" />
-          <span>Binary Raster</span>
-        </label>
-        <label class="quick-toggle-item">
-          <input type="checkbox" id="chk-wind" />
-          <span>Wind Streamlines</span>
-        </label>
-      </div>
-    </div>
-
     <!-- Hidden compatibility elements for automated test suites -->
     <div style="display:none;">
       <input type="checkbox" id="chk-contourf" checked />
       <input type="checkbox" id="chk-contour" checked />
       <input type="checkbox" id="chk-station" checked />
       <input type="checkbox" id="chk-pmtiles" checked />
+      <input type="checkbox" id="chk-raster" />
+      <input type="checkbox" id="chk-wind" />
       <input type="range" id="slider-opacity" min="10" max="100" value="75" />
       <span id="opacity-val">75%</span>
     </div>
@@ -177,54 +224,85 @@ function renderLayersManager(panel) {
 
     if (rowEl && configDrawer) {
       rowEl.addEventListener("click", () => {
-        layer.isExpanded = !layer.isExpanded;
+        const nextExpanded = !layer.isExpanded;
+        if (nextExpanded) {
+          // Accordion: close all other open drawers
+          layers.forEach((other) => {
+            if (other.id !== layer.id && other.isExpanded) {
+              other.isExpanded = false;
+              const otherDrawer = panel.querySelector(`.layer-config[data-layer-id="${other.id}"]`);
+              const otherBtn = panel.querySelector(`.btn-config[data-layer-id="${other.id}"]`);
+              if (otherDrawer) otherDrawer.classList.add("hidden");
+              if (otherBtn) otherBtn.classList.remove("open");
+            }
+          });
+        }
+        layer.isExpanded = nextExpanded;
         configDrawer.classList.toggle("hidden", !layer.isExpanded);
         if (configBtn) configBtn.classList.toggle("open", layer.isExpanded);
       });
     }
 
-    // Config controls for contour layers
-    if (layer.type === "contour" && configDrawer) {
-      const chkFill = configDrawer.querySelector(`.chk-show-fill`);
-      const chkLine = configDrawer.querySelector(`.chk-show-line`);
-      const sliderOpacity = configDrawer.querySelector(`.slider-fill-opacity`);
-      const colorPicker = configDrawer.querySelector(`.color-picker-line`);
+    // Config controls for contour and wind layers
+    if ((layer.type === "contour" || layer.type === "wind") && configDrawer) {
+      const bindProp = (sel, eventType, handler) => {
+        const el = configDrawer.querySelector(sel);
+        if (el) {
+          el.addEventListener("click", (e) => e.stopPropagation());
+          el.addEventListener(eventType, (e) => {
+            handler(e);
+            if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer, currentActiveWinId);
+          });
+        }
+      };
 
-      if (chkFill) {
-        chkFill.addEventListener("click", (e) => e.stopPropagation());
-        chkFill.addEventListener("change", (e) => {
-          layer.config.showFill = e.target.checked;
-          if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer, currentActiveWinId);
-        });
-      }
+      const updateColor = (e) => {
+        layer.config.lineColor = e.target.value;
+        layer.color = e.target.value;
+        const dot = panel.querySelector(`.layer-item[data-layer-id="${layer.id}"] .layer-color-dot`);
+        if (dot) dot.style.background = e.target.value;
+      };
 
-      if (chkLine) {
-        chkLine.addEventListener("click", (e) => e.stopPropagation());
-        chkLine.addEventListener("change", (e) => {
-          layer.config.showLine = e.target.checked;
-          if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer, currentActiveWinId);
-        });
-      }
+      bindProp(".chk-show-fill", "change", (e) => { layer.config.showFill = e.target.checked; });
+      bindProp(".chk-show-line", "change", (e) => { layer.config.showLine = e.target.checked; });
+      bindProp(".slider-fill-opacity", "input", (e) => { layer.config.opacity = parseInt(e.target.value, 10) / 100; });
+      bindProp(".slider-fill-opacity", "change", (e) => { layer.config.opacity = parseInt(e.target.value, 10) / 100; });
+      bindProp(".color-picker-line", "input", updateColor);
+      bindProp(".color-picker-line", "change", updateColor);
+      bindProp(".chk-show-raster", "change", (e) => { layer.config.showRaster = e.target.checked; });
+      bindProp(".chk-show-wind", "change", (e) => { layer.config.showWind = e.target.checked; });
+      bindProp(".chk-show-barbs", "change", (e) => { layer.config.showBarbs = e.target.checked; });
+    }
 
-      if (sliderOpacity) {
-        sliderOpacity.addEventListener("click", (e) => e.stopPropagation());
-        sliderOpacity.addEventListener("input", (e) => {
-          layer.config.opacity = parseInt(e.target.value, 10) / 100;
-          if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer, currentActiveWinId);
-        });
-      }
+    // Config controls for station layers
+    if (layer.type === "station" && configDrawer) {
+      const bindStationCheckbox = (selector, key) => {
+        const chk = configDrawer.querySelector(selector);
+        if (chk) {
+          chk.addEventListener("click", (e) => e.stopPropagation());
+          chk.addEventListener("change", (e) => {
+            if (!layer.config) layer.config = {};
+            layer.config[key] = e.target.checked;
+            if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer, currentActiveWinId);
+          });
+        }
+      };
 
-      if (colorPicker) {
-        colorPicker.addEventListener("click", (e) => e.stopPropagation());
-        colorPicker.addEventListener("change", (e) => {
-          layer.config.lineColor = e.target.value;
-          if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer, currentActiveWinId);
-        });
-      }
+      bindStationCheckbox(".chk-station-temp", "showTemp");
+      bindStationCheckbox(".chk-station-dewpoint", "showDewpoint");
+      bindStationCheckbox(".chk-station-wind", "showWind");
+      bindStationCheckbox(".chk-station-cloud", "showCloud");
+      bindStationCheckbox(".chk-station-weather", "showWeather");
+      bindStationCheckbox(".chk-station-pressure", "showPressure");
+      bindStationCheckbox(".chk-station-tendency", "showTendency");
+      bindStationCheckbox(".chk-station-vis", "showVisibility");
+      bindStationCheckbox(".chk-station-rain6", "showRain6");
+
+      bindStationFilterEvents(configDrawer, layer, onLayerActionCallback, currentActiveWinId);
     }
   });
 
-  // Bind auxiliary checkboxes
+  // Bind auxiliary checkboxes for compatibility
   bindAuxCheckbox("chk-raster", "raster");
   bindAuxCheckbox("chk-wind", "wind");
 }
@@ -262,7 +340,28 @@ function renderLayerRow(layer) {
       <!-- Collapsible Layer Configuration Drawer -->
       <div class="layer-config ${layer.isExpanded ? "" : "hidden"}" data-layer-id="${layer.id}">
         ${
-          isContour
+          layer.type === "wind" || (isWindRelated(layer) && !isContour)
+            ? `
+            <div class="config-row">
+              <label>
+                <input type="checkbox" class="chk-show-wind" ${layer.config?.showWind !== false ? "checked" : ""} />
+                <span>Wind Streamlines</span>
+              </label>
+            </div>
+            <div class="config-row">
+              <label>
+                <input type="checkbox" class="chk-show-barbs" ${layer.config?.showBarbs ? "checked" : ""} />
+                <span>Wind Barbs</span>
+              </label>
+            </div>
+            <div class="config-row">
+              <label>
+                <input type="checkbox" class="chk-show-raster" ${layer.config?.showRaster ? "checked" : ""} />
+                <span>Wind Magnitude Raster</span>
+              </label>
+            </div>
+            `
+            : (isContour
             ? `
             <div class="config-row">
               <label>
@@ -279,12 +378,79 @@ function renderLayerRow(layer) {
               </label>
               <input type="color" class="color-picker-line" value="${layer.config?.lineColor || "#ffffff"}" title="Line Color" />
             </div>
+
+            <div class="config-row">
+              <label>
+                <input type="checkbox" class="chk-show-raster" ${layer.config?.showRaster ? "checked" : ""} />
+                <span>Binary Raster Overlay</span>
+              </label>
+            </div>
+            ${
+              isWindRelated(layer)
+                ? `
+            <div class="config-row">
+              <label>
+                <input type="checkbox" class="chk-show-wind" ${layer.config?.showWind ? "checked" : ""} />
+                <span>Wind Streamlines</span>
+              </label>
+            </div>
+            <div class="config-row">
+              <label>
+                <input type="checkbox" class="chk-show-barbs" ${layer.config?.showBarbs ? "checked" : ""} />
+                <span>Wind Barbs</span>
+              </label>
+            </div>
+            `
+                : ""
+            }
+            `
+            : (layer.type === "station"
+            ? `
+            <div class="config-grid-2col">
+              <label class="config-checkbox-item">
+                <input type="checkbox" class="chk-station-temp" ${layer.config?.showTemp ? "checked" : ""} />
+                <span>Temperature (TT)</span>
+              </label>
+              <label class="config-checkbox-item">
+                <input type="checkbox" class="chk-station-dewpoint" ${layer.config?.showDewpoint ? "checked" : ""} />
+                <span>Dew Point (Td)</span>
+              </label>
+              <label class="config-checkbox-item">
+                <input type="checkbox" class="chk-station-wind" ${layer.config?.showWind ? "checked" : ""} />
+                <span>Wind Barbs (FF/dd)</span>
+              </label>
+              <label class="config-checkbox-item">
+                <input type="checkbox" class="chk-station-cloud" ${layer.config?.showCloud ? "checked" : ""} />
+                <span>Cloud Cover (N)</span>
+              </label>
+              <label class="config-checkbox-item">
+                <input type="checkbox" class="chk-station-weather" ${layer.config?.showWeather ? "checked" : ""} />
+                <span>Weather Symbol (ww)</span>
+              </label>
+              <label class="config-checkbox-item">
+                <input type="checkbox" class="chk-station-pressure" ${layer.config?.showPressure ? "checked" : ""} />
+                <span>Pressure / Height</span>
+              </label>
+              <label class="config-checkbox-item">
+                <input type="checkbox" class="chk-station-tendency" ${layer.config?.showTendency ? "checked" : ""} />
+                <span>3h Tendency (ppa)</span>
+              </label>
+              <label class="config-checkbox-item">
+                <input type="checkbox" class="chk-station-vis" ${layer.config?.showVisibility ? "checked" : ""} />
+                <span>Visibility (VV)</span>
+              </label>
+              <label class="config-checkbox-item">
+                <input type="checkbox" class="chk-station-rain6" ${layer.config?.showRain6 ? "checked" : ""} />
+                <span>6h Rain (R6)</span>
+              </label>
+            </div>
+            ${renderStationFilterSection(layer)}
             `
             : `
             <div class="config-row" style="color: #8b949e; font-size: 11px;">
-              <span>Layer is active (${layer.type}).</span>
+              <span>China standard vector basemap layer.</span>
             </div>
-            `
+            `))
         }
       </div>
     </div>

@@ -20,20 +20,20 @@ type Config struct {
 // LoadConfig parses flags, environment variables, and applies sensible defaults
 func LoadConfig() *Config {
 	cfg := &Config{
-		CassandraHost: getEnv("CASSANDRA_HOST", "159.223.110.159"),
-		CassandraPort: getEnvInt("CASSANDRA_PORT", 45061),
+		CassandraHost: getEnv("CASSANDRA_HOST", ""),
+		CassandraPort: getEnvInt("CASSANDRA_PORT", 9042),
 		HTTPPort:      getEnv("HTTP_PORT", "8088"),
-		EnableTunnel:  getEnvBool("ENABLE_TUNNEL", true),
+		EnableTunnel:  getEnvBool("ENABLE_TUNNEL", false),
 		MockMode:      getEnvBool("MOCK_MODE", false),
 		StaticDir:     getEnv("STATIC_DIR", "../client/dist"),
 		PMTilesPath:   getEnv("PMTILES_PATH", "../client/public/map-china.pmtiles"),
 	}
 
-	hostFlag := flag.String("host", cfg.CassandraHost, "Cassandra host IP or hostname")
-	cportFlag := flag.Int("cport", cfg.CassandraPort, "Cassandra port (dynamic tunnel port)")
+	hostFlag := flag.String("host", cfg.CassandraHost, "Cassandra host IP or hostname (no default, required for product mode)")
+	cportFlag := flag.Int("cport", cfg.CassandraPort, "Cassandra CQL port")
 	httpPortFlag := flag.String("port", cfg.HTTPPort, "HTTP server listening port")
 	tunnelFlag := flag.Bool("tunnel", cfg.EnableTunnel, "Enable reverse proxy tunnel mode")
-	mockFlag := flag.Bool("mock", cfg.MockMode, "Enable offline mock data generator")
+	mockFlag := flag.Bool("mock", cfg.MockMode, "Enable offline mock data generator (default: false, product mode)")
 	staticDirFlag := flag.String("static", cfg.StaticDir, "Path to static frontend dist directory")
 	pmtilesFlag := flag.String("pmtiles", cfg.PMTilesPath, "Path to local map-china.pmtiles file")
 

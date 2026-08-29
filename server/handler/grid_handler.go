@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -25,8 +26,15 @@ func (h *GridHandler) JSONHandler(w http.ResponseWriter, r *http.Request) {
 
 	gridResp, err := h.fetchGrid(r)
 	if err != nil {
-		log.Printf("[GridHandler] Error fetching grid: %v. Falling back to mock.", err)
-		gridResp = h.getFallbackGrid(r)
+		if h.MockMode {
+			log.Printf("[GridHandler] Error fetching grid: %v. Mock fallback.", err)
+			gridResp = h.getFallbackGrid(r)
+		} else {
+			log.Printf("[GridHandler] Grid data not found: %v", err)
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
 	}
 
 	json.NewEncoder(w).Encode(gridResp)
@@ -38,8 +46,15 @@ func (h *GridHandler) BinaryHandler(w http.ResponseWriter, r *http.Request) {
 
 	gridResp, err := h.fetchGrid(r)
 	if err != nil {
-		log.Printf("[GridHandler] Error fetching grid: %v. Falling back to mock.", err)
-		gridResp = h.getFallbackGrid(r)
+		if h.MockMode {
+			log.Printf("[GridHandler] Error fetching binary grid: %v. Mock fallback.", err)
+			gridResp = h.getFallbackGrid(r)
+		} else {
+			log.Printf("[GridHandler] Binary grid data not found: %v", err)
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(err.Error()))
+			return
+		}
 	}
 
 	bin := parser.EncodeBinaryStream(gridResp)
@@ -51,7 +66,14 @@ func (h *GridHandler) fetchGrid(r *http.Request) (*model.GridResponse, error) {
 	dataPath := r.URL.Query().Get("path")
 	file := r.URL.Query().Get("file")
 
-	if h.MockMode || h.Client == nil || dataPath == "" || file == "" {
+	if h.Client == nil || dataPath == "" || file == "" {
+		if h.MockMode {
+			return h.getFallbackGrid(r), nil
+		}
+		return nil, fmt.Errorf("missing query parameter 'path' or 'file' (or CQL client not connected)")
+	}
+
+	if h.MockMode {
 		return h.getFallbackGrid(r), nil
 	}
 
@@ -80,6 +102,9 @@ func (h *GridHandler) getFallbackGrid(r *http.Request) *model.GridResponse {
 	} else if strings.Contains(dataPath, "RAIN") {
 		element = "RAIN"
 		level = 0
+	} else if strings.Contains(dataPath, "WIND") || strings.Contains(dataPath, "UV") {
+		element = "WIND"
+		level = 850
 	}
 
 	if pStr := r.URL.Query().Get("period"); pStr != "" {

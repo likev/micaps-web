@@ -1,42 +1,24 @@
 // main.js - Application bootstrap and orchestrator
 import { getActiveMap } from "./map/mapInstance.js";
-import { initNavBar, refreshNavBarPresets } from "./ui/navBar.js";
+import { initNavBar, refreshNavBarPresets, setNavBarLevel, setNavBarPreset } from "./ui/navBar.js";
 import { initCatalogDrawer } from "./ui/catalogDrawer.js";
-import {
-  initLayerControl,
-  addOrUpdateLayer,
-  removeLayer,
-  syncLayerControlForWindow,
-  clearWindowWeatherLayers,
-} from "./ui/layerControl.js";
-import { initTimeSlider, setTimelineMode } from "./ui/timeSlider.js";
+import { initLayerControl, addOrUpdateLayer, syncLayerControlForWindow, clearWindowWeatherLayers, getLayerById } from "./ui/layerControl.js";
+import { initTimeSlider, setTimelineMode, setTimeSliderVisible, step as timeSliderStep } from "./ui/timeSlider.js";
 import { handleLayerAction } from "./ui/layerActions.js";
 import { initTooltip } from "./ui/tooltip.js";
-import {
-  renderContourLayers,
-  setLayerIsobandVisibility,
-  setLayerIsolineVisibility,
-  setLayerIsolineColor,
-  setLayerIsobandOpacity,
-  removeContourLayer,
-  removeAllContourLayers,
-  setIsobandVisibility,
-  setIsolineVisibility,
-  setContourOpacity,
-} from "./layers/contourLayer.js";
-import { renderBinaryRaster, setRasterVisibility, removeRasterLayer } from "./layers/rasterLayer.js";
+import { renderContourLayers, removeAllContourLayers } from "./layers/contourLayer.js";
+import { renderBinaryRaster, removeRasterLayer } from "./layers/rasterLayer.js";
 import { renderStationWeatherPlots, setStationVisibility, removeStationLayer } from "./layers/stationLayer.js";
-import { renderWindStreamlines, stopWindAnimation } from "./layers/windLayer.js";
+import { renderWindStreamlines, stopWindAnimation, renderGridWindBarbs, removeGridWindBarbs } from "./layers/windLayer.js";
 import { analyzeAndRenderSoundingContours } from "./layers/soundingAnalysis.js";
 import { analyzeAndRenderSurfaceSLPContours } from "./layers/surfaceAnalysis.js";
-import { fetchGridData, fetchGridBinaryStream, fetchStationObservations, fetchTree } from "./api/catalogApi.js";
+import { fetchGridData, fetchGridBinaryStream, fetchStationObservations, fetchTree, fetchLatest } from "./api/catalogApi.js";
 import { updateLegend } from "./ui/legend.js";
 import { initKeyboardShortcuts } from "./ui/keyboardShortcuts.js";
+import { initConfigEditor, openConfigTab } from "./ui/configEditor.js";
 import { appState } from "./store/appState.js";
 import { loadPresetGroups, DEFAULT_MOCK_OBS_FILES } from "./config/presets.js";
 import { resolveColormap } from "./utils/colormaps.js";
-import { setNavBarLevel, setNavBarPreset } from "./ui/navBar.js";
-import { step as timeSliderStep } from "./ui/timeSlider.js";
 import {
   initTabWindowManager,
   getActiveWindow,
@@ -96,6 +78,13 @@ async function bootstrap() {
 
       // Synchronously update layer panel for focused window
       syncLayerControlForWindow(win);
+      setNavBarPreset(win.activeGroup?.id || "");
+
+      const hasData = Boolean(win.activeGroup || win.model || win.isObservation || win.gridData || win.obsTime);
+      if (!hasData) {
+        setTimeSliderVisible(false);
+        return;
+      }
 
       const isObs = Boolean(win.isObservation || win.activeGroup?.isObservation || win.model === "SURFACE" || win.model === "UPPER_AIR");
       if (isObs) {
@@ -108,13 +97,14 @@ async function bootstrap() {
           }
         });
       } else {
-        setTimelineMode("nwp", { period: win.period ?? 24, winTitle });
+        setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle });
       }
     },
     onWindowGroupChange: async (win, group) => {
       if (!win.map || !group) return;
       win.activeGroup = group;
       win.isObservation = Boolean(group.isObservation);
+      win.forecastCycle = null;
       if (group.defaultLevel) win.level = group.defaultLevel;
       const winTitle = `W${win.winIdx + 1}: ${group.name}`;
       updateWindowTitle(win, group.name);
@@ -124,14 +114,14 @@ async function bootstrap() {
         const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle);
         win.obsTime = latestFile;
       } else {
-        setTimelineMode("nwp", { period: win.period ?? 24, winTitle });
+        setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle });
       }
-      await loadPresetGroup(win.map, group, win.period, win.level, win);
+      await loadPresetGroup(win.map, group, win.period, null, win);
     },
     onWindowLevelChange: async (win, level) => {
       if (!win.map) return;
       win.level = level;
-      if (win.activeGroup && win.activeGroup.hasLevel) {
+      if (win.activeGroup) {
         await loadPresetGroup(win.map, win.activeGroup, win.period, level, win);
       } else {
         await loadWeatherField(win.map, win.model, win.element, level, win.period, null, win);
@@ -142,7 +132,7 @@ async function bootstrap() {
       if (!win.map) return;
       const onLoad = async () => {
         if (win.activeGroup) {
-          await loadPresetGroup(win.map, win.activeGroup, win.period, win.level, win);
+          await loadPresetGroup(win.map, win.activeGroup, win.period, null, win);
         }
       };
       if (win.map.isStyleLoaded() || win.map.loaded()) {
@@ -155,30 +145,41 @@ async function bootstrap() {
 
   // ── Navbar ───────────────────────────────────────────────────────────────
   initNavBar("navbar", {
+    onOpenConfig: () => openConfigTab(),
     onConfigReload: reloadConfiguration,
     onPresetSelect: (group) => {
       const win = getActiveWindow();
       if (!win) return;
       win.activeGroup = group;
       win.isObservation = Boolean(group?.isObservation);
-      if (group?.defaultLevel) win.level = group.defaultLevel;
       updateWindowTitle(win, group ? group.name : "");
       setWindowHeaderPreset(win, group?.id || "");
-      if (group?.defaultLevel) setWindowHeaderLevel(win, group.defaultLevel);
     },
-    onLevelSelect: (lvl) => {
+    onLevelSelect: async (lvl) => {
       const win = getActiveWindow();
-      if (!win) return;
-      win.level = lvl;
-      setWindowHeaderLevel(win, lvl);
+      const map = win?.map || getActiveMap();
+      if (!win || !map) return;
+      if (lvl !== null) win.level = lvl;
+      if (win.activeGroup) {
+        await loadPresetGroup(map, win.activeGroup, win.period, lvl, win);
+      } else if (win.model && win.element && lvl !== null) {
+        if (win.isObservation) {
+          if (win.model === "UPPER_AIR") {
+            await loadUpperAirComposite(map, lvl, win.obsTime, win);
+          }
+        } else {
+          await loadWeatherField(map, win.model, win.element, lvl, win.period, null, win);
+        }
+      }
     },
-    onLoadData: async (group) => {
+    onLoadData: async (group, overrideLevel = null) => {
       const win = getActiveWindow();
       const map = win?.map || getActiveMap();
       if (!win || !map || !group) return;
       win.activeGroup = group;
       win.isObservation = Boolean(group.isObservation);
-      if (group.defaultLevel && !win.level) win.level = group.defaultLevel;
+      win.forecastCycle = null;
+      if (overrideLevel !== null) win.level = overrideLevel;
       const winTitle = `W${win.winIdx + 1}: ${group.name}`;
       updateWindowTitle(win, group.name);
       setWindowHeaderPreset(win, group.id);
@@ -187,12 +188,13 @@ async function bootstrap() {
         const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle);
         win.obsTime = latestFile;
       } else {
-        setTimelineMode("nwp", { period: win.period ?? 24, winTitle });
+        setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle });
       }
-      await loadPresetGroup(map, group, win.period, win.level, win);
+      await loadPresetGroup(map, group, win.period, overrideLevel, win);
     },
   });
 
+  initConfigEditor(reloadConfiguration);
   initTooltip("tooltip");
   initKeyboardShortcuts({
     onPeriodStep: (dir) => timeSliderStep(dir),
@@ -200,57 +202,30 @@ async function bootstrap() {
     onToggleSplit: () => toggleTabsAndSplit(),
   });
 
-  // ── Catalog Drawer ───────────────────────────────────────────────────────
   initCatalogDrawer("catalog-drawer", async ({ model, element, level, period, obsTime, isObservation }) => {
-    const map = getMap();
-    const win = getActiveWindow();
+    const map = getMap(), win = getActiveWindow();
     if (!win || !map) return;
-    Object.assign(win, {
-      activeGroup: null,
-      model,
-      element,
-      level: level !== null ? level : win.level,
-      period: period !== null ? period : win.period,
-      obsTime,
-      isObservation,
-    });
-    appState.update({
-      activeGroup: null,
-      model,
-      element,
-      level: win.level,
-      period: win.period,
-      obsTime,
-      isObservation,
-    });
+    const upd = { activeGroup: null, model, element, level: level !== null ? level : win.level, period: period !== null ? period : win.period, obsTime, isObservation };
+    Object.assign(win, upd);
+    appState.update(upd);
     setNavBarPreset("");
 
     const isUpper = model === "UPPER_AIR" || (element && element.includes("UPPER"));
-    const catalogTitle = isObservation
-      ? (isUpper ? `${win.level || 500} hPa Sounding (${model})` : `${element} (${model})`)
-      : `${win.level ? `${win.level} hPa ` : ""}${element} (${model})`;
+    const catalogTitle = isObservation ? (isUpper ? `${win.level || 500} hPa Sounding (${model})` : `${element} (${model})`) : `${win.level ? `${win.level} hPa ` : ""}${element} (${model})`;
 
     updateWindowTitle(win, catalogTitle);
     setWindowHeaderPreset(win, "");
-    if (win.level) {
-      setWindowHeaderLevel(win, win.level);
-      setNavBarLevel(win.level);
-    }
+    if (win.level) { setWindowHeaderLevel(win, win.level); setNavBarLevel(win.level); }
 
     const winBannerTitle = `W${win.winIdx + 1}: ${catalogTitle}`;
     clearAllWeatherLayersFromMap(map, win);
 
     if (isObservation) {
-      const obsPath = model === "SURFACE"
-        ? `SURFACE/${element}`
-        : (model === "UPPER_AIR" ? `UPPER_AIR/${element}/${win.level || 500}` : `${model}/${element}`);
+      const obsPath = model === "SURFACE" ? `SURFACE/${element}` : (model === "UPPER_AIR" ? `UPPER_AIR/${element}/${win.level || 500}` : `${model}/${element}`);
       const latestFile = await syncObservationTimeline(obsPath, obsTime || win.obsTime, winBannerTitle);
       win.obsTime = latestFile;
-      if (model === "UPPER_AIR") {
-        await loadUpperAirComposite(map, win.level || 500, latestFile, win);
-      } else {
-        await loadObservationProduct(map, model, element, win.level, latestFile, win);
-      }
+      if (model === "UPPER_AIR") await loadUpperAirComposite(map, win.level || 500, latestFile, win);
+      else await loadObservationProduct(map, model, element, win.level, latestFile, win);
     } else {
       setTimelineMode("nwp", { period: win.period ?? 24, winTitle: winBannerTitle });
       await loadWeatherField(map, model, element, win.level, win.period, null, win);
@@ -287,9 +262,9 @@ async function bootstrap() {
       win.period = period;
       const activeGroup = win.activeGroup;
       if (activeGroup) {
-        await loadPresetGroup(map, activeGroup, period, win.level, win);
+        await loadPresetGroup(map, activeGroup, period, win.level, win, true);
       } else {
-        await loadWeatherField(map, win.model, win.element, win.level, period, null, win);
+        await loadWeatherField(map, win.model, win.element, win.level, period, null, win, true);
       }
     }
   });
@@ -312,63 +287,121 @@ async function bootstrap() {
   }
 }
 
-async function loadWeatherField(map, model, element, level, period, customOptions = null, win = null) {
-  const file = `26082708.${String(period).padStart(3, "0")}`;
+const forecastCycleCache = {};
+async function resolveLatestForecastCycle(model = "ECMWF_HR", element = "TMP", level = 500) {
+  const path = `${model}/${element}/${level || 500}`;
+  if (forecastCycleCache[path]) return forecastCycleCache[path];
+  try {
+    const res = await fetchLatest(path, "*.000");
+    if (res && res.latest) {
+      const cycle = res.latest.split(".")[0];
+      if (cycle) {
+        forecastCycleCache[path] = cycle;
+        forecastCycleCache[model] = cycle;
+        return cycle;
+      }
+    }
+  } catch (err) {
+    console.warn(`[Forecast] Fetch latest cycle failed for ${path}:`, err);
+  }
+  return forecastCycleCache[model] || "26082820";
+}
+
+async function loadWeatherField(map, model, element, level, period, customOptions = null, win = null, isTimeStep = false) {
+  let cycle = win?.forecastCycle;
+  if (!cycle) {
+    cycle = await resolveLatestForecastCycle(model, element, level);
+    if (win) win.forecastCycle = cycle;
+  }
+  const file = `${cycle}.${String(period).padStart(3, "0")}`;
   const path = `${model}/${element}/${level}`;
-  const layerId = `contour-${element}-${level}`;
-  const name = `${level} hPa ${element} (${model})`;
+  const isWind = element === "WIND" || customOptions?.isWind;
+  const layerId = isWind ? `wind-${element}-${level}` : `contour-${element}-${level}`;
+  const name = isWind ? `${level} hPa Wind Field (${model})` : `${level} hPa ${element} (${model})`;
+
+  const existingLayer = getLayerById(layerId, win);
+  const exCfg = existingLayer?.config || {};
 
   const isHeight = element === "HGT";
   const isTemp = element === "TMP";
   const defaultLineColor = isHeight ? "#58a6ff" : (isTemp ? "#f85149" : "#ffffff");
-  const defaultShowFill = customOptions?.showFill !== undefined ? customOptions.showFill : !isHeight;
-  const defaultShowLine = customOptions?.showLine !== undefined ? customOptions.showLine : true;
-  const lineColor = customOptions?.lineColor || defaultLineColor;
-  const opacity = customOptions?.opacity !== undefined ? customOptions.opacity : 0.75;
+  const lineColor = existingLayer?.color || exCfg.lineColor || customOptions?.lineColor || defaultLineColor;
+  const opacity = exCfg.opacity !== undefined ? exCfg.opacity : (customOptions?.opacity !== undefined ? customOptions.opacity : 0.75);
+  const showFill = exCfg.showFill !== undefined ? exCfg.showFill : (customOptions?.showFill !== undefined ? customOptions.showFill : (!isHeight && !isWind));
+  const showLine = exCfg.showLine !== undefined ? exCfg.showLine : (customOptions?.showLine !== undefined ? customOptions.showLine : !isWind);
+  const lineWidth = exCfg.lineWidth !== undefined ? exCfg.lineWidth : (customOptions?.lineWidth || 1.4);
+  const showWind = exCfg.showWind !== undefined ? exCfg.showWind : (customOptions?.showWind !== undefined ? customOptions.showWind : isWind);
+  const showBarbs = exCfg.showBarbs !== undefined ? exCfg.showBarbs : (customOptions?.showBarbs !== undefined ? customOptions.showBarbs : false);
+  const showRaster = exCfg.showRaster !== undefined ? exCfg.showRaster : false;
+  const isVisible = existingLayer ? existingLayer.visible !== false : true;
 
   try {
     const gridData = await fetchGridData(path, file);
     appState.set("gridData", gridData);
-    if (win) win.gridData = gridData;
+    if (win) {
+      win.gridData = gridData;
+      if (isWind) win.windGridData = gridData;
+    }
     const colormap = customOptions?.colormap || element;
     if (win) win.colormap = colormap;
 
-    renderContourLayers(map, gridData, element, {
-      layerId,
-      showFill: defaultShowFill,
-      showLine: defaultShowLine,
-      lineColor,
-      opacity,
-      colormap,
-    });
+    if (!isWind) {
+      renderContourLayers(map, gridData, element, {
+        layerId,
+        showFill: isVisible && showFill,
+        showLine: isVisible && showLine,
+        lineColor,
+        opacity,
+        colormap,
+      });
+    }
 
-    // Register into Layers Manager for this window
     addOrUpdateLayer({
       id: layerId,
       name,
-      type: "contour",
+      type: isWind ? "wind" : "contour",
       element,
       level,
       model,
+      gridData,
       color: lineColor,
-      config: {
-        showFill: defaultShowFill,
-        showLine: defaultShowLine,
+      visible: isVisible,
+      config: isWind ? {
+        showWind,
+        showBarbs,
+        showRaster,
+      } : {
+        showFill,
+        showLine,
         lineColor,
         opacity,
-        lineWidth: 1.4,
+        lineWidth,
+        showRaster,
+        showWind: false,
+        showBarbs: false,
       },
     }, win);
 
-    if (appState.state.layers.raster && !isHeight) {
-      const binBuffer = await fetchGridBinaryStream(path, file);
-      renderBinaryRaster(map, binBuffer, element, colormap);
+    if ((showRaster || appState.state.layers.raster) && isVisible) {
+      if (gridData && gridData.values) {
+        renderGridRaster(map, gridData, element, colormap);
+      } else {
+        const binBuffer = await fetchGridBinaryStream(path, file);
+        renderBinaryRaster(map, binBuffer, element, colormap);
+      }
     }
 
-    if (element === "WIND" && gridData.u && gridData.v) {
-      renderWindStreamlines(map, gridData);
-    } else if (!customOptions?.keepWind) {
-      stopWindAnimation(map);
+    if (isWind && gridData.u && gridData.v) {
+      if (isVisible && showWind) {
+        renderWindStreamlines(map, gridData);
+      } else {
+        stopWindAnimation(map);
+      }
+      if (isVisible && showBarbs) {
+        renderGridWindBarbs(map, gridData);
+      } else {
+        removeGridWindBarbs(map);
+      }
     }
 
     updateLegend(element, colormap);
@@ -381,29 +414,13 @@ async function syncObservationTimeline(path, currentFile = null, winTitle = "", 
   try {
     const fileEntries = await fetchTree(path);
     if (Array.isArray(fileEntries) && fileEntries.length > 0) {
-      let validFiles = fileEntries
-        .filter((f) => f.name && (f.size > 100 || f.size === 0))
-        .map((f) => f.name);
-
+      let validFiles = fileEntries.filter((f) => f.name && (f.size > 100 || f.size === 0)).map((f) => f.name);
       const hasObsFormat = validFiles.some((f) => f.length >= 14 && f.endsWith(".000"));
-      if (hasObsFormat) {
-        validFiles = validFiles.filter((f) => f.length >= 14 && f.endsWith(".000"));
-      } else {
-        validFiles = DEFAULT_MOCK_OBS_FILES;
-      }
-
+      validFiles = hasObsFormat ? validFiles.filter((f) => f.length >= 14 && f.endsWith(".000")) : DEFAULT_MOCK_OBS_FILES;
       if (validFiles.length > 0) {
-        // Treeview returns newest first; take latest 10 files and reverse to oldest->newest for stepper
-        const recentFiles = validFiles.length >= 2 && validFiles !== DEFAULT_MOCK_OBS_FILES
-          ? validFiles.slice(0, 10).reverse()
-          : DEFAULT_MOCK_OBS_FILES;
-        const targetFile = currentFile && recentFiles.includes(currentFile)
-          ? currentFile
-          : recentFiles[recentFiles.length - 1]; // latest observation time
-
-        if (!win || getActiveWindow() === win) {
-          setTimelineMode("obs", { file: targetFile, files: recentFiles, winTitle });
-        }
+        const recentFiles = validFiles.length >= 2 && validFiles !== DEFAULT_MOCK_OBS_FILES ? validFiles.slice(0, 10).reverse() : DEFAULT_MOCK_OBS_FILES;
+        const targetFile = currentFile && recentFiles.includes(currentFile) ? currentFile : recentFiles[recentFiles.length - 1];
+        if (!win || getActiveWindow() === win) setTimelineMode("obs", { file: targetFile, files: recentFiles, winTitle });
         return targetFile;
       }
     }
@@ -411,82 +428,41 @@ async function syncObservationTimeline(path, currentFile = null, winTitle = "", 
     console.warn("[Main] Failed to query observation file tree for timeline:", err);
   }
   const fallbackFile = currentFile || DEFAULT_MOCK_OBS_FILES[DEFAULT_MOCK_OBS_FILES.length - 1];
-  if (!win || getActiveWindow() === win) {
-    setTimelineMode("obs", { file: fallbackFile, files: DEFAULT_MOCK_OBS_FILES, winTitle });
-  }
+  if (!win || getActiveWindow() === win) setTimelineMode("obs", { file: fallbackFile, files: DEFAULT_MOCK_OBS_FILES, winTitle });
   return fallbackFile;
 }
 
-// When upper plot is loaded, display plot and calculate height & temp contour lines from sounding plot data
 async function loadUpperAirComposite(map, level = 500, obsTime = "20260828170000.000", win = getActiveWindow()) {
-  console.log(`[UpperAir] Loading upper soundings and calculating contour lines for ${level} hPa...`);
-
-  // 1. Load Upper Air Sounding Plots
   const path = `UPPER_AIR/PLOT/${level || 500}`;
   const stations = await fetchStationObservations(path, obsTime);
   appState.set("stationData", stations);
   renderStationWeatherPlots(map, stations, appState.state.layers.station);
-
-  addOrUpdateLayer({
-    id: `station-upper-${level}`,
-    name: `Upper Air ${level}hPa Soundings`,
-    type: "station",
-    color: "#e3b341",
-    visible: true,
-    removable: true,
-  }, win);
-
-  // 2. Calculate Height contour lines and Temperature contour lines from sounding plot data
-  if (stations && stations.features && stations.features.length >= 3) {
-    console.log(`[UpperAir] Calculating objective analysis contours from ${stations.features.length} sounding stations...`);
-    analyzeAndRenderSoundingContours(map, stations, level);
-  }
+  addOrUpdateLayer({ id: `station-upper-${level}`, name: `Upper Air ${level}hPa Soundings`, type: "station", color: "#e3b341", visible: true, removable: true }, win);
+  if (stations?.features?.length >= 3) analyzeAndRenderSoundingContours(map, stations, level);
 }
 
-async function loadObservationProduct(map, model, element, level, file, win = getActiveWindow()) {
-  let path = "";
-  if (model === "SURFACE") {
-    path = `SURFACE/${element}`;
-  } else if (model === "UPPER_AIR") {
-    path = `UPPER_AIR/${element}/${level || 500}`;
-  } else {
-    path = `${model}/${element}`;
-  }
-
+async function loadObservationProduct(map, model, element, level, file, win = getActiveWindow(), customPath = null) {
+  const path = customPath || (model === "SURFACE" ? `SURFACE/${element}` : (model === "UPPER_AIR" ? `UPPER_AIR/${element}/${level || 500}` : `${model}/${element}`));
   try {
-    console.log(`[Main] Fetching observation data: path=${path}, file=${file}...`);
     const stations = await fetchStationObservations(path, file);
     appState.set("stationData", stations);
     renderStationWeatherPlots(map, stations, appState.state.layers.station);
-    console.log(`[Main] Observation stations rendered (${stations && stations.features ? stations.features.length : 0} stations)`);
-
-    addOrUpdateLayer({
-      id: `station-${model.toLowerCase()}`,
-      name: `${model === "SURFACE" ? "Surface" : "Upper Air"} Station Observations`,
-      type: "station",
-      color: "#e3b341",
-      visible: true,
-      removable: true,
-    }, win);
-
-    if (model === "SURFACE" && stations && stations.features && stations.features.length >= 3) {
-      console.log(`[Main] Calculating SLP isobars from ${stations.features.length} surface stations...`);
-      analyzeAndRenderSurfaceSLPContours(map, stations);
-    }
+    const layerId = model === "UPPER_AIR" ? `station-upper-${level || 500}` : `station-${model.toLowerCase()}`;
+    const name = model === "UPPER_AIR" ? `${level || 500} hPa Sounding Station Plots` : `${model === "SURFACE" ? "Surface" : "Upper Air"} Station Observations`;
+    addOrUpdateLayer({ id: layerId, name, type: "station", color: "#e3b341", visible: true, removable: true }, win);
+    if (model === "SURFACE" && stations?.features?.length >= 3) analyzeAndRenderSurfaceSLPContours(map, stations, {}, win);
+    if (model === "UPPER_AIR" && stations?.features?.length >= 3) analyzeAndRenderSoundingContours(map, stations, level || 500, {}, win);
   } catch (err) {
     console.error("[Main] Observation load error:", err);
   }
 }
-
-
-
-
 
 export function clearAllWeatherLayersFromMap(map, win = null) {
   if (!map) return;
   try {
     removeAllContourLayers(map);
     stopWindAnimation(map);
+    removeGridWindBarbs(map);
     removeStationLayer(map);
     removeRasterLayer(map);
   } catch (err) {
@@ -497,20 +473,18 @@ export function clearAllWeatherLayersFromMap(map, win = null) {
   }
 }
 
-async function loadPresetGroup(map, group, period = null, level = null, win = null) {
+async function loadPresetGroup(map, group, period = null, level = null, win = null, isTimeStep = false) {
   if (!group || !group.layers) return;
-  clearAllWeatherLayersFromMap(map, win);
+  if (!isTimeStep) {
+    clearAllWeatherLayersFromMap(map, win);
+  }
 
   const curPeriod = period !== null ? period : (win?.period ?? 24);
-  const curLevel = level !== null ? level : (group.hasLevel ? (group.defaultLevel || win?.level || 500) : null);
+  const curLevel = level !== null ? level : (group.defaultLevel || win?.level || 500);
 
-  if (curLevel !== null) {
-    if (win) win.level = curLevel;
-    if (win && getActiveWindow() === win) setNavBarLevel(curLevel);
-    if (win) setWindowHeaderLevel(win, curLevel);
-  }
-  if (win) win.period = curPeriod;
   if (win) {
+    if (level !== null) win.level = level;
+    win.period = curPeriod;
     updateWindowTitle(win, group.name);
     setWindowHeaderPreset(win, group.id);
   }
@@ -527,34 +501,50 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
     setNavBarPreset(group.id);
   }
 
-  console.log(`[PresetGroup] Loading "${group.name}" at level=${curLevel}hPa, period=+${curPeriod}h...`);
+  if (win && !win.forecastCycle) {
+    const pLayer = group.layers.find((l) => l.type === "contour" || l.type === "wind");
+    if (pLayer) {
+      win.forecastCycle = await resolveLatestForecastCycle(pLayer.model || "ECMWF_HR", pLayer.element || "TMP", curLevel);
+    }
+  }
+
+  const winTitle = `W${(win?.winIdx ?? 0) + 1}: ${group.name}`;
+  if (!group.isObservation && win) {
+    setTimelineMode("nwp", { period: curPeriod, winTitle, initCycle: win.forecastCycle });
+  }
+
+  console.log(`[PresetGroup] Loading "${group.name}" with levelOverride=${level}, period=+${curPeriod}h, cycle=${win?.forecastCycle}...`);
 
   await Promise.allSettled(
     group.layers.map(async (layer) => {
-      const targetLevel = layer.level || (group.hasLevel ? curLevel : null);
+      let targetLevel = null;
+      if (level !== null) {
+        targetLevel = (layer.model === "SURFACE" || layer.level === 0) ? null : level;
+      } else {
+        targetLevel = layer.level || (group.hasLevel ? group.defaultLevel : null);
+      }
+
       if (layer.type === "contour" || layer.type === "wind") {
         const render = layer.render || {};
         await loadWeatherField(map, layer.model, layer.element, targetLevel, curPeriod, {
           ...render,
           keepWind: true,
           colormap: resolveColormap(group, render, targetLevel),
-        }, win);
+        }, win, isTimeStep);
       } else if (layer.type === "station") {
-        const obsPath = layer.model === "UPPER_AIR"
+        const obsPath = layer.path || (layer.model === "UPPER_AIR"
           ? `UPPER_AIR/${layer.element}/${targetLevel || 500}`
-          : `${layer.model}/${layer.element}`;
+          : `${layer.model}/${layer.element}`);
         let file = win?.obsTime;
         if (!file) {
-          file = await syncObservationTimeline(obsPath, null, `W${(win?.winIdx ?? 0) + 1}: ${group.name}`);
+          file = await syncObservationTimeline(obsPath, null, winTitle);
           if (win) win.obsTime = file;
         }
-        await loadObservationProduct(map, layer.model, layer.element, targetLevel, file, win);
+        await loadObservationProduct(map, layer.model, layer.element, targetLevel, file, win, layer.path);
       }
     })
   );
 }
-
-
 
 async function changeVerticalLevel(map, direction, explicitLevel = null, win = getActiveWindow()) {
   const levels = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
@@ -580,7 +570,18 @@ async function changeVerticalLevel(map, direction, explicitLevel = null, win = g
   const activeGroup = win?.activeGroup;
   if (activeGroup && activeGroup.hasLevel) {
     await loadPresetGroup(map, activeGroup, win.period, targetLevel, win);
+  } else if (win?.isObservation || win?.model === "UPPER_AIR") {
+    clearAllWeatherLayersFromMap(map, win);
+    const obsPath = `UPPER_AIR/PLOT/${targetLevel}`;
+    const winTitle = `W${(win?.winIdx ?? 0) + 1}: Upper-Air ${targetLevel}hPa Sounding`;
+    const file = await syncObservationTimeline(obsPath, null, winTitle, win);
+    if (win) {
+      win.obsTime = file;
+      updateWindowTitle(win, `${targetLevel}hPa Upper-Air Sounding`);
+    }
+    await loadObservationProduct(map, "UPPER_AIR", "PLOT", targetLevel, file, win, obsPath);
   } else {
+    clearAllWeatherLayersFromMap(map, win);
     const model = win?.model || "ECMWF_HR";
     const element = win?.element || "TMP";
     const period = win?.period ?? 24;

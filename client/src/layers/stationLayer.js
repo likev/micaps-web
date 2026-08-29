@@ -13,10 +13,35 @@ function getState(map) {
       markers: [],
       geojson: null,
       visible: true,
+      config: {
+        showTemp: true,
+        showDewpoint: true,
+        showWind: true,
+        showCloud: false,
+        showWeather: false,
+        showPressure: false,
+        showTendency: false,
+        showVisibility: false,
+        showRain6: false,
+        filterField1: "none",
+        filterOp1: ">",
+        filterVal1: "",
+        filterLogic: "none",
+        filterField2: "none",
+        filterOp2: "<",
+        filterVal2: "",
+      },
       moveListener: null,
     });
   }
   return mapState.get(map);
+}
+
+export function setStationConfig(map, config) {
+  if (!map) return;
+  const state = getState(map);
+  state.config = { ...state.config, ...config };
+  updateVisibleMarkersForMap(map);
 }
 
 export function renderStationWeatherPlots(map, geojson, visible = true) {
@@ -54,7 +79,23 @@ function isPointInBounds(bounds, lon, lat) {
   return normLon >= w && normLon <= e;
 }
 
-function extractNumber(props, keys, minValid = -90, maxValid = 90) {
+function extractRawNumber(props, keys, minValid = -Infinity, maxValid = Infinity) {
+  if (!props) return null;
+  for (const k of keys) {
+    const v = props[k];
+    if (v !== undefined && v !== null && v !== "" && v !== -9999 && v !== "-9999") {
+      const num = typeof v === "number" ? v : parseFloat(v);
+      if (!isNaN(num) && num > -9000 && num < 9000) {
+        if (num >= minValid && num <= maxValid) {
+          return num;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function extractTemp(props, keys, minValid = -90, maxValid = 90) {
   if (!props) return null;
   for (const k of keys) {
     const v = props[k];
@@ -127,6 +168,132 @@ function hashStation(id, lon, lat) {
   return (h >>> 0);
 }
 
+function getFieldValue(p, field) {
+  switch (field) {
+    case "TT":
+      return extractTemp(p, ["temperature", "temp", "TEM", "TT", "T", "TMP", "t", "temp_max", "tem"]);
+    case "Td":
+      return extractTemp(p, ["dewpoint", "dew_point", "DPT", "TD", "Td", "td", "dew", "dpt"]);
+    case "Wind": {
+      const ws = extractRawNumber(p, ["wind_speed", "windSpeed", "ws", "WIN_S_Avg", "WIN_S", "FF", "ff", "speed"], 0, 150);
+      return ws !== null ? (ws > 100 ? ws / 10.0 : ws) : null;
+    }
+    case "Rain": {
+      const r1 = extractRawNumber(p, ["rain_1h", "RAIN_1H", "rain1h", "PRE_1h", "RAIN_1h", "RAIN"]);
+      const r6 = extractRawNumber(p, ["rain_6h", "RAIN_6H", "rain6h", "PRE_6h", "RAIN_6h"]);
+      const r24 = extractRawNumber(p, ["rain_24h", "RAIN_24H", "rain24h", "PRE_24h", "RAIN_24h"]);
+      return Math.max(r1 || 0, r6 || 0, r24 || 0);
+    }
+    case "Rain6":
+    case "Rain6h":
+    case "rain_6h": {
+      return extractRawNumber(p, ["rain_6h", "RAIN_6H", "rain6h", "PRE_6h", "RAIN_6h"], 0, 1000);
+    }
+    case "Visibility":
+    case "Vis":
+    case "VV":
+    case "vis": {
+      const v = extractRawNumber(p, ["visibility", "VIS", "vis", "VV", "vv", "VIS_Avg", "VIS_Min"], 0, 150000);
+      return v !== null ? (v > 150 ? v / 1000.0 : v) : null;
+    }
+    case "SLP": {
+      const slp = extractRawNumber(p, ["slp", "SLP", "press_slp", "PRS_Sea", "press_stn", "stn_press", "PRS"]);
+      if (slp !== null && slp > 8000) return slp / 10.0;
+      return slp;
+    }
+    case "Height":
+    case "HGT": {
+      return extractRawNumber(p, ["height", "HGT", "hgt", "Height", "GH"], 0, 40000);
+    }
+    default:
+      return null;
+  }
+}
+
+function evaluateSingleRule(p, rule) {
+  if (!rule || !rule.field || rule.field === "none") return true;
+  const actual = getFieldValue(p, rule.field);
+  if (actual === null || isNaN(actual)) return false;
+
+  const op = rule.op || ">";
+  const val1 = rule.val !== undefined && rule.val !== null && rule.val !== "" ? Number(rule.val) : null;
+  const val2 = rule.val2 !== undefined && rule.val2 !== null && rule.val2 !== "" ? Number(rule.val2) : null;
+
+  if (val1 === null || isNaN(val1)) return true;
+
+  if (op === "between" || op === "BETWEEN" || op === "..") {
+    if (val2 === null || isNaN(val2)) return actual >= val1;
+    const min = Math.min(val1, val2);
+    const max = Math.max(val1, val2);
+    return actual >= min && actual <= max;
+  }
+
+  switch (op) {
+    case ">":
+      return actual > val1;
+    case ">=":
+      return actual >= val1;
+    case "<":
+      return actual < val1;
+    case "<=":
+      return actual <= val1;
+    case "==":
+    case "=":
+      return Math.abs(actual - val1) < 0.05;
+    case "!=":
+      return Math.abs(actual - val1) >= 0.05;
+    default:
+      return true;
+  }
+}
+
+export function matchesStationFilters(p, cfg) {
+  if (!cfg) return true;
+
+  // 1. Dynamic multi-filter rules array
+  if (Array.isArray(cfg.filterRules)) {
+    const activeRules = cfg.filterRules.filter(
+      (r) => r.field && r.field !== "none" && r.val !== undefined && r.val !== null && r.val !== "" && !isNaN(Number(r.val))
+    );
+    if (activeRules.length === 0) return true;
+
+    const logic = (cfg.filterLogic || "AND").toUpperCase();
+    if (logic === "NONE") {
+      return evaluateSingleRule(p, activeRules[0]);
+    }
+    if (logic === "OR") {
+      return activeRules.some((r) => evaluateSingleRule(p, r));
+    }
+    return activeRules.every((r) => evaluateSingleRule(p, r));
+  }
+
+  // 2. Legacy fallback
+  const f1 = cfg.filterField1 || "none";
+  const op1 = cfg.filterOp1 || ">";
+  const val1 = cfg.filterVal1;
+
+  const logic = cfg.filterLogic || "none";
+
+  const f2 = cfg.filterField2 || "none";
+  const op2 = cfg.filterOp2 || "<";
+  const val2 = cfg.filterVal2;
+
+  const has1 = f1 !== "none" && val1 !== undefined && val1 !== null && val1 !== "" && !isNaN(Number(val1));
+  const has2 = f2 !== "none" && val2 !== undefined && val2 !== null && val2 !== "" && !isNaN(Number(val2));
+
+  if (!has1 && !has2) return true;
+  if (logic === "none" || !has2) return has1 ? evaluateSingleRule(p, { field: f1, op: op1, val: val1 }) : true;
+  if (!has1 && has2) return evaluateSingleRule(p, { field: f2, op: op2, val: val2 });
+
+  const res1 = evaluateSingleRule(p, { field: f1, op: op1, val: val1 });
+  const res2 = evaluateSingleRule(p, { field: f2, op: op2, val: val2 });
+
+  if (logic === "OR" || logic === "or") {
+    return res1 || res2;
+  }
+  return res1 && res2;
+}
+
 export function updateVisibleMarkersForMap(map) {
   const state = getState(map);
   clearStationMarkersForMap(map);
@@ -136,11 +303,12 @@ export function updateVisibleMarkersForMap(map) {
   const curZoom = map.getZoom();
   const scale = curZoom < 4.5 ? 0.75 : (curZoom < 6.5 ? 0.88 : 1.0);
 
-  // 1. Group in-bounds stations into 100x100px screen pixel grid bins
+  // 1. Group in-bounds stations matching filters into 100x100px screen pixel grid bins
   const screenBins = new Map();
   for (const f of state.geojson.features) {
     const [lon, lat] = f.geometry.coordinates;
     if (!isPointInBounds(bounds, lon, lat)) continue;
+    if (!matchesStationFilters(f.properties || {}, state.config)) continue;
 
     const pt = map.project([lon, lat]);
     const binKey = `${Math.floor(pt.x / 100)},${Math.floor(pt.y / 100)}`;
@@ -180,65 +348,100 @@ export function updateVisibleMarkersForMap(map) {
     el.style.pointerEvents = "none";
 
     // 9-Position Synoptic Station Model Elements
-    const rawT = extractNumber(p, ["temperature", "temp", "TEM", "TT", "T", "TMP", "t", "temp_max", "tem"]);
+    const rawT = extractTemp(p, ["temperature", "temp", "TEM", "TT", "T", "TMP", "t", "temp_max", "tem"]);
     const tt = rawT !== null ? Math.round(rawT).toString() : "";
 
-    const rawTd = extractNumber(p, ["dewpoint", "dew_point", "DPT", "TD", "Td", "td", "dew", "dpt"]);
+    const rawTd = extractTemp(p, ["dewpoint", "dew_point", "DPT", "TD", "Td", "td", "dew", "dpt"]);
     const td = rawTd !== null ? Math.round(rawTd).toString() : "";
 
     const ppp = extractPressureOrHeight(p);
 
-    const rawWs = extractNumber(p, ["wind_speed", "windSpeed", "ws", "WIN_S_Avg", "WIN_S", "FF", "ff", "speed"], 0, 150);
+    const rawWs = extractRawNumber(p, ["wind_speed", "windSpeed", "ws", "WIN_S_Avg", "WIN_S", "FF", "ff", "speed"], 0, 150);
     const ws = rawWs !== null ? (rawWs > 100 ? rawWs / 10.0 : rawWs) : 0;
-    const wd = extractNumber(p, ["wind_dir", "windDir", "wd", "WIN_D_Avg", "WIN_D", "DD", "dd", "dir"], 0, 360) || 0;
+    const wd = extractRawNumber(p, ["wind_dir", "windDir", "wd", "WIN_D_Avg", "WIN_D", "DD", "dd", "dir"], 0, 360) ?? 0;
 
-    const rawCloud = extractNumber(p, ["cloud_cover", "cloudCover", "cloud", "CLO_Cov", "N", "n"], 0, 9);
+    const rawCloud = extractRawNumber(p, ["cloud_cover", "cloudCover", "cloud", "CLO_Cov", "N", "n"], 0, 9);
     const cloudCover = rawCloud !== null ? Math.round(rawCloud) : 0;
 
-    const weatherCode = extractNumber(p, ["weather_code", "weatherCode", "weather", "Ww", "ww", "WEA"], 0, 99) || 0;
+    const weatherCode = extractRawNumber(p, ["weather_code", "weatherCode", "weather", "Ww", "ww", "WEA"], 0, 99) || 0;
 
-    const pDiffRaw = extractNumber(p, ["press_diff_3h", "pDiff3h", "press_diff", "PRS_Change_3h", "p3"], -500, 500);
+    const pDiffRaw = extractRawNumber(p, ["press_diff_3h", "pDiff3h", "press_diff", "PRS_Change_3h", "p3"], -500, 500);
     const pDiff = pDiffRaw !== null && Math.abs(pDiffRaw) > 0.05
       ? `${pDiffRaw > 0 ? "+" : ""}${Math.abs(pDiffRaw) > 30 ? Math.round(pDiffRaw) : Math.round(pDiffRaw * 10)}`
       : "";
 
-    const pTendCode = extractNumber(p, ["press_tend", "pTend", "PRS_Tendency", "a"], 0, 8);
+    const pTendCode = extractRawNumber(p, ["press_tend", "pTend", "PRS_Tendency", "a"], 0, 8);
     const pTend = pTendCode !== null ? getPressureTendencyGlyph(pTendCode) : "";
+
+    const cfg = state.config || {};
+    const showTemp = cfg.showTemp !== undefined ? Boolean(cfg.showTemp) : true;
+    const showDewpoint = cfg.showDewpoint !== undefined ? Boolean(cfg.showDewpoint) : true;
+    const showWind = cfg.showWind !== undefined ? Boolean(cfg.showWind) : true;
+    const showCloud = Boolean(cfg.showCloud);
+    const showWeather = Boolean(cfg.showWeather);
+    const showPressure = Boolean(cfg.showPressure);
+    const showTendency = Boolean(cfg.showTendency);
+    const showVisibility = Boolean(cfg.showVisibility);
+    const showRain6 = Boolean(cfg.showRain6);
+
+    const rawVis = extractRawNumber(p, ["visibility", "VIS", "vis", "VV", "vv", "VIS_Avg", "VIS_Min"], 0, 150000);
+    const vis = rawVis !== null ? (rawVis >= 1000 ? (rawVis / 1000).toFixed(rawVis % 1000 === 0 ? 0 : 1) : (rawVis < 10 ? rawVis.toFixed(1) : Math.round(rawVis).toString())) : "";
+
+    const rawRain6 = extractRawNumber(p, ["rain_6h", "RAIN_6H", "rain6h", "PRE_6h", "RAIN_6h"], 0, 1000);
+    const rain6 = rawRain6 !== null && rawRain6 > 0 ? (rawRain6 < 10 ? rawRain6.toFixed(1) : Math.round(rawRain6).toString()) : "";
 
     const ww = getWeatherSymbol(weatherCode);
     const skySVG = getSkyCoverSVG(cloudCover, 16);
-    const barbSVG = getWindBarbSVG(ws, wd, 144);
+    const barbSVG = getWindBarbSVG(ws, wd, 100);
 
     el.innerHTML = `
       <div style="position: relative; width: 48px; height: 48px; pointer-events: none; transform: scale(${scale}); transform-origin: center center;">
-        <!-- Wind Barb / Direction & Speed (3X Size centered at 24, 24) -->
-        <div style="position: absolute; top: -48px; left: -48px; width: 144px; height: 144px; pointer-events: none; z-index: 1;">
+        <!-- Wind Barb / Direction & Speed (Centered at 24, 24) -->
+        ${showWind ? `
+        <div style="position: absolute; top: -26px; left: -26px; width: 100px; height: 100px; pointer-events: none; z-index: 1;">
           ${barbSVG}
-        </div>
-        <!-- Center Sky Cover Circle (16x16 at 16, 16) -->
+        </div>` : ""}
+        <!-- Center Sky Cover Circle (or small station dot if cloud is hidden) -->
+        ${showCloud ? `
         <div style="position: absolute; top: 16px; left: 16px; width: 16px; height: 16px; pointer-events: none; z-index: 2;">
           ${skySVG}
-        </div>
+        </div>` : `
+        <div style="position: absolute; top: 22px; left: 22px; width: 4px; height: 4px; border-radius: 50%; background: #e3b341; pointer-events: none; z-index: 2; box-shadow: 0 0 2px #000;"></div>`}
         <!-- TT: Temperature (°C) Top-Left in Bold Red/Orange -->
+        ${showTemp && tt ? `
         <div style="position: absolute; top: 4px; left: 0px; width: 18px; text-align: right; color: #f85149; font-weight: 700; font-size: 11px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
           ${tt}
-        </div>
+        </div>` : ""}
         <!-- TdTd: Dew Point (°C) Bottom-Left in Emerald Green -->
+        ${showDewpoint && td ? `
         <div style="position: absolute; bottom: 4px; left: 0px; width: 18px; text-align: right; color: #56d364; font-weight: 600; font-size: 11px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
           ${td}
-        </div>
+        </div>` : ""}
         <!-- ww: Present Weather Symbol (Middle Left) -->
+        ${showWeather && ww ? `
         <div style="position: absolute; top: 16px; left: -2px; width: 16px; text-align: center; color: #e3b341; font-size: 13px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
           ${ww}
-        </div>
+        </div>` : ""}
+        <!-- VV: Visibility (Far-Left in Golden Yellow) -->
+        ${showVisibility && vis ? `
+        <div style="position: absolute; top: 18px; left: -22px; width: 20px; text-align: right; color: #ffd33d; font-weight: 700; font-size: 10px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+          ${vis}
+        </div>` : ""}
         <!-- PPP: Sea-Level Pressure (Top Right in Cyan/Blue) -->
+        ${showPressure && ppp ? `
         <div style="position: absolute; top: 4px; left: 30px; width: 22px; text-align: left; color: #79c0ff; font-weight: 700; font-size: 11px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
           ${ppp}
-        </div>
+        </div>` : ""}
+        <!-- R6: 6h Precipitation (Middle Right in Sky Blue) -->
+        ${showRain6 && rain6 ? `
+        <div style="position: absolute; top: 18px; left: 30px; width: 24px; text-align: left; color: #38bdf8; font-weight: 700; font-size: 10px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+          ${rain6}
+        </div>` : ""}
         <!-- ppa: 3h Pressure Tendency & Diff (Bottom Right in Light Blue) -->
+        ${showTendency && (pDiff || pTend) ? `
         <div style="position: absolute; bottom: 4px; left: 30px; width: 24px; text-align: left; font-size: 9px; font-weight: 500; color: #a5d6ff; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
           ${pDiff}${pTend}
-        </div>
+        </div>` : ""}
       </div>
     `;
 
@@ -285,20 +488,20 @@ export function removeStationLayer(map) {
 }
 
 // Expose station layer controller for automated testing (uses active map fallback)
-window.__STATION_LAYER__ = {
-  getVisibleCount: () => {
-    // Count markers from all maps
-    let total = 0;
-    document.querySelectorAll(".station-plot-marker").forEach(() => total++);
-    return total;
-  },
-  getTotalCount: () => {
-    // Try to get from window.__MAP__ state
-    if (window.__MAP__) {
-      const s = mapState.get(window.__MAP__);
-      if (s && s.geojson && s.geojson.features) return s.geojson.features.length;
-    }
-    return lastStationGeoJSON && lastStationGeoJSON.features ? lastStationGeoJSON.features.length : 0;
-  },
-  setVisible: (map, visible) => setStationVisibility(map, visible),
-};
+if (typeof window !== "undefined") {
+  window.__STATION_LAYER__ = {
+    getVisibleCount: () => {
+      let total = 0;
+      document.querySelectorAll(".station-plot-marker").forEach(() => total++);
+      return total;
+    },
+    getTotalCount: () => {
+      if (window.__MAP__) {
+        const s = mapState.get(window.__MAP__);
+        if (s && s.geojson && s.geojson.features) return s.geojson.features.length;
+      }
+      return lastStationGeoJSON && lastStationGeoJSON.features ? lastStationGeoJSON.features.length : 0;
+    },
+    setVisible: (map, visible) => setStationVisibility(map, visible),
+  };
+}

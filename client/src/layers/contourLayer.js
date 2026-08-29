@@ -62,6 +62,12 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
   try {
     const lines = griddata.contour(Z, { x, y, levels });
     if (Array.isArray(lines)) {
+      for (const f of lines) {
+        if (!f.properties) f.properties = {};
+        const val = f.value ?? f.properties.value ?? f.properties.level ?? 0;
+        f.properties.value = val;
+        f.properties.label = String(Math.round(val));
+      }
       isolineFC.features = lines;
     }
   } catch (err) {
@@ -79,6 +85,7 @@ function getLayerDOMIds(layerId = "default") {
     isobandLayerId: isDefault ? "isoband-layer" : `${layerId}-isoband-layer`,
     isolineSrcId: isDefault ? "isoline-source" : `${layerId}-isoline-source`,
     isolineLayerId: isDefault ? "isoline-layer" : `${layerId}-isoline-layer`,
+    isolineLabelLayerId: isDefault ? "isoline-label-layer" : `${layerId}-isoline-label-layer`,
   };
 }
 
@@ -90,7 +97,7 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
   const lineColor = options.lineColor || "#ffffff";
   const lineWidth = options.lineWidth || 1.4;
 
-  const { isobandSrcId, isobandLayerId, isolineSrcId, isolineLayerId } = getLayerDOMIds(layerId);
+  const { isobandSrcId, isobandLayerId, isolineSrcId, isolineLayerId, isolineLabelLayerId } = getLayerDOMIds(layerId);
 
   // --- ISOBANDS (Contour Fills) ---
   if (isobands) {
@@ -124,7 +131,7 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
     }
   }
 
-  // --- ISOLINES (Contour Lines) ---
+  // --- ISOLINES (Contour Lines) & LABELS (Every 200px) ---
   if (isolines) {
     if (map.getSource(isolineSrcId)) {
       map.getSource(isolineSrcId).setData(isolines);
@@ -132,6 +139,10 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
         map.setLayoutProperty(isolineLayerId, "visibility", visibleIsoline ? "visible" : "none");
         map.setPaintProperty(isolineLayerId, "line-color", lineColor);
         map.setPaintProperty(isolineLayerId, "line-width", lineWidth);
+      }
+      if (map.getLayer(isolineLabelLayerId)) {
+        map.setLayoutProperty(isolineLabelLayerId, "visibility", visibleIsoline ? "visible" : "none");
+        map.setPaintProperty(isolineLabelLayerId, "text-color", lineColor);
       }
     } else {
       map.addSource(isolineSrcId, {
@@ -152,6 +163,27 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
           "line-opacity": 0.85,
         },
       });
+
+      map.addLayer({
+        id: isolineLabelLayerId,
+        type: "symbol",
+        source: isolineSrcId,
+        layout: {
+          "symbol-placement": "line",
+          "symbol-spacing": 200, // Label contour value every 200px
+          "text-field": ["coalesce", ["get", "label"], ["to-string", ["get", "value"]]],
+          "text-size": 11,
+          "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
+          "text-allow-overlap": false,
+          "text-ignore-placement": false,
+          "visibility": visibleIsoline ? "visible" : "none",
+        },
+        paint: {
+          "text-color": lineColor,
+          "text-halo-color": "rgba(10, 15, 25, 0.95)",
+          "text-halo-width": 1.5,
+        },
+      });
     }
   }
 }
@@ -163,14 +195,16 @@ export function setLayerIsobandVisibility(map, layerId, visible) {
 }
 
 export function setLayerIsolineVisibility(map, layerId, visible) {
-  const { isolineLayerId } = getLayerDOMIds(layerId);
+  const { isolineLayerId, isolineLabelLayerId } = getLayerDOMIds(layerId);
   const vis = visible ? "visible" : "none";
   if (map.getLayer(isolineLayerId)) map.setLayoutProperty(isolineLayerId, "visibility", vis);
+  if (map.getLayer(isolineLabelLayerId)) map.setLayoutProperty(isolineLabelLayerId, "visibility", vis);
 }
 
 export function setLayerIsolineColor(map, layerId, color) {
-  const { isolineLayerId } = getLayerDOMIds(layerId);
+  const { isolineLayerId, isolineLabelLayerId } = getLayerDOMIds(layerId);
   if (map.getLayer(isolineLayerId)) map.setPaintProperty(isolineLayerId, "line-color", color);
+  if (map.getLayer(isolineLabelLayerId)) map.setPaintProperty(isolineLabelLayerId, "text-color", color);
 }
 
 export function setLayerIsobandOpacity(map, layerId, opacity) {
@@ -179,8 +213,9 @@ export function setLayerIsobandOpacity(map, layerId, opacity) {
 }
 
 export function removeContourLayer(map, layerId) {
-  const { isobandSrcId, isobandLayerId, isolineSrcId, isolineLayerId } = getLayerDOMIds(layerId);
+  const { isobandSrcId, isobandLayerId, isolineSrcId, isolineLayerId, isolineLabelLayerId } = getLayerDOMIds(layerId);
 
+  if (map.getLayer(isolineLabelLayerId)) map.removeLayer(isolineLabelLayerId);
   if (map.getLayer(isolineLayerId)) map.removeLayer(isolineLayerId);
   if (map.getSource(isolineSrcId)) map.removeSource(isolineSrcId);
   if (map.getLayer(isobandLayerId)) map.removeLayer(isobandLayerId);

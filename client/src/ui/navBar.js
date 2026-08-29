@@ -6,7 +6,7 @@ import { PRESET_GROUPS } from "../config/presets.js";
 let onPresetSelectCallback = null;
 let onLevelSelectCallback = null;
 let onLoadDataCallback = null;
-let onConfigReloadCallback = null;
+let onOpenConfigCallback = null;
 
 export function initNavBar(containerId = "navbar", callbacks = {}) {
   const container = document.getElementById(containerId);
@@ -15,7 +15,7 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
   onPresetSelectCallback = callbacks.onPresetSelect || callbacks.onPresetChange;
   onLevelSelectCallback = callbacks.onLevelSelect || callbacks.onLevelChange;
   onLoadDataCallback = callbacks.onLoadData || callbacks.onPresetChange;
-  onConfigReloadCallback = callbacks.onConfigReload;
+  onOpenConfigCallback = callbacks.onOpenConfig || callbacks.onConfigClick || callbacks.onConfigReload;
 
   const currentLevel = appState.get("level") || 500;
   const levels = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
@@ -41,6 +41,7 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
       <div class="nav-control-group">
         <label for="select-nav-level">Level:</label>
         <select id="select-nav-level" class="nav-select">
+          <option value="" ${!currentLevel ? "selected" : ""}>None</option>
           ${levels.map((l) => `<option value="${l}" ${l === currentLevel ? "selected" : ""}>${l} hPa</option>`).join("")}
         </select>
       </div>
@@ -56,14 +57,11 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
         <span class="status-dot"></span>
         <span id="nav-status-text">Connecting...</span>
       </div>
-      <button id="btn-toggle-catalog" class="btn btn-primary">
-        <span>Catalog</span>
-      </button>
-      <button id="btn-toggle-layers" class="btn">
+      <button id="btn-toggle-layers" class="btn btn-primary">
         <span>Layers</span>
       </button>
-      <button id="btn-reload-config" class="btn" title="Reload preset configuration from the server">
-        <span>Reload Config</span>
+      <button id="btn-open-config" class="btn" title="Open Configuration Editor Tab">
+        <span>⚙ Config</span>
       </button>
     </div>
   `;
@@ -80,25 +78,21 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
     const select = document.getElementById("select-preset");
     const groupId = select ? select.value : "";
     const group = PRESET_GROUPS.find((g) => g.id === groupId) || PRESET_GROUPS[0];
+    const navLevelVal = document.getElementById("select-nav-level")?.value;
+    const overrideLevel = navLevelVal ? parseInt(navLevelVal, 10) : null;
     if (group && onLoadDataCallback) {
       if (select && !select.value) select.value = group.id;
-      onLoadDataCallback(group);
+      onLoadDataCallback(group, overrideLevel);
     }
   });
 
   document.getElementById("select-nav-level").addEventListener("change", (e) => {
-    const lvl = parseInt(e.target.value, 10);
-    if (!isNaN(lvl)) {
-      appState.set("level", lvl);
-      if (onLevelSelectCallback) {
-        onLevelSelectCallback(lvl);
-      }
+    const val = e.target.value;
+    const lvl = val ? parseInt(val, 10) : null;
+    appState.set("level", lvl);
+    if (onLevelSelectCallback) {
+      onLevelSelectCallback(lvl);
     }
-  });
-
-  document.getElementById("btn-toggle-catalog").addEventListener("click", () => {
-    const drawer = document.getElementById("catalog-drawer");
-    if (drawer) drawer.classList.toggle("hidden");
   });
 
   document.getElementById("btn-toggle-layers").addEventListener("click", (e) => {
@@ -109,18 +103,11 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
     }
   });
 
-  document.getElementById("btn-reload-config").addEventListener("click", async (e) => {
-    if (!onConfigReloadCallback) return;
-    const button = e.currentTarget;
-    button.disabled = true;
-    button.textContent = "Reloading...";
-    try {
-      await onConfigReloadCallback();
-    } catch (error) {
-      console.error("[Config] Reload failed:", error);
-    } finally {
-      button.disabled = false;
-      button.textContent = "Reload Config";
+  document.getElementById("btn-open-config").addEventListener("click", () => {
+    if (onOpenConfigCallback) {
+      onOpenConfigCallback();
+    } else if (onConfigReloadCallback) {
+      onConfigReloadCallback();
     }
   });
 
@@ -131,8 +118,10 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
 
 export function setNavBarLevel(level) {
   const select = document.getElementById("select-nav-level");
-  if (select && select.value !== String(level)) {
-    select.value = String(level);
+  if (!select) return;
+  const strVal = level !== null && level !== undefined && level !== "" ? String(level) : "";
+  if (select.value !== strVal) {
+    select.value = strVal;
   }
 }
 

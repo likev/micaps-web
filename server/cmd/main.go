@@ -40,15 +40,20 @@ func main() {
 	var err error
 
 	if !cfg.MockMode {
-		addr := fmt.Sprintf("%s:%d", cfg.CassandraHost, cfg.CassandraPort)
-		log.Printf("[MICAPS-Web] Connecting to Cassandra CQL v4 at %s...", addr)
-		cqlClient, err = db.NewCQLClient(addr, 10*time.Second)
-		if err != nil {
-			log.Printf("[MICAPS-Web] WARNING: Could not connect to Cassandra: %v. Running in mock fallback mode.", err)
+		if cfg.CassandraHost == "" {
+			log.Printf("[MICAPS-Web] WARNING: No Cassandra -host specified in product mode. Running in mock fallback mode. Specify -host <ip> to connect to Cassandra.")
 			cfg.MockMode = true
 		} else {
-			log.Printf("[MICAPS-Web] SUCCESS: Connected to Cassandra cluster at %s", addr)
-			defer cqlClient.Close()
+			addr := fmt.Sprintf("%s:%d", cfg.CassandraHost, cfg.CassandraPort)
+			log.Printf("[MICAPS-Web] Connecting to Cassandra CQL v4 at %s (Tunnel=%t)...", addr, cfg.EnableTunnel)
+			cqlClient, err = db.NewCQLClient(addr, 10*time.Second)
+			if err != nil {
+				log.Printf("[MICAPS-Web] WARNING: Could not connect to Cassandra at %s: %v. Running in mock fallback mode.", addr, err)
+				cfg.MockMode = true
+			} else {
+				log.Printf("[MICAPS-Web] SUCCESS: Connected to Cassandra cluster at %s", addr)
+				defer cqlClient.Close()
+			}
 		}
 	}
 
@@ -61,6 +66,7 @@ func main() {
 
 	// REST API routes
 	mux.HandleFunc("/api/status", staticH.StatusHandler)
+	mux.HandleFunc("/api/config/presets", staticH.PresetsConfigHandler)
 	mux.HandleFunc("/api/catalog/models", catH.ModelsHandler)
 	mux.HandleFunc("/api/catalog/tree", catH.TreeHandler)
 	mux.HandleFunc("/api/catalog/levels", catH.LevelsHandler)

@@ -38,7 +38,7 @@ export function getSkyCoverSVG(octas = 0, size = 18) {
   `;
 }
 
-export function getWindBarbSVG(speed = 0, dir = 0, size = 144) {
+export function getWindBarbSVG(speed = 0, dir = 0, size = 100) {
   const cx = size / 2;
   const cy = size / 2;
 
@@ -47,14 +47,14 @@ export function getWindBarbSVG(speed = 0, dir = 0, size = 144) {
     // Calm: concentric light ring around center
     return `
       <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-        <circle cx="${cx}" cy="${cy}" r="14" fill="none" stroke="#58a6ff" stroke-width="1.8" stroke-dasharray="3,3"/>
+        <circle cx="${cx}" cy="${cy}" r="10" fill="none" stroke="#58a6ff" stroke-width="1.3" stroke-dasharray="2.5,2.5"/>
       </svg>
     `;
   }
 
-  // 3X dimensions:
-  const skyRadius = 10;
-  const staffLength = 58;
+  // Sized at 70% of 3X
+  const skyRadius = 8;
+  const staffLength = 41;
   const angleRad = ((dir - 90) * Math.PI) / 180;
   const xStart = cx + skyRadius * Math.cos(angleRad);
   const yStart = cy + skyRadius * Math.sin(angleRad);
@@ -64,19 +64,19 @@ export function getWindBarbSVG(speed = 0, dir = 0, size = 144) {
   let barbsSVG = "";
   let remSpeed = Math.round(speed);
   let pos = staffLength;
-  const barbAngle = angleRad + (Math.PI * 0.38); // ~68 degrees to the left of staff
+  const barbAngle = angleRad + (Math.PI * 0.68); // ~122.4° (on the RIGHT side of staff when seen from station point, slanting inwards)
 
   // 1. Pennant flag (20 m/s each)
   while (remSpeed >= 18) {
     const pX = cx + pos * Math.cos(angleRad);
     const pY = cy + pos * Math.sin(angleRad);
-    const fX = pX + 24 * Math.cos(barbAngle);
-    const fY = pY + 24 * Math.sin(barbAngle);
-    const posNext = pos - 14;
+    const fX = pX + 17 * Math.cos(barbAngle);
+    const fY = pY + 17 * Math.sin(barbAngle);
+    const posNext = pos - 10;
     const pX2 = cx + posNext * Math.cos(angleRad);
     const pY2 = cy + posNext * Math.sin(angleRad);
-    barbsSVG += `<polygon points="${pX},${pY} ${fX},${fY} ${pX2},${pY2}" fill="#58a6ff" stroke="#58a6ff" stroke-width="1.2"/>`;
-    pos -= 16;
+    barbsSVG += `<polygon points="${pX},${pY} ${fX},${fY} ${pX2},${pY2}" fill="#58a6ff" stroke="#58a6ff" stroke-width="1.0"/>`;
+    pos -= 11;
     remSpeed -= 20;
   }
 
@@ -84,10 +84,10 @@ export function getWindBarbSVG(speed = 0, dir = 0, size = 144) {
   while (remSpeed >= 3.5) {
     const pX = cx + pos * Math.cos(angleRad);
     const pY = cy + pos * Math.sin(angleRad);
-    const bX = pX + 22 * Math.cos(barbAngle);
-    const bY = pY + 22 * Math.sin(barbAngle);
-    barbsSVG += `<line x1="${pX}" y1="${pY}" x2="${bX}" y2="${bY}" stroke="#58a6ff" stroke-width="2.6" stroke-linecap="round"/>`;
-    pos -= 10;
+    const bX = pX + 15 * Math.cos(barbAngle);
+    const bY = pY + 15 * Math.sin(barbAngle);
+    barbsSVG += `<line x1="${pX}" y1="${pY}" x2="${bX}" y2="${bY}" stroke="#58a6ff" stroke-width="1.8" stroke-linecap="round"/>`;
+    pos -= 7;
     remSpeed -= 4;
   }
 
@@ -95,15 +95,15 @@ export function getWindBarbSVG(speed = 0, dir = 0, size = 144) {
   if (remSpeed >= 1.5) {
     const pX = cx + pos * Math.cos(angleRad);
     const pY = cy + pos * Math.sin(angleRad);
-    const bX = pX + 11 * Math.cos(barbAngle);
-    const bY = pY + 11 * Math.sin(barbAngle);
-    barbsSVG += `<line x1="${pX}" y1="${pY}" x2="${bX}" y2="${bY}" stroke="#58a6ff" stroke-width="2.6" stroke-linecap="round"/>`;
+    const bX = pX + 8 * Math.cos(barbAngle);
+    const bY = pY + 8 * Math.sin(barbAngle);
+    barbsSVG += `<line x1="${pX}" y1="${pY}" x2="${bX}" y2="${bY}" stroke="#58a6ff" stroke-width="1.8" stroke-linecap="round"/>`;
   }
 
   return `
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <!-- Wind Staff (3X size) -->
-      <line x1="${xStart}" y1="${yStart}" x2="${xEnd}" y2="${yEnd}" stroke="#58a6ff" stroke-width="2.6" stroke-linecap="round"/>
+      <!-- Wind Staff -->
+      <line x1="${xStart}" y1="${yStart}" x2="${xEnd}" y2="${yEnd}" stroke="#58a6ff" stroke-width="1.8" stroke-linecap="round"/>
       <!-- Feathers & Flags (4 m/s full, 2 m/s half, 20 m/s pennant) -->
       ${barbsSVG}
     </svg>

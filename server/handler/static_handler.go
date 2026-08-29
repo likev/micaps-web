@@ -49,6 +49,53 @@ func (h *StaticHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// PresetsConfigHandler reads or updates presets.json
+func (h *StaticHandler) PresetsConfigHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	distDir := h.Cfg.StaticDir
+	presetsPath := filepath.Join(distDir, "presets.json")
+	if _, err := os.Stat(presetsPath); os.IsNotExist(err) {
+		altPath := filepath.Join(distDir, "config/presets.json")
+		if _, aErr := os.Stat(altPath); aErr == nil {
+			presetsPath = altPath
+		} else {
+			presetsPath = "client/public/presets.json"
+		}
+	}
+
+	if r.Method == http.MethodPost {
+		var raw json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+			http.Error(w, `{"error":"Invalid JSON: `+err.Error()+`"}`, http.StatusBadRequest)
+			return
+		}
+		_ = os.WriteFile(filepath.Join(distDir, "presets.json"), raw, 0644)
+		_ = os.WriteFile("client/public/presets.json", raw, 0644)
+		_ = os.WriteFile("../client/public/presets.json", raw, 0644)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"ok","message":"Configuration saved successfully"}`))
+		return
+	}
+
+	// GET
+	data, err := os.ReadFile(presetsPath)
+	if err != nil {
+		http.Error(w, `{"error":"Could not read presets file: `+err.Error()+`"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(data)
+}
+
 // SPAHandler serves frontend static files with SPA fallback
 func (h *StaticHandler) SPAHandler(w http.ResponseWriter, r *http.Request) {
 	distDir := h.Cfg.StaticDir
@@ -71,3 +118,4 @@ func (h *StaticHandler) SPAHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(`<!DOCTYPE html><html><head><title>MICAPS-Web</title></head><body><h1>MICAPS-Web Server Running</h1><p>Client build in progress or available at Vite dev server.</p></body></html>`))
 }
+

@@ -214,3 +214,164 @@ export function stopWindAnimation(map = null) {
     });
   }
 }
+
+export function renderGridWindBarbs(map, gridData) {
+  if (!map || !gridData || !gridData.u || !gridData.v || !gridData.header) return;
+
+  const header = gridData.header;
+  const nLon = header.n_lon || header.LongitudeGridNumber || 100;
+  const nLat = header.n_lat || header.LatitudeGridNumber || 80;
+  const u = gridData.u;
+  const v = gridData.v;
+  const startLon = header.start_lon ?? header.StartLongitude ?? 70.0;
+  const dLon = Math.abs(header.d_lon ?? header.LongitudeGridSpace ?? 0.25);
+  const startLat = header.start_lat ?? header.StartLatitude ?? 15.0;
+  const dLat = Math.abs(header.d_lat ?? header.LatitudeGridSpace ?? 0.25);
+  const isLatNorthToSouth = header.end_lat !== undefined && header.start_lat > header.end_lat;
+
+  const container = map.getContainer();
+  let barbCanvas = container.querySelector(".wind-barb-canvas");
+  if (!barbCanvas) {
+    barbCanvas = document.createElement("canvas");
+    barbCanvas.className = "wind-barb-canvas";
+    barbCanvas.style.position = "absolute";
+    barbCanvas.style.top = "0";
+    barbCanvas.style.left = "0";
+    barbCanvas.style.width = "100%";
+    barbCanvas.style.height = "100%";
+    barbCanvas.style.pointerEvents = "none";
+    barbCanvas.style.zIndex = "405";
+    container.appendChild(barbCanvas);
+  }
+
+  const ctx = barbCanvas.getContext("2d");
+
+  function sampleWind(lng, lat) {
+    const gx = (lng - startLon) / dLon;
+    const gy = isLatNorthToSouth ? (startLat - lat) / dLat : (lat - startLat) / dLat;
+    if (gx < 0 || gx >= nLon - 1 || gy < 0 || gy >= nLat - 1) return null;
+    const x0 = Math.floor(gx), x1 = Math.min(x0 + 1, nLon - 1);
+    const y0 = Math.floor(gy), y1 = Math.min(y0 + 1, nLat - 1);
+    const fx = gx - x0, fy = gy - y0;
+    const idx00 = y0 * nLon + x0, idx10 = y0 * nLon + x1;
+    const idx01 = y1 * nLon + x0, idx11 = y1 * nLon + x1;
+    const uVal = (1 - fx) * (1 - fy) * (u[idx00] || 0) + fx * (1 - fy) * (u[idx10] || 0) + (1 - fx) * fy * (u[idx01] || 0) + fx * fy * (u[idx11] || 0);
+    const vVal = (1 - fx) * (1 - fy) * (v[idx00] || 0) + fx * (1 - fy) * (v[idx10] || 0) + (1 - fx) * fy * (v[idx01] || 0) + fx * fy * (v[idx11] || 0);
+    return [uVal, vVal];
+  }
+
+  function draw() {
+    const rect = container.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    if (barbCanvas.width !== Math.round(rect.width) || barbCanvas.height !== Math.round(rect.height)) {
+      barbCanvas.width = Math.round(rect.width);
+      barbCanvas.height = Math.round(rect.height);
+    }
+    ctx.clearRect(0, 0, barbCanvas.width, barbCanvas.height);
+
+    const step = 48; // Screen grid spacing for barbs
+    const w = barbCanvas.width;
+    const h = barbCanvas.height;
+
+    for (let sx = step / 2; sx < w; sx += step) {
+      for (let sy = step / 2; sy < h; sy += step) {
+        const lngLat = map.unproject([sx, sy]);
+        const vel = sampleWind(lngLat.lng, lngLat.lat);
+        if (!vel) continue;
+        const [uVal, vVal] = vel;
+        const speed = Math.hypot(uVal, vVal);
+        if (speed < 0.8) continue;
+
+        const staffLen = 22;
+        const dx = -uVal / speed;
+        const dy = vVal / speed;
+        const nx = -dy; // Right side normal when looking from grid point towards tail
+        const ny = dx;
+
+        const x0 = sx, y0 = sy;
+        const x1 = x0 + dx * staffLen, y1 = y0 + dy * staffLen;
+
+        ctx.strokeStyle = speed > 25 ? "#f85149" : (speed > 15 ? "#d29922" : (speed > 8 ? "#58a6ff" : "#79c0ff"));
+        ctx.fillStyle = ctx.strokeStyle;
+        ctx.lineWidth = 1.5;
+        ctx.lineCap = "round";
+
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(x0, y0, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        let s = speed;
+        let pos = 0;
+        const barbLen = 7;
+        const space = 3.5;
+
+        while (s >= 18) {
+          const bx = x1 - dx * pos, by = y1 - dy * pos;
+          const ex = x1 - dx * (pos + 4), ey = y1 - dy * (pos + 4);
+          const tx = bx + nx * barbLen, ty = by + ny * barbLen;
+          ctx.beginPath();
+          ctx.moveTo(bx, by);
+          ctx.lineTo(tx, ty);
+          ctx.lineTo(ex, ey);
+          ctx.closePath();
+          ctx.fill();
+          pos += space + 2;
+          s -= 20;
+        }
+
+        while (s >= 3.5) {
+          const bx = x1 - dx * pos, by = y1 - dy * pos;
+          ctx.beginPath();
+          ctx.moveTo(bx, by);
+          ctx.lineTo(bx + nx * barbLen - dx * 2, by + ny * barbLen - dy * 2);
+          ctx.stroke();
+          pos += space;
+          s -= 4;
+        }
+
+        if (s >= 1.5) {
+          const bx = x1 - dx * pos, by = y1 - dy * pos;
+          ctx.beginPath();
+          ctx.moveTo(bx, by);
+          ctx.lineTo(bx + nx * (barbLen * 0.55) - dx * 1, by + ny * (barbLen * 0.55) - dy * 1);
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
+  draw();
+
+  if (map._windBarbMoveListener) {
+    map.off("move", map._windBarbMoveListener);
+    map.off("resize", map._windBarbMoveListener);
+  }
+  map._windBarbMoveListener = draw;
+  map.on("move", draw);
+  map.on("resize", draw);
+}
+
+export function removeGridWindBarbs(map = null) {
+  if (map) {
+    if (map._windBarbMoveListener) {
+      map.off("move", map._windBarbMoveListener);
+      map.off("resize", map._windBarbMoveListener);
+      map._windBarbMoveListener = null;
+    }
+    const canvas = map.getContainer()?.querySelector(".wind-barb-canvas");
+    if (canvas) {
+      canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+      canvas.remove();
+    }
+  } else {
+    document.querySelectorAll(".wind-barb-canvas").forEach((canvas) => {
+      canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+      canvas.remove();
+    });
+  }
+}

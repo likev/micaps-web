@@ -44,16 +44,39 @@ export function formatObsTimestamp(fileStr = "") {
   const h = fileStr.slice(8, 10);
   const min = fileStr.length >= 12 ? fileStr.slice(10, 12) : "00";
 
-  // Calculate UTC equivalent: BJT (UTC+8) minus 8 hours
-  const bjtTimestamp = Date.UTC(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10), parseInt(h, 10), parseInt(min, 10));
-  const utcDate = new Date(bjtTimestamp - 8 * 3600 * 1000);
-  const pad = (n) => String(n).padStart(2, "0");
-  const utcY = utcDate.getUTCFullYear();
-  const utcM = pad(utcDate.getUTCMonth() + 1);
-  const utcD = pad(utcDate.getUTCDate());
-  const utcH = pad(utcDate.getUTCHours());
-  const utcMin = pad(utcDate.getUTCMinutes());
+  return `${y}-${m}-${d} ${h}:${min} (UTC+8)`;
+}
 
-  return `${y}-${m}-${d} ${h}:${min} BJT (${utcY}-${utcM}-${utcD} ${utcH}:${utcMin} UTC)`;
+export function formatForecastInitTime(cycleStr = "") {
+  if (!cycleStr) return "--";
+  const clean = cycleStr.split(".")[0];
+  if (clean.length >= 8) {
+    const y = clean.length === 8 ? `20${clean.slice(0, 2)}` : clean.slice(0, 4);
+    const m = clean.length === 8 ? clean.slice(2, 4) : clean.slice(4, 6);
+    const d = clean.length === 8 ? clean.slice(4, 6) : clean.slice(6, 8);
+    const h = clean.length === 8 ? clean.slice(6, 8) : clean.slice(8, 10);
+    return `${y}-${m}-${d} ${h}:00 (UTC+8)`;
+  }
+  return cycleStr;
+}
+
+export function formatForecastValidTime(cycleStr = "", leadHours = 0) {
+  if (!cycleStr) return `Analysis + ${leadHours}h`;
+  const clean = cycleStr.split(".")[0];
+  if (clean.length >= 8) {
+    const y = parseInt(clean.length === 8 ? `20${clean.slice(0, 2)}` : clean.slice(0, 4), 10);
+    const m = parseInt(clean.length === 8 ? clean.slice(2, 4) : clean.slice(4, 6), 10) - 1;
+    const d = parseInt(clean.length === 8 ? clean.slice(4, 6) : clean.slice(6, 8), 10);
+    const h = parseInt(clean.length === 8 ? clean.slice(6, 8) : clean.slice(8, 10), 10);
+    const initEpoch = Date.UTC(y, m, d, h);
+    const validDate = new Date(initEpoch + leadHours * 3600 * 1000);
+    const pad = (n) => String(n).padStart(2, "0");
+    const vy = validDate.getUTCFullYear();
+    const vm = pad(validDate.getUTCMonth() + 1);
+    const vd = pad(validDate.getUTCDate());
+    const vh = pad(validDate.getUTCHours());
+    return `${vy}-${vm}-${vd} ${vh}:00 (UTC+8) (+${String(leadHours).padStart(3, "0")}h)`;
+  }
+  return `Analysis + ${leadHours}h`;
 }
 

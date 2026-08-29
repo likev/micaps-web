@@ -6,18 +6,35 @@ import {
   setLayerIsolineColor,
   removeContourLayer,
 } from "../layers/contourLayer.js";
-import { setStationVisibility } from "../layers/stationLayer.js";
-import { renderBinaryRaster, setRasterVisibility } from "../layers/rasterLayer.js";
-import { renderWindStreamlines, stopWindAnimation } from "../layers/windLayer.js";
-import { fetchGridBinaryStream } from "../api/catalogApi.js";
+import { setStationVisibility, setStationConfig } from "../layers/stationLayer.js";
+import { renderBinaryRaster, renderGridRaster, setRasterVisibility } from "../layers/rasterLayer.js";
+import { renderWindStreamlines, stopWindAnimation, renderGridWindBarbs, removeGridWindBarbs } from "../layers/windLayer.js";
+import { fetchGridBinaryStream, fetchGridData } from "../api/catalogApi.js";
 import { appState } from "../store/appState.js";
 import { getActiveWindow } from "./tabWindowManager.js";
 
 export function handleLayerAction(map, action, layerId, value, layer, win = getActiveWindow()) {
   if (action === "visibility") {
-    if (layer.type === "contour") {
-      setLayerIsobandVisibility(map, layerId, value && layer.config.showFill);
-      setLayerIsolineVisibility(map, layerId, value && layer.config.showLine);
+    if (layer.type === "contour" || layer.type === "wind") {
+      setLayerIsobandVisibility(map, layerId, value && layer.config?.showFill);
+      setLayerIsolineVisibility(map, layerId, value && layer.config?.showLine);
+      if (layer.config?.showRaster) {
+        setRasterVisibility(map, value);
+      }
+      if (layer.config?.showWind) {
+        if (value) {
+          triggerWindStreamlines(map, layer, win);
+        } else {
+          stopWindAnimation(map);
+        }
+      }
+      if (layer.config?.showBarbs) {
+        if (value) {
+          triggerWindBarbs(map, layer, win);
+        } else {
+          removeGridWindBarbs(map);
+        }
+      }
     } else if (layer.type === "station") {
       setStationVisibility(map, value);
     } else if (layer.type === "pmtiles") {
@@ -34,47 +51,167 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
       });
     }
   } else if (action === "config") {
-    if (layer.type === "contour") {
-      setLayerIsobandVisibility(map, layerId, layer.visible && value.showFill);
-      setLayerIsolineVisibility(map, layerId, layer.visible && value.showLine);
-      setLayerIsobandOpacity(map, layerId, value.opacity);
-      setLayerIsolineColor(map, layerId, value.lineColor);
+    if (layer.type === "contour" || layer.type === "wind") {
+      if (value.showFill !== undefined) setLayerIsobandVisibility(map, layerId, layer.visible && value.showFill);
+      if (value.showLine !== undefined) setLayerIsolineVisibility(map, layerId, layer.visible && value.showLine);
+      if (value.opacity !== undefined) setLayerIsobandOpacity(map, layerId, value.opacity);
+      if (value.lineColor !== undefined) setLayerIsolineColor(map, layerId, value.lineColor);
+
+      if (value.showRaster !== undefined) {
+        if (value.showRaster && layer.visible) {
+          triggerRasterOverlay(map, layer, win);
+        } else {
+          setRasterVisibility(map, false);
+        }
+      }
+
+      if (value.showWind !== undefined) {
+        if (value.showWind && layer.visible) {
+          triggerWindStreamlines(map, layer, win);
+        } else {
+          stopWindAnimation(map);
+        }
+      }
+
+      if (value.showBarbs !== undefined) {
+        if (value.showBarbs && layer.visible) {
+          triggerWindBarbs(map, layer, win);
+        } else {
+          removeGridWindBarbs(map);
+        }
+      }
+    } else if (layer.type === "station") {
+      setStationConfig(map, value);
     }
   } else if (action === "remove") {
-    if (layer.type === "contour") {
+    if (layer.type === "contour" || layer.type === "wind") {
       removeContourLayer(map, layerId);
+      if (layer.config?.showRaster) setRasterVisibility(map, false);
+      if (layer.config?.showWind) stopWindAnimation(map);
+      if (layer.config?.showBarbs) removeGridWindBarbs(map);
     } else if (layer.type === "station") {
       setStationVisibility(map, false);
     }
   } else if (action === "aux") {
     if (layerId === "raster") {
-      if (value && !map.getLayer("raster-layer")) {
-        const model = win?.model || "ECMWF_HR";
-        const element = win?.element || "TMP";
-        const level = win?.level || 850;
-        const period = win?.period ?? 24;
-        const file = `26082708.${String(period).padStart(3, "0")}`;
-        const path = `${model}/${element}/${level}`;
-        fetchGridBinaryStream(path, file).then((bin) => {
-          renderBinaryRaster(map, bin, element, win?.colormap || element);
-        });
+      if (value) {
+        triggerRasterOverlay(map, null, win);
       } else {
-        setRasterVisibility(map, value);
+        setRasterVisibility(map, false);
       }
     } else if (layerId === "wind") {
       if (value) {
-        let grid = win?.gridData || appState.get("gridData");
-        if (!grid || !grid.u || !grid.v) {
-          grid = {
-            header: (grid && grid.header) ? grid.header : { start_lon: 60, d_lon: 0.5, n_lon: 100, start_lat: 10, d_lat: 0.5, n_lat: 80 },
-            u: new Float32Array(8000).fill(6),
-            v: new Float32Array(8000).fill(4),
-          };
-        }
-        renderWindStreamlines(map, grid);
+        triggerWindStreamlines(map, null, win);
       } else {
         stopWindAnimation(map);
       }
     }
   }
+}
+
+function triggerRasterOverlay(map, layer = null, win = null) {
+  // 1. Direct in-memory gridData from layer (e.g. Surface SLP or Sounding Analysis)
+  if (layer?.gridData) {
+    const colormap = layer.colormap || win?.colormap || layer.element || "TMP";
+    renderGridRaster(map, layer.gridData, layer.element || "TMP", colormap);
+    return;
+  }
+
+  // 2. In-memory gridData from window
+  if (win?.gridData && (!layer || layer.element === win.element)) {
+    const colormap = win.colormap || layer?.colormap || win.element || "TMP";
+    renderGridRaster(map, win.gridData, win.element || "TMP", colormap);
+    return;
+  }
+
+  // 3. Dynamic model, element, level and file from layer or window
+  const model = layer?.model || win?.model || "ECMWF_HR";
+  const element = layer?.element || win?.element || "TMP";
+  const level = layer?.level !== undefined && layer?.level !== null ? layer.level : (win?.level !== undefined ? win.level : null);
+  const colormap = layer?.colormap || win?.colormap || element;
+
+  let path = layer?.path;
+  if (!path) {
+    if (model === "SURFACE") {
+      path = `SURFACE/${element}`;
+    } else if (level && level > 0) {
+      path = `${model}/${element}/${level}`;
+    } else {
+      path = `${model}/${element}`;
+    }
+  }
+
+  let file = layer?.file || win?.obsTime || win?.file;
+  if (!file) {
+    const period = win?.period ?? 24;
+    const cycle = win?.forecastCycle || appState.get("forecastCycle") || "26082908";
+    file = `${cycle}.${String(period).padStart(3, "0")}`;
+  }
+
+  fetchGridBinaryStream(path, file)
+    .then((bin) => {
+      renderBinaryRaster(map, bin, element, colormap);
+    })
+    .catch((err) => {
+      console.warn("[Raster] Binary stream fetch failed, trying JSON gridData:", err);
+      fetchGridData(path, file).then((grid) => {
+        if (grid && grid.values) {
+          renderGridRaster(map, grid, element, colormap);
+        }
+      });
+    });
+}
+
+function triggerWindStreamlines(map, layer = null, win = null) {
+  let grid = layer?.gridData || win?.windGridData || win?.gridData || appState.get("gridData");
+  if (grid && grid.u && grid.v) {
+    renderWindStreamlines(map, grid);
+    return;
+  }
+
+  const model = layer?.model || win?.model || "ECMWF_HR";
+  const level = layer?.level !== undefined && layer?.level !== null && layer?.level > 0 ? layer.level : (win?.level || 850);
+  const period = win?.period ?? 24;
+  const cycle = win?.forecastCycle || appState.get("forecastCycle") || "26082908";
+  const file = layer?.file || win?.file || `${cycle}.${String(period).padStart(3, "0")}`;
+  const path = `${model}/WIND/${level}`;
+
+  fetchGridData(path, file)
+    .then((windGrid) => {
+      if (windGrid && windGrid.u && windGrid.v) {
+        if (layer) layer.gridData = windGrid;
+        if (win) win.windGridData = windGrid;
+        renderWindStreamlines(map, windGrid);
+      }
+    })
+    .catch((err) => {
+      console.warn("[Wind] Fetch wind failed:", err);
+    });
+}
+
+function triggerWindBarbs(map, layer = null, win = null) {
+  let grid = layer?.gridData || win?.windGridData || win?.gridData || appState.get("gridData");
+  if (grid && grid.u && grid.v) {
+    renderGridWindBarbs(map, grid);
+    return;
+  }
+
+  const model = layer?.model || win?.model || "ECMWF_HR";
+  const level = layer?.level !== undefined && layer?.level !== null && layer?.level > 0 ? layer.level : (win?.level || 850);
+  const period = win?.period ?? 24;
+  const cycle = win?.forecastCycle || appState.get("forecastCycle") || "26082908";
+  const file = layer?.file || win?.file || `${cycle}.${String(period).padStart(3, "0")}`;
+  const path = `${model}/WIND/${level}`;
+
+  fetchGridData(path, file)
+    .then((windGrid) => {
+      if (windGrid && windGrid.u && windGrid.v) {
+        if (layer) layer.gridData = windGrid;
+        if (win) win.windGridData = windGrid;
+        renderGridWindBarbs(map, windGrid);
+      }
+    })
+    .catch((err) => {
+      console.warn("[Wind] Fetch wind barbs failed:", err);
+    });
 }

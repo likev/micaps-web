@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -23,8 +24,19 @@ func (h *StationHandler) StationGeoJSONHandler(w http.ResponseWriter, r *http.Re
 
 	stations, err := h.fetchStations(r)
 	if err != nil {
-		log.Printf("[StationHandler] Error fetching stations: %v. Falling back to mock.", err)
-		stations = mock.GenerateMockStations()
+		if h.MockMode {
+			log.Printf("[StationHandler] Error fetching stations: %v. Mock fallback.", err)
+			stations = mock.GenerateMockStations()
+		} else {
+			log.Printf("[StationHandler] Station data not found: %v", err)
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"type":     "FeatureCollection",
+				"features": []interface{}{},
+				"error":    err.Error(),
+			})
+			return
+		}
 	}
 
 	json.NewEncoder(w).Encode(stations)
@@ -34,7 +46,14 @@ func (h *StationHandler) fetchStations(r *http.Request) (*model.GeoJSONFeatureCo
 	dataPath := r.URL.Query().Get("path")
 	file := r.URL.Query().Get("file")
 
-	if h.MockMode || h.Client == nil || dataPath == "" || file == "" {
+	if h.Client == nil || dataPath == "" || file == "" {
+		if h.MockMode {
+			return mock.GenerateMockStations(), nil
+		}
+		return nil, fmt.Errorf("missing query parameter 'path' or 'file' (or CQL client not connected)")
+	}
+
+	if h.MockMode {
 		return mock.GenerateMockStations(), nil
 	}
 

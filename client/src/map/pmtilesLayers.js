@@ -4,6 +4,7 @@ export function getPMTilesStyle(pmtilesUrl) {
   return {
     version: 8,
     name: "MICAPS-Dark-Basemap",
+    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
     sources: {
       "china-vector": {
         type: "vector",

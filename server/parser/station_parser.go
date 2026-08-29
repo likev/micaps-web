@@ -51,7 +51,7 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 		elemMap[eID] = ElemDef{typeCode: eType, byteLen: bLen}
 	}
 
-	features := make([]model.GeoJSONFeature, 0, 3000)
+	features := make([]model.GeoJSONFeature, 0, stationNumber)
 
 	for s := 0; s < stationNumber && ind < len(decompressed); s++ {
 		var stationID int32
@@ -213,11 +213,6 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 			},
 			Properties: props,
 		})
-
-		// Limit to 4000 stations max per response for fast transmission
-		if len(features) >= 4000 {
-			break
-		}
 	}
 
 	return &model.GeoJSONFeatureCollection{
