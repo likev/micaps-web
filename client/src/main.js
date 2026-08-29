@@ -4,7 +4,7 @@ import { initNavBar, refreshNavBarPresets, setNavBarLevel, setNavBarPreset } fro
 import { initCatalogDrawer } from "./ui/catalogDrawer.js";
 import { initLayerControl, addOrUpdateLayer, syncLayerControlForWindow, clearWindowWeatherLayers, getLayerById } from "./ui/layerControl.js";
 import { initTimeSlider, setTimelineMode, setTimeSliderVisible, step as timeSliderStep } from "./ui/timeSlider.js";
-import { handleLayerAction } from "./ui/layerActions.js";
+import { handleLayerAction, triggerStationStreamlines } from "./ui/layerActions.js";
 import { initTooltip } from "./ui/tooltip.js";
 import { renderContourLayers, removeAllContourLayers } from "./layers/contourLayer.js";
 import { renderBinaryRaster, removeRasterLayer } from "./layers/rasterLayer.js";
@@ -442,7 +442,8 @@ async function loadUpperAirComposite(map, level = 500, obsTime = "20260828170000
   const stations = await fetchStationObservations(path, obsTime);
   appState.set("stationData", stations);
   renderStationWeatherPlots(map, stations, appState.state.layers.station);
-  addOrUpdateLayer({ id: `station-upper-${level}`, name: `Upper Air ${level}hPa Soundings`, type: "station", color: "#e3b341", visible: true, removable: true, stationsGeoJSON: stations }, win);
+  const stnLayer = addOrUpdateLayer({ id: `station-upper-${level}`, name: `Upper Air ${level}hPa Soundings`, type: "station", color: "#e3b341", visible: true, removable: true, stationsGeoJSON: stations }, win);
+  if (stnLayer?.config?.showStreamlines) triggerStationStreamlines(map, stnLayer, win);
   if (stations?.features?.length >= 3) analyzeAndRenderSoundingContours(map, stations, level);
 }
 
@@ -454,7 +455,8 @@ async function loadObservationProduct(map, model, element, level, file, win = ge
     renderStationWeatherPlots(map, stations, appState.state.layers.station);
     const layerId = model === "UPPER_AIR" ? `station-upper-${level || 500}` : `station-${model.toLowerCase()}`;
     const name = model === "UPPER_AIR" ? `${level || 500} hPa Sounding Station Plots` : `${model === "SURFACE" ? "Surface" : "Upper Air"} Station Observations`;
-    addOrUpdateLayer({ id: layerId, name, type: "station", color: "#e3b341", visible: true, removable: true, stationsGeoJSON: stations }, win);
+    const stnLayer = addOrUpdateLayer({ id: layerId, name, type: "station", color: "#e3b341", visible: true, removable: true, stationsGeoJSON: stations }, win);
+    if (stnLayer?.config?.showStreamlines) triggerStationStreamlines(map, stnLayer, win);
     if (model === "SURFACE" && stations?.features?.length >= 3) analyzeAndRenderSurfaceSLPContours(map, stations, {}, win);
     if (model === "UPPER_AIR" && stations?.features?.length >= 3) analyzeAndRenderSoundingContours(map, stations, level || 500, {}, win);
   } catch (err) {

@@ -113,6 +113,7 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
         showWeather: layerDef.config?.showWeather !== undefined ? layerDef.config.showWeather : false,
         showPressure: layerDef.config?.showPressure !== undefined ? layerDef.config.showPressure : false,
         showTendency: layerDef.config?.showTendency !== undefined ? layerDef.config.showTendency : false,
+        showStreamlines: layerDef.config?.showStreamlines !== undefined ? layerDef.config.showStreamlines : false,
         filterField1: layerDef.config?.filterField1 || "none",
         filterOp1: layerDef.config?.filterOp1 || ">",
         filterVal1: layerDef.config?.filterVal1 !== undefined ? layerDef.config.filterVal1 : "",
@@ -144,6 +145,8 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
     const panel = document.getElementById("layer-control");
     if (panel) renderLayersManager(panel);
   }
+
+  return existingIdx >= 0 ? layers[existingIdx] : layers[layers.length - 1];
 }
 
 export function removeLayer(layerId, winOrId = null) {

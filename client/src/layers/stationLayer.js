@@ -475,6 +475,14 @@ export function clearStationMarkersForMap(map) {
   state.markers = [];
 }
 
+export function getStationGeoJSON(map = null) {
+  if (map && mapState.has(map)) {
+    const s = mapState.get(map);
+    if (s && s.geojson && s.geojson.features) return s.geojson;
+  }
+  return lastStationGeoJSON || null;
+}
+
 export function removeStationLayer(map) {
   if (!map) return;
   const state = getState(map);

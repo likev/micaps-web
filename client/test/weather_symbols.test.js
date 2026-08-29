@@ -65,4 +65,27 @@ describe("WMO Meteorological Symbol & Wind Barb Verification", () => {
     expect(getPressureTendencyGlyph(3)).toBe("⎺"); // Steady
     expect(getPressureTendencyGlyph(4)).toBe("╭╮"); // Rising then falling
   });
+
+  test("generateStationWindGrid correctly constructs 2D U/V grid from station observations", async () => {
+    const { generateStationWindGrid } = await import("../src/layers/windLayer.js");
+
+    const mockStations = {
+      type: "FeatureCollection",
+      features: [
+        { type: "Feature", geometry: { coordinates: [116.4, 39.9] }, properties: { wind_speed: 12.0, wind_dir: 180 } },
+        { type: "Feature", geometry: { coordinates: [121.5, 31.2] }, properties: { ws: 8.0, wd: 90 } },
+        { type: "Feature", geometry: { coordinates: [113.3, 23.1] }, properties: { u: -5.0, v: 4.0 } },
+        { type: "Feature", geometry: { coordinates: [104.1, 30.7] }, properties: { windSpeed: 6.0, windDir: 270 } },
+      ],
+    };
+
+    const grid = generateStationWindGrid(mockStations);
+    expect(grid).not.toBeNull();
+    expect(grid.header).toBeDefined();
+    expect(grid.header.n_lon).toBeGreaterThan(10);
+    expect(grid.header.n_lat).toBeGreaterThan(10);
+    expect(grid.u).toBeInstanceOf(Float32Array);
+    expect(grid.v).toBeInstanceOf(Float32Array);
+    expect(grid.u.length).toBe(grid.header.n_lon * grid.header.n_lat);
+  });
 });

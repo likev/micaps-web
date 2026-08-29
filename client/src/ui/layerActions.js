@@ -7,10 +7,10 @@ import {
   setLayerIsolineStyle,
   removeContourLayer,
 } from "../layers/contourLayer.js";
-import { setStationVisibility, setStationConfig } from "../layers/stationLayer.js";
+import { setStationVisibility, setStationConfig, getStationGeoJSON } from "../layers/stationLayer.js";
 import { renderBinaryRaster, renderGridRaster, setRasterVisibility } from "../layers/rasterLayer.js";
 import { renderWindStreamlines, stopWindAnimation, renderGridWindBarbs, removeGridWindBarbs, generateStationWindGrid } from "../layers/windLayer.js";
-import { fetchGridBinaryStream, fetchGridData } from "../api/catalogApi.js";
+import { fetchGridBinaryStream, fetchGridData, fetchStationObservations } from "../api/catalogApi.js";
 import { appState } from "../store/appState.js";
 import { getActiveWindow } from "./tabWindowManager.js";
 
@@ -259,13 +259,35 @@ function triggerWindBarbs(map, layer = null, win = null) {
 }
 
 export function triggerStationStreamlines(map, layer = null, win = null) {
-  const geojson = layer?.stationsGeoJSON || win?.stationsGeoJSON || appState.get("stationData");
+  const geojson = layer?.stationsGeoJSON || getStationGeoJSON(map) || win?.stationsGeoJSON || appState.get("stationData");
   if (geojson && geojson.features && geojson.features.length >= 3) {
     const windGrid = generateStationWindGrid(geojson);
     if (windGrid) {
       if (layer) layer.gridData = windGrid;
       if (win) win.windGridData = windGrid;
       renderWindStreamlines(map, windGrid);
+      return;
     }
   }
+
+  // Fallback: If station GeoJSON is not yet in memory, fetch it via API
+  const model = layer?.model || "SURFACE";
+  const element = layer?.element || (model === "SURFACE" ? "PLOT_GLOBAL_3H" : "PLOT");
+  const level = layer?.level || 500;
+  const path = layer?.path || (model === "SURFACE" ? `SURFACE/${element}` : `UPPER_AIR/${element}/${level}`);
+  const file = layer?.file || win?.file || "20260828170000.000";
+
+  fetchStationObservations(path, file)
+    .then((data) => {
+      if (data && data.features && data.features.length >= 3) {
+        if (layer) layer.stationsGeoJSON = data;
+        const windGrid = generateStationWindGrid(data);
+        if (windGrid) {
+          if (layer) layer.gridData = windGrid;
+          if (win) win.windGridData = windGrid;
+          renderWindStreamlines(map, windGrid);
+        }
+      }
+    })
+    .catch((err) => console.warn("[StationStreamlines] Fetch failed:", err));
 }

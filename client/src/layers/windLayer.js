@@ -401,16 +401,34 @@ export function generateStationWindGrid(stationsGeoJSON) {
     const p = f.properties || {};
 
     let ws = null;
-    let wd = null;
-    if (typeof p.ws === "number" && p.ws >= 0 && p.ws < 150) ws = p.ws;
-    else if (typeof p.wind_speed === "number" && p.wind_speed >= 0 && p.wind_speed < 150) ws = p.wind_speed;
+    const wsKeys = ["wind_speed", "windSpeed", "ws", "WIN_S_Avg", "WIN_S", "FF", "ff", "speed"];
+    for (const k of wsKeys) {
+      const v = p[k];
+      if (v !== undefined && v !== null && v !== "" && v !== -9999 && v !== "-9999") {
+        const num = typeof v === "number" ? v : parseFloat(v);
+        if (!isNaN(num) && num >= 0 && num <= 150) {
+          ws = num > 100 ? num / 10.0 : num;
+          break;
+        }
+      }
+    }
 
-    if (typeof p.wd === "number" && p.wd >= 0 && p.wd <= 360) wd = p.wd;
-    else if (typeof p.wind_direction === "number" && p.wind_direction >= 0 && p.wind_direction <= 360) wd = p.wind_direction;
+    let wd = null;
+    const wdKeys = ["wind_dir", "windDir", "wd", "WIN_D_Avg", "WIN_D", "DD", "dd", "dir"];
+    for (const k of wdKeys) {
+      const v = p[k];
+      if (v !== undefined && v !== null && v !== "" && v !== -9999 && v !== "-9999") {
+        const num = typeof v === "number" ? v : parseFloat(v);
+        if (!isNaN(num) && num >= 0 && num <= 360) {
+          wd = num;
+          break;
+        }
+      }
+    }
 
     let u = null;
     let v = null;
-    if (typeof p.u === "number" && typeof p.v === "number") {
+    if (typeof p.u === "number" && typeof p.v === "number" && !isNaN(p.u) && !isNaN(p.v)) {
       u = p.u;
       v = p.v;
     } else if (ws !== null && wd !== null) {
