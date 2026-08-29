@@ -3,7 +3,15 @@ import { getColor } from "../utils/colormaps.js";
 
 let rasterCanvas = null;
 
-export function renderBinaryRaster(map, arrayBuffer, element = "TMP", colormap = null) {
+export function getRasterDOMIds(layerId = "default") {
+  const isDefault = !layerId || layerId === "default";
+  return {
+    rasterSrcId: isDefault ? "raster-source" : `${layerId}-raster-source`,
+    rasterLayerId: isDefault ? "raster-layer" : `${layerId}-raster-layer`,
+  };
+}
+
+export function renderBinaryRaster(map, arrayBuffer, element = "TMP", colormap = null, options = {}) {
   if (!map || !arrayBuffer || arrayBuffer.byteLength < 32) return;
 
   const view = new DataView(arrayBuffer);
@@ -20,27 +28,46 @@ export function renderBinaryRaster(map, arrayBuffer, element = "TMP", colormap =
   const floatValues = new Float32Array(arrayBuffer, 32);
   const zMin = view.getFloat32(24, true);
   const zMax = view.getFloat32(28, true);
-  renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat, element, colormap, zMin, zMax);
+  renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat, element, colormap, zMin, zMax, options);
 }
 
-export function renderGridRaster(map, gridData, element = "TMP", colormap = null) {
-  if (!map || !gridData || !gridData.values || !gridData.header) return;
+export function renderGridRaster(map, gridData, element = "TMP", colormap = null, options = {}) {
+  if (!map || !gridData || (!gridData.values && (!gridData.u || !gridData.v)) || !gridData.header) return;
   const h = gridData.header;
-  const nlon = h.n_lon || h.LongitudeGridNumber || (gridData.values[0]?.length) || 0;
-  const nlat = h.n_lat || h.LatitudeGridNumber || gridData.values.length || 0;
+  const nlon = h.n_lon || h.LongitudeGridNumber || (gridData.values ? gridData.values[0]?.length : (gridData.u ? gridData.u[0]?.length : 0)) || 0;
+  const nlat = h.n_lat || h.LatitudeGridNumber || (gridData.values ? gridData.values.length : (gridData.u ? gridData.u.length : 0)) || 0;
   const slon = h.start_lon ?? h.StartLongitude ?? 60.0;
   const elon = h.end_lon ?? h.EndLongitude ?? (slon + (nlon - 1) * (h.d_lon || h.LongitudeGridSpace || 0.25));
   const slat = h.start_lat ?? h.StartLatitude ?? 60.0;
   const elat = h.end_lat ?? h.EndLatitude ?? (slat + (nlat - 1) * (h.d_lat || h.LatitudeGridSpace || -0.25));
-  const floatValues = gridData.values;
+
+  let floatValues = gridData.values;
+  if (!floatValues && gridData.u && gridData.v) {
+    const is2D = Array.isArray(gridData.u) && Array.isArray(gridData.u[0]);
+    if (is2D) {
+      floatValues = gridData.u.map((row, r) => row.map((uVal, c) => Math.hypot(uVal, gridData.v[r][c])));
+    } else {
+      const len = gridData.u.length;
+      floatValues = new Float32Array(len);
+      for (let k = 0; k < len; k++) {
+        floatValues[k] = Math.hypot(gridData.u[k], gridData.v[k]);
+      }
+    }
+  }
+
   const zMin = gridData.stats?.min;
   const zMax = gridData.stats?.max;
 
-  renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat, element, colormap, zMin, zMax);
+  renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat, element, colormap, zMin, zMax, options);
 }
 
-function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat, element, colormap, zMin = undefined, zMax = undefined) {
+function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat, element, colormap, zMin = undefined, zMax = undefined, options = {}) {
   if (!map || !floatValues || nlon <= 0 || nlat <= 0) return;
+
+  const opts = typeof options === "string" ? { layerId: options } : (options || {});
+  const layerId = opts.layerId || "default";
+  const opacity = opts.opacity !== undefined ? opts.opacity : 0.85;
+  const visible = opts.visible !== false;
 
   if (!rasterCanvas) {
     rasterCanvas = document.createElement("canvas");
@@ -94,16 +121,19 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
     [leftLon, bottomLat],  // Bottom-left
   ];
 
-  if (map.getSource("raster-source")) {
-    map.getSource("raster-source").updateImage({
+  const { rasterSrcId, rasterLayerId } = getRasterDOMIds(layerId);
+
+  if (map.getSource(rasterSrcId)) {
+    map.getSource(rasterSrcId).updateImage({
       url: dataUrl,
       coordinates,
     });
-    if (map.getLayer("raster-layer")) {
-      map.setLayoutProperty("raster-layer", "visibility", "visible");
+    if (map.getLayer(rasterLayerId)) {
+      map.setLayoutProperty(rasterLayerId, "visibility", visible ? "visible" : "none");
+      map.setPaintProperty(rasterLayerId, "raster-opacity", opacity);
     }
   } else {
-    map.addSource("raster-source", {
+    map.addSource(rasterSrcId, {
       type: "image",
       url: dataUrl,
       coordinates,
@@ -112,11 +142,14 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
     const beforeId = map.getLayer("citys-boundary") ? "citys-boundary" : (map.getLayer("provinces-boundary") ? "provinces-boundary" : undefined);
     map.addLayer(
       {
-        id: "raster-layer",
+        id: rasterLayerId,
         type: "raster",
-        source: "raster-source",
+        source: rasterSrcId,
+        layout: {
+          visibility: visible ? "visible" : "none",
+        },
         paint: {
-          "raster-opacity": 0.85,
+          "raster-opacity": opacity,
           "raster-fade-duration": 0,
         },
       },
@@ -125,14 +158,64 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
   }
 }
 
-export function setRasterVisibility(map, visible) {
-  if (map.getLayer("raster-layer")) {
-    map.setLayoutProperty("raster-layer", "visibility", visible ? "visible" : "none");
+export function setRasterVisibility(map, visible, layerId = null) {
+  if (!map || !map.getStyle) return;
+  if (layerId) {
+    const { rasterLayerId } = getRasterDOMIds(layerId);
+    if (map.getLayer(rasterLayerId)) {
+      map.setLayoutProperty(rasterLayerId, "visibility", visible ? "visible" : "none");
+    }
+  } else {
+    const style = map.getStyle();
+    if (style && style.layers) {
+      for (const l of style.layers) {
+        if (l.id.includes("raster-layer") || l.id.endsWith("-raster-layer")) {
+          if (map.getLayer(l.id)) {
+            map.setLayoutProperty(l.id, "visibility", visible ? "visible" : "none");
+          }
+        }
+      }
+    }
   }
 }
 
-export function removeRasterLayer(map) {
-  if (!map) return;
-  if (map.getLayer("raster-layer")) map.removeLayer("raster-layer");
-  if (map.getSource("raster-source")) map.removeSource("raster-source");
+export function setLayerRasterVisibility(map, layerId, visible) {
+  setRasterVisibility(map, visible, layerId);
+}
+
+export function removeRasterLayer(map, layerId = null) {
+  if (!map || !map.getStyle) return;
+  if (layerId) {
+    const { rasterSrcId, rasterLayerId } = getRasterDOMIds(layerId);
+    if (map.getLayer(rasterLayerId)) map.removeLayer(rasterLayerId);
+    if (map.getSource(rasterSrcId)) map.removeSource(rasterSrcId);
+  } else {
+    removeAllRasterLayers(map);
+  }
+}
+
+export function removeAllRasterLayers(map) {
+  if (!map || !map.getStyle) return;
+  const style = map.getStyle();
+  if (!style) return;
+
+  if (style.layers) {
+    for (const l of style.layers) {
+      if (l.id.includes("raster-layer") || l.id.endsWith("-raster-layer")) {
+        if (map.getLayer(l.id)) {
+          map.removeLayer(l.id);
+        }
+      }
+    }
+  }
+
+  if (style.sources) {
+    for (const srcId of Object.keys(style.sources)) {
+      if (srcId.includes("raster-source") || srcId.endsWith("-raster-source")) {
+        if (map.getSource(srcId)) {
+          map.removeSource(srcId);
+        }
+      }
+    }
+  }
 }

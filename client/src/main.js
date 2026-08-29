@@ -334,13 +334,20 @@ async function loadWeatherField(map, model, element, level, period, customOption
     if (win && expectedSeq !== null && expectedSeq !== undefined && win.loadSeq !== expectedSeq) {
       return; // Discard stale in-flight response from fast navigation
     }
-    appState.set("gridData", gridData);
-    if (win) {
-      win.gridData = gridData;
-      if (isWind) win.windGridData = gridData;
-    }
     const colormap = customOptions?.colormap || element;
-    if (win) win.colormap = colormap;
+
+    if (!win?.activeGroup) {
+      appState.set("gridData", gridData);
+      if (win) {
+        win.gridData = gridData;
+        win.element = element;
+        win.model = model;
+        win.colormap = colormap;
+      }
+    }
+    if (win && isWind) {
+      win.windGridData = gridData;
+    }
 
     if (!isWind) {
       renderContourLayers(map, gridData, element, {
@@ -363,7 +370,10 @@ async function loadWeatherField(map, model, element, level, period, customOption
       element,
       level,
       model,
+      path,
+      file,
       gridData,
+      colormap,
       color: lineColor,
       visible: isVisible,
       config: isWind ? {
@@ -385,11 +395,11 @@ async function loadWeatherField(map, model, element, level, period, customOption
     }, win);
 
     if ((showRaster || appState.state.layers.raster) && isVisible) {
-      if (gridData && gridData.values) {
-        renderGridRaster(map, gridData, element, colormap);
+      if (gridData && (gridData.values || (gridData.u && gridData.v))) {
+        renderGridRaster(map, gridData, element, colormap, { layerId, opacity });
       } else {
         const binBuffer = await fetchGridBinaryStream(path, file);
-        renderBinaryRaster(map, binBuffer, element, colormap);
+        renderBinaryRaster(map, binBuffer, element, colormap, { layerId, opacity });
       }
     }
 

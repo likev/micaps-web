@@ -8,11 +8,12 @@ import {
   removeContourLayer,
 } from "../layers/contourLayer.js";
 import { setStationVisibility, setStationConfig, getStationGeoJSON } from "../layers/stationLayer.js";
-import { renderBinaryRaster, renderGridRaster, setRasterVisibility } from "../layers/rasterLayer.js";
+import { renderBinaryRaster, renderGridRaster, setRasterVisibility, removeRasterLayer, getRasterDOMIds } from "../layers/rasterLayer.js";
 import { renderWindStreamlines, stopWindAnimation, renderGridWindBarbs, removeGridWindBarbs, generateStationWindGrid } from "../layers/windLayer.js";
 import { fetchGridBinaryStream, fetchGridData, fetchStationObservations } from "../api/catalogApi.js";
 import { appState } from "../store/appState.js";
 import { getActiveWindow } from "./tabWindowManager.js";
+import { getLayersForWindow } from "./layerControl.js";
 
 export function handleLayerAction(map, action, layerId, value, layer, win = getActiveWindow()) {
   if (action === "visibility") {
@@ -20,7 +21,7 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
       setLayerIsobandVisibility(map, layerId, value && layer.config?.showFill);
       setLayerIsolineVisibility(map, layerId, value && layer.config?.showLine);
       if (layer.config?.showRaster) {
-        setRasterVisibility(map, value);
+        setRasterVisibility(map, value, layerId);
       }
       if (layer.config?.showWind) {
         if (value) {
@@ -81,7 +82,13 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
     } else if (layer.type === "contour" || layer.type === "wind") {
       if (value.showFill !== undefined) setLayerIsobandVisibility(map, layerId, layer.visible && value.showFill);
       if (value.showLine !== undefined) setLayerIsolineVisibility(map, layerId, layer.visible && value.showLine);
-      if (value.opacity !== undefined) setLayerIsobandOpacity(map, layerId, value.opacity);
+      if (value.opacity !== undefined) {
+        setLayerIsobandOpacity(map, layerId, value.opacity);
+        const { rasterLayerId } = getRasterDOMIds(layerId);
+        if (map.getLayer(rasterLayerId)) {
+          map.setPaintProperty(rasterLayerId, "raster-opacity", value.opacity);
+        }
+      }
       if (value.lineWidth !== undefined || value.lineColor !== undefined || value.boldValues !== undefined || value.boldLineWidth !== undefined) {
         setLayerIsolineStyle(map, layerId, {
           lineWidth: layer.config?.lineWidth,
@@ -95,7 +102,7 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
         if (value.showRaster && layer.visible) {
           triggerRasterOverlay(map, layer, win);
         } else {
-          setRasterVisibility(map, false);
+          setRasterVisibility(map, false, layerId);
         }
       }
 
@@ -127,7 +134,7 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
   } else if (action === "remove") {
     if (layer.type === "contour" || layer.type === "wind") {
       removeContourLayer(map, layerId);
-      if (layer.config?.showRaster) setRasterVisibility(map, false);
+      removeRasterLayer(map, layerId);
       if (layer.config?.showWind) stopWindAnimation(map);
       if (layer.config?.showBarbs) removeGridWindBarbs(map);
     } else if (layer.type === "station") {
@@ -152,32 +159,40 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
 }
 
 function triggerRasterOverlay(map, layer = null, win = null) {
-  // 1. Direct in-memory gridData from layer (e.g. Surface SLP, Wind, or Sounding Analysis)
+  if (!map) return;
+
+  // If no specific layer is supplied (e.g. global aux raster action), trigger for all active weather layers in window
+  if (!layer) {
+    const layers = getLayersForWindow(win);
+    const weatherLayers = layers.filter(
+      (l) => (l.type === "contour" || l.type === "wind" || l.gridData) && l.visible !== false
+    );
+    if (weatherLayers.length > 0) {
+      weatherLayers.forEach((l) => triggerRasterOverlay(map, l, win));
+      return;
+    }
+  }
+
+  const layerId = layer?.id || (layer?.type === "wind" || layer?.element === "WIND" ? "wind-WIND" : (layer?.element ? `contour-${layer.element}` : "default"));
+  const element = layer?.element || win?.element || "TMP";
+  const colormap = layer?.colormap || layer?.render?.colormap || win?.colormap || element;
+  const opacity = layer?.config?.opacity !== undefined ? layer.config.opacity : 0.85;
+
+  // 1. Direct in-memory gridData from layer (e.g. RH, HGT, Wind, Surface SLP, or Sounding Analysis)
   if (layer?.gridData) {
-    const colormap = layer.colormap || layer.render?.colormap || layer.element || "TMP";
-    renderGridRaster(map, layer.gridData, layer.element || "TMP", colormap);
+    renderGridRaster(map, layer.gridData, element, colormap, { layerId, opacity });
     return;
   }
 
-  // 2. Wind gridData from window
+  // 2. Wind gridData from window (if wind layer without attached gridData)
   if ((layer?.type === "wind" || layer?.element === "WIND") && win?.windGridData) {
-    const colormap = layer?.colormap || layer?.render?.colormap || "WIND";
-    renderGridRaster(map, win.windGridData, "WIND", colormap);
-    return;
-  }
-
-  // 3. In-memory gridData from window
-  if (win?.gridData && (!layer || layer.element === win.element)) {
-    const colormap = win.colormap || layer?.colormap || win.element || "TMP";
-    renderGridRaster(map, win.gridData, win.element || "TMP", colormap);
+    renderGridRaster(map, win.windGridData, "WIND", colormap, { layerId, opacity });
     return;
   }
 
   // 3. Dynamic model, element, level and file from layer or window
   const model = layer?.model || win?.model || "ECMWF_HR";
-  const element = layer?.element || win?.element || "TMP";
   const level = layer?.level !== undefined && layer?.level !== null ? layer.level : (win?.level !== undefined ? win.level : null);
-  const colormap = layer?.colormap || win?.colormap || element;
 
   let path = layer?.path;
   if (!path) {
@@ -199,13 +214,14 @@ function triggerRasterOverlay(map, layer = null, win = null) {
 
   fetchGridBinaryStream(path, file)
     .then((bin) => {
-      renderBinaryRaster(map, bin, element, colormap);
+      renderBinaryRaster(map, bin, element, colormap, { layerId, opacity });
     })
     .catch((err) => {
-      console.warn("[Raster] Binary stream fetch failed, trying JSON gridData:", err);
+      console.warn(`[Raster] Binary stream fetch failed for ${path}/${file}, trying JSON gridData:`, err);
       fetchGridData(path, file).then((grid) => {
-        if (grid && grid.values) {
-          renderGridRaster(map, grid, element, colormap);
+        if (grid && (grid.values || (grid.u && grid.v))) {
+          if (layer) layer.gridData = grid;
+          renderGridRaster(map, grid, element, colormap, { layerId, opacity });
         }
       });
     });

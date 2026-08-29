@@ -1,6 +1,7 @@
 // contourLayer.js - In-browser Marching Squares isoband and isoline generator
 import * as griddata from "griddata";
 import { getElementLevels, getHexColor } from "../utils/colormaps.js";
+import { removeRasterLayer } from "./rasterLayer.js";
 
 export function parseBoldValues(boldInput, element = null) {
   if (!boldInput) {
@@ -315,6 +316,7 @@ export function removeContourLayer(map, layerId) {
   if (map.getSource(isolineSrcId)) map.removeSource(isolineSrcId);
   if (map.getLayer(isobandLayerId)) map.removeLayer(isobandLayerId);
   if (map.getSource(isobandSrcId)) map.removeSource(isobandSrcId);
+  removeRasterLayer(map, layerId);
 }
 
 
