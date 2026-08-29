@@ -3,6 +3,13 @@ import { autoSaveLayerConfig } from "../config/presets.js";
 
 const PRESETS = {
   clear: [],
+  // Upper-Air Sounding Presets
+  hgt_5880: [{ field: "Height", op: ">=", val: "5880" }],
+  hgt_5520: [{ field: "Height", op: "<=", val: "5520" }],
+  wind_20: [{ field: "Wind", op: ">=", val: "20" }],
+  wind_12: [{ field: "Wind", op: ">=", val: "12" }],
+  tt_m20: [{ field: "TT", op: "<=", val: "-20" }],
+  // Surface Observation Presets
   wind5_rain10_tt10_30: [
     { field: "Wind", op: ">", val: "5" },
     { field: "Rain", op: ">", val: "10" },
@@ -56,10 +63,19 @@ export function ensureLayerFilterRules(layer) {
   }
 }
 
+function isUpperAir(layer) {
+  if (!layer) return false;
+  if (layer.model === "UPPER_AIR") return true;
+  const id = (layer.id || "").toLowerCase();
+  const name = (layer.name || "").toLowerCase();
+  return id.includes("upper") || id.includes("sounding") || name.includes("upper") || name.includes("sounding") || name.includes("高空") || name.includes("探空") || (layer.type === "station" && typeof layer.level === "number" && layer.level > 0);
+}
+
 export function renderStationFilterSection(layer) {
   ensureLayerFilterRules(layer);
   const rules = layer.config.filterRules;
   const logic = layer.config.filterLogic || "AND";
+  const upper = isUpperAir(layer);
 
   return `
     <div class="config-filter-section" style="margin-top: 8px; border-top: 1px solid #30363d; padding-top: 6px;">
@@ -77,7 +93,7 @@ export function renderStationFilterSection(layer) {
 
       <!-- Rule Rows Container -->
       <div class="filter-rules-list" style="display: flex; flex-direction: column; gap: 4px;">
-        ${rules.map((rule, idx) => renderSingleRuleRow(rule, idx, rules.length, logic)).join("")}
+        ${rules.map((rule, idx) => renderSingleRuleRow(rule, idx, rules.length, logic, upper)).join("")}
       </div>
 
       <!-- Action Buttons -->
@@ -92,6 +108,16 @@ export function renderStationFilterSection(layer) {
 
       <!-- Quick Filter Presets -->
       <div class="config-quick-presets" style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px;">
+        ${
+          upper
+            ? `
+        <button type="button" class="btn-multi-filter-preset" data-preset="hgt_5880" style="padding: 1px 6px; background: #21262d; color: #58a6ff; font-weight: 600; border: 1px solid #388bfd; border-radius: 3px; font-size: 10px; cursor: pointer;">Height≥5880 (Sub-High)</button>
+        <button type="button" class="btn-multi-filter-preset" data-preset="wind_20" style="padding: 1px 6px; background: #21262d; color: #f85149; font-weight: 600; border: 1px solid #da3633; border-radius: 3px; font-size: 10px; cursor: pointer;">Wind≥20m/s (Jet)</button>
+        <button type="button" class="btn-multi-filter-preset" data-preset="tt_m20" style="padding: 1px 6px; background: #21262d; color: #79c0ff; border: 1px solid #30363d; border-radius: 3px; font-size: 10px; cursor: pointer;">TT≤-20°C (Cold)</button>
+        <button type="button" class="btn-multi-filter-preset" data-preset="hgt_5520" style="padding: 1px 6px; background: #21262d; color: #a5d6ff; border: 1px solid #30363d; border-radius: 3px; font-size: 10px; cursor: pointer;">Height≤5520 (Trough)</button>
+        <button type="button" class="btn-multi-filter-preset" data-preset="wind_12" style="padding: 1px 6px; background: #21262d; color: #e3b341; border: 1px solid #30363d; border-radius: 3px; font-size: 10px; cursor: pointer;">Wind≥12m/s</button>
+        `
+            : `
         <button type="button" class="btn-multi-filter-preset" data-preset="wind5_rain10_tt10_30" style="padding: 1px 6px; background: #21262d; color: #58a6ff; font-weight: 600; border: 1px solid #388bfd; border-radius: 3px; font-size: 10px; cursor: pointer;">Wind&gt;5 &amp; Rain&gt;10 &amp; TT 10..30</button>
         <button type="button" class="btn-multi-filter-preset" data-preset="wind5_rain10" style="padding: 1px 6px; background: #21262d; color: #a5d6ff; border: 1px solid #30363d; border-radius: 3px; font-size: 10px; cursor: pointer;">Wind&gt;5 &amp; Rain&gt;10</button>
         <button type="button" class="btn-multi-filter-preset" data-preset="tt_10_30" style="padding: 1px 6px; background: #21262d; color: #56d364; border: 1px solid #30363d; border-radius: 3px; font-size: 10px; cursor: pointer;">TT 10..30</button>
@@ -101,12 +127,14 @@ export function renderStationFilterSection(layer) {
         <button type="button" class="btn-multi-filter-preset" data-preset="rain_gt10" style="padding: 1px 6px; background: #21262d; color: #79c0ff; border: 1px solid #30363d; border-radius: 3px; font-size: 10px; cursor: pointer;">Rain&gt;10</button>
         <button type="button" class="btn-multi-filter-preset" data-preset="rain6_gt10" style="padding: 1px 6px; background: #21262d; color: #38bdf8; border: 1px solid #388bfd; border-radius: 3px; font-size: 10px; cursor: pointer;">Rain6&gt;10</button>
         <button type="button" class="btn-multi-filter-preset" data-preset="vis_lt1" style="padding: 1px 6px; background: #21262d; color: #ffd33d; border: 1px solid #d29922; border-radius: 3px; font-size: 10px; cursor: pointer;">Vis&lt;1km</button>
+        `
+        }
       </div>
     </div>
   `;
 }
 
-function renderSingleRuleRow(rule, idx, totalCount, logic) {
+function renderSingleRuleRow(rule, idx, totalCount, logic, upper = false) {
   const isHidden = (logic === "none" && idx > 0);
   const isRange = rule.op === "between" || rule.op === "..";
 
@@ -115,6 +143,15 @@ function renderSingleRuleRow(rule, idx, totalCount, logic) {
       <span style="font-size: 10px; color: #8b949e; min-width: 14px;">#${idx + 1}</span>
       <select class="sel-rule-field" data-rule-idx="${idx}" style="flex: 1.1; min-width: 72px; background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 3px; font-size: 11px; padding: 2px 2px;">
         <option value="none" ${!rule.field || rule.field === "none" ? "selected" : ""}>- Field -</option>
+        ${
+          upper
+            ? `
+        <option value="Height" ${rule.field === "Height" ? "selected" : ""}>Height (gpm)</option>
+        <option value="TT" ${rule.field === "TT" ? "selected" : ""}>TT (Temp °C)</option>
+        <option value="Td" ${rule.field === "Td" ? "selected" : ""}>Td (Dew °C)</option>
+        <option value="Wind" ${rule.field === "Wind" ? "selected" : ""}>Wind (m/s)</option>
+        `
+            : `
         <option value="TT" ${rule.field === "TT" ? "selected" : ""}>TT (Temp °C)</option>
         <option value="Td" ${rule.field === "Td" ? "selected" : ""}>Td (Dew °C)</option>
         <option value="Wind" ${rule.field === "Wind" ? "selected" : ""}>Wind (m/s)</option>
@@ -122,7 +159,8 @@ function renderSingleRuleRow(rule, idx, totalCount, logic) {
         <option value="Rain6" ${rule.field === "Rain6" ? "selected" : ""}>6h Rain (mm)</option>
         <option value="Visibility" ${rule.field === "Visibility" ? "selected" : ""}>Vis (km)</option>
         <option value="SLP" ${rule.field === "SLP" ? "selected" : ""}>SLP (hPa)</option>
-        <option value="Height" ${rule.field === "Height" ? "selected" : ""}>Height (gpm)</option>
+        `
+        }
       </select>
       <select class="sel-rule-op" data-rule-idx="${idx}" style="width: 52px; background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 3px; font-size: 11px; padding: 2px 1px; text-align: center;">
         <option value=">" ${rule.op === ">" ? "selected" : ""}>&gt;</option>
@@ -150,8 +188,9 @@ export function bindStationFilterEvents(configDrawer, layer, onAction, winId) {
   const rerender = () => {
     const listContainer = configDrawer.querySelector(".filter-rules-list");
     if (listContainer) {
+      const upper = isUpperAir(layer);
       listContainer.innerHTML = layer.config.filterRules
-        .map((rule, idx) => renderSingleRuleRow(rule, idx, layer.config.filterRules.length, layer.config.filterLogic))
+        .map((rule, idx) => renderSingleRuleRow(rule, idx, layer.config.filterRules.length, layer.config.filterLogic, upper))
         .join("");
       attachRuleInputListeners();
     }

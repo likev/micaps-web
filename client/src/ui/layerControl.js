@@ -21,6 +21,20 @@ function isWindRelated(layer) {
   return false;
 }
 
+export function isUpperAirStationLayer(layer) {
+  if (!layer) return false;
+  if (layer.model === "UPPER_AIR") return true;
+  const id = (layer.id || "").toLowerCase();
+  const name = (layer.name || "").toLowerCase();
+  if (id.includes("upper") || id.includes("sounding") || name.includes("upper") || name.includes("sounding") || name.includes("高空") || name.includes("探空")) {
+    return true;
+  }
+  if (layer.type === "station" && typeof layer.level === "number" && layer.level > 0 && layer.level < 1050) {
+    return true;
+  }
+  return false;
+}
+
 function createDefaultLayers(winId = "default") {
   return [
     {
@@ -105,7 +119,20 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
       visible: layerDef.visible !== undefined ? layerDef.visible : true,
       isExpanded: false,
       color: layerDef.color || (layerDef.element === "HGT" ? "#58a6ff" : layerDef.element === "TMP" ? "#f85149" : "#388bfd"),
-      config: layerDef.type === "station" ? {
+      config: layerDef.type === "station" ? (isUpperAirStationLayer(layerDef) ? {
+        showTemp: layerDef.config?.showTemp !== undefined ? layerDef.config.showTemp : true,
+        showDewpoint: layerDef.config?.showDewpoint !== undefined ? layerDef.config.showDewpoint : true,
+        showPressure: layerDef.config?.showPressure !== undefined ? layerDef.config.showPressure : true,
+        showWind: layerDef.config?.showWind !== undefined ? layerDef.config.showWind : true,
+        showStreamlines: layerDef.config?.showStreamlines !== undefined ? layerDef.config.showStreamlines : false,
+        filterField1: layerDef.config?.filterField1 || "none",
+        filterOp1: layerDef.config?.filterOp1 || ">=",
+        filterVal1: layerDef.config?.filterVal1 !== undefined ? layerDef.config.filterVal1 : "",
+        filterLogic: layerDef.config?.filterLogic || "none",
+        filterField2: layerDef.config?.filterField2 || "none",
+        filterOp2: layerDef.config?.filterOp2 || "<=",
+        filterVal2: layerDef.config?.filterVal2 !== undefined ? layerDef.config.filterVal2 : "",
+      } : {
         showTemp: layerDef.config?.showTemp !== undefined ? layerDef.config.showTemp : true,
         showDewpoint: layerDef.config?.showDewpoint !== undefined ? layerDef.config.showDewpoint : true,
         showWind: layerDef.config?.showWind !== undefined ? layerDef.config.showWind : true,
@@ -113,6 +140,8 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
         showWeather: layerDef.config?.showWeather !== undefined ? layerDef.config.showWeather : false,
         showPressure: layerDef.config?.showPressure !== undefined ? layerDef.config.showPressure : false,
         showTendency: layerDef.config?.showTendency !== undefined ? layerDef.config.showTendency : false,
+        showVisibility: layerDef.config?.showVisibility !== undefined ? layerDef.config.showVisibility : false,
+        showRain6: layerDef.config?.showRain6 !== undefined ? layerDef.config.showRain6 : false,
         showStreamlines: layerDef.config?.showStreamlines !== undefined ? layerDef.config.showStreamlines : false,
         filterField1: layerDef.config?.filterField1 || "none",
         filterOp1: layerDef.config?.filterOp1 || ">",
@@ -121,7 +150,7 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
         filterField2: layerDef.config?.filterField2 || "none",
         filterOp2: layerDef.config?.filterOp2 || "<",
         filterVal2: layerDef.config?.filterVal2 !== undefined ? layerDef.config.filterVal2 : "",
-      } : (layerDef.type === "wind" ? {
+      }) : (layerDef.type === "wind" ? {
         showWind: layerDef.config?.showWind !== undefined ? layerDef.config.showWind : true,
         showBarbs: layerDef.config?.showBarbs !== undefined ? layerDef.config.showBarbs : false,
         showRaster: layerDef.config?.showRaster !== undefined ? layerDef.config.showRaster : false,
@@ -277,14 +306,9 @@ function renderLayersManager(panel) {
       bindProp(".chk-show-fill", "change", (e) => { layer.config.showFill = e.target.checked; autoSaveLayerConfig(layer); });
       bindProp(".chk-show-line", "change", (e) => { layer.config.showLine = e.target.checked; autoSaveLayerConfig(layer); });
       bindProp(".slider-fill-opacity", "input", (e) => { layer.config.opacity = parseInt(e.target.value, 10) / 100; autoSaveLayerConfig(layer); });
-      bindProp(".slider-fill-opacity", "change", (e) => { layer.config.opacity = parseInt(e.target.value, 10) / 100; autoSaveLayerConfig(layer); });
       bindProp(".color-picker-line", "input", (e) => { updateColor(e); autoSaveLayerConfig(layer); });
-      bindProp(".color-picker-line", "change", (e) => { updateColor(e); autoSaveLayerConfig(layer); });
-      bindProp(".input-line-width", "input", (e) => { layer.config.lineWidth = parseFloat(e.target.value) || 2.0; autoSaveLayerConfig(layer); });
       bindProp(".input-line-width", "change", (e) => { layer.config.lineWidth = parseFloat(e.target.value) || 2.0; autoSaveLayerConfig(layer); });
-      bindProp(".input-bold-values", "input", (e) => { layer.config.boldValues = parseBoldValues(e.target.value); autoSaveLayerConfig(layer); });
       bindProp(".input-bold-values", "change", (e) => { layer.config.boldValues = parseBoldValues(e.target.value); autoSaveLayerConfig(layer); });
-      bindProp(".input-bold-line-width", "input", (e) => { layer.config.boldLineWidth = parseFloat(e.target.value) || 4.0; autoSaveLayerConfig(layer); });
       bindProp(".input-bold-line-width", "change", (e) => { layer.config.boldLineWidth = parseFloat(e.target.value) || 4.0; autoSaveLayerConfig(layer); });
       bindProp(".chk-show-raster", "change", (e) => { layer.config.showRaster = e.target.checked; autoSaveLayerConfig(layer); });
       bindProp(".chk-show-wind", "change", (e) => { layer.config.showWind = e.target.checked; autoSaveLayerConfig(layer); });
@@ -306,16 +330,18 @@ function renderLayersManager(panel) {
         }
       };
 
-      bindStationCheckbox(".chk-station-temp", "showTemp");
-      bindStationCheckbox(".chk-station-dewpoint", "showDewpoint");
-      bindStationCheckbox(".chk-station-wind", "showWind");
-      bindStationCheckbox(".chk-station-cloud", "showCloud");
-      bindStationCheckbox(".chk-station-weather", "showWeather");
-      bindStationCheckbox(".chk-station-pressure", "showPressure");
-      bindStationCheckbox(".chk-station-tendency", "showTendency");
-      bindStationCheckbox(".chk-station-vis", "showVisibility");
-      bindStationCheckbox(".chk-station-rain6", "showRain6");
-      bindStationCheckbox(".chk-station-streamlines", "showStreamlines");
+      [
+        [".chk-station-temp", "showTemp"],
+        [".chk-station-dewpoint", "showDewpoint"],
+        [".chk-station-pressure", "showPressure"],
+        [".chk-station-wind", "showWind"],
+        [".chk-station-cloud", "showCloud"],
+        [".chk-station-weather", "showWeather"],
+        [".chk-station-tendency", "showTendency"],
+        [".chk-station-vis", "showVisibility"],
+        [".chk-station-rain6", "showRain6"],
+        [".chk-station-streamlines", "showStreamlines"],
+      ].forEach(([sel, key]) => bindStationCheckbox(sel, key));
 
       bindStationFilterEvents(configDrawer, layer, onLayerActionCallback, currentActiveWinId);
     }
@@ -335,15 +361,48 @@ function renderLayersManager(panel) {
         }
       };
 
-      bindBasemapCheckbox(".chk-basemap-graticule", "showGraticule");
-      bindBasemapCheckbox(".chk-basemap-provinces", "showProvinces");
-      bindBasemapCheckbox(".chk-basemap-cities", "showCities");
+      [
+        [".chk-basemap-graticule", "showGraticule"],
+        [".chk-basemap-provinces", "showProvinces"],
+        [".chk-basemap-cities", "showCities"],
+      ].forEach(([sel, key]) => bindBasemapCheckbox(sel, key));
     }
   });
 
   // Bind auxiliary checkboxes for compatibility
   bindAuxCheckbox("chk-raster", "raster");
   bindAuxCheckbox("chk-wind", "wind");
+}
+
+function renderStationDrawerHTML(layer) {
+  const upper = isUpperAirStationLayer(layer);
+  const items = upper ? [
+    ["chk-station-temp", layer.config?.showTemp !== false, "Temperature (TT)"],
+    ["chk-station-dewpoint", layer.config?.showDewpoint !== false, "Dew Point / Dep (Td)"],
+    ["chk-station-pressure", layer.config?.showPressure !== false, "Geopotential Height (H)"],
+    ["chk-station-wind", layer.config?.showWind !== false, "Wind Barbs (FF/dd)"],
+  ] : [
+    ["chk-station-temp", layer.config?.showTemp !== false, "Temperature (TT)"],
+    ["chk-station-dewpoint", layer.config?.showDewpoint !== false, "Dew Point (Td)"],
+    ["chk-station-pressure", layer.config?.showPressure !== false, "Sea Level Pressure (SLP)"],
+    ["chk-station-wind", layer.config?.showWind !== false, "Wind Barbs (FF/dd)"],
+    ["chk-station-cloud", Boolean(layer.config?.showCloud), "Cloud Cover (N)"],
+    ["chk-station-weather", Boolean(layer.config?.showWeather), "Weather Symbol (ww)"],
+    ["chk-station-tendency", Boolean(layer.config?.showTendency), "3h Tendency (ppa)"],
+    ["chk-station-vis", Boolean(layer.config?.showVisibility), "Visibility (VV)"],
+    ["chk-station-rain6", Boolean(layer.config?.showRain6), "6h Rain (R6)"],
+  ];
+
+  return `
+    <div class="config-grid-2col">
+      ${items.map(([cls, chk, label]) => `<label class="config-checkbox-item"><input type="checkbox" class="${cls}" ${chk ? "checked" : ""} /><span>${label}</span></label>`).join("")}
+      <label class="config-checkbox-item" style="grid-column: span 2; border-top: 1px solid #30363d; padding-top: 4px; margin-top: 2px;">
+        <input type="checkbox" class="chk-station-streamlines" ${layer.config?.showStreamlines ? "checked" : ""} />
+        <span style="color: #58a6ff; font-weight: 600;">Wind Streamlines (Flow Analysis)</span>
+      </label>
+    </div>
+    ${renderStationFilterSection(layer)}
+  `;
 }
 
 function renderLayerRow(layer) {
@@ -460,51 +519,7 @@ function renderLayerRow(layer) {
             }
             `
             : (layer.type === "station"
-            ? `
-            <div class="config-grid-2col">
-              <label class="config-checkbox-item">
-                <input type="checkbox" class="chk-station-temp" ${layer.config?.showTemp ? "checked" : ""} />
-                <span>Temperature (TT)</span>
-              </label>
-              <label class="config-checkbox-item">
-                <input type="checkbox" class="chk-station-dewpoint" ${layer.config?.showDewpoint ? "checked" : ""} />
-                <span>Dew Point (Td)</span>
-              </label>
-              <label class="config-checkbox-item">
-                <input type="checkbox" class="chk-station-wind" ${layer.config?.showWind ? "checked" : ""} />
-                <span>Wind Barbs (FF/dd)</span>
-              </label>
-              <label class="config-checkbox-item">
-                <input type="checkbox" class="chk-station-cloud" ${layer.config?.showCloud ? "checked" : ""} />
-                <span>Cloud Cover (N)</span>
-              </label>
-              <label class="config-checkbox-item">
-                <input type="checkbox" class="chk-station-weather" ${layer.config?.showWeather ? "checked" : ""} />
-                <span>Weather Symbol (ww)</span>
-              </label>
-              <label class="config-checkbox-item">
-                <input type="checkbox" class="chk-station-pressure" ${layer.config?.showPressure ? "checked" : ""} />
-                <span>Pressure / Height</span>
-              </label>
-              <label class="config-checkbox-item">
-                <input type="checkbox" class="chk-station-tendency" ${layer.config?.showTendency ? "checked" : ""} />
-                <span>3h Tendency (ppa)</span>
-              </label>
-              <label class="config-checkbox-item">
-                <input type="checkbox" class="chk-station-vis" ${layer.config?.showVisibility ? "checked" : ""} />
-                <span>Visibility (VV)</span>
-              </label>
-              <label class="config-checkbox-item">
-                <input type="checkbox" class="chk-station-rain6" ${layer.config?.showRain6 ? "checked" : ""} />
-                <span>6h Rain (R6)</span>
-              </label>
-              <label class="config-checkbox-item" style="grid-column: span 2; border-top: 1px solid #30363d; padding-top: 4px; margin-top: 2px;">
-                <input type="checkbox" class="chk-station-streamlines" ${layer.config?.showStreamlines ? "checked" : ""} />
-                <span style="color: #58a6ff; font-weight: 600;">Wind Streamlines (Flow Analysis)</span>
-              </label>
-            </div>
-            ${renderStationFilterSection(layer)}
-            `
+            ? renderStationDrawerHTML(layer)
             : `
             <div class="config-row">
               <label>
