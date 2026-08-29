@@ -62,7 +62,8 @@ export function renderGridRaster(map, gridData, element = "TMP", colormap = null
   }
 
   let floatValues = gridData.values;
-  if (!floatValues && gridData.u && gridData.v) {
+  const isWind = element === "WIND" || (typeof colormap === "string" && colormap.toUpperCase().includes("WIND"));
+  if ((isWind || !floatValues) && gridData.u && gridData.v) {
     const is2D = Array.isArray(gridData.u) && Array.isArray(gridData.u[0]);
     if (is2D) {
       floatValues = gridData.u.map((row, r) => row.map((uVal, c) => Math.hypot(uVal, gridData.v[r][c])));
@@ -75,8 +76,8 @@ export function renderGridRaster(map, gridData, element = "TMP", colormap = null
     }
   }
 
-  const zMin = gridData.stats?.min;
-  const zMax = gridData.stats?.max;
+  const zMin = isWind ? 0 : gridData.stats?.min;
+  const zMax = isWind ? undefined : gridData.stats?.max;
 
   renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat, element, colormap, zMin, zMax, options);
 }
