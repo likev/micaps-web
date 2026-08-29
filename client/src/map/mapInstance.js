@@ -28,7 +28,12 @@ export function createMapInstance(containerIdOrEl, options = {}) {
     minZoom: 2,
     maxZoom: 14,
     attributionControl: false,
+    keyboard: false,
   });
+
+  if (mapInstance.keyboard) {
+    mapInstance.keyboard.disable();
+  }
 
   mapInstance.addControl(
     new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }),

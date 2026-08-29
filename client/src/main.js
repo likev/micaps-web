@@ -7,18 +7,19 @@ import { initTimeSlider, setTimelineMode, setTimeSliderVisible, step as timeSlid
 import { handleLayerAction, triggerStationStreamlines } from "./ui/layerActions.js";
 import { initTooltip } from "./ui/tooltip.js";
 import { renderContourLayers, removeAllContourLayers } from "./layers/contourLayer.js";
-import { renderBinaryRaster, removeRasterLayer } from "./layers/rasterLayer.js";
+import { renderBinaryRaster, renderGridRaster, removeRasterLayer } from "./layers/rasterLayer.js";
 import { renderStationWeatherPlots, setStationVisibility, removeStationLayer } from "./layers/stationLayer.js";
 import { renderWindStreamlines, stopWindAnimation, renderGridWindBarbs, removeGridWindBarbs } from "./layers/windLayer.js";
 import { analyzeAndRenderSoundingContours } from "./layers/soundingAnalysis.js";
 import { analyzeAndRenderSurfaceSLPContours } from "./layers/surfaceAnalysis.js";
-import { fetchGridData, fetchGridBinaryStream, fetchStationObservations, fetchTree, fetchLatest } from "./api/catalogApi.js";
+import { fetchGridData, fetchGridBinaryStream, fetchStationObservations } from "./api/catalogApi.js";
 import { updateLegend } from "./ui/legend.js";
 import { initKeyboardShortcuts } from "./ui/keyboardShortcuts.js";
 import { initConfigEditor, openConfigTab } from "./ui/configEditor.js";
 import { appState } from "./store/appState.js";
-import { loadPresetGroups, DEFAULT_MOCK_OBS_FILES } from "./config/presets.js";
+import { loadPresetGroups } from "./config/presets.js";
 import { resolveColormap } from "./utils/colormaps.js";
+import { resolveForecastCycles, resolveLatestForecastCycle, syncObservationTimeline } from "./utils/timelineSync.js";
 import {
   initTabWindowManager,
   getActiveWindow,
@@ -299,45 +300,7 @@ async function bootstrap() {
   }
 }
 
-const forecastCyclesCache = {};
-async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP", level = 500) {
-  const path = `${model}/${element}/${level || 500}`;
-  if (forecastCyclesCache[path]?.length) return forecastCyclesCache[path];
-  try {
-    const fileEntries = await fetchTree(path);
-    if (Array.isArray(fileEntries) && fileEntries.length > 0) {
-      const cycleSet = new Set();
-      for (const f of fileEntries) {
-        if (!f.name) continue;
-        const parts = f.name.split(".");
-        if (parts.length >= 2 && parts[0].length >= 8) {
-          cycleSet.add(parts[0]);
-        }
-      }
-      if (cycleSet.size > 0) {
-        const sorted = Array.from(cycleSet).sort().reverse();
-        forecastCyclesCache[path] = sorted;
-        forecastCyclesCache[model] = sorted;
-        return sorted;
-      }
-    }
-  } catch (err) {
-    console.warn(`[Forecast] Fetch cycles failed for ${path}:`, err);
-  }
-
-  const fallback = [
-    "26082908", "26082820", "26082808", "26082720", "26082708",
-    "26082620", "26082608", "26082520", "26082508", "26082420",
-  ];
-  return fallback;
-}
-
-async function resolveLatestForecastCycle(model = "ECMWF_HR", element = "TMP", level = 500) {
-  const cycles = await resolveForecastCycles(model, element, level);
-  return cycles[0] || "26082908";
-}
-
-async function loadWeatherField(map, model, element, level, period, customOptions = null, win = null, isTimeStep = false) {
+async function loadWeatherField(map, model, element, level, period, customOptions = null, win = null, isTimeStep = false, expectedSeq = null) {
   let cycle = win?.forecastCycle;
   if (!cycle) {
     cycle = await resolveLatestForecastCycle(model, element, level);
@@ -346,7 +309,7 @@ async function loadWeatherField(map, model, element, level, period, customOption
   const file = `${cycle}.${String(period).padStart(3, "0")}`;
   const path = `${model}/${element}/${level}`;
   const isWind = element === "WIND" || customOptions?.isWind;
-  const layerId = isWind ? `wind-${element}-${level}` : `contour-${element}-${level}`;
+  const layerId = customOptions?.id || (isWind ? `wind-${element}` : `contour-${element}`);
   const name = isWind ? `${level} hPa Wind Field (${model})` : `${level} hPa ${element} (${model})`;
 
   const existingLayer = getLayerById(layerId, win);
@@ -367,6 +330,9 @@ async function loadWeatherField(map, model, element, level, period, customOption
 
   try {
     const gridData = await fetchGridData(path, file);
+    if (win && expectedSeq !== null && expectedSeq !== undefined && win.loadSeq !== expectedSeq) {
+      return; // Discard stale in-flight response from fast navigation
+    }
     appState.set("gridData", gridData);
     if (win) {
       win.gridData = gridData;
@@ -445,47 +411,29 @@ async function loadWeatherField(map, model, element, level, period, customOption
   }
 }
 
-async function syncObservationTimeline(path, currentFile = null, winTitle = "", win = null) {
-  const isUpper = path.includes("UPPER_AIR") || winTitle.toLowerCase().includes("upper") || winTitle.toLowerCase().includes("sounding");
-  const stepLength = isUpper ? 12 : 3;
-  try {
-    const fileEntries = await fetchTree(path);
-    if (Array.isArray(fileEntries) && fileEntries.length > 0) {
-      let validFiles = fileEntries.filter((f) => f.name && (f.size > 100 || f.size === 0)).map((f) => f.name);
-      const hasObsFormat = validFiles.some((f) => f.length >= 14 && f.endsWith(".000"));
-      validFiles = hasObsFormat ? validFiles.filter((f) => f.length >= 14 && f.endsWith(".000")) : DEFAULT_MOCK_OBS_FILES;
-      if (validFiles.length > 0) {
-        const recentFiles = validFiles.length >= 2 && validFiles !== DEFAULT_MOCK_OBS_FILES ? validFiles.slice(0, 10).reverse() : DEFAULT_MOCK_OBS_FILES;
-        const targetFile = currentFile && recentFiles.includes(currentFile) ? currentFile : recentFiles[recentFiles.length - 1];
-        if (!win || getActiveWindow() === win) setTimelineMode("obs", { file: targetFile, files: recentFiles, winTitle, stepLength, path });
-        return targetFile;
-      }
-    }
-  } catch (err) {
-    console.warn("[Main] Failed to query observation file tree for timeline:", err);
-  }
-  const fallbackFile = currentFile || DEFAULT_MOCK_OBS_FILES[DEFAULT_MOCK_OBS_FILES.length - 1];
-  if (!win || getActiveWindow() === win) setTimelineMode("obs", { file: fallbackFile, files: DEFAULT_MOCK_OBS_FILES, winTitle, stepLength, path });
-  return fallbackFile;
-}
-
-async function loadUpperAirComposite(map, level = 500, obsTime = "20260828170000.000", win = getActiveWindow()) {
+async function loadUpperAirComposite(map, level = 500, obsTime = "20260828170000.000", win = getActiveWindow(), expectedSeq = null) {
   const path = `UPPER_AIR/PLOT/${level || 500}`;
   const stations = await fetchStationObservations(path, obsTime);
+  if (win && expectedSeq !== null && expectedSeq !== undefined && win.loadSeq !== expectedSeq) {
+    return; // Discard stale in-flight response from fast navigation
+  }
   appState.set("stationData", stations);
   renderStationWeatherPlots(map, stations, appState.state.layers.station);
-  const stnLayer = addOrUpdateLayer({ id: `station-upper-${level}`, name: `Upper Air ${level}hPa Soundings`, type: "station", color: "#e3b341", visible: true, removable: true, stationsGeoJSON: stations }, win);
+  const stnLayer = addOrUpdateLayer({ id: "station-upper", name: `${level || 500} hPa Sounding Station Plots`, type: "station", color: "#e3b341", visible: true, removable: true, stationsGeoJSON: stations }, win);
   if (stnLayer?.config?.showStreamlines) triggerStationStreamlines(map, stnLayer, win);
   if (stations?.features?.length >= 3) analyzeAndRenderSoundingContours(map, stations, level);
 }
 
-async function loadObservationProduct(map, model, element, level, file, win = getActiveWindow(), customPath = null) {
+async function loadObservationProduct(map, model, element, level, file, win = getActiveWindow(), customPath = null, expectedSeq = null) {
   const path = customPath || (model === "SURFACE" ? `SURFACE/${element}` : (model === "UPPER_AIR" ? `UPPER_AIR/${element}/${level || 500}` : `${model}/${element}`));
   try {
     const stations = await fetchStationObservations(path, file);
+    if (win && expectedSeq !== null && expectedSeq !== undefined && win.loadSeq !== expectedSeq) {
+      return; // Discard stale in-flight response from fast navigation
+    }
     appState.set("stationData", stations);
     renderStationWeatherPlots(map, stations, appState.state.layers.station);
-    const layerId = model === "UPPER_AIR" ? `station-upper-${level || 500}` : `station-${model.toLowerCase()}`;
+    const layerId = model === "UPPER_AIR" ? "station-upper" : `station-${model.toLowerCase()}`;
     const name = model === "UPPER_AIR" ? `${level || 500} hPa Sounding Station Plots` : `${model === "SURFACE" ? "Surface" : "Upper Air"} Station Observations`;
     const stnLayer = addOrUpdateLayer({ id: layerId, name, type: "station", color: "#e3b341", visible: true, removable: true, stationsGeoJSON: stations }, win);
     if (stnLayer?.config?.showStreamlines) triggerStationStreamlines(map, stnLayer, win);
@@ -512,7 +460,7 @@ export function clearAllWeatherLayersFromMap(map, win = null) {
   }
 }
 
-async function loadPresetGroup(map, group, period = null, level = null, win = null, isTimeStep = false) {
+async function loadPresetGroup(map, group, period = null, level = null, win = null, isTimeStep = false, expectedSeq = null) {
   if (!group || !group.layers) return;
   if (!isTimeStep) {
     clearAllWeatherLayersFromMap(map, win);
@@ -569,9 +517,10 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
         const render = layer.render || {};
         await loadWeatherField(map, layer.model, layer.element, targetLevel, curPeriod, {
           ...render,
+          id: layer.id,
           keepWind: true,
           colormap: resolveColormap(group, render, targetLevel),
-        }, win, isTimeStep);
+        }, win, isTimeStep, expectedSeq);
       } else if (layer.type === "station") {
         const obsPath = layer.path || (layer.model === "UPPER_AIR"
           ? `UPPER_AIR/${layer.element}/${targetLevel || 500}`
@@ -581,7 +530,7 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
           file = await syncObservationTimeline(obsPath, null, winTitle);
           if (win) win.obsTime = file;
         }
-        await loadObservationProduct(map, layer.model, layer.element, targetLevel, file, win, layer.path);
+        await loadObservationProduct(map, layer.model, layer.element, targetLevel, file, win, layer.path, expectedSeq);
       }
     })
   );
@@ -603,30 +552,37 @@ async function changeVerticalLevel(map, direction, explicitLevel = null, win = g
     if (targetLevel === curLevel) return;
   }
 
-  console.log(`[Level] Setting vertical level to ${targetLevel} hPa`);
+  if (win) {
+    win.loadSeq = (win.loadSeq || 0) + 1;
+  }
+  const currentSeq = win?.loadSeq;
+
+  console.log(`[Level] Setting vertical level to ${targetLevel} hPa (seq=${currentSeq})`);
   if (win) win.level = targetLevel;
   if (win && getActiveWindow() === win) appState.set("level", targetLevel);
   setNavBarLevel(targetLevel);
+  setWindowHeaderLevel(win, targetLevel);
 
   const activeGroup = win?.activeGroup;
   if (activeGroup && activeGroup.hasLevel) {
-    await loadPresetGroup(map, activeGroup, win.period, targetLevel, win);
+    await loadPresetGroup(map, activeGroup, win.period, targetLevel, win, false, currentSeq);
   } else if (win?.isObservation || win?.model === "UPPER_AIR") {
     clearAllWeatherLayersFromMap(map, win);
     const obsPath = `UPPER_AIR/PLOT/${targetLevel}`;
     const winTitle = `W${(win?.winIdx ?? 0) + 1}: Upper-Air ${targetLevel}hPa Sounding`;
     const file = await syncObservationTimeline(obsPath, null, winTitle, win);
+    if (win && win.loadSeq !== currentSeq) return;
     if (win) {
       win.obsTime = file;
       updateWindowTitle(win, `${targetLevel}hPa Upper-Air Sounding`);
     }
-    await loadObservationProduct(map, "UPPER_AIR", "PLOT", targetLevel, file, win, obsPath);
+    await loadObservationProduct(map, "UPPER_AIR", "PLOT", targetLevel, file, win, obsPath, currentSeq);
   } else {
     clearAllWeatherLayersFromMap(map, win);
     const model = win?.model || "ECMWF_HR";
     const element = win?.element || "TMP";
     const period = win?.period ?? 24;
-    await loadWeatherField(map, model, element, targetLevel, period, null, win);
+    await loadWeatherField(map, model, element, targetLevel, period, null, win, false, currentSeq);
   }
 }
 
