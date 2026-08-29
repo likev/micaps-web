@@ -39,6 +39,7 @@ let currentObsIdx = obsFiles.length - 1;
 
 let onTimeChangeCallback = null;
 let currentWinTitle = "";
+let isUpperAirMode = false;
 
 export function getPeriodsForStep(step = 6) {
   const stepNum = parseInt(step, 10) || 6;
@@ -62,8 +63,33 @@ export function getPeriodsForStep(step = 6) {
   return periods;
 }
 
-function filterObsFilesByStep(files, stepHours) {
+export function filterObsFilesByStep(files, stepHours, isUpper = false) {
   if (!Array.isArray(files) || files.length === 0) return [];
+
+  if (isUpper) {
+    const stepNum = parseInt(stepHours, 10) || 12;
+    if (stepNum === 12) {
+      // ONLY select 08:00 and 20:00 (UTC+8), filter out 14:00 and 02:00
+      const filtered = files.filter((f) => {
+        if (f.length < 10) return true;
+        const hour = parseInt(f.slice(8, 10), 10);
+        return hour === 8 || hour === 20;
+      });
+      return filtered.length > 0 ? filtered : files.filter((f) => {
+        const hour = parseInt(f.slice(8, 10), 10);
+        return hour !== 2 && hour !== 14;
+      });
+    } else if (stepNum === 6) {
+      // 6h upper-air runs: 02:00, 08:00, 14:00, 20:00 (UTC+8)
+      const filtered = files.filter((f) => {
+        if (f.length < 10) return true;
+        const hour = parseInt(f.slice(8, 10), 10);
+        return hour === 2 || hour === 8 || hour === 14 || hour === 20;
+      });
+      return filtered.length > 0 ? filtered : [...files];
+    }
+  }
+
   if (stepHours <= 1) return [...files];
 
   const filtered = [];
@@ -85,6 +111,42 @@ function filterObsFilesByStep(files, stepHours) {
     }
   }
   return filtered.length > 0 ? filtered : [...files];
+}
+
+function updateStepLengthOptions(isUpper, currentStep) {
+  const selStep = document.getElementById("select-step-length");
+  if (!selStep) return;
+
+  const targetOptions = isUpper
+    ? [
+        { value: "12", label: "12h" },
+        { value: "6", label: "6h" },
+      ]
+    : [
+        { value: "1", label: "1h" },
+        { value: "3", label: "3h" },
+        { value: "6", label: "6h" },
+        { value: "12", label: "12h" },
+        { value: "24", label: "24h" },
+      ];
+
+  const currentOptsStr = Array.from(selStep.options).map((o) => o.value).join(",");
+  const targetOptsStr = targetOptions.map((o) => o.value).join(",");
+
+  if (currentOptsStr !== targetOptsStr) {
+    selStep.innerHTML = "";
+    targetOptions.forEach((opt) => {
+      const el = document.createElement("option");
+      el.value = opt.value;
+      el.textContent = opt.label;
+      selStep.appendChild(el);
+    });
+  }
+
+  const validValues = targetOptions.map((o) => o.value);
+  const valToSet = validValues.includes(String(currentStep)) ? String(currentStep) : validValues[0];
+  selStep.value = valToSet;
+  currentStepLength = parseInt(valToSet, 10);
 }
 
 export function setTimeSliderVisible(visible = true) {
@@ -201,7 +263,7 @@ export function setStepLength(step, triggerCallback = false) {
     if (triggerCallback && onTimeChangeCallback) onTimeChangeCallback(newPeriod);
   } else {
     const curFile = obsFiles[currentObsIdx] || "";
-    obsFiles = filterObsFilesByStep(rawObsFiles, currentStepLength);
+    obsFiles = filterObsFilesByStep(rawObsFiles, currentStepLength, isUpperAirMode);
     const newIdx = obsFiles.indexOf(curFile);
     currentObsIdx = newIdx !== -1 ? newIdx : Math.max(0, obsFiles.length - 1);
     updateLabels();
@@ -348,30 +410,34 @@ export function setTimelineMode(mode, customData = {}) {
   if (customData.winTitle !== undefined) currentWinTitle = customData.winTitle;
   if (customData.initCycle) currentInitCycle = customData.initCycle;
 
+  if (currentMode === "obs") {
+    isUpperAirMode = Boolean(
+      customData.isUpper ||
+      (customData.path && customData.path.includes("UPPER_AIR")) ||
+      (customData.winTitle && (customData.winTitle.toLowerCase().includes("upper") || customData.winTitle.toLowerCase().includes("sounding")))
+    );
+  } else {
+    isUpperAirMode = false;
+  }
+
   // Set default step length: 12h for upper-air, 3h for surface, 6h for NWP forecast
   let targetStep = customData.stepLength;
   if (!targetStep) {
     if (currentMode === "obs") {
-      const isUpper = Boolean(
-        customData.isUpper ||
-        (customData.path && customData.path.includes("UPPER_AIR")) ||
-        (customData.winTitle && (customData.winTitle.toLowerCase().includes("upper") || customData.winTitle.toLowerCase().includes("sounding")))
-      );
-      targetStep = isUpper ? 12 : 3;
+      targetStep = isUpperAirMode ? 12 : 3;
     } else {
       targetStep = 6;
     }
   }
 
   currentStepLength = targetStep;
-  const selStep = document.getElementById("select-step-length");
-  if (selStep) selStep.value = String(currentStepLength);
+  updateStepLengthOptions(isUpperAirMode, currentStepLength);
 
   if (currentMode === "obs") {
     if (Array.isArray(customData.files) && customData.files.length > 0) {
       rawObsFiles = customData.files;
     }
-    obsFiles = filterObsFilesByStep(rawObsFiles, currentStepLength);
+    obsFiles = filterObsFilesByStep(rawObsFiles, currentStepLength, isUpperAirMode);
     if (customData.file) {
       const idx = obsFiles.indexOf(customData.file);
       currentObsIdx = idx !== -1 ? idx : Math.max(0, obsFiles.length - 1);

@@ -74,4 +74,31 @@ describe("Timeslider Step-Length & Discrete Periods", () => {
     expect(formattedValid).toContain("2026-08-29 20:00 (UTC+8)");
     expect(formattedValid).toContain("(+024h)");
   });
+
+  test("Upper-Air observation filtering: 12h keeps only 08:00 and 20:00 UTC+8, filters out 02:00 and 14:00", async () => {
+    const { filterObsFilesByStep } = await import("../src/ui/timeSlider.js");
+
+    const sampleFiles = [
+      "20260828020000.000", // 02:00 UTC+8
+      "20260828080000.000", // 08:00 UTC+8 (synoptic sounding)
+      "20260828140000.000", // 14:00 UTC+8
+      "20260828200000.000", // 20:00 UTC+8 (synoptic sounding)
+      "20260829020000.000", // 02:00 UTC+8
+      "20260829080000.000", // 08:00 UTC+8 (synoptic sounding)
+    ];
+
+    // 12h step for upper-air: ONLY 08:00 and 20:00
+    const filtered12h = filterObsFilesByStep(sampleFiles, 12, true);
+    expect(filtered12h.length).toBe(3);
+    expect(filtered12h).toContain("20260828080000.000");
+    expect(filtered12h).toContain("20260828200000.000");
+    expect(filtered12h).toContain("20260829080000.000");
+    expect(filtered12h).not.toContain("20260828020000.000");
+    expect(filtered12h).not.toContain("20260828140000.000");
+    expect(filtered12h).not.toContain("20260829020000.000");
+
+    // 6h step for upper-air: all 4 synoptic runs (02, 08, 14, 20)
+    const filtered6h = filterObsFilesByStep(sampleFiles, 6, true);
+    expect(filtered6h.length).toBe(6);
+  });
 });
