@@ -36,10 +36,30 @@ export function renderGridRaster(map, gridData, element = "TMP", colormap = null
   const h = gridData.header;
   const nlon = h.n_lon || h.LongitudeGridNumber || (gridData.values ? gridData.values[0]?.length : (gridData.u ? gridData.u[0]?.length : 0)) || 0;
   const nlat = h.n_lat || h.LatitudeGridNumber || (gridData.values ? gridData.values.length : (gridData.u ? gridData.u.length : 0)) || 0;
-  const slon = h.start_lon ?? h.StartLongitude ?? 60.0;
-  const elon = h.end_lon ?? h.EndLongitude ?? (slon + (nlon - 1) * (h.d_lon || h.LongitudeGridSpace || 0.25));
-  const slat = h.start_lat ?? h.StartLatitude ?? 60.0;
-  const elat = h.end_lat ?? h.EndLatitude ?? (slat + (nlat - 1) * (h.d_lat || h.LatitudeGridSpace || -0.25));
+
+  let slon, elon, slat, elat;
+  if (gridData.x && gridData.x.length > 0) {
+    slon = gridData.x[0];
+    elon = gridData.x[gridData.x.length - 1];
+  } else {
+    slon = h.start_lon ?? h.StartLongitude ?? 60.0;
+    const dlon = h.d_lon ?? h.LongitudeGridSpace ?? 0.25;
+    elon = nlon > 1 ? (slon + (nlon - 1) * dlon) : (h.end_lon ?? h.EndLongitude ?? slon);
+  }
+
+  if (gridData.y && gridData.y.length > 0) {
+    slat = gridData.y[0];
+    elat = gridData.y[gridData.y.length - 1];
+  } else {
+    slat = h.start_lat ?? h.StartLatitude ?? 60.0;
+    let dlat = h.d_lat ?? h.LatitudeGridSpace;
+    if (dlat === undefined || dlat === null || dlat === 0) {
+      dlat = (h.end_lat !== undefined && h.end_lat !== null && nlat > 1) ? (h.end_lat - slat) / (nlat - 1) : -0.25;
+    } else if (h.end_lat !== undefined && h.end_lat !== null && slat > h.end_lat && dlat > 0) {
+      dlat = -dlat;
+    }
+    elat = nlat > 1 ? (slat + (nlat - 1) * dlat) : (h.end_lat ?? h.EndLatitude ?? slat);
+  }
 
   let floatValues = gridData.values;
   if (!floatValues && gridData.u && gridData.v) {

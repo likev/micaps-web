@@ -38,6 +38,12 @@ func ParseGridData(decompressed []byte) (*model.GridResponse, error) {
 	for j := 0; j < nLat; j++ {
 		resp.Y[j] = float64(header.StartLatitude) + float64(j)*float64(header.LatitudeGridSpace)
 	}
+	if nLon > 1 {
+		resp.Header.EndLongitude = float32(resp.X[nLon-1])
+	}
+	if nLat > 1 {
+		resp.Header.EndLatitude = float32(resp.Y[nLat-1])
+	}
 
 	if header.DataType == 4 { // Scalar grid
 		expectedBytes := totalPoints * 4

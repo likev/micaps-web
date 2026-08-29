@@ -7,11 +7,11 @@ export function renderWindStreamlines(map, gridData) {
   const nLat = header.n_lat || header.LatitudeGridNumber || 80;
   const u = gridData.u;
   const v = gridData.v;
-  const startLon = header.start_lon ?? header.StartLongitude ?? 60.0;
-  const endLon = header.end_lon ?? header.EndLongitude ?? (startLon + (nLon - 1) * 0.25);
+  const startLon = gridData.x ? gridData.x[0] : (header.start_lon ?? header.StartLongitude ?? 60.0);
+  const endLon = gridData.x ? gridData.x[gridData.x.length - 1] : (header.end_lon ?? header.EndLongitude ?? (startLon + (nLon - 1) * 0.25));
   const dLon = Math.abs(header.d_lon ?? header.LongitudeGridSpace ?? (nLon > 1 ? Math.abs(endLon - startLon) / (nLon - 1) : 0.25));
-  const startLat = header.start_lat ?? header.StartLatitude ?? 60.0;
-  const endLat = header.end_lat ?? header.EndLatitude ?? -10.0;
+  const startLat = gridData.y ? gridData.y[0] : (header.start_lat ?? header.StartLatitude ?? 60.0);
+  const endLat = gridData.y ? gridData.y[gridData.y.length - 1] : (header.end_lat ?? header.EndLatitude ?? (startLat + (nLat - 1) * (header.d_lat || -0.25)));
   const dLat = Math.abs(header.d_lat ?? header.LatitudeGridSpace ?? (nLat > 1 ? Math.abs(endLat - startLat) / (nLat - 1) : 0.25));
   const isLatNorthToSouth = startLat > endLat;
 
@@ -227,11 +227,11 @@ export function renderGridWindBarbs(map, gridData) {
   const nLat = header.n_lat || header.LatitudeGridNumber || 80;
   const u = gridData.u;
   const v = gridData.v;
-  const startLon = header.start_lon ?? header.StartLongitude ?? 60.0;
-  const endLon = header.end_lon ?? header.EndLongitude ?? (startLon + (nLon - 1) * 0.25);
+  const startLon = gridData.x ? gridData.x[0] : (header.start_lon ?? header.StartLongitude ?? 60.0);
+  const endLon = gridData.x ? gridData.x[gridData.x.length - 1] : (header.end_lon ?? header.EndLongitude ?? (startLon + (nLon - 1) * 0.25));
   const dLon = Math.abs(header.d_lon ?? header.LongitudeGridSpace ?? (nLon > 1 ? Math.abs(endLon - startLon) / (nLon - 1) : 0.25));
-  const startLat = header.start_lat ?? header.StartLatitude ?? 60.0;
-  const endLat = header.end_lat ?? header.EndLatitude ?? -10.0;
+  const startLat = gridData.y ? gridData.y[0] : (header.start_lat ?? header.StartLatitude ?? 60.0);
+  const endLat = gridData.y ? gridData.y[gridData.y.length - 1] : (header.end_lat ?? header.EndLatitude ?? (startLat + (nLat - 1) * (header.d_lat || -0.25)));
   const dLat = Math.abs(header.d_lat ?? header.LatitudeGridSpace ?? (nLat > 1 ? Math.abs(endLat - startLat) / (nLat - 1) : 0.25));
   const isLatNorthToSouth = startLat > endLat;
 

@@ -47,13 +47,31 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
   const step = nLon * nLat > 40000 ? 2 : 1;
 
   let x = [];
-  for (let i = 0; i < nLon; i += step) {
-    x.push(gridData.header.start_lon + i * gridData.header.d_lon);
+  if (gridData.x && gridData.x.length === nLon) {
+    for (let i = 0; i < nLon; i += step) {
+      x.push(gridData.x[i]);
+    }
+  } else {
+    for (let i = 0; i < nLon; i += step) {
+      x.push(gridData.header.start_lon + i * gridData.header.d_lon);
+    }
   }
 
   let y = [];
-  for (let j = 0; j < nLat; j += step) {
-    y.push(gridData.header.start_lat + j * gridData.header.d_lat);
+  if (gridData.y && gridData.y.length === nLat) {
+    for (let j = 0; j < nLat; j += step) {
+      y.push(gridData.y[j]);
+    }
+  } else {
+    let dLat = gridData.header.d_lat ?? gridData.header.LatitudeGridSpace;
+    if (dLat === undefined || dLat === null || dLat === 0) {
+      dLat = (gridData.header.end_lat !== undefined && nLat > 1) ? (gridData.header.end_lat - gridData.header.start_lat) / (nLat - 1) : -0.25;
+    } else if (gridData.header.end_lat !== undefined && gridData.header.start_lat > gridData.header.end_lat && dLat > 0) {
+      dLat = -dLat;
+    }
+    for (let j = 0; j < nLat; j += step) {
+      y.push(gridData.header.start_lat + j * dLat);
+    }
   }
 
   // Convert 1D values to 2D array Z[latIndex][lonIndex]
