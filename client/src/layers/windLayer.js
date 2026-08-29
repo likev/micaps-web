@@ -338,7 +338,9 @@ export function renderGridWindBarbs(map, gridData) {
         }
 
         if (s >= 1.5) {
-          const bx = x1 - dx * pos, by = y1 - dy * pos;
+          // If only 1 short barb, indent from staff tip per WMO/NOAA standard
+          const barbPos = pos === 0 ? space : pos;
+          const bx = x1 - dx * barbPos, by = y1 - dy * barbPos;
           ctx.beginPath();
           ctx.moveTo(bx, by);
           ctx.lineTo(bx + nx * (bOffN * 0.52) - dx * (bOffD * 0.52), by + ny * (bOffN * 0.52) - dy * (bOffD * 0.52));

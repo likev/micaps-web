@@ -64,7 +64,8 @@ export function getWindBarbSVG(speed = 0, dir = 0, size = 100) {
   let barbsSVG = "";
   let remSpeed = Math.round(speed);
   let pos = staffLength;
-  const barbAngle = angleRad + (110 * Math.PI / 180); // 110° angle relative to staff (on RIGHT side, slanting inwards)
+  // 110° angle relative to staff pointing outward (feathers on right side, slanting backward towards station)
+  const barbAngle = angleRad + ((110 * Math.PI) / 180);
 
   // 1. Pennant flag (20 m/s each)
   while (remSpeed >= 18) {
@@ -87,14 +88,16 @@ export function getWindBarbSVG(speed = 0, dir = 0, size = 100) {
     const bX = pX + 15 * Math.cos(barbAngle);
     const bY = pY + 15 * Math.sin(barbAngle);
     barbsSVG += `<line x1="${pX}" y1="${pY}" x2="${bX}" y2="${bY}" stroke="#58a6ff" stroke-width="1.8" stroke-linecap="round"/>`;
-    pos -= 7;
+    pos -= 6.5;
     remSpeed -= 4;
   }
 
   // 3. Half barb / short feather (2 m/s)
   if (remSpeed >= 1.5) {
-    const pX = cx + pos * Math.cos(angleRad);
-    const pY = cy + pos * Math.sin(angleRad);
+    // If only 1 short barb, indent from staff tip per WMO/NOAA convention
+    const barbPos = pos === staffLength ? staffLength - 6 : pos;
+    const pX = cx + barbPos * Math.cos(angleRad);
+    const pY = cy + barbPos * Math.sin(angleRad);
     const bX = pX + 8 * Math.cos(barbAngle);
     const bY = pY + 8 * Math.sin(barbAngle);
     barbsSVG += `<line x1="${pX}" y1="${pY}" x2="${bX}" y2="${bY}" stroke="#58a6ff" stroke-width="1.8" stroke-linecap="round"/>`;
