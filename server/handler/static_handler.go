@@ -62,12 +62,24 @@ func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	distDir := h.Cfg.StaticDir
-	candidates := []string{
-		filepath.Join(distDir, "config.json"),
-		filepath.Join(distDir, "config/config.json"),
+	var candidates []string
+	if distDir != "" {
+		candidates = append(candidates,
+			filepath.Join(distDir, "config.json"),
+			filepath.Join(distDir, "config/config.json"),
+		)
+	}
+	if exePath, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exePath)
+		candidates = append(candidates, filepath.Join(exeDir, "config.json"))
+	}
+	candidates = append(candidates,
+		"config.json",
+		"client/dist/config.json",
 		"client/public/config.json",
 		"../client/public/config.json",
-	}
+		"client/config.json",
+	)
 
 	var configPath string
 	for _, p := range candidates {
@@ -102,6 +114,7 @@ func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 		_ = os.WriteFile(filepath.Join(distDir, "config.json"), []byte(str), 0644)
 		_ = os.WriteFile("client/public/config.json", []byte(str), 0644)
 		_ = os.WriteFile("../client/public/config.json", []byte(str), 0644)
+		_ = os.WriteFile("client/dist/config.json", []byte(str), 0644)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok","message":"Configuration saved successfully"}`))
@@ -127,6 +140,23 @@ func (h *StaticHandler) SPAHandler(w http.ResponseWriter, r *http.Request) {
 	if err == nil && !info.IsDir() {
 		http.ServeFile(w, r, path)
 		return
+	}
+
+	// If requesting /config.json specifically and not in distDir, try fallback paths
+	if r.URL.Path == "/config.json" || r.URL.Path == "config.json" {
+		fallbackPaths := []string{
+			"client/public/config.json",
+			"../client/public/config.json",
+			"client/dist/config.json",
+			"client/config.json",
+			"config.json",
+		}
+		for _, fp := range fallbackPaths {
+			if _, err := os.Stat(fp); err == nil {
+				http.ServeFile(w, r, fp)
+				return
+			}
+		}
 	}
 
 	// Fallback to index.html for SPA routes
