@@ -152,14 +152,21 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
 }
 
 function triggerRasterOverlay(map, layer = null, win = null) {
-  // 1. Direct in-memory gridData from layer (e.g. Surface SLP or Sounding Analysis)
+  // 1. Direct in-memory gridData from layer (e.g. Surface SLP, Wind, or Sounding Analysis)
   if (layer?.gridData) {
-    const colormap = layer.colormap || win?.colormap || layer.element || "TMP";
+    const colormap = layer.colormap || layer.render?.colormap || layer.element || "TMP";
     renderGridRaster(map, layer.gridData, layer.element || "TMP", colormap);
     return;
   }
 
-  // 2. In-memory gridData from window
+  // 2. Wind gridData from window
+  if ((layer?.type === "wind" || layer?.element === "WIND") && win?.windGridData) {
+    const colormap = layer?.colormap || layer?.render?.colormap || "WIND";
+    renderGridRaster(map, win.windGridData, "WIND", colormap);
+    return;
+  }
+
+  // 3. In-memory gridData from window
   if (win?.gridData && (!layer || layer.element === win.element)) {
     const colormap = win.colormap || layer?.colormap || win.element || "TMP";
     renderGridRaster(map, win.gridData, win.element || "TMP", colormap);
