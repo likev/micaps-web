@@ -1,22 +1,71 @@
 // colormaps.js - Runtime-loaded meteorological color palettes
 
-const FALLBACK_COLORMAP = [
-  { val: -40, color: [130, 20, 160, 255] },
-  { val: -20, color: [30, 120, 220, 255] },
-  { val: 0, color: [180, 240, 240, 255] },
-  { val: 20, color: [180, 230, 80, 255] },
-  { val: 35, color: [230, 50, 40, 255] },
-  { val: 40, color: [160, 20, 50, 255] },
-];
+const DEFAULT_COLORMAPS = {
+  TMP: [
+    { val: -40, color: [130, 20, 160, 255] },
+    { val: -30, color: [40, 50, 180, 255] },
+    { val: -20, color: [30, 120, 220, 255] },
+    { val: -10, color: [70, 190, 230, 255] },
+    { val: 0, color: [180, 240, 240, 255] },
+    { val: 10, color: [100, 210, 110, 255] },
+    { val: 18, color: [180, 230, 80, 255] },
+    { val: 24, color: [250, 220, 50, 255] },
+    { val: 28, color: [245, 140, 40, 255] },
+    { val: 35, color: [230, 50, 40, 255] },
+    { val: 40, color: [160, 20, 50, 255] },
+  ],
+  WIND: [
+    { val: 0, color: [220, 240, 255, 0] },
+    { val: 2, color: [170, 220, 250, 0] },
+    { val: 6, color: [120, 190, 245, 140] },
+    { val: 12, color: [70, 200, 120, 180] },
+    { val: 18, color: [230, 210, 50, 220] },
+    { val: 25, color: [240, 120, 40, 240] },
+    { val: 32, color: [230, 40, 40, 255] },
+    { val: 45, color: [160, 20, 120, 255] },
+  ],
+  RH: [
+    { val: 0, color: [245, 245, 245, 0] },
+    { val: 45, color: [220, 240, 255, 0] },
+    { val: 60, color: [160, 215, 255, 150] },
+    { val: 70, color: [90, 175, 245, 190] },
+    { val: 80, color: [40, 120, 220, 220] },
+    { val: 90, color: [20, 60, 180, 240] },
+    { val: 100, color: [10, 20, 120, 255] },
+  ],
+  HGT: [
+    { val: 0, color: [30, 50, 140, 255] },
+    { val: 1500, color: [50, 100, 210, 255] },
+    { val: 3000, color: [70, 160, 235, 255] },
+    { val: 5000, color: [100, 210, 200, 255] },
+    { val: 5600, color: [140, 230, 130, 255] },
+    { val: 5880, color: [230, 220, 50, 255] },
+    { val: 7000, color: [245, 140, 40, 255] },
+    { val: 9000, color: [230, 50, 40, 255] },
+    { val: 12000, color: [190, 20, 100, 255] },
+    { val: 17000, color: [130, 20, 160, 255] },
+  ],
+  RAIN: [
+    { val: 0.1, color: [166, 242, 143, 220] },
+    { val: 1, color: [61, 186, 61, 230] },
+    { val: 10, color: [97, 184, 255, 240] },
+    { val: 25, color: [0, 0, 255, 255] },
+    { val: 50, color: [250, 0, 250, 255] },
+    { val: 100, color: [128, 0, 64, 255] },
+    { val: 250, color: [80, 0, 0, 255] },
+  ],
+};
 
-export let COLORMAPS = { TMP: FALLBACK_COLORMAP };
+const FALLBACK_COLORMAP = DEFAULT_COLORMAPS.TMP;
+
+export let COLORMAPS = { ...DEFAULT_COLORMAPS };
 
 export function setColormaps(colormaps) {
   if (!colormaps || typeof colormaps !== "object" || Array.isArray(colormaps)) {
     throw new Error("Preset config colormaps must be an object");
   }
 
-  const normalized = {};
+  const normalized = { ...DEFAULT_COLORMAPS };
   for (const [name, palette] of Object.entries(colormaps)) {
     if (!name || !Array.isArray(palette) || palette.length < 2) {
       throw new Error(`Colormap "${name}" must contain at least two stops`);
@@ -36,15 +85,18 @@ export function setColormaps(colormaps) {
     }).sort((a, b) => a.val - b.val);
   }
 
-  if (!normalized.TMP && !normalized.default) {
-    throw new Error("Preset config must define a TMP or default colormap");
-  }
   COLORMAPS = normalized;
 }
 
 export function getColormap(reference = null, element = "TMP") {
   if (Array.isArray(reference)) return reference;
-  if (typeof reference === "string" && COLORMAPS[reference]) return COLORMAPS[reference];
+  if (typeof reference === "string") {
+    if (COLORMAPS[reference]) return COLORMAPS[reference];
+    const up = reference.toUpperCase();
+    if (COLORMAPS[up]) return COLORMAPS[up];
+  }
+  const elUp = (element || "").toUpperCase();
+  if (COLORMAPS[elUp]) return COLORMAPS[elUp];
   return COLORMAPS[element] || COLORMAPS.TMP || COLORMAPS.default || FALLBACK_COLORMAP;
 }
 

@@ -7,11 +7,13 @@ export function renderWindStreamlines(map, gridData) {
   const nLat = header.n_lat || header.LatitudeGridNumber || 80;
   const u = gridData.u;
   const v = gridData.v;
-  const startLon = header.start_lon ?? header.StartLongitude ?? 70.0;
-  const dLon = Math.abs(header.d_lon ?? header.LongitudeGridSpace ?? 0.25);
-  const startLat = header.start_lat ?? header.StartLatitude ?? 15.0;
-  const dLat = Math.abs(header.d_lat ?? header.LatitudeGridSpace ?? 0.25);
-  const isLatNorthToSouth = header.end_lat !== undefined && header.start_lat > header.end_lat;
+  const startLon = header.start_lon ?? header.StartLongitude ?? 60.0;
+  const endLon = header.end_lon ?? header.EndLongitude ?? (startLon + (nLon - 1) * 0.25);
+  const dLon = Math.abs(header.d_lon ?? header.LongitudeGridSpace ?? (nLon > 1 ? Math.abs(endLon - startLon) / (nLon - 1) : 0.25));
+  const startLat = header.start_lat ?? header.StartLatitude ?? 60.0;
+  const endLat = header.end_lat ?? header.EndLatitude ?? -10.0;
+  const dLat = Math.abs(header.d_lat ?? header.LatitudeGridSpace ?? (nLat > 1 ? Math.abs(endLat - startLat) / (nLat - 1) : 0.25));
+  const isLatNorthToSouth = startLat > endLat;
 
   const container = map.getContainer();
   let streamCanvas = container.querySelector(".streamline-canvas");
@@ -227,11 +229,13 @@ export function renderGridWindBarbs(map, gridData) {
   const nLat = header.n_lat || header.LatitudeGridNumber || 80;
   const u = gridData.u;
   const v = gridData.v;
-  const startLon = header.start_lon ?? header.StartLongitude ?? 70.0;
-  const dLon = Math.abs(header.d_lon ?? header.LongitudeGridSpace ?? 0.25);
-  const startLat = header.start_lat ?? header.StartLatitude ?? 15.0;
-  const dLat = Math.abs(header.d_lat ?? header.LatitudeGridSpace ?? 0.25);
-  const isLatNorthToSouth = header.end_lat !== undefined && header.start_lat > header.end_lat;
+  const startLon = header.start_lon ?? header.StartLongitude ?? 60.0;
+  const endLon = header.end_lon ?? header.EndLongitude ?? (startLon + (nLon - 1) * 0.25);
+  const dLon = Math.abs(header.d_lon ?? header.LongitudeGridSpace ?? (nLon > 1 ? Math.abs(endLon - startLon) / (nLon - 1) : 0.25));
+  const startLat = header.start_lat ?? header.StartLatitude ?? 60.0;
+  const endLat = header.end_lat ?? header.EndLatitude ?? -10.0;
+  const dLat = Math.abs(header.d_lat ?? header.LatitudeGridSpace ?? (nLat > 1 ? Math.abs(endLat - startLat) / (nLat - 1) : 0.25));
+  const isLatNorthToSouth = startLat > endLat;
 
   const container = map.getContainer();
   let barbCanvas = container.querySelector(".wind-barb-canvas");
