@@ -22,10 +22,23 @@ type StaticHandler struct {
 func (h *StaticHandler) PMTilesHandler(w http.ResponseWriter, r *http.Request) {
 	pmtilesFile := h.Cfg.PMTilesPath
 	if _, err := os.Stat(pmtilesFile); os.IsNotExist(err) {
-		// Try relative to workspace
-		altPath := filepath.Join("../client/public/map-china.pmtiles")
-		if _, aErr := os.Stat(altPath); aErr == nil {
-			pmtilesFile = altPath
+		candidates := []string{
+			filepath.Join(h.Cfg.StaticDir, "map-china.pmtiles"),
+			"client/dist/map-china.pmtiles",
+			"../client/dist/map-china.pmtiles",
+			"client/public/map-china.pmtiles",
+			"../client/public/map-china.pmtiles",
+			"map-china.pmtiles",
+		}
+		if exePath, err := os.Executable(); err == nil {
+			exeDir := filepath.Dir(exePath)
+			candidates = append([]string{filepath.Join(exeDir, "map-china.pmtiles")}, candidates...)
+		}
+		for _, alt := range candidates {
+			if _, aErr := os.Stat(alt); aErr == nil {
+				pmtilesFile = alt
+				break
+			}
 		}
 	}
 
@@ -76,6 +89,7 @@ func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 	candidates = append(candidates,
 		"config.json",
 		"client/dist/config.json",
+		"../client/dist/config.json",
 		"client/public/config.json",
 		"../client/public/config.json",
 		"client/config.json",
@@ -89,7 +103,7 @@ func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if configPath == "" {
-		configPath = "client/public/config.json"
+		configPath = filepath.Join(distDir, "config.json")
 	}
 
 	if r.Method == http.MethodPost || r.Method == http.MethodPut {
@@ -111,13 +125,17 @@ func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 		reValColor := regexp.MustCompile(`\{\s*"val":\s*(-?[\d.]+),\s*"color":\s*(\[[^\]]+\])\s*\}`)
 		str = reValColor.ReplaceAllString(str, `{ "val": $1, "color": $2 }`)
 
-		_ = os.WriteFile(filepath.Join(distDir, "config.json"), []byte(str), 0644)
-		_ = os.WriteFile("client/public/config.json", []byte(str), 0644)
-		_ = os.WriteFile("../client/public/config.json", []byte(str), 0644)
-		_ = os.WriteFile("client/dist/config.json", []byte(str), 0644)
+		// Strictly save only to client/dist/config.json (the runtime configuration)
+		targetSavePath := filepath.Join(distDir, "config.json")
+		if distDir == "" {
+			targetSavePath = "client/dist/config.json"
+		}
+		if err := os.WriteFile(targetSavePath, []byte(str), 0644); err != nil {
+			_ = os.WriteFile("client/dist/config.json", []byte(str), 0644)
+		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok","message":"Configuration saved successfully"}`))
+		w.Write([]byte(`{"status":"ok","message":"Configuration saved successfully to client/dist/config.json"}`))
 		return
 	}
 
