@@ -1,6 +1,7 @@
 // timeslider.test.js - Unit tests for timeline stepper and step-length selection
 import { test, expect, describe } from "bun:test";
 import { getPeriodsForStep } from "../src/ui/timeSlider.js";
+import { formatForecastInitTime, formatForecastValidTime } from "../src/utils/formatters.js";
 
 describe("Timeslider Step-Length & Discrete Periods", () => {
   test("getPeriodsForStep generates accurate forecast discrete periods for all step lengths", () => {
@@ -61,5 +62,16 @@ describe("Timeslider Step-Length & Discrete Periods", () => {
     expect(24 % surfaceDefault).toBe(0);
     expect(24 % upperAirDefault).toBe(0);
     expect(24 % weatherModelForecastDefault).toBe(0);
+  });
+
+  test("Init-time forecast run cycles and valid times are formatted accurately", () => {
+    // 26082908 -> 2026-08-29 08:00 (UTC+8)
+    const formattedInit = formatForecastInitTime("26082908");
+    expect(formattedInit).toBe("2026-08-29 08:00 (UTC+8)");
+
+    // 26082820 + 24h -> 2026-08-29 20:00 (UTC+8) (+024h)
+    const formattedValid = formatForecastValidTime("26082820", 24);
+    expect(formattedValid).toContain("2026-08-29 20:00 (UTC+8)");
+    expect(formattedValid).toContain("(+024h)");
   });
 });

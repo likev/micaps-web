@@ -9,6 +9,16 @@ let currentStepLength = 6; // 6h forecast, 3h surface, 12h upper-air
 let discretePeriods = [0, 6, 12, 18, 24, 30, 36, 42, 48, 54, 60, 66, 72, 84, 96, 108, 120];
 let currentPeriodIdx = 4; // default +024h
 let currentInitCycle = "26082820";
+let forecastCycles = [
+  "26082908",
+  "26082820",
+  "26082808",
+  "26082720",
+  "26082708",
+  "26082620",
+  "26082608",
+  "26082520",
+];
 
 let rawObsFiles = [
   "20260827080000.000",
@@ -110,7 +120,10 @@ export function initTimeSlider(containerId = "timeslider-container", onTimeChang
       <div class="timeline-info">
         <span id="time-badge" class="mode-badge">NWP FORECAST</span>
         <span id="time-win-badge" class="win-target-badge" style="display:none;"></span>
-        <span id="time-init-wrapper" class="init-time-wrapper">Init: <strong id="time-init-label">2026-08-28 20:00 UTC</strong></span>
+        <div id="time-init-wrapper" class="init-time-control" style="display:none;">
+          <label for="select-init-time" class="init-time-label">Init:</label>
+          <select id="select-init-time" class="init-time-select" title="Select forecast initialization run cycle"></select>
+        </div>
         <span id="time-lead-wrapper">Forecast Lead: <strong id="time-lead-label">+024h</strong></span>
         <span id="time-valid-label" class="valid-label">Valid: Analysis + 24h</span>
       </div>
@@ -136,6 +149,24 @@ export function initTimeSlider(containerId = "timeslider-container", onTimeChang
     selStep.addEventListener("change", (e) => {
       const newStep = parseInt(e.target.value, 10) || 6;
       setStepLength(newStep, true);
+    });
+  }
+
+  const selInit = document.getElementById("select-init-time");
+  if (selInit) {
+    selInit.addEventListener("change", (e) => {
+      const newCycle = e.target.value;
+      if (newCycle && newCycle !== currentInitCycle) {
+        currentInitCycle = newCycle;
+        updateLabels();
+        if (onTimeChangeCallback) {
+          onTimeChangeCallback({
+            isInitChange: true,
+            initCycle: newCycle,
+            period: discretePeriods[currentPeriodIdx] ?? 24,
+          });
+        }
+      }
     });
   }
 
@@ -225,7 +256,7 @@ function updateLabels() {
   const badge = document.getElementById("time-badge");
   const winBadge = document.getElementById("time-win-badge");
   const initWrapper = document.getElementById("time-init-wrapper");
-  const initLabel = document.getElementById("time-init-label");
+  const selInit = document.getElementById("select-init-time");
   const leadWrapper = document.getElementById("time-lead-wrapper");
   const validLabel = document.getElementById("time-valid-label");
 
@@ -249,13 +280,27 @@ function updateLabels() {
     leadWrapper.innerHTML = `Observation Time: <strong id="time-lead-label">${formatObsTimestamp(curFile)}</strong>`;
     validLabel.textContent = `Real-time Observation (Step: ${currentStepLength}h)`;
   } else {
+    // NWP Model Forecast: display init-time select
+    if (initWrapper) {
+      initWrapper.style.display = "inline-flex";
+      if (selInit) {
+        const curOpts = Array.from(selInit.options).map((o) => o.value).join(",");
+        const targetOpts = forecastCycles.join(",");
+        if (curOpts !== targetOpts) {
+          selInit.innerHTML = "";
+          forecastCycles.forEach((c) => {
+            const opt = document.createElement("option");
+            opt.value = c;
+            opt.textContent = formatForecastInitTime(c);
+            selInit.appendChild(opt);
+          });
+        }
+        selInit.value = currentInitCycle;
+      }
+    }
     badge.textContent = "NWP FORECAST";
     badge.className = "mode-badge";
     const curPeriod = discretePeriods[currentPeriodIdx];
-    if (initWrapper && initLabel) {
-      initWrapper.style.display = "inline-block";
-      initLabel.textContent = formatForecastInitTime(currentInitCycle);
-    }
     leadWrapper.innerHTML = `Forecast Lead: <strong id="time-lead-label">${formatLeadTime(curPeriod)}</strong>`;
     validLabel.textContent = `Valid: ${formatForecastValidTime(currentInitCycle, curPeriod)} (Step: ${currentStepLength}h)`;
   }
@@ -334,6 +379,24 @@ export function setTimelineMode(mode, customData = {}) {
       currentObsIdx = Math.max(0, obsFiles.length - 1);
     }
   } else {
+    if (Array.isArray(customData.cycles) && customData.cycles.length > 0) {
+      forecastCycles = customData.cycles;
+      if (!currentInitCycle || !forecastCycles.includes(currentInitCycle)) {
+        currentInitCycle = forecastCycles[0];
+      }
+    } else if (!forecastCycles.length || !forecastCycles.includes(currentInitCycle)) {
+      forecastCycles = [
+        currentInitCycle || "26082908",
+        "26082820",
+        "26082808",
+        "26082720",
+        "26082708",
+        "26082620",
+        "26082608",
+        "26082520",
+      ];
+    }
+
     discretePeriods = getPeriodsForStep(currentStepLength);
     if (customData.period !== undefined) {
       const idx = discretePeriods.indexOf(customData.period);

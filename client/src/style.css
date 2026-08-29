@@ -506,6 +506,11 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
 .step-length-select { background: #21262d; color: #58a6ff; font-weight: 600; border: 1px solid var(--border-color); border-radius: 4px; padding: 3px 6px; font-size: 11px; font-family: var(--font-mono); outline: none; cursor: pointer; transition: all 0.15s ease; }
 .step-length-select:hover, .step-length-select:focus { border-color: var(--accent-blue); background: #282e37; }
 
+.init-time-control { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary); }
+.init-time-label { font-size: 11px; color: #8b949e; font-weight: 500; }
+.init-time-select { background: #21262d; color: #58a6ff; font-weight: 600; border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 6px; font-size: 11px; font-family: var(--font-mono); outline: none; cursor: pointer; transition: all 0.15s ease; }
+.init-time-select:hover, .init-time-select:focus { border-color: var(--accent-blue); background: #282e37; }
+
 .timeline-body {
   flex: 1;
   display: flex;
@@ -578,20 +583,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
   box-shadow: 0 0 8px rgba(56, 139, 253, 0.4);
 }
 
-.tooltip {
-  position: absolute;
-  pointer-events: none;
-  background: rgba(10, 14, 22, 0.95);
-  border: 1px solid var(--accent-blue);
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-size: 12px;
-  font-family: var(--font-mono);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.6);
-  z-index: 2000;
-  transition: opacity 0.1s ease;
-}
-
+.tooltip { position: absolute; pointer-events: none; background: rgba(10, 14, 22, 0.95); border: 1px solid var(--accent-blue); border-radius: 6px; padding: 8px 12px; font-size: 12px; font-family: var(--font-mono); box-shadow: 0 4px 16px rgba(0,0,0,0.6); z-index: 2000; transition: opacity 0.1s ease; }
 .tooltip.hidden { opacity: 0; }
-
 .station-glyph { transform: translate(-50%, -50%); }
+
