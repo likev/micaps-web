@@ -77,57 +77,28 @@ func ParseGridData(decompressed []byte) (*model.GridResponse, error) {
 			Max:  maxVal,
 			Mean: sumVal / float32(totalPoints),
 		}
-	} else if header.DataType == 11 { // Vector Wind grid (Speed and Direction or U and V)
+	} else if header.DataType == 11 { // Diamond 11: 2D Gridded Vector Wind Field (Block 1 = U component in m/s, Block 2 = V component in m/s)
 		expectedBytes := totalPoints * 8
 		if len(payload) < expectedBytes {
-			return nil, fmt.Errorf("insufficient payload bytes for vector grid: got %d, expected %d", len(payload), expectedBytes)
+			return nil, fmt.Errorf("insufficient payload bytes for Diamond 11 vector grid: got %d, expected %d", len(payload), expectedBytes)
 		}
 
 		resp.U = make([]float32, totalPoints)
 		resp.V = make([]float32, totalPoints)
-		resp.Values = make([]float32, totalPoints) // wind speed magnitude
-
-		// Determine if Block 1 is U (m/s) and Block 2 is V (m/s), or Speed (m/s) and Direction (degrees).
-		// Meteorological NWP wind fields (ECMWF, GFS, CMA-GFS) are standard U/V components.
-		// Wind direction in degrees spans [0, 360] and routinely exceeds 60°, whereas V velocity (m/s) is strictly within [-60, 60].
-		hasLargeAngle := false
-		hasNegative := false
-		for i := 0; i < totalPoints; i += 20 {
-			b1 := math.Float32frombits(binary.LittleEndian.Uint32(payload[i*4 : (i+1)*4]))
-			b2 := math.Float32frombits(binary.LittleEndian.Uint32(payload[totalPoints*4+i*4 : totalPoints*4+(i+1)*4]))
-			if math.IsNaN(float64(b1)) || math.IsNaN(float64(b2)) || b1 < -9000 || b2 < -9000 {
-				continue
-			}
-			if b1 < -0.01 || b2 < -0.01 {
-				hasNegative = true
-			}
-			if b2 > 60.0 && b2 <= 360.0 {
-				hasLargeAngle = true
-			}
-		}
-
-		isSpeedDir := hasLargeAngle && !hasNegative
+		resp.Values = make([]float32, totalPoints) // Wind speed magnitude
 
 		var maxSpeed float32 = 0
+		var sumSpeed float32 = 0
 		for i := 0; i < totalPoints; i++ {
-			b1 := math.Float32frombits(binary.LittleEndian.Uint32(payload[i*4 : (i+1)*4]))
-			b2 := math.Float32frombits(binary.LittleEndian.Uint32(payload[totalPoints*4+i*4 : totalPoints*4+(i+1)*4]))
+			u := math.Float32frombits(binary.LittleEndian.Uint32(payload[i*4 : (i+1)*4]))
+			v := math.Float32frombits(binary.LittleEndian.Uint32(payload[totalPoints*4+i*4 : totalPoints*4+(i+1)*4]))
 
-			var u, v, speed float32
-			if isSpeedDir {
-				speed = b1
-				rad := float64(b2) * math.Pi / 180.0
-				// In MICAPS / MDFS Diamond 11 vector grid with polar speed/dir:
-				// Block 1 is Speed (magnitude).
-				// Block 2 is mathematical polar angle theta in degrees (0° = East / +X, 90° = North / +Y, 180° = West / -X, 270° = South / -Y):
-				// u = speed * cos(theta) (eastward physical velocity component)
-				// v = speed * sin(theta) (northward physical velocity component)
-				u = float32(float64(speed) * math.Cos(rad))
-				v = float32(float64(speed) * math.Sin(rad))
-			} else {
-				u = b1
-				v = b2
+			var speed float32 = 0
+			if !math.IsNaN(float64(u)) && !math.IsNaN(float64(v)) && u > -9000 && v > -9000 {
 				speed = float32(math.Hypot(float64(u), float64(v)))
+			} else {
+				u = 0
+				v = 0
 			}
 
 			resp.U[i] = u
@@ -136,12 +107,13 @@ func ParseGridData(decompressed []byte) (*model.GridResponse, error) {
 			if speed > maxSpeed {
 				maxSpeed = speed
 			}
+			sumSpeed += speed
 		}
 
 		resp.Stats = model.GridStats{
 			Min:  0,
 			Max:  maxSpeed,
-			Mean: maxSpeed / 2,
+			Mean: sumSpeed / float32(totalPoints),
 		}
 	}
 
