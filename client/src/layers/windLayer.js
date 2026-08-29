@@ -131,10 +131,14 @@ export function renderWindStreamlines(map, gridData) {
         continue;
       }
 
-      // Physical displacement in degrees
+      // Physical displacement with zoom-adaptive velocity normalization:
+      // When zoomed in, scale down dt so screen velocity does not explode.
+      // When zoomed out, scale up dt so streamlines do not freeze.
       const latRad = (p.lat * Math.PI) / 180;
       const cosLat = Math.max(0.1, Math.cos(latRad));
-      const dt = 0.08;
+      const currentZoom = typeof map.getZoom === "function" ? map.getZoom() : 4.5;
+      const zoomFactor = Math.pow(2, (4.5 - currentZoom) * 0.85);
+      const dt = 0.055 * zoomFactor;
 
       const dLng = (uVal * dt * 1000) / (111320 * cosLat);
       const dLat = (vVal * dt * 1000) / 110574;
@@ -379,4 +383,108 @@ export function removeGridWindBarbs(map = null) {
       canvas.remove();
     });
   }
+}
+
+// Generate regular 2D (U, V) grid from sparse observation stations (Surface or Upper-Air)
+export function generateStationWindGrid(stationsGeoJSON) {
+  if (!stationsGeoJSON || !stationsGeoJSON.features || stationsGeoJSON.features.length < 3) {
+    return null;
+  }
+
+  const points = [];
+  const uVals = [];
+  const vVals = [];
+
+  for (const f of stationsGeoJSON.features) {
+    if (!f.geometry || !f.geometry.coordinates) continue;
+    const [lon, lat] = f.geometry.coordinates;
+    const p = f.properties || {};
+
+    let ws = null;
+    let wd = null;
+    if (typeof p.ws === "number" && p.ws >= 0 && p.ws < 150) ws = p.ws;
+    else if (typeof p.wind_speed === "number" && p.wind_speed >= 0 && p.wind_speed < 150) ws = p.wind_speed;
+
+    if (typeof p.wd === "number" && p.wd >= 0 && p.wd <= 360) wd = p.wd;
+    else if (typeof p.wind_direction === "number" && p.wind_direction >= 0 && p.wind_direction <= 360) wd = p.wind_direction;
+
+    let u = null;
+    let v = null;
+    if (typeof p.u === "number" && typeof p.v === "number") {
+      u = p.u;
+      v = p.v;
+    } else if (ws !== null && wd !== null) {
+      const rad = (wd * Math.PI) / 180;
+      u = -ws * Math.sin(rad);
+      v = -ws * Math.cos(rad);
+    }
+
+    if (u !== null && v !== null && !isNaN(u) && !isNaN(v)) {
+      points.push([lon, lat]);
+      uVals.push(u);
+      vVals.push(v);
+    }
+  }
+
+  if (points.length < 3) return null;
+
+  const minLon = Math.max(60, Math.min(...points.map((pt) => pt[0])) - 2.0);
+  const maxLon = Math.min(145, Math.max(...points.map((pt) => pt[0])) + 2.0);
+  const minLat = Math.max(10, Math.min(...points.map((pt) => pt[1])) - 2.0);
+  const maxLat = Math.min(60, Math.max(...points.map((pt) => pt[1])) + 2.0);
+
+  const dDeg = 1.0;
+  const x = [];
+  for (let lon = minLon; lon <= maxLon; lon += dDeg) x.push(lon);
+  const y = [];
+  for (let lat = minLat; lat <= maxLat; lat += dDeg) y.push(lat);
+
+  const nCols = x.length;
+  const nRows = y.length;
+  const uGrid = new Float32Array(nCols * nRows);
+  const vGrid = new Float32Array(nCols * nRows);
+
+  for (let r = 0; r < nRows; r++) {
+    const lat = y[r];
+    for (let c = 0; c < nCols; c++) {
+      const lon = x[c];
+      let weightSum = 0;
+      let uSum = 0;
+      let vSum = 0;
+
+      for (let i = 0; i < points.length; i++) {
+        const [px, py] = points[i];
+        const distSq = (lon - px) * (lon - px) + (lat - py) * (lat - py);
+        if (distSq < 0.0001) {
+          weightSum = 1;
+          uSum = uVals[i];
+          vSum = vVals[i];
+          break;
+        }
+        const w = 1.0 / (distSq + 0.5);
+        weightSum += w;
+        uSum += uVals[i] * w;
+        vSum += vVals[i] * w;
+      }
+
+      const idx = r * nCols + c;
+      uGrid[idx] = weightSum > 0 ? uSum / weightSum : 0;
+      vGrid[idx] = weightSum > 0 ? vSum / weightSum : 0;
+    }
+  }
+
+  return {
+    header: {
+      start_lon: minLon,
+      end_lon: maxLon,
+      start_lat: minLat,
+      end_lat: maxLat,
+      n_lon: nCols,
+      n_lat: nRows,
+      d_lon: dDeg,
+      d_lat: dDeg,
+    },
+    u: uGrid,
+    v: vGrid,
+  };
 }

@@ -9,7 +9,7 @@ import {
 } from "../layers/contourLayer.js";
 import { setStationVisibility, setStationConfig } from "../layers/stationLayer.js";
 import { renderBinaryRaster, renderGridRaster, setRasterVisibility } from "../layers/rasterLayer.js";
-import { renderWindStreamlines, stopWindAnimation, renderGridWindBarbs, removeGridWindBarbs } from "../layers/windLayer.js";
+import { renderWindStreamlines, stopWindAnimation, renderGridWindBarbs, removeGridWindBarbs, generateStationWindGrid } from "../layers/windLayer.js";
 import { fetchGridBinaryStream, fetchGridData } from "../api/catalogApi.js";
 import { appState } from "../store/appState.js";
 import { getActiveWindow } from "./tabWindowManager.js";
@@ -38,6 +38,13 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
       }
     } else if (layer.type === "station") {
       setStationVisibility(map, value);
+      if (layer.config?.showStreamlines) {
+        if (value) {
+          triggerStationStreamlines(map, layer, win);
+        } else {
+          stopWindAnimation(map);
+        }
+      }
     } else if (layer.type === "pmtiles") {
       const showGraticule = value && (layer.config?.showGraticule !== false);
       const showProvinces = value && (layer.config?.showProvinces !== false);
@@ -109,6 +116,13 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
       }
     } else if (layer.type === "station") {
       setStationConfig(map, value);
+      if (value.showStreamlines !== undefined) {
+        if (value.showStreamlines && layer.visible) {
+          triggerStationStreamlines(map, layer, win);
+        } else {
+          stopWindAnimation(map);
+        }
+      }
     }
   } else if (action === "remove") {
     if (layer.type === "contour" || layer.type === "wind") {
@@ -118,6 +132,7 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
       if (layer.config?.showBarbs) removeGridWindBarbs(map);
     } else if (layer.type === "station") {
       setStationVisibility(map, false);
+      if (layer.config?.showStreamlines) stopWindAnimation(map);
     }
   } else if (action === "aux") {
     if (layerId === "raster") {
@@ -241,4 +256,16 @@ function triggerWindBarbs(map, layer = null, win = null) {
     .catch((err) => {
       console.warn("[Wind] Fetch wind barbs failed:", err);
     });
+}
+
+export function triggerStationStreamlines(map, layer = null, win = null) {
+  const geojson = layer?.stationsGeoJSON || win?.stationsGeoJSON || appState.get("stationData");
+  if (geojson && geojson.features && geojson.features.length >= 3) {
+    const windGrid = generateStationWindGrid(geojson);
+    if (windGrid) {
+      if (layer) layer.gridData = windGrid;
+      if (win) win.windGridData = windGrid;
+      renderWindStreamlines(map, windGrid);
+    }
+  }
 }

@@ -104,6 +104,7 @@ export function autoSaveLayerConfig(layer) {
             if (layer.config.showTendency !== undefined) pLayer.render.showTendency = layer.config.showTendency;
             if (layer.config.showVisibility !== undefined) pLayer.render.showVisibility = layer.config.showVisibility;
             if (layer.config.showRain6 !== undefined) pLayer.render.showRain6 = layer.config.showRain6;
+            if (layer.config.showStreamlines !== undefined) pLayer.render.showStreamlines = layer.config.showStreamlines;
 
             // Station filter rules & logic
             if (layer.config.filterRules !== undefined) pLayer.render.filterRules = layer.config.filterRules;

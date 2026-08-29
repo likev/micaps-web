@@ -312,6 +312,7 @@ function renderLayersManager(panel) {
       bindStationCheckbox(".chk-station-tendency", "showTendency");
       bindStationCheckbox(".chk-station-vis", "showVisibility");
       bindStationCheckbox(".chk-station-rain6", "showRain6");
+      bindStationCheckbox(".chk-station-streamlines", "showStreamlines");
 
       bindStationFilterEvents(configDrawer, layer, onLayerActionCallback, currentActiveWinId);
     }
@@ -493,6 +494,10 @@ function renderLayerRow(layer) {
               <label class="config-checkbox-item">
                 <input type="checkbox" class="chk-station-rain6" ${layer.config?.showRain6 ? "checked" : ""} />
                 <span>6h Rain (R6)</span>
+              </label>
+              <label class="config-checkbox-item" style="grid-column: span 2; border-top: 1px solid #30363d; padding-top: 4px; margin-top: 2px;">
+                <input type="checkbox" class="chk-station-streamlines" ${layer.config?.showStreamlines ? "checked" : ""} />
+                <span style="color: #58a6ff; font-weight: 600;">Wind Streamlines (Flow Analysis)</span>
               </label>
             </div>
             ${renderStationFilterSection(layer)}

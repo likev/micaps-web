@@ -112,6 +112,7 @@ describe("Configuration File Validation & Auto-Save (config.json)", () => {
         showTemp: true,
         showDewpoint: false,
         showWind: true,
+        showStreamlines: true,
         filterLogic: "AND",
         filterRules: [
           { field: "Wind", op: ">", val: "5" },
@@ -123,6 +124,7 @@ describe("Configuration File Validation & Auto-Save (config.json)", () => {
     const stationLayer = CURRENT_CONFIG.presets[1].layers[0];
     expect(stationLayer.render.showTemp).toBe(true);
     expect(stationLayer.render.showDewpoint).toBe(false);
+    expect(stationLayer.render.showStreamlines).toBe(true);
     expect(stationLayer.render.filterLogic).toBe("AND");
     expect(stationLayer.render.filterRules.length).toBe(2);
     expect(stationLayer.render.filterRules[0].field).toBe("Wind");
