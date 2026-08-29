@@ -407,6 +407,8 @@ async function loadWeatherField(map, model, element, level, period, customOption
 }
 
 async function syncObservationTimeline(path, currentFile = null, winTitle = "", win = null) {
+  const isUpper = path.includes("UPPER_AIR") || winTitle.toLowerCase().includes("upper") || winTitle.toLowerCase().includes("sounding");
+  const stepLength = isUpper ? 12 : 3;
   try {
     const fileEntries = await fetchTree(path);
     if (Array.isArray(fileEntries) && fileEntries.length > 0) {
@@ -416,7 +418,7 @@ async function syncObservationTimeline(path, currentFile = null, winTitle = "", 
       if (validFiles.length > 0) {
         const recentFiles = validFiles.length >= 2 && validFiles !== DEFAULT_MOCK_OBS_FILES ? validFiles.slice(0, 10).reverse() : DEFAULT_MOCK_OBS_FILES;
         const targetFile = currentFile && recentFiles.includes(currentFile) ? currentFile : recentFiles[recentFiles.length - 1];
-        if (!win || getActiveWindow() === win) setTimelineMode("obs", { file: targetFile, files: recentFiles, winTitle });
+        if (!win || getActiveWindow() === win) setTimelineMode("obs", { file: targetFile, files: recentFiles, winTitle, stepLength, path });
         return targetFile;
       }
     }
@@ -424,7 +426,7 @@ async function syncObservationTimeline(path, currentFile = null, winTitle = "", 
     console.warn("[Main] Failed to query observation file tree for timeline:", err);
   }
   const fallbackFile = currentFile || DEFAULT_MOCK_OBS_FILES[DEFAULT_MOCK_OBS_FILES.length - 1];
-  if (!win || getActiveWindow() === win) setTimelineMode("obs", { file: fallbackFile, files: DEFAULT_MOCK_OBS_FILES, winTitle });
+  if (!win || getActiveWindow() === win) setTimelineMode("obs", { file: fallbackFile, files: DEFAULT_MOCK_OBS_FILES, winTitle, stepLength, path });
   return fallbackFile;
 }
 

@@ -1,23 +1,81 @@
-// timeSlider.js - Discrete forecast lead time stepper and observation timeline
+// timeSlider.js - Discrete forecast lead time stepper and observation timeline with step-length selection
 import { appState } from "../store/appState.js";
 import { formatLeadTime, formatObsTimestamp, formatForecastInitTime, formatForecastValidTime } from "../utils/formatters.js";
 
 let playTimer = null;
 let currentMode = "nwp"; // "nwp" or "obs"
-let discretePeriods = [0, 12, 24, 36, 48, 72, 96, 120];
-let currentPeriodIdx = 2; // default +024h
+let currentStepLength = 6; // 6h forecast, 3h surface, 12h upper-air
+
+let discretePeriods = [0, 6, 12, 18, 24, 30, 36, 42, 48, 54, 60, 66, 72, 84, 96, 108, 120];
+let currentPeriodIdx = 4; // default +024h
 let currentInitCycle = "26082820";
 
-let obsFiles = [
+let rawObsFiles = [
   "20260827080000.000",
-  "20260827120000.000",
+  "20260827110000.000",
+  "20260827140000.000",
   "20260827170000.000",
-  "20260827174000.000",
   "20260827200000.000",
+  "20260828020000.000",
+  "20260828050000.000",
+  "20260828080000.000",
+  "20260828110000.000",
+  "20260828140000.000",
+  "20260828170000.000",
+  "20260828200000.000",
 ];
+let obsFiles = [...rawObsFiles];
 let currentObsIdx = obsFiles.length - 1;
 
 let onTimeChangeCallback = null;
+let currentWinTitle = "";
+
+export function getPeriodsForStep(step = 6) {
+  const stepNum = parseInt(step, 10) || 6;
+  const periods = [0];
+  if (stepNum === 1) {
+    for (let p = 1; p <= 36; p += 1) periods.push(p);
+    for (let p = 39; p <= 72; p += 3) periods.push(p);
+  } else if (stepNum === 3) {
+    for (let p = 3; p <= 72; p += 3) periods.push(p);
+    for (let p = 78; p <= 120; p += 6) periods.push(p);
+  } else if (stepNum === 6) {
+    for (let p = 6; p <= 120; p += 6) periods.push(p);
+    for (let p = 132; p <= 240; p += 12) periods.push(p);
+  } else if (stepNum === 12) {
+    for (let p = 12; p <= 240; p += 12) periods.push(p);
+  } else if (stepNum === 24) {
+    for (let p = 24; p <= 240; p += 24) periods.push(p);
+  } else {
+    for (let p = stepNum; p <= 120; p += stepNum) periods.push(p);
+  }
+  return periods;
+}
+
+function filterObsFilesByStep(files, stepHours) {
+  if (!Array.isArray(files) || files.length === 0) return [];
+  if (stepHours <= 1) return [...files];
+
+  const filtered = [];
+  let lastTimeMs = 0;
+  for (const file of files) {
+    if (file.length >= 10) {
+      const year = parseInt(file.slice(0, 4), 10);
+      const month = parseInt(file.slice(4, 6), 10) - 1;
+      const day = parseInt(file.slice(6, 8), 10);
+      const hour = parseInt(file.slice(8, 10), 10);
+      const min = parseInt(file.slice(10, 12) || "0", 10);
+      const timeMs = Date.UTC(year, month, day, hour, min);
+      if (lastTimeMs === 0 || Math.abs(timeMs - lastTimeMs) >= (stepHours * 3600000 - 1800000)) {
+        filtered.push(file);
+        lastTimeMs = timeMs;
+      }
+    } else {
+      filtered.push(file);
+    }
+  }
+  return filtered.length > 0 ? filtered : [...files];
+}
 
 export function setTimeSliderVisible(visible = true) {
   const container = document.getElementById("timeslider-container");
@@ -36,6 +94,16 @@ export function initTimeSlider(containerId = "timeslider-container", onTimeChang
       <button id="btn-prev" class="step-nav-btn" title="Previous Step">◀</button>
       <button id="btn-play" class="play-btn" title="Play / Pause Animation">▶</button>
       <button id="btn-next" class="step-nav-btn" title="Next Step">▶</button>
+      <div class="step-length-control">
+        <label for="select-step-length" class="step-length-label">Step:</label>
+        <select id="select-step-length" class="step-length-select" title="Change timeline step length">
+          <option value="1">1h</option>
+          <option value="3">3h</option>
+          <option value="6" selected>6h</option>
+          <option value="12">12h</option>
+          <option value="24">24h</option>
+        </select>
+      </div>
     </div>
 
     <div class="timeline-body">
@@ -52,14 +120,10 @@ export function initTimeSlider(containerId = "timeslider-container", onTimeChang
     </div>
   `;
 
-  const btnPlay = document.getElementById("btn-play");
-  const btnPrev = document.getElementById("btn-prev");
-  const btnNext = document.getElementById("btn-next");
+  document.getElementById("btn-prev")?.addEventListener("click", () => step(-1));
+  document.getElementById("btn-next")?.addEventListener("click", () => step(1));
 
-  btnPrev.addEventListener("click", () => step(-1));
-  btnNext.addEventListener("click", () => step(1));
-
-  btnPlay.addEventListener("click", () => {
+  document.getElementById("btn-play")?.addEventListener("click", () => {
     if (playTimer) {
       pausePlayback();
     } else {
@@ -67,8 +131,54 @@ export function initTimeSlider(containerId = "timeslider-container", onTimeChang
     }
   });
 
+  const selStep = document.getElementById("select-step-length");
+  if (selStep) {
+    selStep.addEventListener("change", (e) => {
+      const newStep = parseInt(e.target.value, 10) || 6;
+      setStepLength(newStep, true);
+    });
+  }
+
   renderChips();
   updateLabels();
+}
+
+export function setStepLength(step, triggerCallback = false) {
+  currentStepLength = parseInt(step, 10) || (currentMode === "obs" ? 3 : 6);
+  const selStep = document.getElementById("select-step-length");
+  if (selStep && selStep.value !== String(currentStepLength)) {
+    selStep.value = String(currentStepLength);
+  }
+
+  if (currentMode === "nwp") {
+    const curVal = discretePeriods[currentPeriodIdx] ?? 24;
+    discretePeriods = getPeriodsForStep(currentStepLength);
+    let closestIdx = 0;
+    let minDiff = Infinity;
+    discretePeriods.forEach((p, idx) => {
+      const diff = Math.abs(p - curVal);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestIdx = idx;
+      }
+    });
+    currentPeriodIdx = closestIdx;
+    const newPeriod = discretePeriods[currentPeriodIdx];
+    appState.set("period", newPeriod);
+    updateLabels();
+    renderChips();
+    if (triggerCallback && onTimeChangeCallback) onTimeChangeCallback(newPeriod);
+  } else {
+    const curFile = obsFiles[currentObsIdx] || "";
+    obsFiles = filterObsFilesByStep(rawObsFiles, currentStepLength);
+    const newIdx = obsFiles.indexOf(curFile);
+    currentObsIdx = newIdx !== -1 ? newIdx : Math.max(0, obsFiles.length - 1);
+    updateLabels();
+    renderChips();
+    if (triggerCallback && onTimeChangeCallback && obsFiles[currentObsIdx]) {
+      onTimeChangeCallback({ isObs: true, file: obsFiles[currentObsIdx] });
+    }
+  }
 }
 
 function renderChips() {
@@ -80,7 +190,6 @@ function renderChips() {
     obsFiles.forEach((file, idx) => {
       const btn = document.createElement("button");
       btn.className = `chip-btn ${idx === currentObsIdx ? "active" : ""}`;
-      // Extract MM-DD HH:MM BJT
       const timeLabel = file.length >= 10
         ? `${file.slice(4, 6)}/${file.slice(6, 8)} ${file.slice(8, 10)}:${file.slice(10, 12) || "00"}`
         : file;
@@ -95,7 +204,6 @@ function renderChips() {
       chipsContainer.appendChild(btn);
     });
   } else {
-    // Discrete Forecast Lead Hours (No continuous steps)
     discretePeriods.forEach((period, idx) => {
       const btn = document.createElement("button");
       btn.className = `chip-btn ${idx === currentPeriodIdx ? "active" : ""}`;
@@ -112,8 +220,6 @@ function renderChips() {
     });
   }
 }
-
-let currentWinTitle = "";
 
 function updateLabels() {
   const badge = document.getElementById("time-badge");
@@ -141,7 +247,7 @@ function updateLabels() {
     badge.className = "mode-badge obs-badge";
     const curFile = obsFiles[currentObsIdx] || "";
     leadWrapper.innerHTML = `Observation Time: <strong id="time-lead-label">${formatObsTimestamp(curFile)}</strong>`;
-    validLabel.textContent = "Real-time Observation Analysis (UTC+8 / BJT)";
+    validLabel.textContent = `Real-time Observation (Step: ${currentStepLength}h)`;
   } else {
     badge.textContent = "NWP FORECAST";
     badge.className = "mode-badge";
@@ -151,7 +257,7 @@ function updateLabels() {
       initLabel.textContent = formatForecastInitTime(currentInitCycle);
     }
     leadWrapper.innerHTML = `Forecast Lead: <strong id="time-lead-label">${formatLeadTime(curPeriod)}</strong>`;
-    validLabel.textContent = `Valid: ${formatForecastValidTime(currentInitCycle, curPeriod)}`;
+    validLabel.textContent = `Valid: ${formatForecastValidTime(currentInitCycle, curPeriod)} (Step: ${currentStepLength}h)`;
   }
 }
 
@@ -194,26 +300,49 @@ function pausePlayback() {
 
 export function setTimelineMode(mode, customData = {}) {
   currentMode = mode === "obs" ? "obs" : "nwp";
-  if (customData.winTitle !== undefined) {
-    currentWinTitle = customData.winTitle;
+  if (customData.winTitle !== undefined) currentWinTitle = customData.winTitle;
+  if (customData.initCycle) currentInitCycle = customData.initCycle;
+
+  // Set default step length: 12h for upper-air, 3h for surface, 6h for NWP forecast
+  let targetStep = customData.stepLength;
+  if (!targetStep) {
+    if (currentMode === "obs") {
+      const isUpper = Boolean(
+        customData.isUpper ||
+        (customData.path && customData.path.includes("UPPER_AIR")) ||
+        (customData.winTitle && (customData.winTitle.toLowerCase().includes("upper") || customData.winTitle.toLowerCase().includes("sounding")))
+      );
+      targetStep = isUpper ? 12 : 3;
+    } else {
+      targetStep = 6;
+    }
   }
-  if (customData.initCycle) {
-    currentInitCycle = customData.initCycle;
-  }
+
+  currentStepLength = targetStep;
+  const selStep = document.getElementById("select-step-length");
+  if (selStep) selStep.value = String(currentStepLength);
+
   if (currentMode === "obs") {
     if (Array.isArray(customData.files) && customData.files.length > 0) {
-      obsFiles = customData.files;
+      rawObsFiles = customData.files;
     }
+    obsFiles = filterObsFilesByStep(rawObsFiles, currentStepLength);
     if (customData.file) {
       const idx = obsFiles.indexOf(customData.file);
-      currentObsIdx = idx !== -1 ? idx : obsFiles.length - 1;
+      currentObsIdx = idx !== -1 ? idx : Math.max(0, obsFiles.length - 1);
     } else {
-      currentObsIdx = obsFiles.length - 1;
+      currentObsIdx = Math.max(0, obsFiles.length - 1);
     }
-  } else if (currentMode === "nwp" && customData.period !== undefined) {
-    const idx = discretePeriods.indexOf(customData.period);
-    if (idx !== -1) currentPeriodIdx = idx;
+  } else {
+    discretePeriods = getPeriodsForStep(currentStepLength);
+    if (customData.period !== undefined) {
+      const idx = discretePeriods.indexOf(customData.period);
+      currentPeriodIdx = idx !== -1 ? idx : Math.min(2, discretePeriods.length - 1);
+    } else {
+      currentPeriodIdx = Math.min(4, discretePeriods.length - 1);
+    }
   }
+
   pausePlayback();
   updateLabels();
   renderChips();
