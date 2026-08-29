@@ -28,8 +28,10 @@ export function isFeatureBold(val, boldValues) {
     const numB = Number(b);
     if (!Number.isFinite(numB)) return false;
     if (numVal === numB) return true;
-    if (Math.round(numVal * 10) === numB) return true;
-    if (Math.round(numVal / 10) === numB) return true;
+    if (Math.abs(numB) >= 100 && Math.abs(numVal) >= 100) {
+      if (Math.round(numVal * 10) === numB) return true;
+      if (Math.round(numVal / 10) === numB) return true;
+    }
     return false;
   });
 }

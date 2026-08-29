@@ -49,7 +49,7 @@ func (h *StaticHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ConfigHandler reads or updates config.json (and legacy presets.json)
+// ConfigHandler reads or updates config.json
 func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
@@ -66,9 +66,6 @@ func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 		filepath.Join(distDir, "config/config.json"),
 		"client/public/config.json",
 		"../client/public/config.json",
-		filepath.Join(distDir, "presets.json"),
-		"client/public/presets.json",
-		"../client/public/presets.json",
 	}
 
 	var configPath string
@@ -91,8 +88,6 @@ func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 		_ = os.WriteFile(filepath.Join(distDir, "config.json"), raw, 0644)
 		_ = os.WriteFile("client/public/config.json", raw, 0644)
 		_ = os.WriteFile("../client/public/config.json", raw, 0644)
-		_ = os.WriteFile(filepath.Join(distDir, "presets.json"), raw, 0644)
-		_ = os.WriteFile("client/public/presets.json", raw, 0644)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok","message":"Configuration saved successfully"}`))
@@ -107,11 +102,6 @@ func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(data)
-}
-
-// Legacy alias
-func (h *StaticHandler) PresetsConfigHandler(w http.ResponseWriter, r *http.Request) {
-	h.ConfigHandler(w, r)
 }
 
 // SPAHandler serves frontend static files with SPA fallback

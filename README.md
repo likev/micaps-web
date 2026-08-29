@@ -41,11 +41,9 @@ graph TD
         UI["Workstation UI (Catalog Drawer, Layer Controls, Time Slider)"]
     end
 
-    subgraph Testing ["Headless Automation Suite (Bun 1.4)"]
+    subgraph Testing ["Fast Meteorological Unit Test Suite (Bun Test)"]
         BunTest["Bun Test Runner (bun test)"]
-        BunWV["Bun.WebView (Native Headless Browser Controller)"]
-        Chromium["Headless Chromium Engine"]
-        BunTest --> BunWV --> Chromium -->|Navigate, Click, Scroll, Screenshot| Frontend
+        BunTest -->|Test Colormaps, Symbols, Formatter, Contours| Frontend
     end
 
     Parser -->|REST JSON & Float32 Streams| Frontend
@@ -68,7 +66,7 @@ graph TD
   - Adaptive Level-of-Detail (LoD) decluttering.
 - **High-Density Raster & Wind Streamlines**: Zero-copy Float32 binary streaming rendered to offscreen canvas with CMA color palettes, plus animated wind streamline particle simulator.
 - **Dynamic Bore Tunnel Translation**: Supports ephemeral reverse proxy tunnels (`bore.pub:<port>`) with dynamic port binding and cluster internal IP rewriting, with automatic offline mock fallback.
-- **Bun 1.4 Native `Bun.WebView` E2E Test Suite**: Headless browser automation testing with navigate, click, evaluate, and screenshot verification directly via Bun 1.4.
+- **Fast Unit Test Suite**: Comprehensive testing for meteorological colormaps, synoptic isoline scaling, characteristic bold lines, WMO symbols, and config formatting via Bun Test.
 - **Strict Modularity**: Every source file across the entire repository adheres strictly to **< 600 lines**.
 
 ---
@@ -109,7 +107,7 @@ micaps-web/
 │   ├── package.json                  # Dependencies, build scripts & test runner
 │   ├── vite.config.js                # Vite build configuration
 │   ├── public/
-│   │   └── presets.json              # Runtime-editable composite preset configuration
+│   │   └── config.json               # Runtime-editable meteorological configuration (presets & colormaps)
 │   ├── src/
 │   │   ├── main.js                   # Application bootstrap & lifecycle orchestrator (< 160 lines)
 │   │   ├── style.css                 # Dark meteorological theme stylesheet (< 330 lines)
@@ -119,18 +117,12 @@ micaps-web/
 │   │   ├── store/                    # Reactive workstation state manager
 │   │   ├── ui/                       # Navbar, catalog drawer, layer control, time slider, tooltip
 │   │   └── utils/                    # CMA palettes, weather symbols, griddata-js adapter
-│   └── test/                         # E2E Automation Testing Suite (Bun.WebView)
-│       ├── run_all.js                # Sequential test runner (< 60 lines)
-│       ├── e2e/
-│       │   ├── helpers/testEnv.js    # Bun.WebView browser fixture (< 40 lines)
-│       │   ├── map_render.test.js    # Vector map & graticule test (< 50 lines)
-│       │   ├── ui_controls.test.js   # Drawer, slider & tooltip test (< 70 lines)
-│       │   ├── contour_layer.test.js # griddata-js isoband & isoline test (< 50 lines)
-│       │   ├── raster_wind.test.js   # Binary raster & wind streamline test (< 50 lines)
-│       │   ├── station_plot.test.js  # WMO/NOAA 9-point station plot test (< 50 lines)
-│       │   └── visual_regression.test.js # Screenshot capture verification (< 30 lines)
-│       └── screenshots/
-│           └── workstation-screenshot.png # High-resolution screenshot captured by Bun.WebView
+│   └── test/                         # Meteorological Unit Test Suite
+│       ├── colormaps.test.js         # Dynamic colormaps & level scaling tests
+│       ├── weather_symbols.test.js   # WMO symbols & 110° wind barbs tests
+│       ├── contour_logic.test.js     # Characteristic bold contour tests
+│       ├── config.test.js            # config.json validation & compact formatting tests
+│       └── formatters.test.js        # Meteorological unit and date formatting tests
 ```
 
 ---
@@ -195,11 +187,11 @@ Open your browser at:
 http://localhost:8088
 ```
 
-### Runtime Preset Configuration
+### Runtime Configuration (config.json)
 
-Composite presets and named colormaps are loaded from `client/public/presets.json` at startup rather than bundled into the JavaScript. Edit that JSON file, then click **Reload Config** in the workstation navbar to apply changes without rebuilding or restarting the frontend.
+Composite presets and named colormaps are loaded from `client/public/config.json` at startup rather than bundled into the JavaScript. Edit that JSON file, or modify layer styling directly in the workstation UI to auto-save immediately.
 
-For a production build served from `client/dist`, edit or replace `client/dist/presets.json`; Vite copies the source file there during `bun run build`. The file has this shape:
+For a production build served from `client/dist`, edit or replace `client/dist/config.json`; Vite copies the source file there during `bun run build`. The file has this shape:
 
 ```json
 {
@@ -237,9 +229,9 @@ For a production build served from `client/dist`, edit or replace `client/dist/p
 
 ---
 
-## Automated E2E Testing with Bun 1.4 `Bun.WebView`
+## Fast Unit Testing with Bun Test
 
-Bun 1.4 includes a built-in headless browser automation engine via `Bun.WebView`. The test suite controls headless Chromium to navigate, interact with UI widgets, test WebGL layer rendering, and capture screenshots.
+Run the entire suite of meteorological algorithms, colormap calculations, WMO symbol rendering, and configuration formatting tests:
 
 ```bash
 cd client
@@ -248,31 +240,20 @@ bun test
 
 Or execute individual test suites:
 ```bash
-# Verify offline vector basemap & coordinate graticule
-bun test ./test/e2e/map_render.test.js
+# Verify meteorological colormaps and dynamic level scaling
+bun test ./test/colormaps.test.js
 
-# Verify catalog drawer, time scrubber, and tooltips
-bun test ./test/e2e/ui_controls.test.js
+# Verify WMO standard symbols and 110-degree wind barbs
+bun test ./test/weather_symbols.test.js
 
-# Verify griddata-js Marching Squares isobands & isolines
-bun test ./test/e2e/contour_layer.test.js
+# Verify characteristic bold contour line matching logic
+bun test ./test/contour_logic.test.js
 
-# Verify WMO/NOAA 9-point station plot model & LoD decluttering
-bun test ./test/e2e/station_plot.test.js
+# Verify configuration format and preset schema
+bun test ./test/config.test.js
 
-# Verify Float32 binary raster stream and wind streamlines
-bun test ./test/e2e/raster_wind.test.js
-
-# Capture full-viewport screenshot and verify visual regression
-bun test ./test/e2e/visual_regression.test.js
-```
-
-### Test Suite Execution Output
-```text
-========================================
-ALL TEST SUITES COMPLETED: 6 passed, 0 failed
-Total Tests: 17 passed, 0 failed (100% pass rate)
-========================================
+# Verify date/time, cycle, and coordinate formatting
+bun test ./test/formatters.test.js
 ```
 
 ---

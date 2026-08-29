@@ -1,7 +1,7 @@
 // presets.js - Runtime-loaded composite preset & layer configuration (config.json)
 import { setColormaps } from "../utils/colormaps.js";
 
-const CONFIG_URL = new URL("./config.json", document.baseURI);
+const CONFIG_URL = new URL("./config.json", typeof document !== "undefined" ? document.baseURI : "http://localhost:8088/");
 
 // Keep this as a live export so existing consumers see a successfully reloaded
 // configuration without needing to be re-imported.
@@ -13,11 +13,8 @@ let autoSaveTimer = null;
 export async function loadPresetGroups() {
   let response = await fetch(new URL(CONFIG_URL.href + "?_t=" + Date.now()), { cache: "no-store" });
   if (!response.ok) {
-    // Fallback to /api/config or ./presets.json
+    // Fallback to /api/config
     response = await fetch("/api/config?_t=" + Date.now(), { cache: "no-store" });
-    if (!response.ok) {
-      response = await fetch("./presets.json?_t=" + Date.now(), { cache: "no-store" });
-    }
   }
   if (!response.ok) {
     throw new Error(`Config request failed (${response.status})`);
@@ -51,13 +48,7 @@ export async function savePresetConfig(configObj = CURRENT_CONFIG) {
     body: formatCompactJSON(configObj),
   });
   if (!res.ok) {
-    // Try legacy /api/config/presets
-    const legacyRes = await fetch("/api/config/presets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: formatCompactJSON(configObj),
-    });
-    if (!legacyRes.ok) throw new Error(`Failed to save config (${res.status})`);
+    throw new Error(`Failed to save config (${res.status})`);
   }
   const groups = Array.isArray(configObj) ? configObj : configObj?.presets;
   if (Array.isArray(groups)) {

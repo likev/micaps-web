@@ -119,7 +119,6 @@ async function loadCurrentConfigIntoEditor() {
   try {
     if (badge) { badge.className = "config-editor-status"; badge.textContent = "Fetching..."; }
     let res = await fetch(`/api/config?_t=${Date.now()}`);
-    if (!res.ok) res = await fetch(`/api/config/presets?_t=${Date.now()}`);
     let text = "";
     if (res.ok) {
       const data = await res.json();

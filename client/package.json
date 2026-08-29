@@ -9,14 +9,15 @@
     "package": "rm -f ../client.zip && cd dist && zip -r ../../client.zip . --exclude \"map-china.pmtiles\"",
     "build:all": "vite build && npm run package",
     "preview": "vite preview",
-    "test": "bun ./test/run_all.js"
+    "test": "bun test"
   },
   "dependencies": {
     "@deck.gl/core": "^9.0.38",
     "@deck.gl/layers": "^9.0.38",
     "@deck.gl/mapbox": "^9.0.38",
     "maplibre-gl": "^5.0.1",
-    "pmtiles": "^3.2.1"
+    "pmtiles": "^3.2.1",
+    "griddata": "file:../../griddata-js"
   },
   "devDependencies": {
     "vite": "^6.1.1"

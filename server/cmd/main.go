@@ -67,7 +67,6 @@ func main() {
 	// REST API routes
 	mux.HandleFunc("/api/status", staticH.StatusHandler)
 	mux.HandleFunc("/api/config", staticH.ConfigHandler)
-	mux.HandleFunc("/api/config/presets", staticH.PresetsConfigHandler)
 	mux.HandleFunc("/api/catalog/models", catH.ModelsHandler)
 	mux.HandleFunc("/api/catalog/tree", catH.TreeHandler)
 	mux.HandleFunc("/api/catalog/levels", catH.LevelsHandler)
