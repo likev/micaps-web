@@ -64,8 +64,8 @@ export function getWindBarbSVG(speed = 0, dir = 0, size = 100) {
   let barbsSVG = "";
   let remSpeed = Math.round(speed);
   let pos = staffLength;
-  // 110° angle relative to staff pointing outward (feathers on right side, slanting backward towards station)
-  const barbAngle = angleRad + ((110 * Math.PI) / 180);
+  // 110° angle relative to inward staff toward station (slanted backward towards tail per NOAA WPC standard)
+  const barbAngle = angleRad + ((70 * Math.PI) / 180);
 
   // 1. Pennant flag (20 m/s each)
   while (remSpeed >= 18) {

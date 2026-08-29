@@ -309,14 +309,14 @@ export function renderGridWindBarbs(map, gridData) {
         let pos = 0;
         const barbLen = 8;
         const space = 3.5;
-        // 110° angle relative to staff: sin(110°)=0.940 (right normal), cos(110°)=-0.342 (inward staff)
+        // 110° angle relative to inward staff: bOffN (perpendicular), bOffD (slanted back towards tail)
         const bOffN = barbLen * 0.940;
         const bOffD = barbLen * 0.342;
 
         while (s >= 18) {
           const bx = x1 - dx * pos, by = y1 - dy * pos;
           const ex = x1 - dx * (pos + 4.5), ey = y1 - dy * (pos + 4.5);
-          const tx = bx + nx * bOffN - dx * bOffD, ty = by + ny * bOffN - dy * bOffD;
+          const tx = bx + nx * bOffN + dx * bOffD, ty = by + ny * bOffN + dy * bOffD;
           ctx.beginPath();
           ctx.moveTo(bx, by);
           ctx.lineTo(tx, ty);
@@ -331,7 +331,7 @@ export function renderGridWindBarbs(map, gridData) {
           const bx = x1 - dx * pos, by = y1 - dy * pos;
           ctx.beginPath();
           ctx.moveTo(bx, by);
-          ctx.lineTo(bx + nx * bOffN - dx * bOffD, by + ny * bOffN - dy * bOffD);
+          ctx.lineTo(bx + nx * bOffN + dx * bOffD, by + ny * bOffN + dy * bOffD);
           ctx.stroke();
           pos += space;
           s -= 4;
@@ -343,7 +343,7 @@ export function renderGridWindBarbs(map, gridData) {
           const bx = x1 - dx * barbPos, by = y1 - dy * barbPos;
           ctx.beginPath();
           ctx.moveTo(bx, by);
-          ctx.lineTo(bx + nx * (bOffN * 0.52) - dx * (bOffD * 0.52), by + ny * (bOffN * 0.52) - dy * (bOffD * 0.52));
+          ctx.lineTo(bx + nx * (bOffN * 0.52) + dx * (bOffD * 0.52), by + ny * (bOffN * 0.52) + dy * (bOffD * 0.52));
           ctx.stroke();
         }
       }
