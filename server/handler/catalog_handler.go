@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"micaps-web/db"
@@ -62,7 +63,14 @@ func (h *CatalogHandler) TreeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	files, err := db.GetFileList(h.Client, dataPath)
+	limit := 100
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	files, err := db.GetFileList(h.Client, dataPath, limit)
 	if err != nil {
 		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
 		return

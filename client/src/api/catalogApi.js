@@ -9,8 +9,8 @@ export async function fetchModels() {
   return await fetchJson("/api/catalog/models");
 }
 
-export async function fetchTree(path) {
-  return await fetchJson("/api/catalog/tree", { path });
+export async function fetchTree(path, limit = 50) {
+  return await fetchJson("/api/catalog/tree", { path, limit });
 }
 
 export async function fetchLevels(path) {

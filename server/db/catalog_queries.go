@@ -99,8 +99,11 @@ func GetLatestCycle(client *CQLClient, dataPath string, suffix string) (string, 
 	return "", fmt.Errorf("no latest cycle record found for %s", dataPath)
 }
 
-// GetFileList queries treeview table for available files under dataPath
-func GetFileList(client *CQLClient, dataPath string) ([]model.FileEntry, error) {
+// GetFileList queries treeview table for available files under dataPath with an optional limit
+func GetFileList(client *CQLClient, dataPath string, limit int) ([]model.FileEntry, error) {
+	if limit <= 0 {
+		limit = 100
+	}
 	candidates := candidateDataPaths(dataPath)
 	if len(candidates) == 0 {
 		return nil, fmt.Errorf("empty dataPath")
@@ -108,7 +111,7 @@ func GetFileList(client *CQLClient, dataPath string) ([]model.FileEntry, error) 
 
 	var lastErr error
 	for _, cPath := range candidates {
-		query := fmt.Sprintf(`SELECT column1, value FROM micapsdataserver.treeview WHERE "dataPath" = '%s'`, cPath)
+		query := fmt.Sprintf(`SELECT column1, value FROM micapsdataserver.treeview WHERE "dataPath" = '%s' LIMIT %d`, cPath, limit)
 		rows, err := client.Query(query)
 		if err != nil {
 			lastErr = err

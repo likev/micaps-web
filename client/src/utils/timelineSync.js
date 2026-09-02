@@ -90,38 +90,9 @@ export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP",
     }
   }
 
-  // 1. Try fetchTree with specific level path (e.g. ECMWF_HR/TMP/500)
+  // 1. First priority: O(1) point lookup in latestdatatime index table
   try {
-    const fileEntries = await fetchTree(path);
-    const cycles = extractCyclesFromFiles(fileEntries);
-    if (cycles.length > 0) {
-      forecastCyclesCache[path] = { data: cycles, ts: Date.now() };
-      forecastCyclesCache[model] = { data: cycles, ts: Date.now() };
-      return cycles;
-    }
-  } catch (err) {
-    console.warn(`[Forecast] Fetch cycles failed for ${path}:`, err);
-  }
-
-  // 2. Try fetchTree with model/element path (e.g. ECMWF_HR/TMP)
-  if (shortPath !== path) {
-    try {
-      const fileEntries = await fetchTree(shortPath);
-      const cycles = extractCyclesFromFiles(fileEntries);
-      if (cycles.length > 0) {
-        forecastCyclesCache[path] = { data: cycles, ts: Date.now() };
-        forecastCyclesCache[shortPath] = { data: cycles, ts: Date.now() };
-        forecastCyclesCache[model] = { data: cycles, ts: Date.now() };
-        return cycles;
-      }
-    } catch (err) {
-      console.warn(`[Forecast] Fetch cycles failed for ${shortPath}:`, err);
-    }
-  }
-
-  // 3. Try fetchLatest from latestdatatime
-  try {
-    const latestRes = await fetchLatest(path);
+    const latestRes = await fetchLatest(path, "*.024");
     const latestStr = latestRes?.latest || latestRes?.value;
     if (latestStr) {
       const cycles = generateDynamicForecastCycles(latestStr, 10);
@@ -133,7 +104,7 @@ export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP",
     }
   } catch (_) {
     try {
-      const latestRes = await fetchLatest(shortPath);
+      const latestRes = await fetchLatest(shortPath, "*.024");
       const latestStr = latestRes?.latest || latestRes?.value;
       if (latestStr) {
         const cycles = generateDynamicForecastCycles(latestStr, 10);
@@ -144,6 +115,35 @@ export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP",
         }
       }
     } catch (_) {}
+  }
+
+  // 2. Second priority: Bounded treeview catalog query with limit=30
+  try {
+    const fileEntries = await fetchTree(path, 30);
+    const cycles = extractCyclesFromFiles(fileEntries);
+    if (cycles.length > 0) {
+      forecastCyclesCache[path] = { data: cycles, ts: Date.now() };
+      forecastCyclesCache[model] = { data: cycles, ts: Date.now() };
+      return cycles;
+    }
+  } catch (err) {
+    console.warn(`[Forecast] Fetch cycles failed for ${path}:`, err);
+  }
+
+  // 3. Third priority: Bounded treeview catalog query on model/element path with limit=30
+  if (shortPath !== path) {
+    try {
+      const fileEntries = await fetchTree(shortPath, 30);
+      const cycles = extractCyclesFromFiles(fileEntries);
+      if (cycles.length > 0) {
+        forecastCyclesCache[path] = { data: cycles, ts: Date.now() };
+        forecastCyclesCache[shortPath] = { data: cycles, ts: Date.now() };
+        forecastCyclesCache[model] = { data: cycles, ts: Date.now() };
+        return cycles;
+      }
+    } catch (err) {
+      console.warn(`[Forecast] Fetch cycles failed for ${shortPath}:`, err);
+    }
   }
 
   // 4. Dynamic fallback based on real-time clock
@@ -174,7 +174,7 @@ export async function syncObservationTimeline(path, currentFile = null, winTitle
     }
   };
   try {
-    const fileEntries = await fetchTree(path);
+    const fileEntries = await fetchTree(path, 30);
     if (Array.isArray(fileEntries) && fileEntries.length > 0) {
       let validFiles = fileEntries.filter((f) => f.name && (f.size > 100 || f.size === 0)).map((f) => f.name);
       const hasObsFormat = validFiles.some((f) => f.length >= 14 && f.endsWith(".000"));
