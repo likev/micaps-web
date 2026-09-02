@@ -22,6 +22,8 @@ export async function loadPresetGroups() {
 
   const config = await response.json();
   CURRENT_CONFIG = config;
+  // expose for mapInstance resolveInitialBasemapScheme
+  try { if (typeof window !== "undefined") window.__MICAPS_CONFIG__ = config; } catch {}
   const groups = Array.isArray(config) ? config : config?.presets;
   if (!Array.isArray(groups) || groups.some((group) => !group || !group.id || !Array.isArray(group.layers))) {
     throw new Error("Config must be an array of groups with id and layers");
@@ -30,6 +32,13 @@ export async function loadPresetGroups() {
   if (!Array.isArray(config) && config.colormaps !== undefined) {
     setColormaps(config.colormaps);
   }
+  // persist basemap scheme for next map creation (maptile only, no UI chrome change)
+  try {
+    const scheme = config?.basemap?.scheme;
+    if (scheme === "light" || scheme === "dark") {
+      try { if (typeof localStorage !== "undefined") localStorage.setItem("micaps-basemap-scheme", scheme); } catch {}
+    }
+  } catch {}
   PRESET_GROUPS = groups;
   return PRESET_GROUPS;
 }

@@ -35,6 +35,20 @@ export function isUpperAirStationLayer(layer) {
   return false;
 }
 
+function resolveDefaultScheme() {
+  try {
+    const s = localStorage.getItem("micaps-basemap-scheme");
+    if (s === "light" || s === "dark") return s;
+  } catch {}
+  try {
+    if (typeof document !== "undefined") {
+      const attr = document.documentElement.getAttribute("data-theme");
+      if (attr === "light" || attr === "dark") return attr;
+    }
+  } catch {}
+  return "dark";
+}
+
 function createDefaultLayers(winId = "default") {
   return [
     {
@@ -50,6 +64,7 @@ function createDefaultLayers(winId = "default") {
         showGraticule: true,
         showProvinces: true,
         showCities: true,
+        scheme: resolveDefaultScheme(),
       },
     },
   ];
@@ -366,6 +381,17 @@ function renderLayersManager(panel) {
         [".chk-basemap-provinces", "showProvinces"],
         [".chk-basemap-cities", "showCities"],
       ].forEach(([sel, key]) => bindBasemapCheckbox(sel, key));
+
+      const schemeSel = configDrawer.querySelector(".sel-basemap-scheme");
+      if (schemeSel) {
+        schemeSel.addEventListener("click", (e) => e.stopPropagation());
+        schemeSel.addEventListener("change", (e) => {
+          if (!layer.config) layer.config = {};
+          layer.config.scheme = e.target.value;
+          autoSaveLayerConfig(layer);
+          if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer, currentActiveWinId);
+        });
+      }
     }
   });
 
@@ -536,8 +562,16 @@ function renderLayerRow(layer) {
             <div class="config-row">
               <label>
                 <input type="checkbox" class="chk-basemap-cities" ${layer.config?.showCities !== false ? "checked" : ""} />
-                <span>City Boundaries</span>
+                <span>City / County Boundaries</span>
               </label>
+            </div>
+            <div class="config-row" style="margin-top:4px; border-top: 1px solid var(--border-color); padding-top:6px;">
+              <label style="color: var(--text-secondary); font-size:11px; display:flex; align-items:center; gap:4px;">🎨 Theme</label>
+              <select class="sel-basemap-scheme" style="background: var(--bg-secondary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:4px; padding:3px 6px; font-size:11px; min-width:140px;">
+                <option value="dark" ${(layer.config?.scheme || "dark") === "dark" ? "selected" : ""}>🌙 Midnight Slate (Dark)</option>
+                <option value="light" ${layer.config?.scheme === "light" ? "selected" : ""}>☀️ Daybreak Neutral (Light)</option>
+                <option value="micaps" ${layer.config?.scheme === "micaps" ? "selected" : ""}>🌐 MICAPS Classic (Navy)</option>
+              </select>
             </div>
             `))
         }

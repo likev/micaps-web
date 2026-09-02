@@ -35,8 +35,18 @@ export function generateGraticuleGeoJSON(step = 10) {
   };
 }
 
-export function addGraticuleLayers(map) {
+import { getBasemapScheme } from "./pmtilesLayers.js";
+
+export function addGraticuleLayers(map, schemeName = null) {
   if (map.getSource("graticule-source")) return;
+
+  let graticuleColor = "rgba(255, 255, 255, 0.16)";
+  if (schemeName) {
+    try { graticuleColor = getBasemapScheme(schemeName).graticule; } catch {}
+  } else if (typeof document !== "undefined") {
+    const attr = document.documentElement.getAttribute("data-theme");
+    if (attr) { try { graticuleColor = getBasemapScheme(attr).graticule; } catch {} }
+  }
 
   map.addSource("graticule-source", {
     type: "geojson",
@@ -48,9 +58,15 @@ export function addGraticuleLayers(map) {
     type: "line",
     source: "graticule-source",
     paint: {
-      "line-color": "rgba(255, 255, 255, 0.16)",
+      "line-color": graticuleColor,
       "line-width": 0.75,
       "line-dasharray": [4, 4],
     },
   });
+}
+
+export function updateGraticuleScheme(map, schemeName) {
+  if (!map || !map.getLayer("graticule-lines")) return;
+  const scheme = getBasemapScheme(schemeName);
+  map.setPaintProperty("graticule-lines", "line-color", scheme.graticule);
 }

@@ -183,6 +183,12 @@
       }
     ]
   },
+  "basemap": {
+    "scheme": "dark",
+    "showGraticule": true,
+    "showProvinces": true,
+    "showCities": true
+  },
   "presets": [
     {
       "category": "NWP Synoptic",

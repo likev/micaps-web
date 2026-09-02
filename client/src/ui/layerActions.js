@@ -53,7 +53,7 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
 
       const chinaLayers = ["china-fill", "china-boundary"];
       const provLayers = ["provinces-bg-fill", "provinces-boundary", "provinces-fill", "provinces-detail-boundary"];
-      const cityLayers = ["citys-fill", "citys-boundary"];
+      const cityLayers = ["citys-fill", "citys-boundary", "county-fill", "county-boundary"];
 
       chinaLayers.forEach((id) => { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", value ? "visible" : "none"); });
       provLayers.forEach((id) => { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", showProvinces ? "visible" : "none"); });
@@ -62,6 +62,15 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
     }
   } else if (action === "config") {
     if (layer.type === "pmtiles") {
+      if (value.scheme !== undefined) {
+        // live theme switch without reload — lazy import to avoid cycle
+        import("../map/pmtilesLayers.js").then(({ applyBasemapScheme }) => {
+          try { applyBasemapScheme(map, value.scheme); } catch {}
+        });
+        import("../map/graticule.js").then(({ updateGraticuleScheme }) => {
+          try { updateGraticuleScheme(map, value.scheme); } catch {}
+        });
+      }
       if (value.showGraticule !== undefined) {
         if (map.getLayer("graticule-lines")) {
           map.setLayoutProperty("graticule-lines", "visibility", (layer.visible && value.showGraticule !== false) ? "visible" : "none");
@@ -74,7 +83,7 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
         });
       }
       if (value.showCities !== undefined) {
-        const cityLayers = ["citys-fill", "citys-boundary"];
+        const cityLayers = ["citys-fill", "citys-boundary", "county-fill", "county-boundary"];
         cityLayers.forEach((id) => {
           if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", (layer.visible && value.showCities !== false) ? "visible" : "none");
         });
