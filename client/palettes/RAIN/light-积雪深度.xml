@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="Depth(cm)" valuedefined="true" entrystyle="Default">
+  <entry value="0" rgba="255,255,255,255" />
+  <entry value="0.5" rgba="208,238,251,255" />
+  <entry value="1" rgba="126,190,231,255" />
+  <entry value="2.5" rgba="70,154,168,255" />
+  <entry value="5" rgba="160,207,80,255" />
+  <entry value="10" rgba="102,190,73,255" />
+  <entry value="15" rgba="248,176,67,255" />
+  <entry value="20" rgba="246,121,43,255" />
+  <entry value="25" rgba="233,80,41,255" />
+  <entry value="30" rgba="167,24,30,255" />
+</palette>

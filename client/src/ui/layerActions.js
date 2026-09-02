@@ -130,6 +130,34 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
           removeGridWindBarbs(map);
         }
       }
+
+      // Palette change: load the XML palette file and update the live colormap for this layer
+      if (value.palettePath !== undefined) {
+        if (!value.palettePath) {
+          // Revert to built-in default — re-render with null colormap (element default)
+          if (layer.config?.showRaster && layer.visible) {
+            triggerRasterOverlay(map, layer, win);
+          }
+        } else {
+          import("../utils/paletteLoader.js").then(({ loadXMLPalette }) => {
+            loadXMLPalette(value.palettePath).then((stops) => {
+              if (!stops) return;
+              // Register under a stable per-layer key so colormaps.js can resolve it
+              import("../utils/colormaps.js").then(({ setColormaps, COLORMAPS }) => {
+                try {
+                  const key = `palette:${layer.id}`;
+                  setColormaps({ ...COLORMAPS, [key]: stops });
+                  // Store key on layer so rasterLayer picks it up
+                  layer.colormap = key;
+                  if (layer.config?.showRaster && layer.visible) {
+                    triggerRasterOverlay(map, layer, win);
+                  }
+                } catch { /* ignore colormap registration errors */ }
+              });
+            });
+          });
+        }
+      }
     } else if (layer.type === "station") {
       setStationConfig(map, value);
       if (value.showStreamlines !== undefined) {

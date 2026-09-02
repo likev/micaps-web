@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="6小时最大阵风" valuedefined="true" entrystyle="Default">
+  <entry value="0" rgba="78,197,254,255" />
+  <entry value="5.5" rgba="52,251,216,255" />
+  <entry value="8" rgba="67,235,0,255" />
+  <entry value="10.8" rgba="236,249,0,255" />
+  <entry value="13.9" rgba="254,217,0,255" />
+  <entry value="17.2" rgba="255,163,0,255" />
+  <entry value="20.8" rgba="249,108,0,255" />
+  <entry value="24.5" rgba="220,33,2,255" />
+  <entry value="28.5" rgba="224,90,85,255" />
+</palette>

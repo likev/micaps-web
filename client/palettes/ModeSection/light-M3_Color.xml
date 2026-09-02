@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!-- edited with XMLSpy v2007 sp1 (http://www.altova.com) by wt (EMBRACE) -->
+<ColorOption>
+    <ColorList Name="Grids颜色">
+		<Color>255,255,255</Color>
+		<Color>200,255,190</Color>
+		<Color>150,245,140</Color>
+		<Color>80,240,80</Color>
+		<Color>30,180,30</Color>
+		<Color>15,160,15</Color>
+	</ColorList>
+	</ColorOption>

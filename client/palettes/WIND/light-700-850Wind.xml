@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="700-850Wind" valuedefined="true" entrystyle="Default">
+  <entry value="10" rgba="255,255,255,255" />
+  <entry value="12" rgba="0,212,139,255" />
+  <entry value="15" rgba="4,219,0,255" />
+  <entry value="18" rgba="162,230,45,255" />
+  <entry value="21" rgba="229,177,41,255" />
+  <entry value="24" rgba="227,136,43,255" />
+  <entry value="27" rgba="247,62,59,255" />
+  <entry value="30" rgba="216,12,133,255" />
+</palette>

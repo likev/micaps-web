@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="500hPaHigh" valuedefined="true" entrystyle="Default">
+  <entry value="500" rgba="0,47,255,255" />
+  <entry value="510" rgba="40,130,240,255" />
+  <entry value="520" rgba="120,185,250,255" />
+  <entry value="530" rgba="180,240,250,255" />
+  <entry value="540" rgba="255,255,255,255" />
+  <entry value="588" rgba="255,160,0,255" />
+  <entry value="592" rgba="255,50,0,255" />
+  <entry value="596" rgba="165,0,0,255" />
+  <entry value="600" rgba="255,0,206" />
+</palette>

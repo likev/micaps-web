@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="850hPadt" valuedefined="true" entrystyle="Default">
+  <entry value="-22.00" rgba="156,0,156,255" />
+  <entry value="-20.00" rgba="206,0,255,255" />
+  <entry value="-18.00" rgba="255,0,255,255" />
+  <entry value="-16.00" rgba="107,0,255,255" />
+  <entry value="-14.00" rgba="0,47,255,255" />
+  <entry value="-12.00" rgba="28,106,255,255" />
+  <entry value="-10.00" rgba="0,125,253,255" />
+  <entry value="-8.00" rgba="0,147,251,255" />
+  <entry value="-6.00" rgba="8,169,247,255" />
+  <entry value="-4.00" rgba="63,188,249,255" />
+  <entry value="-2.00" rgba="118,207,251,255" />
+  <entry value="-1.00" rgba="173,226,252,255" />
+  <entry value="0.00" rgba="255,255,255,255" />
+  <entry value="1.00" rgba="255,168,170,255" />
+  <entry value="2.00" rgba="253,179,143,255" />
+  <entry value="4.00" rgba="247,118,93,255" />
+  <entry value="6.00" rgba="247,93,93,255" />
+  <entry value="8.00" rgba="250,0,38,255" />
+  <entry value="10.00" rgba="201,3,3,255" />
+  <entry value="12.00" rgba="168,0,26,255" />
+  <entry value="14.00" rgba="181,0,49,255" />
+  <entry value="16.00" rgba="206,0,99,255" />
+  <entry value="18.00" rgba="255,0,156,255" />
+  <entry value="20.00" rgba="255,0,206,255" />
+</palette>

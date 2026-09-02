@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="3hRain" valuedefined="true" entrystyle="Default">
+  <entry value="0.00" rgba="255,255,255,0" />
+  <entry value="0.01" rgba="203,244,202,255" />
+  <entry value="1.00" rgba="171,255,167,255" />
+  <entry value="3.00" rgba="89,191,103,255" />
+  <entry value="10.00" rgba="117,189,255,255" />
+  <entry value="20.00" rgba="41,45,231,255" />
+  <entry value="50.00" rgba="237,45,251,255" />
+  <entry value="70.00" rgba="139,46,105,255" />
+</palette>

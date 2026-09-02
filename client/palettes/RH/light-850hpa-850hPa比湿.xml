@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="850hPabishi" valuedefined="true" entrystyle="Default">
+  <entry value="6.00" rgba="255,255,255,255" />
+  <entry value="8.00" rgba="180,250,170,255" />
+  <entry value="10.00" rgba="120,245,115,255" />
+  <entry value="12.00" rgba="55,210,60,255" />
+  <entry value="14.00" rgba="30,180,30,255" />
+  <entry value="16.00" rgba="15,160,15,255" />
+</palette>

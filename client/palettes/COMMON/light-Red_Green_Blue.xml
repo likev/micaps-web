@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette valuedefined="true">
+<entry value="0.10" rgba="77,73,72,255" />
+<entry value="1.00" rgba="97,98,98,255" />
+<entry value="2.00" rgba="115,115,115,255" />
+<entry value="4.00" rgba="165,165,165,255" />
+<entry value="6.00" rgba="228,222,220,255" />
+<entry value="8.00" rgba="33,168,220,255" />
+<entry value="10.00" rgba="22,145,201,255" />
+<entry value="15.00" rgba="10,120,183,255" />
+<entry value="20.00" rgba="0,98,166,255" />
+<entry value="25.00" rgba="168,212,123,255" />
+<entry value="30.00" rgba="135,198,112,255" />
+<entry value="35.00" rgba="100,180,90,255" />
+<entry value="40.00" rgba="60,165,75,255" />
+<entry value="45.00" rgba="0,120,39,255" />
+<entry value="50.00" rgba="255,245,0,255" />
+<entry value="60.00" rgba="248,196,0,255" />
+<entry value="70.00" rgba="240,156,10,255" />
+<entry value="80.00" rgba="233,116,20,255" />
+<entry value="90.00" rgba="225,77,25,255" />
+<entry value="100.00" rgba="218,37,29,255" />
+<entry value="150.00" rgba="225,0,0,255" />
+<entry value="200.00" rgba="250,100,250,255" />
+</palette>

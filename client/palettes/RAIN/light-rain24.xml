@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<palette valuedefined="true">
+  <entry value="0" rgba="166,242,143,255" />
+  <entry value="10" rgba="56,168,0,255" />
+  <entry value="25" rgba="97,184,255,255" />
+  <entry value="50" rgba="0,0,255,255" />
+  <entry value="100" rgba="250,0,250,255" />
+  <entry value="180" rgba="115,0,0,255" />
+  <entry value="250" rgba="64,0,0,255" />
+</palette>

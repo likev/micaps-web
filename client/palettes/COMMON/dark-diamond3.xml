@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<palette valuedefined="true">
+
+  <entry value="-20.00" rgba="223,255,0,255" />
+
+  <entry value="-15.00" rgba="175,255,0,255" />
+
+  <entry value="-10.00" rgba="127,255,0,255" />
+
+  <entry value="-5.00" rgba="79,255,0,255" />
+
+  <entry value="0.00" rgba="0,255,255,255" />
+
+  <entry value="5.00" rgba="0,207,255,255" />
+
+  <entry value="10.00" rgba="0,159,255,255" />
+
+  <entry value="15.00" rgba="0,111,255,255" />
+
+  <entry value="20.00" rgba="0,63,255,255" />
+
+</palette>

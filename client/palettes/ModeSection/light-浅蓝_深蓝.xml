@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- edited with XMLSpy v2007 sp1 (http://www.altova.com) by wt (EMBRACE) -->
+<ColorOption>
+	<ColorList Name="浅蓝_深蓝">
+		<Color>0, 0, 100</Color>
+		<Color>0, 0, 255</Color>
+		<Color>250, 250, 255</Color>
+	</ColorList>
+</ColorOption>

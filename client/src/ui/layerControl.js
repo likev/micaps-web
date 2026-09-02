@@ -180,6 +180,7 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
         showWind: layerDef.config?.showWind !== undefined ? layerDef.config.showWind : false,
         showBarbs: layerDef.config?.showBarbs !== undefined ? layerDef.config.showBarbs : false,
         showRaster: layerDef.config?.showRaster !== undefined ? layerDef.config.showRaster : false,
+        palettePath: layerDef.config?.palettePath || null,
       }),
       ...layerDef,
     });
@@ -328,7 +329,74 @@ function renderLayersManager(panel) {
       bindProp(".chk-show-raster", "change", (e) => { layer.config.showRaster = e.target.checked; autoSaveLayerConfig(layer); });
       bindProp(".chk-show-wind", "change", (e) => { layer.config.showWind = e.target.checked; autoSaveLayerConfig(layer); });
       bindProp(".chk-show-barbs", "change", (e) => { layer.config.showBarbs = e.target.checked; autoSaveLayerConfig(layer); });
-    }
+
+      // Palette picker: load element-filtered palette files into the select dropdown
+      const paletteSel = configDrawer.querySelector(".sel-palette");
+      const gradientPreview = configDrawer.querySelector(".palette-gradient-preview");
+      if (paletteSel) {
+        paletteSel.addEventListener("click", (e) => e.stopPropagation());
+
+        // Populate palette options asynchronously (filtered to element's category)
+        import("../utils/paletteLoader.js").then(({ getPaletteCategory, listPaletteFiles, loadXMLPalette }) => {
+          const elem = (layer.element || "").toUpperCase();
+          const category = getPaletteCategory(elem) || elem;
+          if (!category) return;
+
+          listPaletteFiles(category).then((files) => {
+            const xmlFiles = files.filter((f) => f.name.endsWith(".xml"));
+            // Clear existing options except the "Built-in default" placeholder
+            while (paletteSel.options.length > 1) paletteSel.remove(1);
+            for (const { name, path } of xmlFiles) {
+              const opt = document.createElement("option");
+              opt.value = path;
+              // Friendly label: strip theme prefix and extension, e.g. "dark-above60.xml" → "above60 (dark)"
+              const base = name.replace(/\.xml$/, "");
+              const themeMatch = base.match(/^(dark|light|micaps)-(.+)$/i);
+              opt.textContent = themeMatch
+                ? `${themeMatch[2].replace(/-/g, " ")} (${themeMatch[1]})`
+                : base.replace(/-/g, " ");
+              if (layer.config?.palettePath === path) opt.selected = true;
+              paletteSel.appendChild(opt);
+            }
+            // Restore gradient preview if palette already set
+            if (layer.config?.palettePath) {
+              loadXMLPalette(layer.config.palettePath).then((stops) => {
+                if (stops && gradientPreview) {
+                  const colors = stops.map((s) => `rgba(${s.color.slice(0, 3).join(",")},${((s.color[3] ?? 255) / 255).toFixed(2)})`).join(", ");
+                  gradientPreview.style.background = `linear-gradient(to right, ${colors})`;
+                }
+              });
+            }
+          });
+        });
+
+        paletteSel.addEventListener("change", (e) => {
+          e.stopPropagation();
+          const path = e.target.value || null;
+          if (!layer.config) layer.config = {};
+          layer.config.palettePath = path;
+          autoSaveLayerConfig(layer);
+
+          // Update gradient preview
+          if (gradientPreview) {
+            if (!path) {
+              gradientPreview.style.background = "linear-gradient(to right, #888, #fff)";
+            } else {
+              import("../utils/paletteLoader.js").then(({ loadXMLPalette }) => {
+                loadXMLPalette(path).then((stops) => {
+                  if (stops) {
+                    const colors = stops.map((s) => `rgba(${s.color.slice(0, 3).join(",")},${((s.color[3] ?? 255) / 255).toFixed(2)})`).join(", ");
+                    gradientPreview.style.background = `linear-gradient(to right, ${colors})`;
+                  }
+                });
+              });
+            }
+          }
+
+          if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer, currentActiveWinId);
+        });
+      }
+    } // end if (layer.type === "contour" || layer.type === "wind")
 
     // Config controls for station layers
     if (layer.type === "station" && configDrawer) {
@@ -524,6 +592,15 @@ function renderLayerRow(layer) {
                 <input type="checkbox" class="chk-show-raster" ${layer.config?.showRaster ? "checked" : ""} />
                 <span>Binary Raster Overlay</span>
               </label>
+            </div>
+            <div class="config-row palette-picker-row" style="flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 2px;">
+              <label style="color: var(--text-secondary); font-size: 11px; display: flex; align-items: center; gap: 4px;">🎨 Raster Palette</label>
+              <div style="display: flex; gap: 4px; width: 100%;">
+                <select class="sel-palette" style="flex: 1; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; padding: 3px 6px; font-size: 11px;">
+                  <option value="">— Built-in default —</option>
+                </select>
+                <div class="palette-gradient-preview" style="width: 40px; height: 22px; border-radius: 3px; border: 1px solid var(--border-color); flex-shrink: 0; background: linear-gradient(to right, #888, #fff);"></div>
+              </div>
             </div>
             ${
               isWindRelated(layer)

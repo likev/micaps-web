@@ -327,6 +327,7 @@ async function loadWeatherField(map, model, element, level, period, customOption
   const showWind = exCfg.showWind !== undefined ? exCfg.showWind : (customOptions?.showWind !== undefined ? customOptions.showWind : isWind);
   const showBarbs = exCfg.showBarbs !== undefined ? exCfg.showBarbs : (customOptions?.showBarbs !== undefined ? customOptions.showBarbs : false);
   const showRaster = exCfg.showRaster !== undefined ? exCfg.showRaster : false;
+  const savedPalettePath = exCfg.palettePath || null;
   const isVisible = existingLayer ? existingLayer.visible !== false : true;
 
   try {
@@ -334,7 +335,22 @@ async function loadWeatherField(map, model, element, level, period, customOption
     if (win && expectedSeq !== null && expectedSeq !== undefined && win.loadSeq !== expectedSeq) {
       return; // Discard stale in-flight response from fast navigation
     }
-    const colormap = customOptions?.colormap || element;
+    let colormap = customOptions?.colormap || element;
+
+    // Restore a previously-chosen XML palette for this layer
+    if (savedPalettePath) {
+      const paletteKey = `palette:${layerId}`;
+      try {
+        const { loadXMLPalette } = await import("./utils/paletteLoader.js");
+        const { setColormaps, COLORMAPS } = await import("./utils/colormaps.js");
+        const stops = await loadXMLPalette(savedPalettePath);
+        if (stops) {
+          setColormaps({ ...COLORMAPS, [paletteKey]: stops });
+          if (existingLayer) existingLayer.colormap = paletteKey;
+          colormap = paletteKey;
+        }
+      } catch { /* ignore — fall back to built-in */ }
+    }
 
     if (!win?.activeGroup) {
       appState.set("gridData", gridData);

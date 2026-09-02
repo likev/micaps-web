@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette valuedefined="true">
+  <entry value="0.00" rgba="0,0,0,0" />
+  <entry value="10.00" rgba="0,0,0,0" />
+  <entry value="20.00" rgba="0,0,0,0" />
+  <entry value="30.00" rgba="0,0,0,0" />
+  <entry value="40.00" rgba="0,0,0,0" />
+  <entry value="50.00" rgba="127,194,64,255" />
+  <entry value="60.00" rgba="175,206,54,255" />
+  <entry value="70.00" rgba="218,200,43,255" />
+  <entry value="80.00" rgba="231,150,30,255" />
+  <entry value="90.00" rgba="243,84,16,255" />
+  <entry value="100.00" rgba="255,0,0,255" />
+</palette>

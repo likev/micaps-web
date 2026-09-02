@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="24HPrecipitationt" valuedefined="true" entrystyle="Default">
+  <entry value="0.1" rgba="234,234,234,255" />
+  <entry value="10" rgba="200,200,200,255" />
+  <entry value="25" rgba="153,153,153,255" />
+  <entry value="50" rgba="108,108,108,255" />
+  <entry value="100" rgba="58,58,58,255" />
+  <entry value="250" rgba="6,6,6,255" />
+</palette>

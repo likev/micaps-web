@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<palette entrystyle="DescriptionOnly" valuedefined="true">
+  <entry value="0" rgba="2,227,0,255" desc="优"/>
+  <entry value="1" rgba="255,255,0,255" desc="良"/>
+  <entry value="2" rgba="255,126,0,255" desc="轻度污染"/>
+  <entry value="3" rgba="255,0,0,255" desc="中度污染"/>
+  <entry value="4" rgba="153,0,75,255" desc="重度污染"/>
+  <entry value="5" rgba="126,1,35,255" desc="严重污染"/>
+  <entry value="6" rgba="255,255,255,255" desc="爆表"/>
+</palette>

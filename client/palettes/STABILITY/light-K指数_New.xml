@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="KIndex_850hPaWind" valuedefined="true" entrystyle="Default">
+  <entry value="25" rgba="195,233,250,255" />
+  <entry value="26" rgba="153,215,245,255" />
+  <entry value="27" rgba="119,184,227,255" />
+  <entry value="28" rgba="82,153,209,255" />
+  <entry value="29" rgba="70,155,164,255" />
+  <entry value="30" rgba="71,170,109,255" />
+  <entry value="31" rgba="97,189,71,255" />
+  <entry value="32" rgba="170,210,81,255" />
+  <entry value="33" rgba="240,230,91,255" />
+  <entry value="34" rgba="248,189,73,255" />
+  <entry value="35" rgba="246,138,50,255" />
+  <entry value="36" rgba="239,92,36,255" />
+  <entry value="37" rgba="226,58,35,255" />
+  <entry value="38" rgba="210,25,35,255" />
+  <entry value="39" rgba="184,20,28,255" />
+  <entry value="40" rgba="158,16,20,255" />
+</palette>

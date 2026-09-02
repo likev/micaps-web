@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette>
+ <entry value="198.15" rgba="23,209,182,255"/> 
+ <entry value="199.15" rgba="23,209,179,255"/> 
+ <entry value="200.15" rgba="26,205,165,255"/> 
+ <entry value="201.15" rgba="27,198,161,255"/> 
+ <entry value="202.15" rgba="36,193,146,255"/> 
+ <entry value="203.15" rgba="32,189,151,255"/> 
+ <entry value="204.15" rgba="32,186,137,255"/> 
+ <entry value="205.15" rgba="38,189,130,255"/> 
+ <entry value="206.15" rgba="48,178,130,255"/> 
+ <entry value="207.15" rgba="39,176,118,255"/> 
+ <entry value="208.15" rgba="42,175,109,255"/> 
+ <entry value="209.15" rgba="43,174,108,255"/> 
+ <entry value="210.15" rgba="50,167,103,255"/> 
+ <entry value="211.15" rgba="51,163,94,255"/> 
+ <entry value="212.15" rgba="54,160,81,255"/> 
+ <entry value="213.15" rgba="51,152,80,255"/> 
+ <entry value="214.15" rgba="55,150,67,255"/>
+ <entry value="215.15" rgba="58,148,65,255"/>
+ <entry value="216.15" rgba="58,145,60,255"/> 
+ <entry value="217.15" rgba="60,141,50,255"/> 
+ <entry value="218.15" rgba="65,135,42,255"/> 
+ <entry value="219.15" rgba="66,132,38,255"/> 
+ <entry value="220.15" rgba="66,130,38,255"/> 
+ <entry value="221.15" rgba="83,137,55,255"/> 
+ <entry value="222.15" rgba="103,154,73,255"/> 
+ <entry value="223.15" rgba="123,165,105,255"/> 
+ <entry value="224.15" rgba="138,182,118,255"/> 
+ <entry value="225.15" rgba="157,193,141,255"/> 
+ <entry value="226.15" rgba="180,209,166,255"/> 
+ <entry value="227.15" rgba="196,209,187,255"/> 
+ <entry value="228.15" rgba="214,229,204,255"/> 
+ <entry value="229.15" rgba="231,235,231,255"/> 
+ <entry value="230.15" rgba="248,248,255,255"/> 
+ <entry value="231.15" rgba="252,252,252,255"/> 
+ <entry value="232.15" rgba="233,237,246,255"/> 
+ <entry value="233.15" rgba="222,224,238,255"/> 
+ <entry value="234.15" rgba="209,206,229,255"/> 
+ <entry value="235.15" rgba="195,196,224,255"/> 
+ <entry value="236.15" rgba="183,181,214,255"/> 
+ <entry value="237.15" rgba="169,169,205,255"/> 
+ <entry value="238.15" rgba="155,156,203,255"/> 
+ <entry value="239.15" rgba="140,141,192,255"/> 
+ <entry value="240.15" rgba="127,124,181,255"/> 
+ <entry value="241.15" rgba="106,108,176,255"/> 
+ <entry value="242.15" rgba="98,98,171,255"/> 
+ <entry value="243.15" rgba="83,83,159,255"/> 
+ <entry value="244.15" rgba="73,73,155,255"/> 
+ <entry value="245.15" rgba="54,54,146,255"/> 
+ <entry value="246.15" rgba="42,41,140,255"/> 
+ <entry value="247.15" rgba="23,24,127,255"/> 
+ <entry value="248.15" rgba="13,12,122,255"/>
+ <entry value="249.15" rgba="1,1,115,255"/>
+ <entry value="250.15" rgba="9,11,113,255"/>
+ <entry value="251.15" rgba="28,23,100,255"/>
+ <entry value="252.15" rgba="45,51,91,255"/>
+ <entry value="253.15" rgba="71,67,88,255"/>
+ <entry value="254.15" rgba="85,88,75,255"/>
+ <entry value="255.15" rgba="109,109,64,255"/> 
+ <entry value="256.15" rgba="128,129,50,255"/> 
+ <entry value="257.15" rgba="145,142,48,255"/> 
+ <entry value="258.15" rgba="177,171,43,255"/> 
+ <entry value="259.15" rgba="186,201,33,255"/> 
+ <entry value="260.15" rgba="210,209,22,255"/> 
+ <entry value="261.15" rgba="235,223,17,255"/> 
+ <entry value="262.15" rgba="247,247,16,255"/> 
+ <entry value="263.15" rgba="247,247,16,255"/> 
+ <entry value="264.15" rgba="246,245,16,255"/> 
+ <entry value="265.15" rgba="243,230,16,255"/> 
+ <entry value="266.15" rgba="239,212,16,255"/> 
+ <entry value="267.15" rgba="239,206,15,255"/> 
+ <entry value="268.15" rgba="239,184,11,255"/> 
+ <entry value="269.15" rgba="239,178,10,255"/> 
+ <entry value="270.15" rgba="239,170,9,255"/> 
+ <entry value="271.15" rgba="241,146,6,255"/>
+ <entry value="272.15" rgba="243,135,4,255"/>
+ <entry value="273.15" rgba="245,119,2,255"/> 
+ <entry value="274.15" rgba="245,118,2,255"/> 
+ <entry value="275.15" rgba="247,103,0,255"/> 
+ <entry value="276.15" rgba="247,84,0,255"/> 
+ <entry value="277.15" rgba="247,74,0,255"/> 
+ <entry value="278.15" rgba="247,59,0,255"/> 
+ <entry value="279.15" rgba="247,51,0,255"/> 
+ <entry value="280.15" rgba="247,39,0,255"/> 
+ <entry value="281.15" rgba="247,25,0,255"/> 
+ <entry value="282.15" rgba="247,25,0,255"/>
+ <entry value="283.15" rgba="15,21,0,255"/>
+ <entry value="284.15" rgba="1,1,1,255"/> 
+ <entry value="285.15" rgba="1,1,1,255"/> 
+ <entry value="286.15" rgba="1,1,1,255"/> 
+ <entry value="287.15" rgba="1,1,1,255"/> 
+ <entry value="288.15" rgba="1,1,1,255"/> 
+ <entry value="289.15" rgba="1,1,1,255"/> 
+ <entry value="290.15" rgba="1,1,1,255"/> 
+ <entry value="291.15" rgba="1,1,1,255"/> 
+ <entry value="292.15" rgba="1,1,1,255"/> 
+ <entry value="293.15" rgba="1,1,1,255"/> 
+ <entry value="294.15" rgba="1,1,1,255"/> 
+ <entry value="295.15" rgba="1,1,1,255"/> 
+ <entry value="296.15" rgba="1,1,1,255"/> 
+ <entry value="297.15" rgba="1,1,1,255"/> 
+ <entry value="298.15" rgba="1,1,1,255"/> 
+ <entry value="299.15" rgba="1,1,1,255"/> 
+ <entry value="300.15" rgba="1,1,1,255"/> 
+ <entry value="301.15" rgba="1,1,1,255"/> 
+ <entry value="302.15" rgba="1,1,1,255"/> 
+ <entry value="303.15" rgba="1,1,1,255"/> 
+ <entry value="304.15" rgba="1,1,1,255"/> 
+ <entry value="305.15" rgba="1,1,1,255"/> 
+ <entry value="306.15" rgba="1,1,1,255"/> 
+ <entry value="307.15" rgba="1,1,1,255"/> 
+ <entry value="308.15" rgba="1,1,1,255"/> 
+ <entry value="309.15" rgba="1,1,1,255"/> 
+ <entry value="310.15" rgba="1,1,1,255"/> 
+ <entry value="311.15" rgba="1,1,1,255"/> 
+ <entry value="312.15" rgba="1,1,1,255"/> 
+ <entry value="313.15" rgba="1,1,1,255"/> 
+ <entry value="314.15" rgba="1,1,1,255"/> 
+ <entry value="315.15" rgba="1,1,1,255"/> 
+ <entry value="316.15" rgba="1,1,1,255"/> 
+ <entry value="317.15" rgba="1,1,1,255"/> 
+ <entry value="318.15" rgba="1,1,1,255"/> 
+ </palette>                                       
+                                        
+                                        
+                                        
+                                        
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     
+                     

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="850hPaTemp" valuedefined="true" entrystyle="Default">
+  <entry value="-44.00" rgba="0,47,255,255" />
+  <entry value="-40.00" rgba="20,100,210,255" />
+  <entry value="-36.00" rgba="30,110,235,255" />
+  <entry value="-28.00" rgba="60,150,245,255" />
+  <entry value="-20.00" rgba="120,185,250,255" />
+  <entry value="-12.00" rgba="180,240,250,255" />
+  <entry value="-4.00" rgba="255,192,60,255" />
+  <entry value="-1.00" rgba="225,255,255,255" />
+  <entry value="0.00" rgba="255,255,255,255" />
+  <entry value="1.00" rgba="255,232,120,255" />
+  <entry value="4.00" rgba="255,192,60,255" />
+  <entry value="8.00" rgba="255,250,170,255" />
+  <entry value="16.00" rgba="255,192,60,255" />
+  <entry value="24.00" rgba="255,50,0,255" />
+  <entry value="32.00" rgba="165,0,0,255" />
+</palette>

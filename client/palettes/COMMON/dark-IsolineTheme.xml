@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette>
+  <entry value="0" rgba="255,128,255,255" />
+  <entry value="1" rgba="160,255,64,255" />
+  <entry value="2" rgba="130,145,204,255" />
+  <entry value="3" rgba="178,112,93,255" />
+  <entry value="4" rgba="76,97,178,255" />
+  <entry value="5" rgba="255,167,19,255" />
+  <entry value="6" rgba="62,255,139,255" />
+  <entry value="7" rgba="171,128,204,255" />
+  <entry value="8" rgba="134,75,178,255" />
+  <entry value="9" rgba="178,146,91,255" />
+  <entry value="10" rgba="255,214,18,255" />
+  <entry value="11" rgba="61,255,248,255" />
+  <entry value="12" rgba="204,128,188,255" />
+  <entry value="13" rgba="178,163,91,255" />
+  <entry value="14" rgba="178,75,157,255" />
+  <entry value="15" rgba="144,154,211,255" />
+  <entry value="16" rgba="218,217,221,255" />
+  <entry value="17" rgba="213,157,221,255" />
+  <entry value="18" rgba="221,131,177,255" />
+  <entry value="19" rgba="195,122,211,255" />
+  <entry value="20" rgba="211,115,89,255" />
+</palette>

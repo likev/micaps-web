@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="t-td" valuedefined="true" entrystyle="Default">
+  <entry value="0.00" rgba="15,160,15,255" />
+  <entry value="1.00" rgba="30,180,30,255" />
+  <entry value="2.00" rgba="80,240,80,255" />
+  <entry value="3.00" rgba="150,245,140,255" />
+  <entry value="4.00" rgba="200,255,190,255" />
+  <entry value="5.00" rgba="230,241,216,255" />
+  <entry value="6.00" rgba="255,255,255,255" />
+</palette>
