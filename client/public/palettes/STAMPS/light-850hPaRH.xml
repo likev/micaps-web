@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="850hPaRH" valuedefined="true" entrystyle="Default">
+  <entry value="50.00" rgba="255,255,255,255" />
+  <entry value="60.00" rgba="200,255,190,255" />
+  <entry value="70.00" rgba="150,245,140,255" />
+  <entry value="80.00" rgba="80,240,80,255" />
+  <entry value="90.00" rgba="30,180,30,255" />
+  <entry value="95.00" rgba="15,160,15,255" />
+</palette>

@@ -130,7 +130,7 @@ async function bootstrap() {
             if (!win.forecastCycle || !cycles.includes(win.forecastCycle)) {
               win.forecastCycle = cycles[0];
             }
-            setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle, cycles, stepLength: 6 });
+            setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 });
           }
         });
       }
@@ -153,7 +153,7 @@ async function bootstrap() {
         const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", win.level || 500);
         win.forecastCycle = cycles[0];
         if (getActiveWindow() === win) {
-          setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle, cycles, stepLength: 6 });
+          setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 });
         }
       }
       await loadPresetGroup(win.map, group, win.period, null, win);
@@ -222,7 +222,7 @@ async function bootstrap() {
         const pLayer = group.layers?.find((l) => l.type === "contour" || l.type === "wind");
         const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", win.level || 500);
         win.forecastCycle = cycles[0];
-        setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle, cycles, stepLength: 6 });
+        setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 });
       }
       await loadPresetGroup(map, group, win.period, overrideLevel, win);
     },
@@ -267,7 +267,7 @@ async function bootstrap() {
     } else {
       const cycles = await resolveForecastCycles(model, element, win.level || 500);
       win.forecastCycle = cycles[0];
-      setTimelineMode("nwp", { period: win.period ?? 24, winTitle: winBannerTitle, initCycle: win.forecastCycle, cycles, stepLength: 6 });
+      setTimelineMode("nwp", { period: win.period ?? 24, winTitle: winBannerTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 });
       await loadWeatherField(map, model, element, win.level, win.period, null, win);
     }
   });
@@ -282,11 +282,14 @@ async function bootstrap() {
     const win = getActiveWindow();
     const map = getMap();
     if (!win || !map) return;
+    if (typeof data === "object" && data !== null && data.stepLength) {
+      win.stepLength = data.stepLength;
+    }
     if (typeof data === "object" && data !== null && data.isObs) {
       win.obsTime = data.file;
       clearAllWeatherLayersFromMap(map, win);
       if (win.activeGroup) {
-        await loadPresetGroup(map, win.activeGroup, win.period, win.level, win);
+        await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, true);
       } else {
         const model = win.model || "SURFACE";
         const element = win.element || "PLOT_GLOBAL_3H";
@@ -620,13 +623,13 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
   }
 
   const winTitle = `W${(win?.winIdx ?? 0) + 1}: ${group.name}`;
-  if (!group.isObservation && win) {
+  if (!isTimeStep && !group.isObservation && win) {
     const pLayer = group.layers.find((l) => l.type === "contour" || l.type === "wind");
     const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", curLevel);
     if (!win.forecastCycle || !cycles.includes(win.forecastCycle)) {
       win.forecastCycle = cycles[0];
     }
-    setTimelineMode("nwp", { period: curPeriod, winTitle, initCycle: win.forecastCycle, cycles, stepLength: 6 });
+    setTimelineMode("nwp", { period: curPeriod, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 });
   }
 
   console.log(`[PresetGroup] Loading "${group.name}" with levelOverride=${level}, period=+${curPeriod}h, cycle=${win?.forecastCycle}...`);

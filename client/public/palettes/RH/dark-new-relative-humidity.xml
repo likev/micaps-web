@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="2mDIVPRMSL" valuedefined="true" entrystyle="Default">
+  <entry value="5" rgba="160,116,173,255" />
+  <entry value="10" rgba="172,138,186,255" />
+  <entry value="15" rgba="183,153,196,255" />
+  <entry value="20" rgba="200,175,212,255" />
+  <entry value="25" rgba="213,191,221,255" />
+  <entry value="30" rgba="224,206,229,255" />
+  <entry value="35" rgba="235,220,236,255" />
+  <entry value="40" rgba="240,232,241,255" />
+  <entry value="45" rgba="245,242,245,255" />
+  <entry value="50" rgba="241,246,240,255" />
+  <entry value="55" rgba="231,244,228,255" />
+  <entry value="60" rgba="220,241,215,255" />
+  <entry value="65" rgba="204,235,199,255" />
+  <entry value="70" rgba="187,227,183,255" />
+  <entry value="75" rgba="165,215,163,255" />
+  <entry value="80" rgba="136,198,139,255" />
+  <entry value="85" rgba="113,182,121,255" />
+  <entry value="90" rgba="90,64,105,255" />
+  <entry value="95" rgba="74,149,95,255" />
+</palette>

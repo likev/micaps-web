@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="6HSnowFall" valuedefined="true" entrystyle="Default">
+  <entry value="0.1" rgba="235,235,235,255" />
+  <entry value="0.7" rgba="201,201,201,255" />
+  <entry value="12" rgba="154,154,154,255" />
+  <entry value="5" rgba="108,108,108,255" />
+  <entry value="8" rgba="55,55,55,255" />
+  <entry value="12" rgba="1,1,1,255" />
+</palette>

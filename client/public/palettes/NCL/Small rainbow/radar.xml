@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<palette>
+  <entry rgba="0,255,255,255" value="1" />
+  <entry rgba="0,157,255,255" value="2" />
+  <entry rgba="0,0,255,255" value="3" />
+  <entry rgba="9,130,175,255" value="4" />
+  <entry rgba="0,255,0,255" value="5" />
+  <entry rgba="8,175,20,255" value="6" />
+  <entry rgba="255,214,0,255" value="7" />
+  <entry rgba="255,152,0,255" value="8" />
+  <entry rgba="255,0,0,255" value="9" />
+  <entry rgba="221,0,27,255" value="10" />
+  <entry rgba="188,0,54,255" value="11" />
+  <entry rgba="121,0,109,255" value="12" />
+  <entry rgba="121,51,160,255" value="13" />
+  <entry rgba="195,163,212,255" value="14" />
+  <entry rgba="255,255,255,255" value="15" />
+</palette>

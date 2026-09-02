@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="SLP_RHU" valuedefined="true" entrystyle="Default">
+  <entry value="0" rgba="125,51,139,255" />
+  <entry value="5" rgba="140,83,156,255" />
+  <entry value="10" rgba="154,112,171,255" />
+  <entry value="15" rgba="168,131,184,255" />
+  <entry value="20" rgba="189,158,203,255" />
+  <entry value="25" rgba="204,177,214,255" />
+  <entry value="30" rgba="218,196,224,255" />
+  <entry value="35" rgba="232,214,233,255" />
+  <entry value="40" rgba="237,228,238,255" />
+  <entry value="45" rgba="243,239,243,255" />
+  <entry value="50" rgba="238,244,237,255" />
+  <entry value="55" rgba="227,242,223,255" />
+  <entry value="60" rgba="213,238,208,255" />
+  <entry value="65" rgba="194,231,187,255" />
+  <entry value="70" rgba="173,222,168,255" />
+  <entry value="75" rgba="147,208,144,255" />
+  <entry value="80" rgba="110,187,115,255" />
+  <entry value="85" rgba="81,168,92,255" />
+  <entry value="90" rgba="54,147,74,255" />
+  <entry value="95" rgba="27,126,56,255" />
+</palette>

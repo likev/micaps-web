@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="Visib" valuedefined="true" entrystyle="Default">
+  <entry value="0.00" rgba="255,255,255,255" />
+  <entry value="0.2" rgba="156,0,255,255" />
+  <entry value="0.5" rgba="254,1,0,255" />
+  <entry value="1.00" rgba="252,85,6,255" />
+  <entry value="2.00" rgba="251,178,73,255" />
+  <entry value="3.00" rgba="255,255,0,255" />
+  <entry value="5.00" rgba="117,255,48,255" />
+  <entry value="10.00" rgba="146,224,248,255" />
+  <entry value="20.00" rgba="201,236,255,255" />
+  <entry value="30.00" rgba="255,255,255,255" />
+</palette>

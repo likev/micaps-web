@@ -1,0 +1,25 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<palette>
+  <entry rgba="0,253,253,255" value="1" />
+  <entry rgba="8,222,253,255" value="2" />
+  <entry rgba="16,189,253,255" value="3" />
+  <entry rgba="24,157,253,255" value="4" />
+  <entry rgba="32,125,253,255" value="5" />
+  <entry rgba="40,93,253,255" value="6" />
+  <entry rgba="48,60,253,255" value="7" />
+  <entry rgba="85,85,253,255" value="8" />
+  <entry rgba="133,133,253,255" value="9" />
+  <entry rgba="181,181,253,255" value="10" />
+  <entry rgba="230,230,253,255" value="11" />
+  <entry rgba="253,230,230,255" value="12" />
+  <entry rgba="253,181,181,255" value="13" />
+  <entry rgba="253,133,133,255" value="14" />
+  <entry rgba="253,85,85,255" value="15" />
+  <entry rgba="253,60,48,255" value="16" />
+  <entry rgba="253,93,40,255" value="17" />
+  <entry rgba="253,125,32,255" value="18" />
+  <entry rgba="253,157,24,255" value="19" />
+  <entry rgba="253,189,16,255" value="20" />
+  <entry rgba="253,224,8,255" value="21" />
+  <entry rgba="253,253,0,255" value="22" />
+</palette>

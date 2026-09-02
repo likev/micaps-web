@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"micaps-web/config"
@@ -175,6 +176,36 @@ func (h *StaticHandler) SPAHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+	}
+
+	// If requesting /palettes/... try multiple candidate paths and do not fallback to index.html
+	if strings.HasPrefix(r.URL.Path, "/palettes/") {
+		paletteRel := strings.TrimPrefix(r.URL.Path, "/palettes/")
+		candidates := []string{
+			filepath.Join(distDir, "palettes", paletteRel),
+			filepath.Join("client", "public", "palettes", paletteRel),
+			filepath.Join("client", "palettes", paletteRel),
+			filepath.Join("..", "client", "public", "palettes", paletteRel),
+			filepath.Join("..", "client", "palettes", paletteRel),
+			filepath.Join("palettes", paletteRel),
+		}
+		if exePath, err := os.Executable(); err == nil {
+			exeDir := filepath.Dir(exePath)
+			candidates = append([]string{
+				filepath.Join(exeDir, "palettes", paletteRel),
+				filepath.Join(exeDir, "client", "palettes", paletteRel),
+				filepath.Join(exeDir, "client", "public", "palettes", paletteRel),
+				filepath.Join(exeDir, "client", "dist", "palettes", paletteRel),
+			}, candidates...)
+		}
+		for _, cp := range candidates {
+			if info, err := os.Stat(cp); err == nil && !info.IsDir() {
+				http.ServeFile(w, r, cp)
+				return
+			}
+		}
+		http.NotFound(w, r)
+		return
 	}
 
 	// Fallback to index.html for SPA routes

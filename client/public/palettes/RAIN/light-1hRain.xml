@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="1hRain" valuedefined="true" entrystyle="Default">
+  <entry value="-2.00" rgba="255,255,255,255" />
+  <entry value="0.00" rgba="166,242,142,255" />
+  <entry value="2.00" rgba="57,168,3,255" />
+  <entry value="4.00" rgba="93,184,255,255" />
+  <entry value="6.00" rgba="4,0,249,255" />
+  <entry value="8.00" rgba="1,117,72,255" />
+  <entry value="10.00" rgba="248,4,252,255" />
+  <entry value="20.00" rgba="225,79,0,255" />
+  <entry value="50.00" rgba="111,2,0,255" />
+</palette>

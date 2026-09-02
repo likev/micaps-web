@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<palette>
+  <entry value="0" rgba="0,173,160,255"/>
+  <entry value="100" rgba="195,193,253,255"/>
+  <entry value="200" rgba="120,111,131,255"/>
+  <entry value="300" rgba="2,42,202,255"/>
+  <entry value="400" rgba="132,254,166,255"/>
+  <entry value="500" rgba="0,238,58,255"/>
+  <entry value="600" rgba="0,145,45,255"/>
+  <entry value="700" rgba="255,243,96,255"/>
+  <entry value="800" rgba="205,200,31,255"/>
+  <entry value="900" rgba="141,137,14,255"/>
+  <entry value="1000" rgba="255,166,161,255"/>
+  <entry value="1100" rgba="255,86,75,255"/>
+  <entry value="1200" rgba="255,0,0,255"/>
+  <entry value="1300" rgba="228,136,251,255"/>
+  <entry value="1400" rgba="191,20,246,255"/>
+</palette>

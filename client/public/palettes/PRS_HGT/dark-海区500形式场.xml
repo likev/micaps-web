@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="SLP500hPaHGT_850hPaW" valuedefined="true" entrystyle="Default">
+  <entry value="-3" rgba="81,166,40,255" />
+  <entry value="-2.8" rgba="99,176,47,255" />
+  <entry value="-2.6" rgba="114,185,53,255" />
+  <entry value="-2.4" rgba="131,194,66,255" />
+  <entry value="-2.2" rgba="140,199,78,255" />
+  <entry value="-2" rgba="150,203,91,255" />
+  <entry value="-1.8" rgba="161,209,106,255" />
+  <entry value="-1.6" rgba="171,213,118,255" />
+  <entry value="-1.4" rgba="181,218,131,255" />
+  <entry value="-1.2" rgba="193,225,148,255" />
+  <entry value="-1" rgba="203,229,161,255" />
+  <entry value="-0.8" rgba="216,241,191,255" />
+  <entry value="-0.6" rgba="236,246,205,255" />
+  <entry value="-0.4" rgba="248,251,221,255" />
+  <entry value="-0.2" rgba="253,251,225,255" />
+  <entry value="0" rgba="247,237,206,255" />
+  <entry value="0.2" rgba="242,227,192,255" />
+  <entry value="0.4" rgba="237,215,176,255" />
+  <entry value="0.6" rgba="231,202,158,255" />
+  <entry value="0.8" rgba="226,192,158,255" />
+  <entry value="1" rgba="226,192,144,255" />
+  <entry value="1.2" rgba="220,178,125,255" />
+  <entry value="1.4" rgba="215,168,111,255" />
+  <entry value="1.6" rgba="210,157,96,255" />
+  <entry value="1.8" rgba="204,144,70,255" />
+  <entry value="2" rgba="200,134,65,255" />
+  <entry value="2.2" rgba="195,124,51,255" />
+  <entry value="2.4" rgba="189,111,37,255" />
+  <entry value="2.6" rgba="179,93,31,255" />
+  <entry value="2.8" rgba="169,75,25,255" />
+  <entry value="3" rgba="161,60,20,255" />
+</palette>

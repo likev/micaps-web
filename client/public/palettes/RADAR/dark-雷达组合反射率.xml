@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="CompositeReflectivity_500hPaHGT" valuedefined="true" entrystyle="Default">
+  <entry value="0" rgba="2,154,255,255" />
+  <entry value="5" rgba="0,1,253,255" />
+  <entry value="10" rgba="12,128,178,255" />
+  <entry value="15" rgba="0,255,0,255" />
+  <entry value="20" rgba="0,177,17,255" />
+  <entry value="25" rgba="255,211,2,255" />
+  <entry value="30" rgba="255,152,0,255" />
+  <entry value="35" rgba="255,152,0,255" />
+  <entry value="40" rgba="253,1,0,255" />
+  <entry value="45" rgba="223,0,25,255" />
+  <entry value="50" rgba="188,0,56,255" />
+  <entry value="55" rgba="119,0,111,255" />
+  <entry value="60" rgba="124,50,158,255" />
+  <entry value="65" rgba="192,166,209,255" />
+  <entry value="70" rgba="255,255,255,255" />
+</palette>

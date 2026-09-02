@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<palette entrystyle="DescriptionOnly" valuedefined="true">
+  <entry value="0" rgba="2,227,0,255" desc="PM2.5:优"/>
+  <entry value="35" rgba="255,255,0,255" desc="良"/>
+  <entry value="75" rgba="255,126,0,255" desc="轻度污染"/>
+  <entry value="115" rgba="255,0,0,255" desc="中度污染"/>
+  <entry value="150" rgba="153,0,75,255" desc="重度污染"/>
+  <entry value="250" rgba="126,1,35,255" desc="严重污染"/>
+  <entry value="350" rgba="255,255,255,255" desc="爆表"/>
+</palette>

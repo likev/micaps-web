@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<palette>
+  <entry rgba="153,15,15,255" value="1" />
+  <entry rgba="178,44,44,255" value="2" />
+  <entry rgba="204,81,81,255" value="3" />
+  <entry rgba="229,126,126,255" value="4" />
+  <entry rgba="255,178,178,255" value="5" />
+  <entry rgba="153,84,15,255" value="6" />
+  <entry rgba="178,111,44,255" value="7" />
+  <entry rgba="204,142,81,255" value="8" />
+  <entry rgba="229,177,126,255" value="9" />
+  <entry rgba="255,216,178,255" value="10" />
+  <entry rgba="107,153,15,255" value="11" />
+  <entry rgba="133,178,44,255" value="12" />
+  <entry rgba="163,204,81,255" value="13" />
+  <entry rgba="195,229,126,255" value="14" />
+  <entry rgba="229,255,178,255" value="15" />
+  <entry rgba="15,107,153,255" value="16" />
+  <entry rgba="44,133,178,255" value="17" />
+  <entry rgba="81,163,204,255" value="18" />
+  <entry rgba="126,195,229,255" value="19" />
+  <entry rgba="178,229,255,255" value="20" />
+  <entry rgba="38,15,153,255" value="21" />
+  <entry rgba="66,44,178,255" value="22" />
+  <entry rgba="101,81,204,255" value="23" />
+  <entry rgba="143,126,229,255" value="24" />
+  <entry rgba="191,178,255,255" value="25" />
+</palette>

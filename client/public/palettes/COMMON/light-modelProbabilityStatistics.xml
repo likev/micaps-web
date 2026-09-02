@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="modelProbabilityStatistics" valuedefined="true" entrystyle="Default">
+  <entry value="0.00" rgba="255,255,255,255" />
+  <entry value="10.00" rgba="231,255,225,255" />
+  <entry value="20.00" rgba="201,255,191,255" />
+  <entry value="30.00" rgba="151,245,141,255" />
+  <entry value="40.00" rgba="80,241,80,255" />
+  <entry value="50.00" rgba="54,211,60,255" />
+  <entry value="60.00" rgba="0,201,201,255" />
+  <entry value="70.00" rgba="80,165,245,255" />
+  <entry value="80.00" rgba="40,131,241,255" />
+  <entry value="90.00" rgba="20,100,211,255" />
+  <entry value="100.00" rgba="71,60,200,255" />
+  <entry value="110.00" rgba="40,10,194,255" />
+</palette>

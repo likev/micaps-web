@@ -1,0 +1,8 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<palette>
+  <entry value="3" rgba="78,78,78,255" />
+  <entry value="8" rgba="0,0,255,255" />
+  <entry value="12" rgba="0,150,0,255" />
+  <entry value="17" rgba="255,0,0,255" />
+  <entry value="25" rgba="255,218,255,255" />
+</palette>

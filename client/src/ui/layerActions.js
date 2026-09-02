@@ -15,6 +15,7 @@ import { fetchGridBinaryStream, fetchGridData, fetchStationObservations } from "
 import { appState } from "../store/appState.js";
 import { getActiveWindow } from "./tabWindowManager.js";
 import { getLayersForWindow } from "./layerControl.js";
+import { updateLegend } from "./legend.js";
 
 const paletteSeq = new Map();
 
@@ -153,8 +154,27 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
 
       // Palette change: load the XML palette file and update the live colormap for this layer (sequence-guarded)
       if (value.palettePath !== undefined) {
+        const elem = (layer.element || "TMP").toUpperCase();
         if (!value.palettePath) {
-          // Revert to built-in default — re-render with null colormap (element default)
+          // Revert to built-in default — re-render with element default colormap
+          layer.colormap = null;
+          if (layer.type === "contour" && layer.gridData) {
+            renderContourLayers(map, layer.gridData, elem, {
+              ...layer.config,
+              layerId,
+              colormap: elem,
+              showFill: layer.visible && layer.config?.showFill !== false,
+              showLine: layer.visible && layer.config?.showLine !== false,
+              opacity: layer.config?.opacity ?? 0.75,
+              lineColor: layer.config?.lineColor,
+              lineWidth: layer.config?.lineWidth,
+              boldValues: layer.config?.boldValues,
+              boldLineWidth: layer.config?.boldLineWidth,
+              smooth: layer.config?.smooth,
+              smoothIterations: layer.config?.smoothIterations,
+            });
+            updateLegend(elem, elem, layer.gridData?.stats?.min, layer.gridData?.stats?.max, win);
+          }
           if (layer.config?.showRaster && layer.visible) {
             triggerRasterOverlay(map, layer, win);
           }
@@ -173,8 +193,25 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
                 try {
                   const key = `palette:${layer.id}`;
                   setColormaps({ ...COLORMAPS, [key]: stops });
-                  // Store key on layer so rasterLayer picks it up
+                  // Store key on layer so contour isobands and raster pick it up
                   layer.colormap = key;
+                  if (layer.type === "contour" && layer.gridData) {
+                    renderContourLayers(map, layer.gridData, elem, {
+                      ...layer.config,
+                      layerId,
+                      colormap: key,
+                      showFill: layer.visible && layer.config?.showFill !== false,
+                      showLine: layer.visible && layer.config?.showLine !== false,
+                      opacity: layer.config?.opacity ?? 0.75,
+                      lineColor: layer.config?.lineColor,
+                      lineWidth: layer.config?.lineWidth,
+                      boldValues: layer.config?.boldValues,
+                      boldLineWidth: layer.config?.boldLineWidth,
+                      smooth: layer.config?.smooth,
+                      smoothIterations: layer.config?.smoothIterations,
+                    });
+                    updateLegend(elem, key, layer.gridData?.stats?.min, layer.gridData?.stats?.max, win);
+                  }
                   if (layer.config?.showRaster && layer.visible) {
                     triggerRasterOverlay(map, layer, win);
                   }

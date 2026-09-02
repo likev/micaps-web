@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="LowCloudCover" valuedefined="true" entrystyle="Default">
+  <entry value="0.0" rgba="19,19,19,255" />
+  <entry value="10" rgba="48,48,48,255" />
+  <entry value="25" rgba="76,76,76,255" />
+  <entry value="40" rgba="103,103,103,255" />
+  <entry value="50" rgba="129,129,129,255" />
+  <entry value="60" rgba="154,154,154,255" />
+  <entry value="70" rgba="180,180,180,255" />
+  <entry value="80" rgba="206,206,206,255" />
+  <entry value="90" rgba="229,229,229,255" />
+  <entry value="99" rgba="255,255,255,255" />
+</palette>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palette name="haipingmianqiya" valuedefined="true" entrystyle="Default">
+  <entry value="960 " rgba="80,0,80,255" />
+  <entry value="965 " rgba="81,10,118,255" />
+  <entry value="970 " rgba="93,24,129,255" />
+  <entry value="975 " rgba="155,40,215,255" />
+  <entry value="980 " rgba="134,0,134,255" />
+  <entry value="985 " rgba="187,0,187,255" />
+  <entry value="990 " rgba="241,0,241,255" />
+  <entry value="995 " rgba="255,80,255,255" />
+  <entry value="1000" rgba="255,241,255,255" />
+  <entry value="1020" rgba="187,255,187,255" />
+  <entry value="1030" rgba="80,255,80,255" />
+  <entry value="1040" rgba="0,187,0,255" />
+  <entry value="1050" rgba="0,80,0,255" />
+</palette>

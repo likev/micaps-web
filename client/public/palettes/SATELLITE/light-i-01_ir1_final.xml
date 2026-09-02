@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<palette>
+	 <entry  value="102.01"   rgba="0  ,0  ,0  ,255"/>
+   <entry  value="102.01"   rgba="10 ,10 ,10 ,255"/>
+   <entry  value="122.90"   rgba="34 ,33 ,34 ,255"/>
+   <entry  value="143.00"   rgba="46 ,45 ,46 ,255"/>
+   <entry  value="152.49"   rgba="59 ,56 ,59 ,255"/>
+   <entry  value="159.23"   rgba="71 ,68 ,71 ,255"/>
+   <entry  value="164.56"   rgba="83 ,80 ,83 ,255"/>
+   <entry  value="168.99"   rgba="95 ,92 ,96 ,255"/>
+   <entry  value="172.84"   rgba="108,103,108,255"/>
+   <entry  value="176.23"   rgba="120,115,120,255"/>
+   <entry  value="179.30"   rgba="132,127,133,255"/>
+   <entry  value="182.11"   rgba="145,138,145,255"/>
+   <entry  value="184.70"   rgba="157,150,157,255"/>
+   <entry  value="187.13"   rgba="169,162,170,255"/>
+   <entry  value="189.41"   rgba="181,174,182,255"/>
+   <entry  value="191.57"   rgba="194,185,194,255"/>
+   <entry  value="193.60"   rgba="206,197,207,255"/>
+   <entry  value="195.54"   rgba="218,209,219,255"/>
+   <entry  value="197.38"   rgba="231,221,232,255"/>
+   <entry  value="199.15"   rgba="233,182,219,255"/>
+   <entry  value="200.85"   rgba="234,171,203,255"/>
+   <entry  value="202.49"   rgba="235,166,195,255"/>
+   <entry  value="204.07"   rgba="236,160,187,255"/>
+   <entry  value="205.60"   rgba="237,155,179,255"/>
+   <entry  value="207.08"   rgba="238,150,171,255"/>
+   <entry  value="208.51"   rgba="239,144,163,255"/>
+   <entry  value="209.89"   rgba="240,139,155,255"/>
+   <entry  value="211.23"   rgba="241,134,147,255"/>
+   <entry  value="212.54"   rgba="242,128,139,255"/>
+   <entry  value="213.82"   rgba="243,123,131,255"/>
+   <entry  value="215.07"   rgba="244,118,123,255"/>
+   <entry  value="216.29"   rgba="245,113,115,255"/>
+   <entry  value="217.48"   rgba="245,98 ,100,255"/>
+   <entry  value="218.65"   rgba="245,78 ,80 ,255"/>
+   <entry  value="219.79"   rgba="245,69 ,70 ,255"/>
+   <entry  value="220.91"   rgba="245,54 ,55 ,255"/>
+   <entry  value="222.00"   rgba="218,81 ,70 ,255"/>
+   <entry  value="223.08"   rgba="205,95 ,77 ,255"/>
+   <entry  value="224.13"   rgba="192,109,85 ,255"/>
+   <entry  value="225.17"   rgba="179,123,93 ,255"/>
+   <entry  value="226.19"   rgba="166,137,101,255"/>
+   <entry  value="227.18"   rgba="152,116,74 ,255"/>
+   <entry  value="228.16"   rgba="165,129,76 ,255"/>
+   <entry  value="229.13"   rgba="172,136,78 ,255"/>
+   <entry  value="230.07"   rgba="179,143,79 ,255"/>
+   <entry  value="231.02"   rgba="186,149,81 ,255"/>
+   <entry  value="231.94"   rgba="193,156,82 ,255"/>
+   <entry  value="232.85"   rgba="199,163,84 ,255"/>
+   <entry  value="233.76"   rgba="206,170,85 ,255"/>
+   <entry  value="234.63"   rgba="213,176,87 ,255"/>
+   <entry  value="235.51"   rgba="220,183,88 ,255"/>
+   <entry  value="236.36"   rgba="227,190,90 ,255"/>
+   <entry  value="237.21"   rgba="234,197,91 ,255"/>
+   <entry  value="238.06"   rgba="241,204,93 ,255"/>
+   <entry  value="238.88"   rgba="240,201,83 ,255"/>
+   <entry  value="239.71"   rgba="231,203,103,255"/>
+   <entry  value="240.52"   rgba="226,205,114,255"/>
+   <entry  value="241.31"   rgba="222,206,124,255"/>
+   <entry  value="242.09"   rgba="218,208,135,255"/>
+   <entry  value="242.87"   rgba="213,209,145,255"/>
+   <entry  value="243.64"   rgba="209,211,156,255"/>
+   <entry  value="244.40"   rgba="205,212,166,255"/>
+   <entry  value="245.16"   rgba="200,214,177,255"/>
+   <entry  value="245.91"   rgba="196,215,187,255"/>
+   <entry  value="246.65"   rgba="192,217,198,255"/>
+   <entry  value="247.38"   rgba="187,218,208,255"/>
+   <entry  value="248.10"   rgba="183,220,219,255"/>
+   <entry  value="248.83"   rgba="179,221,229,255"/>
+   <entry  value="249.54"   rgba="175,223,240,255"/>
+   <entry  value="250.24"   rgba="169,221,240,255"/>
+   <entry  value="250.94"   rgba="165,216,237,255"/>
+   <entry  value="251.64"   rgba="164,214,235,255"/>
+   <entry  value="252.32"   rgba="162,212,234,255"/>
+   <entry  value="253.00"   rgba="161,210,232,255"/>
+   <entry  value="253.68"   rgba="159,208,231,255"/>
+   <entry  value="254.35"   rgba="157,205,230,255"/>
+   <entry  value="255.01"   rgba="156,203,228,255"/>
+   <entry  value="255.67"   rgba="154,201,227,255"/>
+   <entry  value="256.32"   rgba="153,199,225,255"/>
+   <entry  value="256.96"   rgba="151,197,224,255"/>
+   <entry  value="257.60"   rgba="149,195,223,255"/>
+   <entry  value="258.24"   rgba="148,193,221,255"/>
+   <entry  value="258.87"   rgba="146,190,220,255"/>
+   <entry  value="259.50"   rgba="145,188,218,255"/>
+   <entry  value="260.12"   rgba="143,186,217,255"/>
+   <entry  value="260.74"   rgba="141,184,216,255"/>
+   <entry  value="261.35"   rgba="140,182,214,255"/>
+   <entry  value="261.96"   rgba="138,180,213,255"/>
+   <entry  value="262.57"   rgba="137,177,211,255"/>
+   <entry  value="263.16"   rgba="135,175,210,255"/>
+   <entry  value="263.76"   rgba="133,173,209,255"/>
+   <entry  value="264.35"   rgba="132,171,207,255"/>
+   <entry  value="264.93"   rgba="130,169,206,255"/>
+   <entry  value="265.51"   rgba="129,167,204,255"/>
+   <entry  value="266.09"   rgba="127,165,203,255"/>
+   <entry  value="266.67"   rgba="125,162,202,255"/>
+   <entry  value="267.24"   rgba="124,160,200,255"/>
+   <entry  value="267.81"   rgba="122,158,199,255"/>
+   <entry  value="268.37"   rgba="121,156,197,255"/>
+   <entry  value="268.93"   rgba="119,154,196,255"/>
+   <entry  value="269.49"   rgba="117,152,195,255"/>
+   <entry  value="270.04"   rgba="116,149,193,255"/>
+   <entry  value="270.59"   rgba="114,147,192,255"/>
+   <entry  value="271.14"   rgba="113,145,190,255"/>
+   <entry  value="271.68"   rgba="111,143,189,255"/>
+   <entry  value="272.23"   rgba="109,141,188,255"/>
+   <entry  value="272.77"   rgba="108,139,186,255"/>
+   <entry  value="273.31"   rgba="106,137,185,255"/>
+   <entry  value="273.85"   rgba="105,134,183,255"/>
+   <entry  value="274.38"   rgba="103,132,182,255"/>
+   <entry  value="274.90"   rgba="101,130,181,255"/>
+   <entry  value="275.43"   rgba="100,128,179,255"/>
+   <entry  value="275.95"   rgba="98 ,126,178,255"/>
+   <entry  value="276.47"   rgba="97 ,124,176,255"/>
+   <entry  value="276.98"   rgba="95 ,121,175,255"/>
+   <entry  value="277.50"   rgba="93 ,119,174,255"/>
+   <entry  value="278.01"   rgba="92 ,117,172,255"/>
+   <entry  value="278.51"   rgba="90 ,115,171,255"/>
+   <entry  value="279.02"   rgba="89 ,113,169,255"/>
+   <entry  value="279.52"   rgba="87 ,111,168,255"/>
+   <entry  value="280.02"   rgba="85 ,109,167,255"/>
+   <entry  value="280.52"   rgba="84 ,106,165,255"/>
+   <entry  value="281.01"   rgba="82 ,104,164,255"/>
+   <entry  value="281.50"   rgba="81 ,102,162,255"/>
+   <entry  value="281.99"   rgba="79 ,100,161,255"/>
+   <entry  value="282.48"   rgba="77 ,98 ,160,255"/>
+   <entry  value="282.97"   rgba="76 ,96 ,158,255"/>
+   <entry  value="283.45"   rgba="74 ,93 ,157,255"/>
+   <entry  value="283.93"   rgba="73 ,91 ,155,255"/>
+   <entry  value="284.41"   rgba="71 ,89 ,154,255"/>
+   <entry  value="284.89"   rgba="69 ,87 ,153,255"/>
+   <entry  value="285.36"   rgba="68 ,85 ,151,255"/>
+   <entry  value="285.83"   rgba="66 ,83 ,150,255"/>
+   <entry  value="286.31"   rgba="65 ,81 ,148,255"/>
+   <entry  value="286.78"   rgba="63 ,78 ,147,255"/>
+   <entry  value="287.24"   rgba="61 ,76 ,146,255"/>
+   <entry  value="287.71"   rgba="60 ,74 ,144,255"/>
+   <entry  value="288.18"   rgba="58 ,72 ,143,255"/>
+   <entry  value="288.64"   rgba="57 ,70 ,141,255"/>
+   <entry  value="289.10"   rgba="55 ,68 ,140,255"/>
+   <entry  value="289.56"   rgba="54 ,66 ,139,255"/>
+   <entry  value="290.01"   rgba="53 ,65 ,138,255"/>
+   <entry  value="290.47"   rgba="51 ,63 ,136,255"/>
+   <entry  value="290.92"   rgba="50 ,62 ,135,255"/>
+   <entry  value="291.37"   rgba="49 ,61 ,134,255"/>
+   <entry  value="291.81"   rgba="49 ,60 ,133,255"/>
+   <entry  value="292.26"   rgba="48 ,59 ,132,255"/>
+   <entry  value="292.71"   rgba="47 ,58 ,132,255"/>
+   <entry  value="293.15"   rgba="46 ,57 ,131,255"/>
+   <entry  value="293.59"   rgba="46 ,56 ,130,255"/>
+   <entry  value="294.03"   rgba="45 ,55 ,129,255"/>
+   <entry  value="294.47"   rgba="44 ,54 ,128,255"/>
+   <entry  value="294.91"   rgba="43 ,53 ,127,255"/>
+   <entry  value="295.34"   rgba="43 ,52 ,127,255"/>
+   <entry  value="295.77"   rgba="42 ,51 ,126,255"/>
+   <entry  value="296.20"   rgba="41 ,50 ,125,255"/>
+   <entry  value="296.63"   rgba="40 ,49 ,124,255"/>
+   <entry  value="297.06"   rgba="40 ,48 ,123,255"/>
+   <entry  value="297.49"   rgba="39 ,47 ,122,255"/>
+   <entry  value="297.91"   rgba="38 ,46 ,122,255"/>
+   <entry  value="298.33"   rgba="37 ,45 ,121,255"/>
+   <entry  value="298.75"   rgba="36 ,44 ,120,255"/>
+   <entry  value="299.18"   rgba="36 ,43 ,119,255"/>
+   <entry  value="299.59"   rgba="35 ,42 ,118,255"/>
+   <entry  value="300.01"   rgba="34 ,41 ,117,255"/>
+   <entry  value="300.43"   rgba="33 ,40 ,117,255"/>
+   <entry  value="300.84"   rgba="33 ,39 ,116,255"/>
+   <entry  value="301.25"   rgba="32 ,38 ,115,255"/>
+   <entry  value="301.67"   rgba="31 ,37 ,114,255"/>
+   <entry  value="302.08"   rgba="30 ,36 ,113,255"/>
+   <entry  value="302.49"   rgba="30 ,35 ,112,255"/>
+   <entry  value="302.90"   rgba="29 ,34 ,112,255"/>
+   <entry  value="303.31"   rgba="28 ,33 ,111,255"/>
+   <entry  value="303.71"   rgba="27 ,32 ,110,255"/>
+   <entry  value="304.12"   rgba="27 ,31 ,109,255"/>
+   <entry  value="304.52"   rgba="26 ,30 ,108,255"/>
+   <entry  value="304.93"   rgba="25 ,29 ,107,255"/>
+   <entry  value="305.33"   rgba="24 ,28 ,107,255"/>
+   <entry  value="305.73"   rgba="23 ,27 ,106,255"/>
+   <entry  value="306.13"   rgba="23 ,26 ,105,255"/>
+   <entry  value="306.52"   rgba="22 ,25 ,104,255"/>
+   <entry  value="306.92"   rgba="21 ,24 ,103,255"/>
+   <entry  value="307.31"   rgba="20 ,23 ,102,255"/>
+   <entry  value="307.71"   rgba="20 ,22 ,102,255"/>
+   <entry  value="308.10"   rgba="19 ,21 ,101,255"/>
+   <entry  value="308.49"   rgba="18 ,20 ,100,255"/>
+   <entry  value="308.88"   rgba="17 ,19 ,99 ,255"/>
+   <entry  value="309.27"   rgba="17 ,18 ,98 ,255"/>
+   <entry  value="309.66"   rgba="16 ,17 ,97 ,255"/>
+   <entry  value="310.04"   rgba="15 ,16 ,97 ,255"/>
+   <entry  value="310.42"   rgba="14 ,15 ,96 ,255"/>
+   <entry  value="310.81"   rgba="14 ,14 ,95 ,255"/>
+   <entry  value="311.19"   rgba="13 ,13 ,94 ,255"/>
+   <entry  value="311.57"   rgba="12 ,12 ,93 ,255"/>
+   <entry  value="311.95"   rgba="11 ,11 ,92 ,255"/>
+   <entry  value="312.33"   rgba="11 ,11 ,92 ,255"/>
+   <entry  value="312.71"   rgba="10 ,11 ,91 ,255"/>
+   <entry  value="313.09"   rgba="10 ,11 ,91 ,255"/>
+   <entry  value="313.46"   rgba="10 ,11 ,91 ,255"/>
+   <entry  value="313.84"   rgba="10 ,11 ,91 ,255"/>
+   <entry  value="314.21"   rgba="10 ,11 ,91 ,255"/>
+   <entry  value="314.58"   rgba="10 ,11 ,91 ,255"/>
+   <entry  value="314.96"   rgba="10 ,11 ,91 ,255"/>
+   <entry  value="315.33"   rgba="10 ,11 ,91 ,255"/>
+   <entry  value="315.70"   rgba="10 ,11 ,91 ,255"/>
+   <entry  value="316.07"   rgba="10 ,11 ,91 ,255"/>
+   <entry  value="316.44"   rgba="10 ,11 ,91 ,255"/>
+   <entry  value="316.82"   rgba="10 ,11 ,91 ,255"/>
+   <entry  value="317.19"   rgba="10 ,11 ,91 ,255"/>
+   <entry  value="317.55"   rgba="10 ,11 ,91 ,255"/>
+   <entry  value="317.92"   rgba="10 ,11 ,91 ,255"/>
+   <entry  value="318.28"   rgba="10 ,11 ,91 ,255"/>
+   <entry  value="318.64"   rgba="11 ,12 ,92 ,255"/>
+   <entry  value="319.01"   rgba="11 ,12 ,92 ,255"/>
+   <entry  value="319.37"   rgba="11 ,11 ,92 ,255"/>
+   <entry  value="319.73"   rgba="11 ,11 ,92 ,255"/>
+   <entry  value="320.09"   rgba="10 ,11 ,91 ,255"/>
+   <entry  value="320.45"   rgba="10 ,10 ,91 ,255"/>
+   <entry  value="320.81"   rgba="10 ,10 ,91 ,255"/>
+   <entry  value="321.16"   rgba="10 ,10 ,91 ,255"/>
+   <entry  value="321.52"   rgba="12 ,13 ,93 ,255"/>
+   <entry  value="321.87"   rgba="12 ,13 ,93 ,255"/>
+   <entry  value="322.22"   rgba="11 ,12 ,92 ,255"/>
+   <entry  value="322.57"   rgba="11 ,12 ,92 ,255"/>
+   <entry  value="322.92"   rgba="11 ,11 ,92 ,255"/>
+   <entry  value="323.28"   rgba="11 ,11 ,92 ,255"/>
+   <entry  value="323.63"   rgba="10 ,11 ,91 ,255"/>
+   <entry  value="323.98"   rgba="10 ,10 ,91 ,255"/>
+   <entry  value="324.32"   rgba="10 ,10 ,91 ,255"/>
+   <entry  value="324.67"   rgba="10 ,10 ,91 ,255"/>
+   <entry  value="325.02"   rgba="12 ,12 ,93 ,255"/>
+   <entry  value="325.37"   rgba="12 ,12 ,93 ,255"/>
+   <entry  value="325.72"   rgba="12 ,12 ,93 ,255"/>
+   <entry  value="326.06"   rgba="12 ,12 ,93 ,255"/>
+   <entry  value="326.40"   rgba="11 ,11 ,92 ,255"/>
+   <entry  value="326.75"   rgba="11 ,11 ,92 ,255"/>
+   <entry  value="327.09"   rgba="11 ,11 ,92 ,255"/>
+   <entry  value="327.44"   rgba="11 ,11 ,92 ,255"/>
+   <entry  value="327.78"   rgba="10 ,10 ,91 ,255"/>
+   <entry  value="328.12"   rgba="10 ,10 ,91 ,255"/>
+   <entry  value="328.47"   rgba="10 ,10 ,91 ,255"/>
+   <entry  value="328.81"   rgba="10 ,10 ,91 ,255"/>
+   <entry  value="329.15"   rgba="12 ,12 ,93 ,255"/>
+   <entry  value="329.49"   rgba="12 ,12 ,93 ,255"/>
+   <entry  value="329.83"   rgba="11 ,12 ,92 ,255"/>
+   <entry  value="330.17"   rgba="11 ,11 ,92 ,255"/>
+   <entry  value="330.51"   rgba="11 ,11 ,92 ,255"/>
+   <entry  value="330.86"   rgba="11 ,11 ,92 ,255"/>
+   <entry  value="331.22"   rgba="10 ,10 ,91 ,255"/>
+   <entry  value="331.59"   rgba="10 ,10 ,91 ,255"/>
+   <entry  value="331.99"   rgba="10 ,10 ,91 ,255"/>
+   <entry  value="332.42"   rgba="10 ,10 ,91 ,255"/>
+   <entry  value="332.89"   rgba="10 ,10 ,91 ,255"/>
+   <entry  value="333.37"   rgba="10 ,10 ,91 ,255"/>
+   <entry  value="333.88"   rgba="10 ,10 ,91 ,255"/>
+   <entry  value="334.42"   rgba="10 ,10 ,91 ,255"/>
+</palette>

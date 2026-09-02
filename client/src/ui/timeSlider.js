@@ -262,7 +262,7 @@ export function setStepLength(step, triggerCallback = false) {
       // attach seq as non-enumerable hint for callers that inspect it; primitive period kept for compat
       if (typeof payload === "number") {
         // wrap in object for seq-aware callers while keeping number via valueOf
-        const boxed = { period: payload, _seq: seq, valueOf() { return payload; } };
+        const boxed = { period: payload, stepLength: currentStepLength, _seq: seq, valueOf() { return payload; } };
         onTimeChangeCallback(boxed);
       } else {
         onTimeChangeCallback(payload);
@@ -276,7 +276,7 @@ export function setStepLength(step, triggerCallback = false) {
     updateLabels();
     renderChips();
     if (triggerCallback && onTimeChangeCallback && obsFiles[currentObsIdx]) {
-      onTimeChangeCallback({ isObs: true, file: obsFiles[currentObsIdx], _seq: ++periodStepSeq });
+      onTimeChangeCallback({ isObs: true, file: obsFiles[currentObsIdx], stepLength: currentStepLength, _seq: ++periodStepSeq });
     }
   }
 }
