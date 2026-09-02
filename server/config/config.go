@@ -126,7 +126,7 @@ func LoadConfig() *Config {
 		EnableTunnel:  getEnvBool("ENABLE_TUNNEL", false),
 		MockMode:      getEnvBool("MOCK_MODE", false),
 		StaticDir:     getEnv("STATIC_DIR", "../client/dist"),
-		PMTilesPath:   getEnv("PMTILES_PATH", "../client/dist/map-china.pmtiles"),
+		PMTilesPath:   getEnv("PMTILES_PATH", "../client/map/map-china.pmtiles"),
 	}
 
 	fs := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)

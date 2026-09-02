@@ -10,7 +10,7 @@ export default defineConfig({
   },
   plugins: [
     {
-      name: "serve-palettes-dev",
+      name: "serve-static-dev",
       configureServer(server) {
         server.middlewares.use("/palettes", (req, res, next) => {
           const reqPath = decodeURIComponent((req.url || "").split("?")[0].replace(/^\//, ""));
@@ -18,6 +18,36 @@ export default defineConfig({
           if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
             if (filePath.endsWith(".json")) res.setHeader("Content-Type", "application/json");
             else if (filePath.endsWith(".xml")) res.setHeader("Content-Type", "application/xml");
+            fs.createReadStream(filePath).pipe(res);
+            return;
+          }
+          next();
+        });
+
+        server.middlewares.use("/map-china.pmtiles", (req, res, next) => {
+          const filePath = path.resolve(__dirname, "map", "map-china.pmtiles");
+          if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+            const stat = fs.statSync(filePath);
+            const range = req.headers.range;
+            if (range) {
+              const parts = range.replace(/bytes=/, "").split("-");
+              const start = parseInt(parts[0], 10);
+              const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
+              res.writeHead(206, {
+                "Content-Range": `bytes ${start}-${end}/${stat.size}`,
+                "Accept-Ranges": "bytes",
+                "Content-Length": end - start + 1,
+                "Content-Type": "application/octet-stream",
+                "Access-Control-Allow-Origin": "*",
+              });
+              fs.createReadStream(filePath, { start, end }).pipe(res);
+              return;
+            }
+            res.writeHead(200, {
+              "Content-Length": stat.size,
+              "Content-Type": "application/octet-stream",
+              "Access-Control-Allow-Origin": "*",
+            });
             fs.createReadStream(filePath).pipe(res);
             return;
           }

@@ -24,16 +24,23 @@ func (h *StaticHandler) PMTilesHandler(w http.ResponseWriter, r *http.Request) {
 	pmtilesFile := h.Cfg.PMTilesPath
 	if _, err := os.Stat(pmtilesFile); os.IsNotExist(err) {
 		candidates := []string{
+			"client/map/map-china.pmtiles",
+			"../client/map/map-china.pmtiles",
+			"map/map-china.pmtiles",
+			"client/public/map-china.pmtiles",
+			"../client/public/map-china.pmtiles",
 			filepath.Join(h.Cfg.StaticDir, "map-china.pmtiles"),
 			"client/dist/map-china.pmtiles",
 			"../client/dist/map-china.pmtiles",
-			"client/public/map-china.pmtiles",
-			"../client/public/map-china.pmtiles",
 			"map-china.pmtiles",
 		}
 		if exePath, err := os.Executable(); err == nil {
 			exeDir := filepath.Dir(exePath)
-			candidates = append([]string{filepath.Join(exeDir, "map-china.pmtiles")}, candidates...)
+			candidates = append([]string{
+				filepath.Join(exeDir, "map", "map-china.pmtiles"),
+				filepath.Join(exeDir, "client", "map", "map-china.pmtiles"),
+				filepath.Join(exeDir, "map-china.pmtiles"),
+			}, candidates...)
 		}
 		for _, alt := range candidates {
 			if _, aErr := os.Stat(alt); aErr == nil {
