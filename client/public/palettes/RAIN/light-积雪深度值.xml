@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<palette name="Depth(cm)" valuedefined="true" entrystyle="Default">
-  <entry value="0" rgba="255,255,255,255" />
-  <entry value="0.5" rgba="0,0,0,255" />
-</palette>

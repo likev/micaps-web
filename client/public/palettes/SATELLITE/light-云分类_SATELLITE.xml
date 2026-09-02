@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<palette entrystyle="DescriptionOnly" valuedefined="true">
-  <entry value="0" rgba="255,255,255,255" desc="晴空"/>
-  <entry value="1" rgba="254,19,2,255" desc="深对流云"/>
-  <entry value="2" rgba="254,198,22,255" desc="强烈上升的积雨云"/>
-  <entry value="3" rgba="0,198,53,255" desc="卷云(大冰粒)" />
-  <entry value="4" rgba="128,151,253,255" desc="卷云(小冰粒)"/>
-</palette>

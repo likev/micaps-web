@@ -1,7 +1,0 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<palette entrystyle="DescriptionOnly" valuedefined="true">
-  <entry value="1" rgba="63,105,226,255" desc="雨"/>
-  <entry value="2" rgba="239,139,239,255" desc="雨夹雪"/>
-  <entry value="3" rgba="201,201,201,255" desc="雪"/>
-  <entry value="4" rgba="221,12,57,255" desc="冻雨" />
-</palette>

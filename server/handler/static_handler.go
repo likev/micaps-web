@@ -182,20 +182,16 @@ func (h *StaticHandler) SPAHandler(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, "/palettes/") {
 		paletteRel := strings.TrimPrefix(r.URL.Path, "/palettes/")
 		candidates := []string{
-			filepath.Join(distDir, "palettes", paletteRel),
-			filepath.Join("client", "public", "palettes", paletteRel),
 			filepath.Join("client", "palettes", paletteRel),
-			filepath.Join("..", "client", "public", "palettes", paletteRel),
 			filepath.Join("..", "client", "palettes", paletteRel),
 			filepath.Join("palettes", paletteRel),
+			filepath.Join(distDir, "palettes", paletteRel),
 		}
 		if exePath, err := os.Executable(); err == nil {
 			exeDir := filepath.Dir(exePath)
 			candidates = append([]string{
-				filepath.Join(exeDir, "palettes", paletteRel),
 				filepath.Join(exeDir, "client", "palettes", paletteRel),
-				filepath.Join(exeDir, "client", "public", "palettes", paletteRel),
-				filepath.Join(exeDir, "client", "dist", "palettes", paletteRel),
+				filepath.Join(exeDir, "palettes", paletteRel),
 			}, candidates...)
 		}
 		for _, cp := range candidates {
