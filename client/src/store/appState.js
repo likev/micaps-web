@@ -53,6 +53,7 @@ class AppState {
 
   set(key, value) {
     const oldValue = this.state[key];
+    if (oldValue === value) return;
     this.state[key] = value;
     this.emit(key, value, oldValue);
   }

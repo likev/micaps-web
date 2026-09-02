@@ -15,8 +15,11 @@ import { appState } from "../store/appState.js";
 import { getActiveWindow } from "./tabWindowManager.js";
 import { getLayersForWindow } from "./layerControl.js";
 
+const paletteSeq = new Map();
+
 export function handleLayerAction(map, action, layerId, value, layer, win = getActiveWindow()) {
   if (action === "visibility") {
+    if (!layer) return;
     if (layer.type === "contour" || layer.type === "wind") {
       setLayerIsobandVisibility(map, layerId, value && layer.config?.showFill);
       setLayerIsolineVisibility(map, layerId, value && layer.config?.showLine);
@@ -131,7 +134,7 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
         }
       }
 
-      // Palette change: load the XML palette file and update the live colormap for this layer
+      // Palette change: load the XML palette file and update the live colormap for this layer (sequence-guarded)
       if (value.palettePath !== undefined) {
         if (!value.palettePath) {
           // Revert to built-in default — re-render with null colormap (element default)
@@ -139,11 +142,17 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
             triggerRasterOverlay(map, layer, win);
           }
         } else {
+          const seq = (paletteSeq.get(layer.id) || 0) + 1;
+          paletteSeq.set(layer.id, seq);
+          const mySeq = seq;
+          const capturedPath = value.palettePath;
           import("../utils/paletteLoader.js").then(({ loadXMLPalette }) => {
-            loadXMLPalette(value.palettePath).then((stops) => {
+            loadXMLPalette(capturedPath).then((stops) => {
+              if (mySeq !== paletteSeq.get(layer.id)) return;
               if (!stops) return;
               // Register under a stable per-layer key so colormaps.js can resolve it
               import("../utils/colormaps.js").then(({ setColormaps, COLORMAPS }) => {
+                if (mySeq !== paletteSeq.get(layer.id)) return;
                 try {
                   const key = `palette:${layer.id}`;
                   setColormaps({ ...COLORMAPS, [key]: stops });
@@ -195,7 +204,7 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
   }
 }
 
-function triggerRasterOverlay(map, layer = null, win = null) {
+async function triggerRasterOverlay(map, layer = null, win = null) {
   if (!map) return;
 
   // If no specific layer is supplied (e.g. global aux raster action), trigger for all active weather layers in window
@@ -245,7 +254,14 @@ function triggerRasterOverlay(map, layer = null, win = null) {
   let file = layer?.file || win?.obsTime || win?.file;
   if (!file) {
     const period = win?.period ?? 24;
-    const cycle = win?.forecastCycle || appState.get("forecastCycle") || "26082908";
+    let cycle = win?.forecastCycle || appState.get("forecastCycle");
+    if (!cycle) {
+      try {
+        const { resolveLatestForecastCycle } = await import("../utils/timelineSync.js");
+        cycle = await resolveLatestForecastCycle(model, element, level);
+      } catch {}
+    }
+    if (!cycle) cycle = "26082908";
     file = `${cycle}.${String(period).padStart(3, "0")}`;
   }
 
@@ -264,7 +280,7 @@ function triggerRasterOverlay(map, layer = null, win = null) {
     });
 }
 
-function triggerWindStreamlines(map, layer = null, win = null) {
+async function triggerWindStreamlines(map, layer = null, win = null) {
   let grid = layer?.gridData || win?.windGridData || win?.gridData || appState.get("gridData");
   if (grid && grid.u && grid.v) {
     renderWindStreamlines(map, grid);
@@ -274,7 +290,14 @@ function triggerWindStreamlines(map, layer = null, win = null) {
   const model = layer?.model || win?.model || "ECMWF_HR";
   const level = layer?.level !== undefined && layer?.level !== null && layer?.level > 0 ? layer.level : (win?.level || 850);
   const period = win?.period ?? 24;
-  const cycle = win?.forecastCycle || appState.get("forecastCycle") || "26082908";
+  let cycle = win?.forecastCycle || appState.get("forecastCycle");
+  if (!cycle) {
+    try {
+      const { resolveLatestForecastCycle } = await import("../utils/timelineSync.js");
+      cycle = await resolveLatestForecastCycle(model, "WIND", level);
+    } catch {}
+  }
+  if (!cycle) cycle = "26082908";
   const file = layer?.file || win?.file || `${cycle}.${String(period).padStart(3, "0")}`;
   const path = `${model}/WIND/${level}`;
 
@@ -291,7 +314,7 @@ function triggerWindStreamlines(map, layer = null, win = null) {
     });
 }
 
-function triggerWindBarbs(map, layer = null, win = null) {
+async function triggerWindBarbs(map, layer = null, win = null) {
   let grid = layer?.gridData || win?.windGridData || win?.gridData || appState.get("gridData");
   if (grid && grid.u && grid.v) {
     renderGridWindBarbs(map, grid);
@@ -301,7 +324,14 @@ function triggerWindBarbs(map, layer = null, win = null) {
   const model = layer?.model || win?.model || "ECMWF_HR";
   const level = layer?.level !== undefined && layer?.level !== null && layer?.level > 0 ? layer.level : (win?.level || 850);
   const period = win?.period ?? 24;
-  const cycle = win?.forecastCycle || appState.get("forecastCycle") || "26082908";
+  let cycle = win?.forecastCycle || appState.get("forecastCycle");
+  if (!cycle) {
+    try {
+      const { resolveLatestForecastCycle } = await import("../utils/timelineSync.js");
+      cycle = await resolveLatestForecastCycle(model, "WIND", level);
+    } catch {}
+  }
+  if (!cycle) cycle = "26082908";
   const file = layer?.file || win?.file || `${cycle}.${String(period).padStart(3, "0")}`;
   const path = `${model}/WIND/${level}`;
 
@@ -318,7 +348,7 @@ function triggerWindBarbs(map, layer = null, win = null) {
     });
 }
 
-export function triggerStationStreamlines(map, layer = null, win = null) {
+export async function triggerStationStreamlines(map, layer = null, win = null) {
   const geojson = layer?.stationsGeoJSON || getStationGeoJSON(map) || win?.stationsGeoJSON || appState.get("stationData");
   if (geojson && geojson.features && geojson.features.length >= 3) {
     const windGrid = generateStationWindGrid(geojson);
@@ -335,7 +365,19 @@ export function triggerStationStreamlines(map, layer = null, win = null) {
   const element = layer?.element || (model === "SURFACE" ? "PLOT_GLOBAL_3H" : "PLOT");
   const level = layer?.level || 500;
   const path = layer?.path || (model === "SURFACE" ? `SURFACE/${element}` : `UPPER_AIR/${element}/${level}`);
-  const file = layer?.file || win?.file || "20260828170000.000";
+  let file = layer?.file || win?.file || win?.obsTime || appState.get("obsTime") || appState.get("file");
+  if (!file) {
+    try {
+      const { syncObservationTimeline } = await import("../utils/timelineSync.js");
+      const winTitle = win?.title || layer?.name || "";
+      file = await syncObservationTimeline(path, null, winTitle, win);
+    } catch {}
+  }
+
+  if (!file) {
+    console.warn("[StationStreamlines] No obsTime/file available, aborting fetch");
+    return;
+  }
 
   fetchStationObservations(path, file)
     .then((data) => {

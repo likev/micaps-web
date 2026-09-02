@@ -5,10 +5,12 @@ import { getActiveWindow } from "../ui/tabWindowManager.js";
 import { DEFAULT_MOCK_OBS_FILES } from "../config/presets.js";
 
 const forecastCyclesCache = {};
+const FORECAST_CYCLES_TTL_MS = 5 * 60 * 1000;
 
 export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP", level = 500) {
   const path = `${model}/${element}/${level || 500}`;
-  if (forecastCyclesCache[path]?.length) return forecastCyclesCache[path];
+  const cached = forecastCyclesCache[path];
+  if (cached && Array.isArray(cached.data) && cached.data.length && (Date.now() - cached.ts) < FORECAST_CYCLES_TTL_MS) return cached.data;
   try {
     const fileEntries = await fetchTree(path);
     if (Array.isArray(fileEntries) && fileEntries.length > 0) {
@@ -22,8 +24,8 @@ export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP",
       }
       if (cycleSet.size > 0) {
         const sorted = Array.from(cycleSet).sort().reverse();
-        forecastCyclesCache[path] = sorted;
-        forecastCyclesCache[model] = sorted;
+        forecastCyclesCache[path] = { data: sorted, ts: Date.now() };
+        forecastCyclesCache[model] = { data: sorted, ts: Date.now() };
         return sorted;
       }
     }
@@ -46,16 +48,32 @@ export async function resolveLatestForecastCycle(model = "ECMWF_HR", element = "
 export async function syncObservationTimeline(path, currentFile = null, winTitle = "", win = null) {
   const isUpper = path.includes("UPPER_AIR") || winTitle.toLowerCase().includes("upper") || winTitle.toLowerCase().includes("sounding");
   const stepLength = isUpper ? 12 : 3;
+  const applyTimeline = (file, files) => {
+    if (win) {
+      win._obsTimeline = { file, files };
+      if (getActiveWindow() === win) {
+        setTimelineMode("obs", { file, files, winTitle, stepLength, path });
+      } else {
+        win._pendingTimeline = { file, files, winTitle, stepLength, path };
+      }
+    } else {
+      setTimelineMode("obs", { file, files, winTitle, stepLength, path });
+    }
+  };
   try {
     const fileEntries = await fetchTree(path);
     if (Array.isArray(fileEntries) && fileEntries.length > 0) {
       let validFiles = fileEntries.filter((f) => f.name && (f.size > 100 || f.size === 0)).map((f) => f.name);
       const hasObsFormat = validFiles.some((f) => f.length >= 14 && f.endsWith(".000"));
+      const isMockFallback = !hasObsFormat;
       validFiles = hasObsFormat ? validFiles.filter((f) => f.length >= 14 && f.endsWith(".000")) : DEFAULT_MOCK_OBS_FILES;
       if (validFiles.length > 0) {
-        const recentFiles = validFiles.length >= 2 && validFiles !== DEFAULT_MOCK_OBS_FILES ? validFiles.slice(0, 10).reverse() : DEFAULT_MOCK_OBS_FILES;
-        const targetFile = currentFile && recentFiles.includes(currentFile) ? currentFile : recentFiles[recentFiles.length - 1];
-        if (!win || getActiveWindow() === win) setTimelineMode("obs", { file: targetFile, files: recentFiles, winTitle, stepLength, path });
+        // FIX: after filter validFiles is always a new array, so `validFiles !== DEFAULT_MOCK_OBS_FILES` is always true — use isMockFallback flag instead
+        const recentFiles = !isMockFallback && validFiles.length >= 2 ? validFiles.slice(0, 10).reverse() : (validFiles.length >= 2 ? validFiles.slice(-10) : DEFAULT_MOCK_OBS_FILES);
+        // when falling back to mock, recentFiles should be mock files
+        const effectiveFiles = isMockFallback ? DEFAULT_MOCK_OBS_FILES : recentFiles;
+        const targetFile = currentFile && effectiveFiles.includes(currentFile) ? currentFile : effectiveFiles[effectiveFiles.length - 1];
+        applyTimeline(targetFile, effectiveFiles);
         return targetFile;
       }
     }
@@ -63,6 +81,6 @@ export async function syncObservationTimeline(path, currentFile = null, winTitle
     console.warn("[Main] Failed to query observation file tree for timeline:", err);
   }
   const fallbackFile = currentFile || DEFAULT_MOCK_OBS_FILES[DEFAULT_MOCK_OBS_FILES.length - 1];
-  if (!win || getActiveWindow() === win) setTimelineMode("obs", { file: fallbackFile, files: DEFAULT_MOCK_OBS_FILES, winTitle, stepLength, path });
+  applyTimeline(fallbackFile, DEFAULT_MOCK_OBS_FILES);
   return fallbackFile;
 }

@@ -186,6 +186,14 @@ export function bindStationFilterEvents(configDrawer, layer, onAction, winId) {
   };
 
   const rerender = () => {
+    // Preserve focus/selection across innerHTML rebuild
+    const activeEl = document.activeElement;
+    const wasInput = activeEl && configDrawer.contains(activeEl) && (activeEl.classList.contains("ipt-rule-val") || activeEl.classList.contains("ipt-rule-val2") || activeEl.classList.contains("sel-rule-field") || activeEl.classList.contains("sel-rule-op"));
+    const activeIdx = wasInput ? activeEl.dataset.ruleIdx : null;
+    const activeClass = wasInput ? Array.from(activeEl.classList).find((c) => c.startsWith("ipt-") || c.startsWith("sel-")) : null;
+    const selStart = wasInput && activeEl.selectionStart !== undefined ? activeEl.selectionStart : null;
+    const selEnd = wasInput && activeEl.selectionEnd !== undefined ? activeEl.selectionEnd : null;
+
     const listContainer = configDrawer.querySelector(".filter-rules-list");
     if (listContainer) {
       const upper = isUpperAir(layer);
@@ -193,6 +201,20 @@ export function bindStationFilterEvents(configDrawer, layer, onAction, winId) {
         .map((rule, idx) => renderSingleRuleRow(rule, idx, layer.config.filterRules.length, layer.config.filterLogic, upper))
         .join("");
       attachRuleInputListeners();
+      // Restore focus and cursor position if editing was in progress
+      if (wasInput && activeIdx !== null && activeClass) {
+        // Distinguish val vs val2 when both share same idx
+        const selector = `.${activeClass}[data-rule-idx="${activeIdx}"]`;
+        const candidates = configDrawer.querySelectorAll(selector);
+        let newEl = candidates[0] || null;
+        // If multiple matches (unlikely same class same idx), prefer first; val2 distinct class ensures uniqueness
+        if (newEl) {
+          newEl.focus();
+          if (selStart !== null && typeof newEl.setSelectionRange === "function") {
+            try { newEl.setSelectionRange(selStart, selEnd); } catch {}
+          }
+        }
+      }
     }
     triggerUpdate();
   };

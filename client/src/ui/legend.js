@@ -56,12 +56,19 @@ function renderLegendPanel(winId, panelId = "legend-panel") {
 
     let tickLabels = [];
     if (palette && palette.length > 0) {
-      if (element === "HGT" && zMin !== undefined && zMax !== undefined && zMax > zMin) {
-        const isDam = zMax < 2500;
-        const low = Math.round(zMin);
-        const mid = Math.round((zMin + zMax) / 2);
-        const high = Math.round(zMax);
-        tickLabels = [`${low}`, `${mid}`, `${high} ${isDam ? "dam" : "gpm"}`];
+      if (zMin !== undefined && zMax !== undefined && zMax > zMin) {
+        if (element === "HGT") {
+          const isDam = zMax < 2500;
+          const low = Math.round(zMin);
+          const mid = Math.round((zMin + zMax) / 2);
+          const high = Math.round(zMax);
+          tickLabels = [`${low}`, `${mid}`, `${high} ${isDam ? "dam" : "gpm"}`];
+        } else {
+          const low = Math.round(zMin);
+          const mid = Math.round((zMin + zMax) / 2);
+          const high = Math.round(zMax);
+          tickLabels = [`${low}`, `${mid}`, `${high} ${unit}`.trim()];
+        }
       } else {
         const first = palette[0].val;
         const mid = palette[Math.floor(palette.length / 2)].val;
@@ -76,7 +83,7 @@ function renderLegendPanel(winId, panelId = "legend-panel") {
           <span class="legend-title">${element}</span>
           <span class="legend-unit">${unit ? `(${unit})` : ""}</span>
         </div>
-        <div class="legend-bar" style="background: ${grad};"></div>
+        <div class="legend-bar" role="img" aria-label="${element} color scale ${zMin ?? ''} to ${zMax ?? ''} ${unit}" style="background: ${grad};"></div>
         <div class="legend-ticks">
           ${tickLabels.map((t) => `<span>${t}</span>`).join("")}
         </div>

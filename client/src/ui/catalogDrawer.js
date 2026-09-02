@@ -65,7 +65,7 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
       </div>
 
       <!-- Observation Time (Only for Observations) -->
-      <div class="form-group" id="group-obs-time" style="display: none;">
+      <div class="form-group hidden" id="group-obs-time" data-visible="false">
         <label>Observation Time (UTC)</label>
         <select id="select-obs-time" class="form-select">
           <option value="20260827200000.000" selected>2026-08-27 20:00:00 UTC</option>
@@ -82,9 +82,35 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
     </div>
   `;
 
-  document.getElementById("btn-close-drawer").addEventListener("click", () => {
+  function closeDrawer() {
     drawer.classList.add("hidden");
+  }
+
+  document.getElementById("btn-close-drawer").addEventListener("click", () => {
+    closeDrawer();
   });
+
+  // Escape to close and outside-click to close
+  const escHandler = (e) => {
+    if (e.key === "Escape" && !drawer.classList.contains("hidden")) {
+      closeDrawer();
+    }
+  };
+  document.addEventListener("keydown", escHandler);
+
+  // Outside-click: close when clicking outside drawer (ignore clicks on drawer itself)
+  // Use capture to avoid interference with other handlers; check that drawer is visible
+  const outsideClickHandler = (e) => {
+    if (drawer.classList.contains("hidden")) return;
+    if (drawer.contains(e.target)) return;
+    // Don't close if click was on the button that opens the drawer (if any) – keep open then
+    // Identify potential open triggers by data attribute or known ids
+    const trigger = e.target.closest("#btn-open-catalog, #btn-toggle-catalog, [data-open-catalog]");
+    if (trigger) return;
+    closeDrawer();
+  };
+  // Delay binding to avoid immediate close from the same click that opened the drawer
+  setTimeout(() => document.addEventListener("click", outsideClickHandler), 0);
 
   const selectModel = document.getElementById("select-model");
   const selectElement = document.getElementById("select-element");
@@ -96,13 +122,27 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
   const groupObsTime = document.getElementById("group-obs-time");
   const btnLoad = document.getElementById("btn-load-product");
 
+  // Ensure data-visible reflects initial hidden state
+  groupLevel.dataset.visible = String(!groupLevel.classList.contains("hidden"));
+  groupPeriod.dataset.visible = String(!groupPeriod.classList.contains("hidden"));
+  groupObsTime.dataset.visible = String(!groupObsTime.classList.contains("hidden"));
+
+  function setGroupVisible(groupEl, visible) {
+    groupEl.classList.toggle("hidden", !visible);
+    groupEl.dataset.visible = String(visible);
+    // Keep style.display in sync for legacy CSS that may rely on it
+    groupEl.style.display = visible ? "flex" : "none";
+  }
+
   function updateFormVisibility() {
+    const prevLevel = selectLevel.value;
+    const prevElement = selectElement.value;
     const model = selectModel.value;
 
     if (model === "SURFACE") {
-      groupLevel.style.display = "none";
-      groupPeriod.style.display = "none"; // Observations do NOT have forecast offset
-      groupObsTime.style.display = "flex";
+      setGroupVisible(groupLevel, false);
+      setGroupVisible(groupPeriod, false);
+      setGroupVisible(groupObsTime, true);
 
       selectElement.innerHTML = `
         <option value="PLOT_GLOBAL_3H" selected>PLOT_GLOBAL_3H - Global 3-Hour Synoptic Plots</option>
@@ -110,9 +150,9 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
         <option value="PLOT">PLOT - Standard Surface Plots</option>
       `;
     } else if (model === "UPPER_AIR") {
-      groupLevel.style.display = "flex";
-      groupPeriod.style.display = "none"; // Observations do NOT have forecast offset
-      groupObsTime.style.display = "flex";
+      setGroupVisible(groupLevel, true);
+      setGroupVisible(groupPeriod, false);
+      setGroupVisible(groupObsTime, true);
 
       selectElement.innerHTML = `
         <option value="PLOT" selected>PLOT - Upper Air Sounding Plots</option>
@@ -126,9 +166,9 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
       `;
     } else {
       // NWP Model
-      groupLevel.style.display = "flex";
-      groupPeriod.style.display = "flex"; // NWP models have discrete forecast lead offsets
-      groupObsTime.style.display = "none";
+      setGroupVisible(groupLevel, true);
+      setGroupVisible(groupPeriod, true);
+      setGroupVisible(groupObsTime, false);
 
       selectElement.innerHTML = `
         <option value="TMP" selected>TMP - Temperature (°C)</option>
@@ -145,9 +185,62 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
         <option value="200">200 hPa</option>
       `;
     }
+
+    // Restore previous selections if still valid
+    const levelOptions = Array.from(selectLevel.options).map((o) => o.value);
+    if (prevLevel && levelOptions.includes(prevLevel)) {
+      selectLevel.value = prevLevel;
+    }
+    const elementOptions = Array.from(selectElement.options).map((o) => o.value);
+    if (prevElement && elementOptions.includes(prevElement)) {
+      selectElement.value = prevElement;
+    }
   }
 
   selectModel.addEventListener("change", updateFormVisibility);
+
+  // Attempt to dynamically populate obs times via catalog API
+  (async () => {
+    try {
+      const { fetchTree } = await import("../api/catalogApi.js");
+      // Try known observation paths
+      const candidatePaths = ["SURFACE/PLOT_10MIN", "SURFACE/PLOT", "UPPER_AIR/PLOT"];
+      let files = null;
+      for (const p of candidatePaths) {
+        try {
+          const res = await fetchTree(p);
+          // fetchTree may return array of strings or object with files
+          const arr = Array.isArray(res) ? res : res?.files || res?.data || null;
+          if (Array.isArray(arr) && arr.length) {
+            files = arr;
+            break;
+          }
+        } catch (_) {
+          continue;
+        }
+      }
+      if (files && files.length) {
+        // Filter to .000 files and sort descending (newest first)
+        const obsFiles = files.filter((f) => typeof f === "string" && f.endsWith(".000")).sort().reverse();
+        const toUse = obsFiles.length ? obsFiles.slice(0, 10) : files.slice(0, 10);
+        if (toUse.length) {
+          selectObsTime.innerHTML = toUse
+            .map((f, idx) => {
+              let label = f;
+              try {
+                label = formatObsTimestamp(f);
+              } catch {
+                label = f;
+              }
+              return `<option value="${f}" ${idx === 0 ? "selected" : ""}>${label}</option>`;
+            })
+            .join("");
+        }
+      }
+    } catch (_) {
+      // keep hard-coded fallback
+    }
+  })();
 
   btnLoad.addEventListener("click", async () => {
     btnLoad.disabled = true;
@@ -156,7 +249,8 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
     const model = selectModel.value;
     const isObs = model === "SURFACE" || model === "UPPER_AIR";
     const element = selectElement.value;
-    const level = groupLevel.style.display !== "none" ? parseFloat(selectLevel.value) : null;
+    const levelVisible = groupLevel.dataset.visible === "true" && !groupLevel.classList.contains("hidden");
+    const level = levelVisible ? parseFloat(selectLevel.value) : null;
     const period = !isObs ? parseInt(selectPeriod.value, 10) : null;
     const obsTime = isObs ? selectObsTime.value : null;
 

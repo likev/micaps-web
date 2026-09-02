@@ -40,6 +40,8 @@ let currentObsIdx = obsFiles.length - 1;
 let onTimeChangeCallback = null;
 let currentWinTitle = "";
 let isUpperAirMode = false;
+let periodStepSeq = 0; // stale guard token for period steps
+const winLoadSeqMap = new Map(); // winId -> seq (optional per-win tracking)
 
 export function getPeriodsForStep(step = 6) {
   const stepNum = parseInt(step, 10) || 6;
@@ -260,7 +262,19 @@ export function setStepLength(step, triggerCallback = false) {
     appState.set("period", newPeriod);
     updateLabels();
     renderChips();
-    if (triggerCallback && onTimeChangeCallback) onTimeChangeCallback(newPeriod);
+    if (triggerCallback && onTimeChangeCallback) {
+      const seq = ++periodStepSeq;
+      // win.loadSeq stale guard: main.js can compare seq / win.loadSeq to discard stale period loads
+      const payload = newPeriod;
+      // attach seq as non-enumerable hint for callers that inspect it; primitive period kept for compat
+      if (typeof payload === "number") {
+        // wrap in object for seq-aware callers while keeping number via valueOf
+        const boxed = { period: payload, _seq: seq, valueOf() { return payload; } };
+        onTimeChangeCallback(boxed);
+      } else {
+        onTimeChangeCallback(payload);
+      }
+    }
   } else {
     const curFile = obsFiles[currentObsIdx] || "";
     obsFiles = filterObsFilesByStep(rawObsFiles, currentStepLength, isUpperAirMode);
@@ -269,7 +283,7 @@ export function setStepLength(step, triggerCallback = false) {
     updateLabels();
     renderChips();
     if (triggerCallback && onTimeChangeCallback && obsFiles[currentObsIdx]) {
-      onTimeChangeCallback({ isObs: true, file: obsFiles[currentObsIdx] });
+      onTimeChangeCallback({ isObs: true, file: obsFiles[currentObsIdx], _seq: ++periodStepSeq });
     }
   }
 }
@@ -278,11 +292,16 @@ function renderChips() {
   const chipsContainer = document.getElementById("timeline-chips");
   if (!chipsContainer) return;
   chipsContainer.innerHTML = "";
+  chipsContainer.setAttribute("role", "tablist");
+  chipsContainer.setAttribute("aria-label", currentMode === "obs" ? "Observation time steps" : "Forecast lead time steps");
 
   if (currentMode === "obs") {
     obsFiles.forEach((file, idx) => {
       const btn = document.createElement("button");
       btn.className = `chip-btn ${idx === currentObsIdx ? "active" : ""}`;
+      btn.setAttribute("role", "tab");
+      btn.setAttribute("aria-selected", idx === currentObsIdx ? "true" : "false");
+      btn.setAttribute("aria-label", formatObsTimestamp(file));
       const timeLabel = file.length >= 10
         ? `${file.slice(4, 6)}/${file.slice(6, 8)} ${file.slice(8, 10)}:${file.slice(10, 12) || "00"}`
         : file;
@@ -292,7 +311,7 @@ function renderChips() {
         currentObsIdx = idx;
         updateLabels();
         renderChips();
-        if (onTimeChangeCallback) onTimeChangeCallback({ isObs: true, file });
+        if (onTimeChangeCallback) onTimeChangeCallback({ isObs: true, file, _seq: ++periodStepSeq });
       });
       chipsContainer.appendChild(btn);
     });
@@ -300,6 +319,9 @@ function renderChips() {
     discretePeriods.forEach((period, idx) => {
       const btn = document.createElement("button");
       btn.className = `chip-btn ${idx === currentPeriodIdx ? "active" : ""}`;
+      btn.setAttribute("role", "tab");
+      btn.setAttribute("aria-selected", idx === currentPeriodIdx ? "true" : "false");
+      btn.setAttribute("aria-label", period === 0 ? "Analysis 000h" : `Forecast +${period}h`);
       btn.textContent = period === 0 ? "000h" : `+${period}h`;
       btn.addEventListener("click", () => {
         currentPeriodIdx = idx;
@@ -307,7 +329,11 @@ function renderChips() {
         appState.set("period", p);
         updateLabels();
         renderChips();
-        if (onTimeChangeCallback) onTimeChangeCallback(p);
+        if (onTimeChangeCallback) {
+          const seq = ++periodStepSeq;
+          const boxed = { period: p, _seq: seq, valueOf() { return p; } };
+          onTimeChangeCallback(boxed);
+        }
       });
       chipsContainer.appendChild(btn);
     });
@@ -374,14 +400,18 @@ export function step(delta) {
     currentObsIdx = (currentObsIdx + delta + obsFiles.length) % obsFiles.length;
     updateLabels();
     renderChips();
-    if (onTimeChangeCallback) onTimeChangeCallback({ isObs: true, file: obsFiles[currentObsIdx] });
+    if (onTimeChangeCallback) onTimeChangeCallback({ isObs: true, file: obsFiles[currentObsIdx], _seq: ++periodStepSeq });
   } else {
     currentPeriodIdx = (currentPeriodIdx + delta + discretePeriods.length) % discretePeriods.length;
     const period = discretePeriods[currentPeriodIdx];
     appState.set("period", period);
     updateLabels();
     renderChips();
-    if (onTimeChangeCallback) onTimeChangeCallback(period);
+    if (onTimeChangeCallback) {
+      const seq = ++periodStepSeq;
+      const boxed = { period, _seq: seq, valueOf() { return period; } };
+      onTimeChangeCallback(boxed);
+    }
   }
 }
 
@@ -411,6 +441,7 @@ export function setTimelineMode(mode, customData = {}) {
   if (customData.initCycle) currentInitCycle = customData.initCycle;
 
   if (currentMode === "obs") {
+    // Priority: explicit isUpper > path check (reliable) > winTitle heuristic (brittle — e.g. surface product named "upper")
     isUpperAirMode = Boolean(
       customData.isUpper ||
       (customData.path && customData.path.includes("UPPER_AIR")) ||
@@ -479,4 +510,15 @@ export function setTimelineMode(mode, customData = {}) {
     setTimeSliderVisible(true);
   }
 }
+
+// Pause playback when window/tab is hidden to save resources and avoid background fetch spam
+if (typeof document !== "undefined" && !document.__timeSliderVisibilityBound) {
+  document.__timeSliderVisibilityBound = true;
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) pausePlayback();
+  });
+  window.addEventListener("blur", () => pausePlayback());
+}
+
+export function getPeriodStepSeq() { return periodStepSeq; }
 

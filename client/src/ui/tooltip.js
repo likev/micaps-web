@@ -5,12 +5,13 @@ export function initTooltip(containerId = "tooltip") {
   const el = document.getElementById(containerId);
   if (!el) return;
 
-  window.__SHOW_TOOLTIP__ = (lngLat, props) => {
+  window.__SHOW_TOOLTIP__ = (lngLat, props, cursorPos = null) => {
     if (!props) {
       el.classList.add("hidden");
       return;
     }
 
+    // Value threshold -90 filters missing/sentinel values (MICAPS uses -999); Antarctic -80 remains valid.
     const tt = props.temperature > -90 ? `${props.temperature} °C` : "--";
     const td = props.dewpoint > -90 ? `${props.dewpoint} °C` : "--";
     const slp = props.slp > 0 ? `${props.slp} hPa` : "--";
@@ -33,8 +34,25 @@ export function initTooltip(containerId = "tooltip") {
       </div>
     `;
 
-    el.style.left = "20px";
-    el.style.top = "60px";
+    // Dynamic positioning: if cursor position provided (via 3rd arg or props/cursorPos containing x/y), position near cursor; fallback to 20,60.
+    let x = 20, y = 60;
+    const pos = cursorPos || (props && typeof props.x === "number" && typeof props.y === "number" ? props : null) || (props && typeof props.clientX === "number" ? { x: props.clientX, y: props.clientY } : null);
+    if (pos && typeof pos.x === "number" && typeof pos.y === "number") {
+      x = pos.x + 16;
+      y = pos.y + 16;
+      // Clamp to viewport to avoid overflow
+      const vw = window.innerWidth || 800;
+      const vh = window.innerHeight || 600;
+      // Approximate tooltip size 260x180; adjust after render if needed
+      const estW = 280, estH = 180;
+      if (x + estW > vw) x = Math.max(8, vw - estW - 8);
+      if (y + estH > vh) y = Math.max(8, pos.y - estH - 12);
+    } else if (cursorPos && typeof cursorPos.clientX === "number") {
+      x = cursorPos.clientX + 16;
+      y = cursorPos.clientY + 16;
+    }
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
     el.classList.remove("hidden");
   };
 

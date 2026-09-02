@@ -1,10 +1,42 @@
 // configEditor.js - Interactive Preset & Colormap Configuration Editor Tab
 import { PRESET_GROUPS, loadPresetGroups, savePresetConfig, formatCompactJSON } from "../config/presets.js";
-import { refreshPresetControls } from "./tabWindowManager.js";
+import { refreshPresetControls, getActiveWindow, focusWindow } from "./tabWindowManager.js";
 import { refreshNavBarPresets } from "./navBar.js";
+import { appState } from "../store/appState.js";
 
 let isConfigTabOpen = false;
 let onConfigChangedCallback = null;
+let prevActiveTabId = null;
+let prevActiveWinIdx = null;
+let lastSavedText = "";
+let beforeUnloadHandler = null;
+
+function hasUnsavedChanges() {
+  const ta = document.getElementById("config-json-textarea");
+  return ta && ta.value !== lastSavedText;
+}
+
+function ensureBeforeUnload() {
+  if (beforeUnloadHandler) return;
+  beforeUnloadHandler = (e) => {
+    if (!hasUnsavedChanges()) return;
+    e.preventDefault();
+    e.returnValue = "";
+  };
+  window.addEventListener("beforeunload", beforeUnloadHandler);
+}
+
+function clearBeforeUnload() {
+  if (beforeUnloadHandler) {
+    window.removeEventListener("beforeunload", beforeUnloadHandler);
+    beforeUnloadHandler = null;
+  }
+}
+
+function updateBeforeUnloadState() {
+  if (hasUnsavedChanges()) ensureBeforeUnload();
+  else clearBeforeUnload();
+}
 
 export function initConfigEditor(onConfigChanged) {
   onConfigChangedCallback = onConfigChanged;
@@ -19,6 +51,15 @@ export function openConfigTab() {
   const wsContainer = document.getElementById("workspace-container");
   if (!tabsList || !wsContainer) return;
 
+  // Remember previously active window to restore on close
+  const activeWin = getActiveWindow?.();
+  if (activeWin) {
+    prevActiveTabId = activeWin.tabId;
+    prevActiveWinIdx = activeWin.winIdx;
+  } else if (appState.get("activeWinId")) {
+    // fallback: keep previous recorded ids
+  }
+
   // 1. If tab already exists, focus it
   let tabPill = document.getElementById("tab-item-config");
   let panel = document.getElementById("config-editor-panel");
@@ -27,13 +68,24 @@ export function openConfigTab() {
     tabPill = document.createElement("div");
     tabPill.className = "tab-item tab-item-config";
     tabPill.id = "tab-item-config";
+    tabPill.setAttribute("role", "tab");
+    tabPill.setAttribute("aria-selected", "false");
     tabPill.innerHTML = `
       <span class="tab-label">⚙ Config</span>
       <button class="tab-close-btn" id="btn-config-tab-close" title="Close Config Tab">×</button>
     `;
 
     const addBtn = document.getElementById("btn-add-tab");
-    tabsList.insertBefore(tabPill, addBtn);
+    // Fix: tabsList may be hidden in split mode (layout !== 1x1 → .hidden). Ensure pill remains visible.
+    const wasHidden = tabsList.classList.contains("hidden");
+    if (wasHidden) tabsList.classList.remove("hidden");
+    if (addBtn && addBtn.parentNode === tabsList) {
+      tabsList.insertBefore(tabPill, addBtn);
+    } else {
+      tabsList.appendChild(tabPill);
+    }
+    // If we temporarily un-hid tabsList for insertion, keep it visible while config tab is open
+    // (activateConfigTab will manage workspace visibility; tabs-list visibility is layout-driven but config should be accessible)
 
     tabPill.addEventListener("click", (e) => {
       if (e.target.classList.contains("tab-close-btn")) {
@@ -43,6 +95,10 @@ export function openConfigTab() {
         activateConfigTab();
       }
     });
+  } else {
+    // Pill already exists but may be hidden due to prior layout change — ensure visible
+    tabPill.style.display = "";
+    if (tabsList.classList.contains("hidden")) tabsList.classList.remove("hidden");
   }
 
   if (!panel) {
@@ -77,10 +133,19 @@ export function openConfigTab() {
 
 export function activateConfigTab() {
   isConfigTabOpen = true;
-  document.querySelectorAll(".tab-item").forEach((pill) => pill.classList.remove("active"));
-  document.getElementById("tab-item-config")?.classList.add("active");
+  document.querySelectorAll(".tab-item").forEach((pill) => {
+    pill.classList.remove("active");
+    pill.setAttribute("aria-selected", "false");
+  });
+  const cfgPill = document.getElementById("tab-item-config");
+  if (cfgPill) {
+    cfgPill.classList.add("active");
+    cfgPill.setAttribute("aria-selected", "true");
+  }
 
   document.querySelectorAll(".tab-workspace").forEach((ws) => ws.classList.remove("active"));
+  // Ensure any active-single window highlight is cleared while config is open (state inconsistency fix)
+  document.querySelectorAll(".window-panel.active-single").forEach((wp) => wp.classList.remove("active-single"));
   const panel = document.getElementById("config-editor-panel");
   if (panel) panel.style.display = "flex";
 
@@ -91,19 +156,32 @@ export function activateConfigTab() {
 }
 
 export function closeConfigTab() {
+  // beforeunload guard: if unsaved changes, confirm (when user clicks close button)
+  if (hasUnsavedChanges()) {
+    const ok = window.confirm("You have unsaved changes. Close without saving?");
+    if (!ok) return;
+  }
+  clearBeforeUnload();
   isConfigTabOpen = false;
   document.getElementById("tab-item-config")?.remove();
   const panel = document.getElementById("config-editor-panel");
   if (panel) panel.remove();
 
-  // Restore active workspace tab
-  const wsList = document.querySelectorAll(".tab-workspace");
-  if (wsList.length > 0) {
-    wsList[0].classList.add("active");
+  // Restore previously active window instead of always wsList[0]
+  let restored = false;
+  if (prevActiveTabId !== null && prevActiveWinIdx !== null) {
+    try { focusWindow(prevActiveTabId, prevActiveWinIdx); restored = true; } catch {}
   }
-  const tabPills = document.querySelectorAll(".tab-item:not(.tab-item-config)");
-  if (tabPills.length > 0) {
-    tabPills[0].classList.add("active");
+  if (!restored) {
+    const wsList = document.querySelectorAll(".tab-workspace");
+    if (wsList.length > 0) {
+      wsList[0].classList.add("active");
+    }
+    const tabPills = document.querySelectorAll(".tab-item:not(.tab-item-config)");
+    if (tabPills.length > 0) {
+      tabPills[0].classList.add("active");
+      tabPills[0].setAttribute("aria-selected", "true");
+    }
   }
 
   const legendPanel = document.getElementById("legend-panel");
@@ -129,7 +207,9 @@ async function loadCurrentConfigIntoEditor() {
       text = formatCompactJSON(data);
     }
     textarea.value = text;
+    lastSavedText = text;
     validateEditorContent();
+    updateBeforeUnloadState();
   } catch (err) {
     if (badge) { badge.className = "config-editor-status error"; badge.textContent = "Load Error"; }
     if (msg) msg.textContent = `Error loading config: ${err.message}`;
@@ -166,7 +246,10 @@ function bindEditorEvents(panel) {
   const badge = panel.querySelector("#config-status-badge");
 
   if (textarea) {
-    textarea.addEventListener("input", () => validateEditorContent());
+    textarea.addEventListener("input", () => {
+      validateEditorContent();
+      updateBeforeUnloadState();
+    });
     textarea.addEventListener("keydown", (e) => {
       if (e.key === "Tab") {
         e.preventDefault();
@@ -175,6 +258,7 @@ function bindEditorEvents(panel) {
         textarea.value = textarea.value.substring(0, start) + "  " + textarea.value.substring(end);
         textarea.selectionStart = textarea.selectionEnd = start + 2;
         validateEditorContent();
+        updateBeforeUnloadState();
       }
     });
   }
@@ -220,6 +304,8 @@ function bindEditorEvents(panel) {
 
         if (badge) { badge.className = "config-editor-status valid"; badge.textContent = "✓ Saved & Applied"; }
         if (msg) msg.textContent = "Configuration successfully saved to server and applied to workstation!";
+        if (textarea) lastSavedText = textarea.value;
+        updateBeforeUnloadState();
       } catch (err) {
         if (badge) { badge.className = "config-editor-status error"; badge.textContent = "Save Failed"; }
         if (msg) msg.textContent = `Save error: ${err.message}`;

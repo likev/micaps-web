@@ -29,11 +29,11 @@ export function isUpperAirStationLayer(layer) {
   if (id.includes("upper") || id.includes("sounding") || name.includes("upper") || name.includes("sounding") || name.includes("高空") || name.includes("探空")) {
     return true;
   }
-  if (layer.type === "station" && typeof layer.level === "number" && layer.level > 0 && layer.level < 1050) {
-    return true;
-  }
   return false;
 }
+
+// Per-layer palette load guard: abort token via incrementing sequence + isConnected check
+const paletteLoadSeq = new Map();
 
 function resolveDefaultScheme() {
   try {
@@ -223,6 +223,21 @@ function renderLayersManager(panel) {
   const layers = getLayersForWindow(currentActiveWinId);
   const count = layers.length;
 
+  // Preserve scroll and focus across full rebuild
+  const prevList = panel.querySelector("#layers-list");
+  const prevScrollTop = prevList ? prevList.scrollTop : 0;
+  const activeEl = document.activeElement;
+  const activeElId = activeEl && activeEl.id ? activeEl.id : null;
+  // Save a fallback selector for elements without id (e.g. palette select): data-layer-id + class
+  let activeFallbackSelector = null;
+  if (activeEl && panel.contains(activeEl) && !activeElId) {
+    const dlid = activeEl.getAttribute && activeEl.getAttribute("data-layer-id");
+    const cls = activeEl.className ? String(activeEl.className).trim().split(/\s+/)[0] : null;
+    if (dlid && cls) activeFallbackSelector = `.${CSS.escape(cls)}[data-layer-id="${CSS.escape(dlid)}"]`;
+    else if (dlid) activeFallbackSelector = `[data-layer-id="${CSS.escape(dlid)}"]`;
+    else if (cls) activeFallbackSelector = `.${CSS.escape(cls)}`;
+  }
+
   panel.innerHTML = `
     <div class="panel-title">
       <div style="display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden;">
@@ -248,6 +263,19 @@ function renderLayersManager(panel) {
       <span id="opacity-val">75%</span>
     </div>
   `;
+
+  // Restore scroll and focus (must happen after DOM rebuild but before rebinding)
+  try {
+    const newList = panel.querySelector("#layers-list");
+    if (newList) newList.scrollTop = prevScrollTop;
+    if (activeElId) {
+      const toFocus = panel.querySelector(`#${CSS.escape(activeElId)}`) || document.getElementById(activeElId);
+      if (toFocus && typeof toFocus.focus === "function" && panel.contains(toFocus)) toFocus.focus();
+    } else if (activeFallbackSelector) {
+      const toFocus = panel.querySelector(activeFallbackSelector);
+      if (toFocus && typeof toFocus.focus === "function") toFocus.focus();
+    }
+  } catch {}
 
   // Bind row events
   layers.forEach((layer) => {
@@ -336,32 +364,53 @@ function renderLayersManager(panel) {
       if (paletteSel) {
         paletteSel.addEventListener("click", (e) => e.stopPropagation());
 
-        // Populate palette options asynchronously (filtered to element's category)
+        // Populate palette options asynchronously with abort-token guard
+        const seq = (paletteLoadSeq.get(layer.id) || 0) + 1;
+        paletteLoadSeq.set(layer.id, seq);
+        const mySeq = seq;
         import("../utils/paletteLoader.js").then(({ getPaletteCategory, listPaletteFiles, loadXMLPalette }) => {
+          if (mySeq !== paletteLoadSeq.get(layer.id)) return;
+          if (!configDrawer.isConnected) return;
+          if (!getLayerById(layer.id, currentActiveWinId)) return;
           const elem = (layer.element || "").toUpperCase();
           const category = getPaletteCategory(elem) || elem;
           if (!category) return;
 
           listPaletteFiles(category).then((files) => {
+            if (mySeq !== paletteLoadSeq.get(layer.id)) return;
+            if (!configDrawer.isConnected) return;
+            if (!getLayerById(layer.id, currentActiveWinId)) return;
+            if (!paletteSel.isConnected) return;
             const xmlFiles = files.filter((f) => f.name.endsWith(".xml"));
             // Clear existing options except the "Built-in default" placeholder
             while (paletteSel.options.length > 1) paletteSel.remove(1);
-            for (const { name, path } of xmlFiles) {
-              const opt = document.createElement("option");
-              opt.value = path;
-              // Friendly label: strip theme prefix and extension, e.g. "dark-above60.xml" → "above60 (dark)"
-              const base = name.replace(/\.xml$/, "");
-              const themeMatch = base.match(/^(dark|light|micaps)-(.+)$/i);
-              opt.textContent = themeMatch
-                ? `${themeMatch[2].replace(/-/g, " ")} (${themeMatch[1]})`
-                : base.replace(/-/g, " ");
-              if (layer.config?.palettePath === path) opt.selected = true;
-              paletteSel.appendChild(opt);
+            if (xmlFiles.length === 0) {
+              const emptyOpt = document.createElement("option");
+              emptyOpt.value = "";
+              emptyOpt.textContent = "No palettes";
+              emptyOpt.disabled = true;
+              paletteSel.appendChild(emptyOpt);
+            } else {
+              for (const { name, path } of xmlFiles) {
+                const opt = document.createElement("option");
+                opt.value = path;
+                // Friendly label: strip theme prefix and extension, e.g. "dark-above60.xml" → "above60 (dark)"
+                const base = name.replace(/\.xml$/, "");
+                const themeMatch = base.match(/^(dark|light|micaps)-(.+)$/i);
+                opt.textContent = themeMatch
+                  ? `${themeMatch[2].replace(/-/g, " ")} (${themeMatch[1]})`
+                  : base.replace(/-/g, " ");
+                if (layer.config?.palettePath === path) opt.selected = true;
+                paletteSel.appendChild(opt);
+              }
             }
-            // Restore gradient preview if palette already set
+            // Restore gradient preview if palette already set (alpha handled via color[3])
             if (layer.config?.palettePath) {
               loadXMLPalette(layer.config.palettePath).then((stops) => {
-                if (stops && gradientPreview) {
+                if (mySeq !== paletteLoadSeq.get(layer.id)) return;
+                if (!configDrawer.isConnected) return;
+                if (stops && gradientPreview && gradientPreview.isConnected) {
+                  // Note: slicing to 0,3 keeps RGB; alpha from color[3] applied separately
                   const colors = stops.map((s) => `rgba(${s.color.slice(0, 3).join(",")},${((s.color[3] ?? 255) / 255).toFixed(2)})`).join(", ");
                   gradientPreview.style.background = `linear-gradient(to right, ${colors})`;
                 }
@@ -384,7 +433,10 @@ function renderLayersManager(panel) {
             } else {
               import("../utils/paletteLoader.js").then(({ loadXMLPalette }) => {
                 loadXMLPalette(path).then((stops) => {
+                  if (!gradientPreview.isConnected) return;
+                  if (!configDrawer.isConnected) return;
                   if (stops) {
+                    // alpha from color[3] handled separately, slice 0,3 is correct
                     const colors = stops.map((s) => `rgba(${s.color.slice(0, 3).join(",")},${((s.color[3] ?? 255) / 255).toFixed(2)})`).join(", ");
                     gradientPreview.style.background = `linear-gradient(to right, ${colors})`;
                   }
@@ -503,29 +555,29 @@ function renderLayerRow(layer) {
   const isContour = layer.type === "contour";
 
   return `
-    <div class="layer-item" data-layer-id="${layer.id}">
-      <div class="layer-row" data-layer-id="${layer.id}" title="${layer.name} (Click to configure)">
+    <div class="layer-item" data-layer-id="${layer.id}" role="group" aria-label="${layer.name}">
+      <div class="layer-row" data-layer-id="${layer.id}" title="${layer.name} (Click to configure)" role="button" tabindex="0" aria-expanded="${layer.isExpanded ? "true" : "false"}" aria-label="Configure ${layer.name}">
         <!-- Visibility Eye Toggle Button -->
-        <button class="btn-vis ${layer.visible ? "active" : ""}" data-layer-id="${layer.id}" title="Toggle Visibility">
+        <button class="btn-vis ${layer.visible ? "active" : ""}" data-layer-id="${layer.id}" title="Toggle Visibility" aria-label="Toggle visibility for ${layer.name}" aria-pressed="${layer.visible ? "true" : "false"}">
           ${layer.visible ? "👁" : "👁‍🗨"}
         </button>
 
         <!-- Layer Color Dot -->
-        <span class="layer-color-dot" style="background: ${layer.color || "#58a6ff"};"></span>
+        <span class="layer-color-dot" style="background: ${layer.color || "#58a6ff"};" aria-hidden="true"></span>
 
         <!-- Layer Name (single row, guaranteed no overlap) -->
         <span class="layer-name" title="${layer.name}">${layer.name}</span>
 
         <!-- Config Button -->
-        <button class="btn-config ${layer.isExpanded ? "open" : ""}" data-layer-id="${layer.id}" title="Configure Layer">
+        <button class="btn-config ${layer.isExpanded ? "open" : ""}" data-layer-id="${layer.id}" title="Configure Layer" aria-label="Configure ${layer.name}" aria-expanded="${layer.isExpanded ? "true" : "false"}">
           ⚙
         </button>
 
         <!-- Remove Layer Button -->
         ${
           layer.removable
-            ? `<button class="btn-remove" data-layer-id="${layer.id}" title="Remove Layer">✕</button>`
-            : `<span style="width: 22px; flex-shrink: 0;"></span>`
+            ? `<button class="btn-remove" data-layer-id="${layer.id}" title="Remove Layer" aria-label="Remove ${layer.name}">✕</button>`
+            : `<span style="width: 22px; flex-shrink: 0;" aria-hidden="true"></span>`
         }
       </div>
 

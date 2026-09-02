@@ -35,6 +35,30 @@ function getMap() {
   return (win && win.map) || getActiveMap();
 }
 
+function ensureErrorToast() {
+  let el = document.getElementById("error-toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "error-toast";
+    el.className = "hidden";
+    el.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#21262d;color:#f85149;border:1px solid #da3633;border-radius:6px;padding:8px 14px;font-size:12px;z-index:9999;max-width:80vw;box-shadow:0 4px 12px rgba(0,0,0,0.4);";
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
+function showErrorToast(msg) {
+  const el = ensureErrorToast();
+  el.textContent = msg;
+  el.classList.remove("hidden");
+  el.style.display = "block";
+  clearTimeout(showErrorToast._tid);
+  showErrorToast._tid = setTimeout(() => {
+    el.classList.add("hidden");
+    el.style.display = "none";
+  }, 4000);
+}
+
 async function reloadConfiguration() {
   await loadPresetGroups();
   refreshPresetControls();
@@ -80,7 +104,6 @@ async function bootstrap() {
       // Synchronously update layer panel and legends for focused window
       syncLayerControlForWindow(win);
       syncLegendForWindow(win);
-      setNavBarPreset(win.activeGroup?.id || "");
 
       const hasData = Boolean(win.activeGroup || win.model || win.isObservation || win.gridData || win.obsTime);
       if (!hasData) {
@@ -201,7 +224,11 @@ async function bootstrap() {
   initTooltip("tooltip");
   initKeyboardShortcuts({
     onPeriodStep: (dir) => timeSliderStep(dir),
-    onLevelStep: (dir) => changeVerticalLevel(getMap(), dir),
+    onLevelStep: async (dir) => {
+      const m = getMap();
+      if (!m) return;
+      await changeVerticalLevel(m, dir);
+    },
     onToggleSplit: () => toggleTabsAndSplit(),
   });
 
@@ -273,12 +300,14 @@ async function bootstrap() {
       }
     } else {
       const period = typeof data === "number" ? data : win.period;
+      win.loadSeq = (win.loadSeq || 0) + 1;
+      const expectedSeq = win.loadSeq;
       win.period = period;
       const activeGroup = win.activeGroup;
       if (activeGroup) {
-        await loadPresetGroup(map, activeGroup, period, win.level, win, true);
+        await loadPresetGroup(map, activeGroup, period, win.level, win, true, expectedSeq);
       } else {
-        await loadWeatherField(map, win.model, win.element, win.level, period, null, win, true);
+        await loadWeatherField(map, win.model, win.element, win.level, period, null, win, true, expectedSeq);
       }
     }
   });
@@ -320,13 +349,13 @@ async function loadWeatherField(map, model, element, level, period, customOption
   const isTemp = element === "TMP";
   const defaultLineColor = isHeight ? "#58a6ff" : (isTemp ? "#f85149" : "#ffffff");
   const lineColor = existingLayer?.color || exCfg.lineColor || customOptions?.lineColor || defaultLineColor;
-  const opacity = exCfg.opacity !== undefined ? exCfg.opacity : (customOptions?.opacity !== undefined ? customOptions.opacity : 0.75);
-  const showFill = exCfg.showFill !== undefined ? exCfg.showFill : (customOptions?.showFill !== undefined ? customOptions.showFill : (!isHeight && !isWind));
-  const showLine = exCfg.showLine !== undefined ? exCfg.showLine : (customOptions?.showLine !== undefined ? customOptions.showLine : !isWind);
-  const lineWidth = exCfg.lineWidth !== undefined ? exCfg.lineWidth : (customOptions?.lineWidth || 1.4);
-  const showWind = exCfg.showWind !== undefined ? exCfg.showWind : (customOptions?.showWind !== undefined ? customOptions.showWind : isWind);
-  const showBarbs = exCfg.showBarbs !== undefined ? exCfg.showBarbs : (customOptions?.showBarbs !== undefined ? customOptions.showBarbs : false);
-  const showRaster = exCfg.showRaster !== undefined ? exCfg.showRaster : false;
+  const opacity = exCfg.opacity ?? customOptions?.opacity ?? 0.75;
+  const showFill = exCfg.showFill ?? customOptions?.showFill ?? (!isHeight && !isWind);
+  const showLine = exCfg.showLine ?? customOptions?.showLine ?? !isWind;
+  const lineWidth = exCfg.lineWidth ?? customOptions?.lineWidth ?? 1.4;
+  const showWind = exCfg.showWind ?? customOptions?.showWind ?? isWind;
+  const showBarbs = exCfg.showBarbs ?? customOptions?.showBarbs ?? false;
+  const showRaster = exCfg.showRaster ?? false;
   const savedPalettePath = exCfg.palettePath || null;
   const isVisible = existingLayer ? existingLayer.visible !== false : true;
 
@@ -435,12 +464,20 @@ async function loadWeatherField(map, model, element, level, period, customOption
     updateLegend(element, colormap, gridData.stats?.min, gridData.stats?.max, win);
   } catch (err) {
     console.error(`[Bootstrap] Field load failed for ${path}/${file}:`, err);
+    showErrorToast(`Failed to load ${element} ${level}hPa: ${err.message || err}`);
   }
 }
 
 async function loadUpperAirComposite(map, level = 500, obsTime = "20260828170000.000", win = getActiveWindow(), expectedSeq = null) {
   const path = `UPPER_AIR/PLOT/${level || 500}`;
-  const stations = await fetchStationObservations(path, obsTime);
+  let stations;
+  try {
+    stations = await fetchStationObservations(path, obsTime);
+  } catch (err) {
+    console.error("[Main] Upper-air composite load error:", err);
+    showErrorToast(`Upper-air load failed (${level}hPa): ${err.message || err}`);
+    return;
+  }
   if (win && expectedSeq !== null && expectedSeq !== undefined && win.loadSeq !== expectedSeq) {
     return; // Discard stale in-flight response from fast navigation
   }
@@ -468,6 +505,7 @@ async function loadObservationProduct(map, model, element, level, file, win = ge
     if (model === "UPPER_AIR" && stations?.features?.length >= 3) analyzeAndRenderSoundingContours(map, stations, level || 500, {}, win);
   } catch (err) {
     console.error("[Main] Observation load error:", err);
+    showErrorToast(`Observation load failed: ${err.message || err}`);
   }
 }
 
@@ -496,6 +534,7 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
 
   const curPeriod = period !== null ? period : (win?.period ?? 24);
   const curLevel = level !== null ? level : (group.defaultLevel || win?.level || 500);
+  const prevPeriod = win?.period;
 
   if (win) {
     if (level !== null) win.level = level;
@@ -532,7 +571,7 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
 
   console.log(`[PresetGroup] Loading "${group.name}" with levelOverride=${level}, period=+${curPeriod}h, cycle=${win?.forecastCycle}...`);
 
-  await Promise.allSettled(
+  const results = await Promise.allSettled(
     group.layers.map(async (layer) => {
       let targetLevel = null;
       if (level !== null) {
@@ -562,6 +601,11 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
       }
     })
   );
+  const anySuccess = results.some((r) => r.status === "fulfilled");
+  if (!anySuccess && win && prevPeriod !== undefined) {
+    // Rollback period assignment if all layer loads failed
+    win.period = prevPeriod;
+  }
 }
 
 async function changeVerticalLevel(map, direction, explicitLevel = null, win = getActiveWindow()) {

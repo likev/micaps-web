@@ -8,7 +8,7 @@ const DEFAULT_LEVELS = [500, 850, 1000, 200, 700, 400, 300, 100];
 let tabs = [];
 let activeTabId = 1;
 let callbacks = {};
-let isSyncingCamera = false;
+const syncingTabs = new Set();
 
 export function initTabWindowManager(callbacksObj = {}) {
   callbacks = callbacksObj;
@@ -170,7 +170,8 @@ function createWindowPanel(tab, gridEl, wIdx) {
   `;
 
   panelEl.addEventListener("click", () => {
-    focusWindow(tabId, wIdx);
+    const curIdx = parseInt(panelEl.dataset.winIdx, 10);
+    focusWindow(tabId, Number.isNaN(curIdx) ? winObj.winIdx : curIdx);
   });
 
   gridEl.appendChild(panelEl);
@@ -199,11 +200,13 @@ function renderTabPillForWindow(tab, winObj) {
   `;
 
   pill.addEventListener("click", (e) => {
+    const curIdx = parseInt(pill.dataset.winIdx, 10);
+    const targetIdx = Number.isNaN(curIdx) ? winObj.winIdx : curIdx;
     if (e.target.classList.contains("tab-close-btn")) {
       e.stopPropagation();
-      closeWindowTab(tab, wIdx);
+      closeWindowTab(tab, targetIdx);
     } else {
-      focusWindow(tab.id, wIdx);
+      focusWindow(tab.id, targetIdx);
     }
   });
 
@@ -216,7 +219,9 @@ function addTabWindow() {
   const gridEl = document.getElementById(`windows-grid-${tab.id}`);
   if (!gridEl) return;
 
-  const newIdx = tab.windows.length;
+  let newIdx = tab.windows.length;
+  // Ensure pill id uniqueness (post-reindex length is unique, but guard against stale DOM)
+  while (document.getElementById(`tab-item-win-${newIdx}`)) newIdx++;
   const newWin = createWindowPanel(tab, gridEl, newIdx);
   setupWindowControlsForWin(tab, newWin);
   initWindowMap(newWin);
@@ -233,15 +238,108 @@ function closeWindowTab(tab, winIdx) {
   win.map = null;
 
   document.getElementById(win.panelId)?.remove();
-  document.getElementById(`tab-item-win-${winIdx}`)?.remove();
+  document.getElementById(`tab-item-win-${win.winIdx}`)?.remove();
 
   tab.windows.splice(winIdx, 1);
   tab.windows.forEach((w, idx) => {
-    w.winIdx = idx;
-    const badge = document.getElementById(w.badgeId);
+    const oldWinIdx = w.winIdx;
+    const oldPanelId = w.panelId;
+    const oldHeaderId = w.headerId;
+    const oldBadgeId = w.badgeId;
+    const oldTitleId = w.titleId;
+    const oldPresetId = w.presetSelectId;
+    const oldLevelId = w.levelSelectId;
+    const oldMaxBtnId = w.maxBtnId;
+
+    const newPanelId = `win-panel-${tab.id}-${idx}`;
+    const newHeaderId = `win-header-${tab.id}-${idx}`;
+    const newBadgeId = `win-badge-${tab.id}-${idx}`;
+    const newTitleId = `win-title-${tab.id}-${idx}`;
+    const newPresetId = `win-preset-${tab.id}-${idx}`;
+    const newLevelId = `win-level-${tab.id}-${idx}`;
+    const newMaxBtnId = `win-max-${tab.id}-${idx}`;
+    const newId = `tab-${tab.id}-win-${idx}`;
+
+    const renameEl = (oldId, newId) => {
+      if (oldId !== newId) {
+        const el = document.getElementById(oldId);
+        if (el) el.id = newId;
+      }
+    };
+
+    // Panel: rename and update dataset.winIdx (domId viewport kept as-is to avoid breaking map container)
+    if (oldPanelId !== newPanelId) {
+      const panelEl = document.getElementById(oldPanelId);
+      if (panelEl) {
+        panelEl.id = newPanelId;
+        panelEl.dataset.winIdx = String(idx);
+      }
+    } else {
+      const panelEl = document.getElementById(newPanelId);
+      if (panelEl) panelEl.dataset.winIdx = String(idx);
+    }
+    renameEl(oldHeaderId, newHeaderId);
+    renameEl(oldBadgeId, newBadgeId);
+    renameEl(oldTitleId, newTitleId);
+    renameEl(oldPresetId, newPresetId);
+    renameEl(oldLevelId, newLevelId);
+    renameEl(oldMaxBtnId, newMaxBtnId);
+    // w.domId intentionally not renamed to keep map container stable
+
+    const badge = document.getElementById(newBadgeId);
     if (badge) badge.textContent = `W${idx + 1}`;
-    const pill = document.getElementById(`tab-item-win-${idx}`);
-    if (pill) pill.dataset.winIdx = String(idx);
+
+    // Pill renaming: lookup by old winIdx
+    const oldPillId = `tab-item-win-${oldWinIdx}`;
+    const newPillId = `tab-item-win-${idx}`;
+    let pill = document.getElementById(oldPillId);
+    if (!pill) pill = document.getElementById(newPillId);
+    if (pill) {
+      if (pill.id !== newPillId) pill.id = newPillId;
+      pill.dataset.winIdx = String(idx);
+      // Update label id and text
+      const oldLabelId = `tab-label-${oldWinIdx}`;
+      const newLabelId = `tab-label-${idx}`;
+      let labelEl = document.getElementById(oldLabelId);
+      if (!labelEl) labelEl = pill.querySelector('[id^="tab-label-"]');
+      if (labelEl) {
+        if (labelEl.id !== newLabelId) labelEl.id = newLabelId;
+        const titleText = document.getElementById(newTitleId)?.textContent || "";
+        labelEl.textContent = titleText ? `W${idx + 1}: ${titleText}` : `Tab ${idx + 1}`;
+      }
+      const oldCloseId = `tab-close-${oldWinIdx}`;
+      const newCloseId = `tab-close-${idx}`;
+      const closeBtn = document.getElementById(oldCloseId);
+      if (closeBtn && closeBtn.id !== newCloseId) closeBtn.id = newCloseId;
+      // Ensure close button visibility matches new idx (>=4 closable)
+      const hasClose = !!pill.querySelector(`#${newCloseId}`) || !!document.getElementById(newCloseId);
+      if (idx >= 4 && !hasClose) {
+        const btn = document.createElement("button");
+        btn.className = "tab-close-btn";
+        btn.id = newCloseId;
+        btn.title = "Close Tab";
+        btn.textContent = "×";
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const cur = parseInt(pill.dataset.winIdx, 10);
+          closeWindowTab(tab, Number.isNaN(cur) ? idx : cur);
+        });
+        pill.appendChild(btn);
+      } else if (idx < 4 && hasClose) {
+        document.getElementById(newCloseId)?.remove();
+      }
+    }
+
+    // Update window object fields to new ids (domId kept)
+    w.winIdx = idx;
+    w.id = newId;
+    w.panelId = newPanelId;
+    w.headerId = newHeaderId;
+    w.badgeId = newBadgeId;
+    w.titleId = newTitleId;
+    w.presetSelectId = newPresetId;
+    w.levelSelectId = newLevelId;
+    w.maxBtnId = newMaxBtnId;
   });
 
   const nextIdx = Math.max(0, winIdx - 1);
@@ -330,11 +428,22 @@ export function focusWindow(tabId, winIdx) {
   const tab = tabs.find((t) => t.id === tabId) || getActiveTab();
   if (!tab) return;
 
-  tab.activeWinIdx = winIdx;
   const activeWin = tab.windows[winIdx];
   if (!activeWin) return;
 
-  // Highlight active panel and tab item
+  // Avoid redundant work when already focused
+  const alreadyFocused =
+    tab.activeWinIdx === winIdx &&
+    tab.windows[tab.activeWinIdx]?.id === activeWin.id &&
+    document.getElementById(activeWin.panelId)?.classList.contains("active");
+  if (alreadyFocused) {
+    if (activeWin.map) setActiveMap(activeWin.map);
+    return;
+  }
+
+  tab.activeWinIdx = winIdx;
+
+  // Highlight active panel and tab item (lookup by w.winIdx after reindex)
   tab.windows.forEach((w) => {
     const p = document.getElementById(w.panelId);
     if (p) {
@@ -367,6 +476,15 @@ export function focusWindow(tabId, winIdx) {
     obsTime: activeWin.obsTime,
     isObservation: activeWin.isObservation,
   });
+
+  // Apply pending observation timeline stored by syncObservationTimeline for background windows
+  if (activeWin._pendingTimeline) {
+    const pt = activeWin._pendingTimeline;
+    delete activeWin._pendingTimeline;
+    import("./timeSlider.js").then(({ setTimelineMode }) => {
+      try { setTimelineMode("obs", pt); } catch {}
+    });
+  }
 
   callbacks.onWindowFocus?.(activeWin);
 }
@@ -404,23 +522,26 @@ function initWindowMap(win) {
   // Camera synchronization across visible windows in split mode
   map.on("move", () => {
     const tab = tabs.find((t) => t.id === win.tabId);
-    if (!tab || !tab.syncMap || tab.layout === "1x1" || isSyncingCamera) return;
+    if (!tab || !tab.syncMap || tab.layout === "1x1" || syncingTabs.has(tab.id)) return;
 
     const numVisible = tab.layout === "1x2" ? 2 : 4;
     if (win.winIdx >= numVisible) return;
 
-    isSyncingCamera = true;
-    const center = map.getCenter();
-    const zoom = map.getZoom();
-    const pitch = map.getPitch();
-    const bearing = map.getBearing();
+    syncingTabs.add(tab.id);
+    try {
+      const center = map.getCenter();
+      const zoom = map.getZoom();
+      const pitch = map.getPitch();
+      const bearing = map.getBearing();
 
-    tab.windows.slice(0, numVisible).forEach((otherWin) => {
-      if (otherWin !== win && otherWin.map && (otherWin.map.isStyleLoaded() || otherWin.map.loaded())) {
-        otherWin.map.jumpTo({ center, zoom, pitch, bearing });
-      }
-    });
-    isSyncingCamera = false;
+      tab.windows.slice(0, numVisible).forEach((otherWin) => {
+        if (otherWin !== win && otherWin.map && (otherWin.map.isStyleLoaded() || otherWin.map.loaded())) {
+          otherWin.map.jumpTo({ center, zoom, pitch, bearing });
+        }
+      });
+    } finally {
+      syncingTabs.delete(tab.id);
+    }
   });
 }
 
@@ -484,7 +605,10 @@ export function setWindowHeaderPreset(win, groupId) {
 
 export function setWindowHeaderLevel(win, level) {
   const el = document.getElementById(win.levelSelectId);
-  if (el) el.value = String(level);
+  if (el) {
+    if (level == null || level === "") el.value = "";
+    else el.value = String(level);
+  }
 }
 
 export function refreshPresetControls() {
@@ -523,22 +647,25 @@ export function refreshPresetControls() {
 }
 
 export function syncTabCameras(tab) {
-  if (!tab || !tab.syncMap || tab.layout === "1x1" || isSyncingCamera) return;
+  if (!tab || !tab.syncMap || tab.layout === "1x1" || syncingTabs.has(tab.id)) return;
   const activeWin = tab.windows[tab.activeWinIdx] || tab.windows[0];
   if (!activeWin || !activeWin.map) return;
 
   const numVisible = tab.layout === "1x2" ? 2 : 4;
   const map = activeWin.map;
-  isSyncingCamera = true;
-  const center = map.getCenter();
-  const zoom = map.getZoom();
-  const pitch = map.getPitch();
-  const bearing = map.getBearing();
+  syncingTabs.add(tab.id);
+  try {
+    const center = map.getCenter();
+    const zoom = map.getZoom();
+    const pitch = map.getPitch();
+    const bearing = map.getBearing();
 
-  tab.windows.slice(0, numVisible).forEach((otherWin) => {
-    if (otherWin !== activeWin && otherWin.map && (otherWin.map.isStyleLoaded() || otherWin.map.loaded())) {
-      otherWin.map.jumpTo({ center, zoom, pitch, bearing });
-    }
-  });
-  isSyncingCamera = false;
+    tab.windows.slice(0, numVisible).forEach((otherWin) => {
+      if (otherWin !== activeWin && otherWin.map && (otherWin.map.isStyleLoaded() || otherWin.map.loaded())) {
+        otherWin.map.jumpTo({ center, zoom, pitch, bearing });
+      }
+    });
+  } finally {
+    syncingTabs.delete(tab.id);
+  }
 }
