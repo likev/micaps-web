@@ -2,7 +2,7 @@
 import { getActiveMap } from "./map/mapInstance.js";
 import { initNavBar, refreshNavBarPresets, setNavBarLevel, setNavBarPreset } from "./ui/navBar.js";
 import { initCatalogDrawer } from "./ui/catalogDrawer.js";
-import { initLayerControl, addOrUpdateLayer, syncLayerControlForWindow, clearWindowWeatherLayers, getLayerById } from "./ui/layerControl.js";
+import { initLayerControl, addOrUpdateLayer, syncLayerControlForWindow, clearWindowWeatherLayers, getLayerById, getLayersForWindow } from "./ui/layerControl.js";
 import { initTimeSlider, setTimelineMode, setTimeSliderVisible, step as timeSliderStep } from "./ui/timeSlider.js";
 import { handleLayerAction, triggerStationStreamlines } from "./ui/layerActions.js";
 import { initTooltip } from "./ui/tooltip.js";
@@ -10,8 +10,8 @@ import { renderContourLayers, removeAllContourLayers } from "./layers/contourLay
 import { renderBinaryRaster, renderGridRaster, removeRasterLayer } from "./layers/rasterLayer.js";
 import { renderStationWeatherPlots, setStationVisibility, removeStationLayer } from "./layers/stationLayer.js";
 import { renderWindStreamlines, stopWindAnimation, renderGridWindBarbs, removeGridWindBarbs } from "./layers/windLayer.js";
-import { analyzeAndRenderSoundingContours } from "./layers/soundingAnalysis.js";
-import { analyzeAndRenderSurfaceSLPContours } from "./layers/surfaceAnalysis.js";
+import { analyzeAndRenderSoundingContours, analyzeAndRenderSoundingElementContour } from "./layers/soundingAnalysis.js";
+import { analyzeAndRenderSurfaceContours, analyzeAndRenderSurfaceSLPContours } from "./layers/surfaceAnalysis.js";
 import { fetchGridData, fetchGridBinaryStream, fetchStationObservations } from "./api/catalogApi.js";
 import { updateLegend, clearLegends, syncLegendForWindow } from "./ui/legend.js";
 import { initKeyboardShortcuts } from "./ui/keyboardShortcuts.js";
@@ -358,6 +358,8 @@ async function loadWeatherField(map, model, element, level, period, customOption
   const showRaster = exCfg.showRaster ?? false;
   const savedPalettePath = exCfg.palettePath || null;
   const isVisible = existingLayer ? existingLayer.visible !== false : true;
+  const smooth = exCfg.smooth ?? customOptions?.smooth ?? true;
+  const smoothIterations = exCfg.smoothIterations ?? customOptions?.smoothIterations ?? 2;
 
   try {
     const gridData = await fetchGridData(path, file);
@@ -405,6 +407,8 @@ async function loadWeatherField(map, model, element, level, period, customOption
         boldLineWidth: customOptions?.boldLineWidth,
         opacity,
         colormap,
+        smooth,
+        smoothIterations,
       });
     }
 
@@ -436,6 +440,8 @@ async function loadWeatherField(map, model, element, level, period, customOption
         showRaster,
         showWind: false,
         showBarbs: false,
+        smooth,
+        smoothIterations,
       },
     }, win);
 
@@ -484,8 +490,17 @@ async function loadUpperAirComposite(map, level = 500, obsTime = "20260828170000
   appState.set("stationData", stations);
   renderStationWeatherPlots(map, stations, appState.state.layers.station);
   const stnLayer = addOrUpdateLayer({ id: "station-upper", name: `${level || 500} hPa Sounding Station Plots`, type: "station", color: "#e3b341", visible: true, removable: true, stationsGeoJSON: stations }, win);
-  if (stnLayer?.config?.showStreamlines) triggerStationStreamlines(map, stnLayer, win);
-  if (stations?.features?.length >= 3) analyzeAndRenderSoundingContours(map, stations, level);
+  if (stations?.features?.length >= 3) {
+    const winLayers = getLayersForWindow(win);
+    const activeUpperContours = winLayers.filter((l) => l.type === "contour" && l.model === "UPPER_AIR");
+    if (activeUpperContours.length > 0) {
+      for (const cLayer of activeUpperContours) {
+        analyzeAndRenderSoundingElementContour(map, stations, level || 500, cLayer.element || "HGT", cLayer.config || {}, win);
+      }
+    } else {
+      analyzeAndRenderSoundingContours(map, stations, level || 500, {}, win);
+    }
+  }
 }
 
 async function loadObservationProduct(map, model, element, level, file, win = getActiveWindow(), customPath = null, expectedSeq = null) {
@@ -501,8 +516,28 @@ async function loadObservationProduct(map, model, element, level, file, win = ge
     const name = model === "UPPER_AIR" ? `${level || 500} hPa Sounding Station Plots` : `${model === "SURFACE" ? "Surface" : "Upper Air"} Station Observations`;
     const stnLayer = addOrUpdateLayer({ id: layerId, name, type: "station", color: "#e3b341", visible: true, removable: true, stationsGeoJSON: stations }, win);
     if (stnLayer?.config?.showStreamlines) triggerStationStreamlines(map, stnLayer, win);
-    if (model === "SURFACE" && stations?.features?.length >= 3) analyzeAndRenderSurfaceSLPContours(map, stations, {}, win);
-    if (model === "UPPER_AIR" && stations?.features?.length >= 3) analyzeAndRenderSoundingContours(map, stations, level || 500, {}, win);
+    if (model === "SURFACE" && stations?.features?.length >= 3) {
+      const winLayers = getLayersForWindow(win);
+      const activeSurfaceContours = winLayers.filter((l) => l.type === "contour" && l.model === "SURFACE");
+      if (activeSurfaceContours.length > 0) {
+        for (const cLayer of activeSurfaceContours) {
+          analyzeAndRenderSurfaceContours(map, stations, cLayer.element || "SLP", cLayer.config || {}, win);
+        }
+      } else {
+        analyzeAndRenderSurfaceContours(map, stations, "SLP", {}, win);
+      }
+    }
+    if (model === "UPPER_AIR" && stations?.features?.length >= 3) {
+      const winLayers = getLayersForWindow(win);
+      const activeUpperContours = winLayers.filter((l) => l.type === "contour" && l.model === "UPPER_AIR");
+      if (activeUpperContours.length > 0) {
+        for (const cLayer of activeUpperContours) {
+          analyzeAndRenderSoundingElementContour(map, stations, level || 500, cLayer.element || "HGT", cLayer.config || {}, win);
+        }
+      } else {
+        analyzeAndRenderSoundingContours(map, stations, level || 500, {}, win);
+      }
+    }
   } catch (err) {
     console.error("[Main] Observation load error:", err);
     showErrorToast(`Observation load failed: ${err.message || err}`);

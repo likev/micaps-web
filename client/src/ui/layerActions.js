@@ -5,6 +5,7 @@ import {
   setLayerIsobandOpacity,
   setLayerIsolineColor,
   setLayerIsolineStyle,
+  renderContourLayers,
   removeContourLayer,
 } from "../layers/contourLayer.js";
 import { setStationVisibility, setStationConfig, getStationGeoJSON } from "../layers/stationLayer.js";
@@ -110,6 +111,22 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
         });
       }
 
+      if (value.smooth !== undefined && layer.type === "contour" && layer.gridData) {
+        renderContourLayers(map, layer.gridData, layer.element || "TMP", {
+          ...layer.config,
+          layerId,
+          smooth: value.smooth,
+          showFill: layer.visible && layer.config?.showFill,
+          showLine: layer.visible && layer.config?.showLine,
+          opacity: layer.config?.opacity,
+          lineColor: layer.config?.lineColor,
+          lineWidth: layer.config?.lineWidth,
+          boldValues: layer.config?.boldValues,
+          boldLineWidth: layer.config?.boldLineWidth,
+          colormap: layer.colormap,
+        });
+      }
+
       if (value.showRaster !== undefined) {
         if (value.showRaster && layer.visible) {
           triggerRasterOverlay(map, layer, win);
@@ -176,6 +193,25 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
           stopWindAnimation(map);
         }
       }
+    }
+  } else if (action === "addContour") {
+    const elem = (value || "SLP").toUpperCase();
+    const geojson = layer?.stationsGeoJSON || getStationGeoJSON(map) || win?.stationsGeoJSON || appState.get("stationData");
+    if (!geojson || !geojson.features || geojson.features.length < 3) {
+      console.warn("[LayerActions] Insufficient station data to generate contour for:", elem);
+      return;
+    }
+
+    const isUpper = (layer?.model === "UPPER_AIR") || (layer?.id && layer.id.includes("upper")) || (layer?.name && (layer.name.includes("Sounding") || layer.name.includes("Upper")));
+    if (isUpper) {
+      const level = layer?.level || win?.level || 500;
+      import("../layers/soundingAnalysis.js").then(({ analyzeAndRenderSoundingElementContour }) => {
+        analyzeAndRenderSoundingElementContour(map, geojson, level, elem, {}, win);
+      });
+    } else {
+      import("../layers/surfaceAnalysis.js").then(({ analyzeAndRenderSurfaceContours }) => {
+        analyzeAndRenderSurfaceContours(map, geojson, elem, {}, win);
+      });
     }
   } else if (action === "remove") {
     if (layer.type === "contour" || layer.type === "wind") {

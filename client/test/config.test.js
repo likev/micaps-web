@@ -75,6 +75,8 @@ describe("Configuration File Validation & Auto-Save (config.json)", () => {
         lineWidth: 3.5,
         boldValues: [5880, 588],
         boldLineWidth: 5.0,
+        smooth: true,
+        smoothIterations: 2,
       },
     });
 
@@ -85,6 +87,8 @@ describe("Configuration File Validation & Auto-Save (config.json)", () => {
     expect(hgtLayer.render.lineWidth).toBe(3.5);
     expect(hgtLayer.render.boldValues).toEqual([5880, 588]);
     expect(hgtLayer.render.boldLineWidth).toBe(5.0);
+    expect(hgtLayer.render.smooth).toBe(true);
+    expect(hgtLayer.render.smoothIterations).toBe(2);
 
     // 2. Update Wind Streamlines & Barbs config
     autoSaveLayerConfig({

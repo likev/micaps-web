@@ -225,7 +225,8 @@
             "lineColor": "#58a6ff",
             "lineWidth": 2,
             "showFill": false,
-            "showLine": true
+            "showLine": true,
+            "smooth": true
           },
           "type": "contour"
         },
@@ -264,7 +265,8 @@
             "lineColor": "#58a6ff",
             "lineWidth": 2,
             "showFill": false,
-            "showLine": true
+            "showLine": true,
+            "smooth": true
           },
           "type": "contour"
         },
@@ -283,7 +285,8 @@
             "lineColor": "#f85149",
             "lineWidth": 2,
             "showFill": false,
-            "showLine": true
+            "showLine": true,
+            "smooth": true
           },
           "type": "contour"
         },
@@ -322,7 +325,8 @@
             "lineColor": "#58a6ff",
             "lineWidth": 2,
             "showFill": false,
-            "showLine": true
+            "showLine": true,
+            "smooth": true
           },
           "type": "contour"
         },

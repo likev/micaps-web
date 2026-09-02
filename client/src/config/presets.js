@@ -100,6 +100,8 @@ export function autoSaveLayerConfig(layer) {
             if (layer.config.boldValues !== undefined) pLayer.render.boldValues = layer.config.boldValues;
             if (layer.config.boldLineWidth !== undefined) pLayer.render.boldLineWidth = layer.config.boldLineWidth;
             if (layer.config.opacity !== undefined) pLayer.render.opacity = layer.config.opacity;
+            if (layer.config.smooth !== undefined) pLayer.render.smooth = layer.config.smooth;
+            if (layer.config.smoothIterations !== undefined) pLayer.render.smoothIterations = layer.config.smoothIterations;
             if (layer.config.showRaster !== undefined) pLayer.render.showRaster = layer.config.showRaster;
             if (layer.config.showWind !== undefined) pLayer.render.showWind = layer.config.showWind;
             if (layer.config.showBarbs !== undefined) pLayer.render.showBarbs = layer.config.showBarbs;

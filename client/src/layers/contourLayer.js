@@ -2,6 +2,7 @@
 import * as griddata from "griddata";
 import { getElementLevels, getHexColor } from "../utils/colormaps.js";
 import { removeRasterLayer } from "./rasterLayer.js";
+import { smoothFeatureCollection, smoothGrid2D } from "../utils/smoothContour.js";
 
 export function parseBoldValues(boldInput, element = null) {
   if (!boldInput) {
@@ -44,7 +45,8 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
 
   const nLon = gridData.header.n_lon;
   const nLat = gridData.header.n_lat;
-  const step = nLon * nLat > 40000 ? 2 : 1;
+  // Full grid resolution for high-fidelity smooth isolines (downsample only for massive grids > 500,000 pts)
+  const step = nLon * nLat > 500000 ? 2 : 1;
 
   let x = [];
   if (gridData.x && gridData.x.length === nLon) {
@@ -90,6 +92,14 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
     Z.reverse();
   }
 
+  const shouldSmooth = options.smooth !== false;
+  const smoothIterations = typeof options.smoothIterations === "number" ? options.smoothIterations : 2;
+
+  // 2D Spatial Filtering on scalar grid to eliminate single-grid noise before Marching Squares
+  if (shouldSmooth && Z.length >= 3 && Z[0]?.length >= 3) {
+    Z = smoothGrid2D(Z, 1, 0.4);
+  }
+
   // Determine isoline levels
   const levels = getElementLevels(element, gridData.stats?.min, gridData.stats?.max, options.colormap);
 
@@ -129,8 +139,13 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
     console.error("[Contour] contour failed:", err);
   }
 
+  // 3. Smooth Isolines vector curves using Chaikin's algorithm
+  if (shouldSmooth && isolineFC.features.length > 0) {
+    isolineFC = smoothFeatureCollection(isolineFC, smoothIterations);
+  }
+
   // Update MapLibre sources
-  updateMapLibreContour(map, isobandFC, isolineFC, { ...options, element, boldValues });
+  updateMapLibreContour(map, isobandFC, isolineFC, { ...options, element, boldValues, smooth: shouldSmooth, smoothIterations });
 }
 
 function getLayerDOMIds(layerId = "default") {
@@ -226,6 +241,8 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
         source: isolineSrcId,
         layout: {
           visibility: visibleIsoline ? "visible" : "none",
+          "line-join": "round",
+          "line-cap": "round",
         },
         paint: {
           "line-color": lineColorExp,
@@ -366,7 +383,12 @@ export function removeAllContourLayers(map) {
 }
 
 export function renderCustomContourGeoJSON(map, isobands, isolines, options = {}) {
-  updateMapLibreContour(map, isobands, isolines, options);
+  let smoothLines = isolines;
+  if (options.smooth !== false && isolines && Array.isArray(isolines.features) && isolines.features.length > 0) {
+    const it = typeof options.smoothIterations === "number" ? options.smoothIterations : 2;
+    smoothLines = smoothFeatureCollection(isolines, it);
+  }
+  updateMapLibreContour(map, isobands, smoothLines, options);
 }
 
 export function setIsobandVisibility(map, visible) {

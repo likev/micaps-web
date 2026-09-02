@@ -355,6 +355,7 @@ function renderLayersManager(panel) {
       bindProp(".input-bold-values", "change", (e) => { layer.config.boldValues = parseBoldValues(e.target.value); autoSaveLayerConfig(layer); });
       bindProp(".input-bold-line-width", "change", (e) => { layer.config.boldLineWidth = parseFloat(e.target.value) || 4.0; autoSaveLayerConfig(layer); });
       bindProp(".chk-show-raster", "change", (e) => { layer.config.showRaster = e.target.checked; autoSaveLayerConfig(layer); });
+      bindProp(".chk-smooth-lines", "change", (e) => { layer.config.smooth = e.target.checked; autoSaveLayerConfig(layer); });
       bindProp(".chk-show-wind", "change", (e) => { layer.config.showWind = e.target.checked; autoSaveLayerConfig(layer); });
       bindProp(".chk-show-barbs", "change", (e) => { layer.config.showBarbs = e.target.checked; autoSaveLayerConfig(layer); });
 
@@ -479,6 +480,18 @@ function renderLayersManager(panel) {
       ].forEach(([sel, key]) => bindStationCheckbox(sel, key));
 
       bindStationFilterEvents(configDrawer, layer, onLayerActionCallback, currentActiveWinId);
+
+      const btnAddContour = configDrawer.querySelector(".btn-add-station-contour");
+      const selContourElem = configDrawer.querySelector(".sel-contour-element");
+      if (btnAddContour && selContourElem) {
+        btnAddContour.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const elem = selContourElem.value;
+          if (onLayerActionCallback) {
+            onLayerActionCallback("addContour", layer.id, elem, layer, currentActiveWinId);
+          }
+        });
+      }
     }
 
     // Config controls for basemap (PMTiles & Graticule)
@@ -546,6 +559,30 @@ function renderStationDrawerHTML(layer) {
         <input type="checkbox" class="chk-station-streamlines" ${layer.config?.showStreamlines ? "checked" : ""} />
         <span style="color: #58a6ff; font-weight: 600;">Wind Streamlines (Flow Analysis)</span>
       </label>
+    <div class="config-row station-contour-selector-row" style="flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 6px; padding-top: 6px; border-top: 1px solid #30363d; width: 100%;">
+      <label style="color: var(--text-secondary, #8b949e); font-size: 11px; display: flex; align-items: center; gap: 4px; font-weight: 600;">
+        <span>📈 Add Contour Layer</span>
+      </label>
+      <div style="display: flex; gap: 4px; width: 100%;">
+        <select class="sel-contour-element" style="flex: 1; height: 24px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; padding: 0 6px; font-size: 11px;">
+          ${upper ? `
+            <option value="HGT">Geopotential Height (HGT)</option>
+            <option value="TMP">Temperature (TMP)</option>
+            <option value="TD">Dew Point (TD)</option>
+            <option value="WIND">Wind Speed (WIND)</option>
+          ` : `
+            <option value="SLP">Sea Level Pressure (SLP)</option>
+            <option value="TMP">Temperature (TMP)</option>
+            <option value="TD">Dew Point (TD)</option>
+            <option value="VIS">Visibility (VIS)</option>
+            <option value="RAIN6">6h Precipitation (RAIN6)</option>
+            <option value="WIND">Wind Speed (WIND)</option>
+          `}
+        </select>
+        <button class="btn-add-station-contour" title="Generate and add contour layer" style="height: 24px; padding: 0 10px; font-size: 11px; font-weight: 500; background: #238636; color: #ffffff; border: 1px solid #2ea043; border-radius: 4px; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 2px;">
+          ＋ Add
+        </button>
+      </div>
     </div>
     ${renderStationFilterSection(layer)}
   `;
@@ -637,6 +674,13 @@ function renderLayerRow(layer) {
                   <span style="color: #8b949e;">px</span>
                 </div>
               </div>
+            </div>
+
+            <div class="config-row">
+              <label>
+                <input type="checkbox" class="chk-smooth-lines" ${layer.config?.smooth !== false ? "checked" : ""} />
+                <span>Smooth Contour Lines</span>
+              </label>
             </div>
 
             <div class="config-row">
