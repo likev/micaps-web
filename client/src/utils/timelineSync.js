@@ -1,5 +1,4 @@
-// timelineSync.js - Forecast cycle discovery and observation file timeline synchronization
-import { fetchTree } from "../api/catalogApi.js";
+import { fetchTree, fetchLatest } from "../api/catalogApi.js";
 import { setTimelineMode } from "../ui/timeSlider.js";
 import { getActiveWindow } from "../ui/tabWindowManager.js";
 import { DEFAULT_MOCK_OBS_FILES } from "../config/presets.js";
@@ -7,42 +6,156 @@ import { DEFAULT_MOCK_OBS_FILES } from "../config/presets.js";
 const forecastCyclesCache = {};
 const FORECAST_CYCLES_TTL_MS = 5 * 60 * 1000;
 
-export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP", level = 500) {
+export function invalidateForecastCyclesCache(key = null) {
+  if (key) {
+    delete forecastCyclesCache[key];
+  } else {
+    for (const k in forecastCyclesCache) {
+      delete forecastCyclesCache[k];
+    }
+  }
+}
+
+export function generateDynamicForecastCycles(base = null, count = 10) {
+  let baseDate;
+  let initHour;
+
+  if (typeof base === "string" && base.length >= 8) {
+    const clean = base.split(".")[0];
+    const y = parseInt(clean.length === 8 ? `20${clean.slice(0, 2)}` : clean.slice(0, 4), 10);
+    const m = parseInt(clean.length === 8 ? clean.slice(2, 4) : clean.slice(4, 6), 10) - 1;
+    const d = parseInt(clean.length === 8 ? clean.slice(4, 6) : clean.slice(6, 8), 10);
+    const h = parseInt(clean.length === 8 ? clean.slice(6, 8) : clean.slice(8, 10), 10);
+    initHour = h >= 20 ? 20 : 8;
+    baseDate = new Date(Date.UTC(y, m, d, initHour));
+  } else if (base instanceof Date) {
+    const bjt = new Date(base.getTime() + 8 * 3600 * 1000);
+    const bjtHour = bjt.getUTCHours();
+    initHour = bjtHour >= 20 ? 20 : (bjtHour >= 8 ? 8 : 20);
+    const dayOffset = bjtHour < 8 ? 1 : 0;
+    baseDate = new Date(Date.UTC(bjt.getUTCFullYear(), bjt.getUTCMonth(), bjt.getUTCDate() - dayOffset, initHour));
+  } else {
+    const now = new Date();
+    const bjt = new Date(now.getTime() + 8 * 3600 * 1000);
+    const bjtHour = bjt.getUTCHours();
+    initHour = bjtHour >= 20 ? 20 : (bjtHour >= 8 ? 8 : 20);
+    const dayOffset = bjtHour < 8 ? 1 : 0;
+    baseDate = new Date(Date.UTC(bjt.getUTCFullYear(), bjt.getUTCMonth(), bjt.getUTCDate() - dayOffset, initHour));
+  }
+
+  const cycles = [];
+  const pad = (n) => String(n).padStart(2, "0");
+  let curTime = baseDate.getTime();
+
+  for (let i = 0; i < count; i++) {
+    const d = new Date(curTime);
+    const yy = String(d.getUTCFullYear()).slice(-2);
+    const mm = pad(d.getUTCMonth() + 1);
+    const dd = pad(d.getUTCDate());
+    const hh = pad(d.getUTCHours());
+    cycles.push(`${yy}${mm}${dd}${hh}`);
+    curTime -= 12 * 3600 * 1000;
+  }
+
+  return cycles;
+}
+
+function extractCyclesFromFiles(fileEntries) {
+  if (!Array.isArray(fileEntries) || fileEntries.length === 0) return [];
+  const cycleSet = new Set();
+  for (const f of fileEntries) {
+    const fname = typeof f === "string" ? f : f?.name;
+    if (!fname) continue;
+    const parts = fname.split(".");
+    if (parts.length >= 2 && parts[0].length >= 8) {
+      const prefix = parts[0];
+      const cycle = prefix.length === 10 && prefix.startsWith("20") ? prefix.slice(2) : prefix.slice(0, 8);
+      cycleSet.add(cycle);
+    }
+  }
+  if (cycleSet.size > 0) {
+    return Array.from(cycleSet).sort().reverse();
+  }
+  return [];
+}
+
+export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP", level = 500, forceRefresh = false) {
   const path = `${model}/${element}/${level || 500}`;
-  const cached = forecastCyclesCache[path];
-  if (cached && Array.isArray(cached.data) && cached.data.length && (Date.now() - cached.ts) < FORECAST_CYCLES_TTL_MS) return cached.data;
+  const shortPath = `${model}/${element}`;
+
+  if (!forceRefresh) {
+    const cached = forecastCyclesCache[path] || forecastCyclesCache[shortPath] || forecastCyclesCache[model];
+    if (cached && Array.isArray(cached.data) && cached.data.length && (Date.now() - cached.ts) < FORECAST_CYCLES_TTL_MS) {
+      return cached.data;
+    }
+  }
+
+  // 1. Try fetchTree with specific level path (e.g. ECMWF_HR/TMP/500)
   try {
     const fileEntries = await fetchTree(path);
-    if (Array.isArray(fileEntries) && fileEntries.length > 0) {
-      const cycleSet = new Set();
-      for (const f of fileEntries) {
-        if (!f.name) continue;
-        const parts = f.name.split(".");
-        if (parts.length >= 2 && parts[0].length >= 8) {
-          cycleSet.add(parts[0]);
-        }
-      }
-      if (cycleSet.size > 0) {
-        const sorted = Array.from(cycleSet).sort().reverse();
-        forecastCyclesCache[path] = { data: sorted, ts: Date.now() };
-        forecastCyclesCache[model] = { data: sorted, ts: Date.now() };
-        return sorted;
-      }
+    const cycles = extractCyclesFromFiles(fileEntries);
+    if (cycles.length > 0) {
+      forecastCyclesCache[path] = { data: cycles, ts: Date.now() };
+      forecastCyclesCache[model] = { data: cycles, ts: Date.now() };
+      return cycles;
     }
   } catch (err) {
     console.warn(`[Forecast] Fetch cycles failed for ${path}:`, err);
   }
 
-  const fallback = [
-    "26082908", "26082820", "26082808", "26082720", "26082708",
-    "26082620", "26082608", "26082520", "26082508", "26082420",
-  ];
-  return fallback;
+  // 2. Try fetchTree with model/element path (e.g. ECMWF_HR/TMP)
+  if (shortPath !== path) {
+    try {
+      const fileEntries = await fetchTree(shortPath);
+      const cycles = extractCyclesFromFiles(fileEntries);
+      if (cycles.length > 0) {
+        forecastCyclesCache[path] = { data: cycles, ts: Date.now() };
+        forecastCyclesCache[shortPath] = { data: cycles, ts: Date.now() };
+        forecastCyclesCache[model] = { data: cycles, ts: Date.now() };
+        return cycles;
+      }
+    } catch (err) {
+      console.warn(`[Forecast] Fetch cycles failed for ${shortPath}:`, err);
+    }
+  }
+
+  // 3. Try fetchLatest from latestdatatime
+  try {
+    const latestRes = await fetchLatest(path);
+    const latestStr = latestRes?.latest || latestRes?.value;
+    if (latestStr) {
+      const cycles = generateDynamicForecastCycles(latestStr, 10);
+      if (cycles.length > 0) {
+        forecastCyclesCache[path] = { data: cycles, ts: Date.now() };
+        forecastCyclesCache[model] = { data: cycles, ts: Date.now() };
+        return cycles;
+      }
+    }
+  } catch (_) {
+    try {
+      const latestRes = await fetchLatest(shortPath);
+      const latestStr = latestRes?.latest || latestRes?.value;
+      if (latestStr) {
+        const cycles = generateDynamicForecastCycles(latestStr, 10);
+        if (cycles.length > 0) {
+          forecastCyclesCache[path] = { data: cycles, ts: Date.now() };
+          forecastCyclesCache[model] = { data: cycles, ts: Date.now() };
+          return cycles;
+        }
+      }
+    } catch (_) {}
+  }
+
+  // 4. Dynamic fallback based on real-time clock
+  const dynamicFallback = generateDynamicForecastCycles(null, 10);
+  forecastCyclesCache[path] = { data: dynamicFallback, ts: Date.now() };
+  forecastCyclesCache[model] = { data: dynamicFallback, ts: Date.now() };
+  return dynamicFallback;
 }
 
-export async function resolveLatestForecastCycle(model = "ECMWF_HR", element = "TMP", level = 500) {
-  const cycles = await resolveForecastCycles(model, element, level);
-  return cycles[0] || "26082908";
+export async function resolveLatestForecastCycle(model = "ECMWF_HR", element = "TMP", level = 500, forceRefresh = false) {
+  const cycles = await resolveForecastCycles(model, element, level, forceRefresh);
+  return cycles[0] || generateDynamicForecastCycles(null, 1)[0];
 }
 
 export async function syncObservationTimeline(path, currentFile = null, winTitle = "", win = null) {

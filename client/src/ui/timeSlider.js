@@ -1,6 +1,6 @@
-// timeSlider.js - Discrete forecast lead time stepper and observation timeline with step-length selection
 import { appState } from "../store/appState.js";
 import { formatLeadTime, formatObsTimestamp, formatForecastInitTime, formatForecastValidTime } from "../utils/formatters.js";
+import { generateDynamicForecastCycles } from "../utils/timelineSync.js";
 
 let playTimer = null;
 let currentMode = "nwp"; // "nwp" or "obs"
@@ -8,17 +8,8 @@ let currentStepLength = 6; // 6h forecast, 3h surface, 12h upper-air
 
 let discretePeriods = [0, 6, 12, 18, 24, 30, 36, 42, 48, 54, 60, 66, 72, 84, 96, 108, 120];
 let currentPeriodIdx = 4; // default +024h
-let currentInitCycle = "26082820";
-let forecastCycles = [
-  "26082908",
-  "26082820",
-  "26082808",
-  "26082720",
-  "26082708",
-  "26082620",
-  "26082608",
-  "26082520",
-];
+let forecastCycles = generateDynamicForecastCycles(null, 10);
+let currentInitCycle = forecastCycles[0] || "26082820";
 
 let rawObsFiles = [
   "20260827080000.000",
@@ -482,16 +473,10 @@ export function setTimelineMode(mode, customData = {}) {
         currentInitCycle = forecastCycles[0];
       }
     } else if (!forecastCycles.length || !forecastCycles.includes(currentInitCycle)) {
-      forecastCycles = [
-        currentInitCycle || "26082908",
-        "26082820",
-        "26082808",
-        "26082720",
-        "26082708",
-        "26082620",
-        "26082608",
-        "26082520",
-      ];
+      forecastCycles = generateDynamicForecastCycles(currentInitCycle, 10);
+      if (!currentInitCycle || !forecastCycles.includes(currentInitCycle)) {
+        currentInitCycle = forecastCycles[0];
+      }
     }
 
     discretePeriods = getPeriodsForStep(currentStepLength);

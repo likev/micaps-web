@@ -297,7 +297,10 @@ async function triggerRasterOverlay(map, layer = null, win = null) {
         cycle = await resolveLatestForecastCycle(model, element, level);
       } catch {}
     }
-    if (!cycle) cycle = "26082908";
+    if (!cycle) {
+      const { generateDynamicForecastCycles } = await import("../utils/timelineSync.js");
+      cycle = generateDynamicForecastCycles(null, 1)[0];
+    }
     file = `${cycle}.${String(period).padStart(3, "0")}`;
   }
 
@@ -333,7 +336,10 @@ async function triggerWindStreamlines(map, layer = null, win = null) {
       cycle = await resolveLatestForecastCycle(model, "WIND", level);
     } catch {}
   }
-  if (!cycle) cycle = "26082908";
+  if (!cycle) {
+    const { generateDynamicForecastCycles } = await import("../utils/timelineSync.js");
+    cycle = generateDynamicForecastCycles(null, 1)[0];
+  }
   const file = layer?.file || win?.file || `${cycle}.${String(period).padStart(3, "0")}`;
   const path = `${model}/WIND/${level}`;
 
@@ -367,7 +373,10 @@ async function triggerWindBarbs(map, layer = null, win = null) {
       cycle = await resolveLatestForecastCycle(model, "WIND", level);
     } catch {}
   }
-  if (!cycle) cycle = "26082908";
+  if (!cycle) {
+    const { generateDynamicForecastCycles } = await import("../utils/timelineSync.js");
+    cycle = generateDynamicForecastCycles(null, 1)[0];
+  }
   const file = layer?.file || win?.file || `${cycle}.${String(period).padStart(3, "0")}`;
   const path = `${model}/WIND/${level}`;
 

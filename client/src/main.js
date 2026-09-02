@@ -19,7 +19,7 @@ import { initConfigEditor, openConfigTab } from "./ui/configEditor.js";
 import { appState } from "./store/appState.js";
 import { loadPresetGroups } from "./config/presets.js";
 import { resolveColormap } from "./utils/colormaps.js";
-import { resolveForecastCycles, resolveLatestForecastCycle, syncObservationTimeline } from "./utils/timelineSync.js";
+import { resolveForecastCycles, resolveLatestForecastCycle, syncObservationTimeline, invalidateForecastCyclesCache } from "./utils/timelineSync.js";
 import {
   initTabWindowManager,
   getActiveWindow,
@@ -60,12 +60,14 @@ function showErrorToast(msg) {
 }
 
 async function reloadConfiguration() {
+  invalidateForecastCyclesCache();
   await loadPresetGroups();
   refreshPresetControls();
   refreshNavBarPresets();
   console.log("[Config] Preset configuration reloaded");
   const win = getActiveWindow();
   if (win?.map) {
+    win.forecastCycle = null;
     if (win.activeGroup) {
       await loadPresetGroup(win.map, win.activeGroup, win.period, win.level, win);
     } else if (!win.isObservation) {
@@ -125,7 +127,10 @@ async function bootstrap() {
         const pLayer = win.activeGroup?.layers?.find((l) => l.type === "contour" || l.type === "wind");
         resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", win.level || 500).then((cycles) => {
           if (getActiveWindow() === win) {
-            setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle || cycles[0], cycles, stepLength: 6 });
+            if (!win.forecastCycle || !cycles.includes(win.forecastCycle)) {
+              win.forecastCycle = cycles[0];
+            }
+            setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle, cycles, stepLength: 6 });
           }
         });
       }
@@ -145,11 +150,11 @@ async function bootstrap() {
         win.obsTime = latestFile;
       } else {
         const pLayer = group.layers?.find((l) => l.type === "contour" || l.type === "wind");
-        resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", win.level || 500).then((cycles) => {
-          if (getActiveWindow() === win) {
-            setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle || cycles[0], cycles, stepLength: 6 });
-          }
-        });
+        const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", win.level || 500);
+        win.forecastCycle = cycles[0];
+        if (getActiveWindow() === win) {
+          setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle, cycles, stepLength: 6 });
+        }
       }
       await loadPresetGroup(win.map, group, win.period, null, win);
     },
@@ -214,7 +219,10 @@ async function bootstrap() {
         const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle);
         win.obsTime = latestFile;
       } else {
-        setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle });
+        const pLayer = group.layers?.find((l) => l.type === "contour" || l.type === "wind");
+        const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", win.level || 500);
+        win.forecastCycle = cycles[0];
+        setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle, cycles, stepLength: 6 });
       }
       await loadPresetGroup(map, group, win.period, overrideLevel, win);
     },
@@ -235,7 +243,7 @@ async function bootstrap() {
   initCatalogDrawer("catalog-drawer", async ({ model, element, level, period, obsTime, isObservation }) => {
     const map = getMap(), win = getActiveWindow();
     if (!win || !map) return;
-    const upd = { activeGroup: null, model, element, level: level !== null ? level : win.level, period: period !== null ? period : win.period, obsTime, isObservation };
+    const upd = { activeGroup: null, model, element, level: level !== null ? level : win.level, period: period !== null ? period : win.period, obsTime, isObservation, forecastCycle: null };
     Object.assign(win, upd);
     appState.update(upd);
     setNavBarPreset("");
@@ -257,7 +265,9 @@ async function bootstrap() {
       if (model === "UPPER_AIR") await loadUpperAirComposite(map, win.level || 500, latestFile, win);
       else await loadObservationProduct(map, model, element, win.level, latestFile, win);
     } else {
-      setTimelineMode("nwp", { period: win.period ?? 24, winTitle: winBannerTitle });
+      const cycles = await resolveForecastCycles(model, element, win.level || 500);
+      win.forecastCycle = cycles[0];
+      setTimelineMode("nwp", { period: win.period ?? 24, winTitle: winBannerTitle, initCycle: win.forecastCycle, cycles, stepLength: 6 });
       await loadWeatherField(map, model, element, win.level, win.period, null, win);
     }
   });
@@ -272,7 +282,7 @@ async function bootstrap() {
     const win = getActiveWindow();
     const map = getMap();
     if (!win || !map) return;
-    if (typeof data === "object" && data.isObs) {
+    if (typeof data === "object" && data !== null && data.isObs) {
       win.obsTime = data.file;
       clearAllWeatherLayersFromMap(map, win);
       if (win.activeGroup) {
@@ -287,7 +297,7 @@ async function bootstrap() {
           await loadObservationProduct(map, model, element, level, data.file, win);
         }
       }
-    } else if (typeof data === "object" && data.isInitChange) {
+    } else if (typeof data === "object" && data !== null && data.isInitChange) {
       win.forecastCycle = data.initCycle;
       const period = typeof data.period === "number" ? data.period : (win.period ?? 24);
       win.period = period;
@@ -299,10 +309,20 @@ async function bootstrap() {
         await loadWeatherField(map, win.model, win.element, win.level, period, null, win, false);
       }
     } else {
-      const period = typeof data === "number" ? data : win.period;
+      let period = win.period ?? 24;
+      if (typeof data === "number") {
+        period = data;
+      } else if (typeof data === "object" && data !== null) {
+        if (typeof data.period === "number") {
+          period = data.period;
+        } else if (typeof data.valueOf === "function" && typeof data.valueOf() === "number") {
+          period = data.valueOf();
+        }
+      }
       win.loadSeq = (win.loadSeq || 0) + 1;
       const expectedSeq = win.loadSeq;
       win.period = period;
+      appState.set("period", period);
       const activeGroup = win.activeGroup;
       if (activeGroup) {
         await loadPresetGroup(map, activeGroup, period, win.level, win, true, expectedSeq);
@@ -590,18 +610,14 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
     setNavBarPreset(group.id);
   }
 
-  if (win && !win.forecastCycle) {
-    const pLayer = group.layers.find((l) => l.type === "contour" || l.type === "wind");
-    if (pLayer) {
-      win.forecastCycle = await resolveLatestForecastCycle(pLayer.model || "ECMWF_HR", pLayer.element || "TMP", curLevel);
-    }
-  }
-
   const winTitle = `W${(win?.winIdx ?? 0) + 1}: ${group.name}`;
   if (!group.isObservation && win) {
     const pLayer = group.layers.find((l) => l.type === "contour" || l.type === "wind");
     const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", curLevel);
-    setTimelineMode("nwp", { period: curPeriod, winTitle, initCycle: win.forecastCycle || cycles[0], cycles, stepLength: 6 });
+    if (!win.forecastCycle || !cycles.includes(win.forecastCycle)) {
+      win.forecastCycle = cycles[0];
+    }
+    setTimelineMode("nwp", { period: curPeriod, winTitle, initCycle: win.forecastCycle, cycles, stepLength: 6 });
   }
 
   console.log(`[PresetGroup] Loading "${group.name}" with levelOverride=${level}, period=+${curPeriod}h, cycle=${win?.forecastCycle}...`);
