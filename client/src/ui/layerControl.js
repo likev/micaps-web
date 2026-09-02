@@ -501,7 +501,7 @@ function renderStationDrawerHTML(layer) {
 
   return `
     <div class="config-grid-2col">
-      ${items.map(([cls, chk, label]) => `<label class="config-checkbox-item"><input type="checkbox" class="${cls}" ${chk ? "checked" : ""} /><span>${label}</span></label>`).join("")}
+      ${items.map(([cls, chk, label]) => `<label class="config-checkbox-item" title="${label}"><input type="checkbox" class="${cls}" ${chk ? "checked" : ""} /><span title="${label}">${label}</span></label>`).join("")}
       <label class="config-checkbox-item" style="grid-column: span 2; border-top: 1px solid #30363d; padding-top: 4px; margin-top: 2px;">
         <input type="checkbox" class="chk-station-streamlines" ${layer.config?.showStreamlines ? "checked" : ""} />
         <span style="color: #58a6ff; font-weight: 600;">Wind Streamlines (Flow Analysis)</span>
@@ -600,24 +600,24 @@ function renderLayerRow(layer) {
             </div>
 
             <div class="config-row" style="flex-wrap: wrap; gap: 4px;">
-              <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-                <label style="display: flex; align-items: center; gap: 4px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 100%; box-sizing: border-box; flex-wrap: wrap; gap: 4px; min-width: 0;">
+                <label style="display: flex; align-items: center; gap: 4px; min-width: 0;">
                   <input type="checkbox" class="chk-show-line" ${layer.config?.showLine ? "checked" : ""} />
                   <span>Contour Lines</span>
                 </label>
-                <div style="display: flex; align-items: center; gap: 4px;">
+                <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap; min-width: 0; max-width: 100%;">
                   <input type="color" class="color-picker-line" value="${layer.config?.lineColor || (layer.element === 'HGT' ? '#58a6ff' : layer.element === 'TMP' ? '#f85149' : '#ffffff')}" title="Line Color" />
                   <span style="font-size: 11px; color: #8b949e;">Width</span>
-                  <input type="number" class="input-line-width" min="0.5" max="10" step="0.5" value="${layer.config?.lineWidth !== undefined ? layer.config.lineWidth : 2.0}" style="width: 44px; height: 20px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; text-align: center; font-size: 11px;" title="Standard Line Width" />
+                  <input type="number" class="input-line-width" min="0.5" max="10" step="0.5" value="${layer.config?.lineWidth !== undefined ? layer.config.lineWidth : 2.0}" style="width: 40px; min-width: 0; height: 20px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; text-align: center; font-size: 11px;" title="Standard Line Width" />
                   <span style="font-size: 11px; color: #8b949e;">px</span>
                 </div>
               </div>
-              <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding-left: 20px; font-size: 11px;">
-                <span style="color: #8b949e;">Bold (5880m, 1010hPa):</span>
-                <div style="display: flex; align-items: center; gap: 4px;">
-                  <input type="text" class="input-bold-values" placeholder="5880, 1010" value="${(layer.config?.boldValues || (layer.element === 'HGT' ? [5880, 588] : layer.element === 'SLP' ? [1010] : layer.element === 'TMP' ? [0] : [])).join(', ')}" style="width: 76px; height: 20px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; padding: 0 4px; font-size: 11px;" title="Values to render in bold (comma-separated)" />
+              <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 100%; box-sizing: border-box; padding-left: 20px; font-size: 11px; flex-wrap: wrap; gap: 4px; min-width: 0;">
+                <span style="color: #8b949e; flex-shrink: 0;">Bold (5880m, 1010hPa):</span>
+                <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap; min-width: 0; max-width: 100%;">
+                  <input type="text" class="input-bold-values" placeholder="5880, 1010" value="${(layer.config?.boldValues || (layer.element === 'HGT' ? [5880, 588] : layer.element === 'SLP' ? [1010] : layer.element === 'TMP' ? [0] : [])).join(', ')}" style="width: 64px; min-width: 0; height: 20px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; padding: 0 4px; font-size: 11px;" title="Values to render in bold (comma-separated)" />
                   <span style="color: #8b949e;">Width</span>
-                  <input type="number" class="input-bold-line-width" min="1" max="12" step="0.5" value="${layer.config?.boldLineWidth !== undefined ? layer.config.boldLineWidth : 4.0}" style="width: 40px; height: 20px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; text-align: center; font-size: 11px;" title="Bold Line Width" />
+                  <input type="number" class="input-bold-line-width" min="1" max="12" step="0.5" value="${layer.config?.boldLineWidth !== undefined ? layer.config.boldLineWidth : 4.0}" style="width: 36px; min-width: 0; height: 20px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; text-align: center; font-size: 11px;" title="Bold Line Width" />
                   <span style="color: #8b949e;">px</span>
                 </div>
               </div>
