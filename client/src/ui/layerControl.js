@@ -405,6 +405,10 @@ function renderLayersManager(panel) {
                 paletteSel.appendChild(opt);
               }
             }
+            // Explicitly restore the selected value so it survives panel rebuilds
+            if (layer.config?.palettePath) {
+              paletteSel.value = layer.config.palettePath;
+            }
             // Restore gradient preview if palette already set (alpha handled via color[3])
             if (layer.config?.palettePath) {
               loadXMLPalette(layer.config.palettePath).then((stops) => {

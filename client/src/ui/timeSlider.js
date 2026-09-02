@@ -227,6 +227,8 @@ export function initTimeSlider(containerId = "timeslider-container", onTimeChang
 
   renderChips();
   updateLabels();
+  // Re-sync step-length select in case setTimelineMode was called before the DOM was ready
+  updateStepLengthOptions(isUpperAirMode, currentStepLength);
 }
 
 export function setStepLength(step, triggerCallback = false) {

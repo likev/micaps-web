@@ -465,6 +465,13 @@ async function loadWeatherField(map, model, element, level, period, customOption
       },
     }, win);
 
+    // Bug fix: addOrUpdateLayer only re-renders the panel when winId === currentActiveWinId.
+    // If the user switched tabs while data was loading, currentActiveWinId may differ even though
+    // win is still the correct active window. Force a panel sync here to make layers visible immediately.
+    if (win && getActiveWindow() === win) {
+      syncLayerControlForWindow(win);
+    }
+
     if ((showRaster || appState.state.layers.raster) && isVisible) {
       if (gridData && (gridData.values || (gridData.u && gridData.v))) {
         renderGridRaster(map, gridData, element, colormap, { layerId, opacity });
@@ -510,6 +517,7 @@ async function loadUpperAirComposite(map, level = 500, obsTime = "20260828170000
   appState.set("stationData", stations);
   renderStationWeatherPlots(map, stations, appState.state.layers.station);
   const stnLayer = addOrUpdateLayer({ id: "station-upper", name: `${level || 500} hPa Sounding Station Plots`, type: "station", color: "#e3b341", visible: true, removable: true, stationsGeoJSON: stations }, win);
+  if (win && getActiveWindow() === win) syncLayerControlForWindow(win);
   if (stations?.features?.length >= 3) {
     const winLayers = getLayersForWindow(win);
     const activeUpperContours = winLayers.filter((l) => l.type === "contour" && l.model === "UPPER_AIR");
@@ -535,6 +543,7 @@ async function loadObservationProduct(map, model, element, level, file, win = ge
     const layerId = model === "UPPER_AIR" ? "station-upper" : `station-${model.toLowerCase()}`;
     const name = model === "UPPER_AIR" ? `${level || 500} hPa Sounding Station Plots` : `${model === "SURFACE" ? "Surface" : "Upper Air"} Station Observations`;
     const stnLayer = addOrUpdateLayer({ id: layerId, name, type: "station", color: "#e3b341", visible: true, removable: true, stationsGeoJSON: stations }, win);
+    if (win && getActiveWindow() === win) syncLayerControlForWindow(win);
     if (stnLayer?.config?.showStreamlines) triggerStationStreamlines(map, stnLayer, win);
     if (model === "SURFACE" && stations?.features?.length >= 3) {
       const winLayers = getLayersForWindow(win);
