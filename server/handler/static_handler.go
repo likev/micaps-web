@@ -82,23 +82,14 @@ func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	distDir := h.Cfg.StaticDir
-	var candidates []string
-	candidates = append(candidates,
+	candidates := []string{
 		"client/config.json",
 		"../client/config.json",
-		"config.json",
-	)
-	if distDir != "" {
-		candidates = append(candidates,
-			filepath.Join(distDir, "config.json"),
-		)
 	}
 	if exePath, err := os.Executable(); err == nil {
 		exeDir := filepath.Dir(exePath)
 		candidates = append(candidates,
 			filepath.Join(exeDir, "client/config.json"),
-			filepath.Join(exeDir, "config.json"),
 		)
 	}
 
@@ -144,16 +135,6 @@ func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Also sync to distDir / client/dist if present
-		if distDir != "" {
-			_ = os.WriteFile(filepath.Join(distDir, "config.json"), []byte(str), 0644)
-		}
-		if _, err := os.Stat("client/dist/config.json"); err == nil {
-			_ = os.WriteFile("client/dist/config.json", []byte(str), 0644)
-		} else if _, err := os.Stat("../client/dist/config.json"); err == nil {
-			_ = os.WriteFile("../client/dist/config.json", []byte(str), 0644)
-		}
-
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok","message":"Configuration saved successfully to client/config.json"}`))
 		return
@@ -171,6 +152,26 @@ func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 
 // SPAHandler serves frontend static files with SPA fallback
 func (h *StaticHandler) SPAHandler(w http.ResponseWriter, r *http.Request) {
+	// If requesting /config.json, strictly serve from client/config.json
+	if r.URL.Path == "/config.json" || r.URL.Path == "config.json" {
+		candidates := []string{
+			"client/config.json",
+			"../client/config.json",
+		}
+		if exePath, err := os.Executable(); err == nil {
+			exeDir := filepath.Dir(exePath)
+			candidates = append(candidates, filepath.Join(exeDir, "client", "config.json"))
+		}
+		for _, fp := range candidates {
+			if _, err := os.Stat(fp); err == nil {
+				http.ServeFile(w, r, fp)
+				return
+			}
+		}
+		http.NotFound(w, r)
+		return
+	}
+
 	distDir := h.Cfg.StaticDir
 	path := filepath.Join(distDir, filepath.Clean(r.URL.Path))
 
@@ -178,22 +179,6 @@ func (h *StaticHandler) SPAHandler(w http.ResponseWriter, r *http.Request) {
 	if err == nil && !info.IsDir() {
 		http.ServeFile(w, r, path)
 		return
-	}
-
-	// If requesting /config.json specifically and not in distDir, try fallback paths
-	if r.URL.Path == "/config.json" || r.URL.Path == "config.json" {
-		fallbackPaths := []string{
-			"client/config.json",
-			"../client/config.json",
-			"client/dist/config.json",
-			"config.json",
-		}
-		for _, fp := range fallbackPaths {
-			if _, err := os.Stat(fp); err == nil {
-				http.ServeFile(w, r, fp)
-				return
-			}
-		}
 	}
 
 	// If requesting /palettes/... try multiple candidate paths and do not fallback to index.html
