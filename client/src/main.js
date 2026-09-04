@@ -121,6 +121,7 @@ async function bootstrap() {
         syncObservationTimeline(obsPath, win.obsTime, winTitle, win).then((latestFile) => {
           if (getActiveWindow() === win) {
             win.obsTime = latestFile;
+            updateWindowTitle(win);
           }
         });
       } else {
@@ -131,6 +132,7 @@ async function bootstrap() {
               win.forecastCycle = cycles[0];
             }
             setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 });
+            updateWindowTitle(win);
           }
         });
       }
@@ -149,10 +151,12 @@ async function bootstrap() {
         const obsPath = group.id?.includes("upper") ? `UPPER_AIR/PLOT/${effectiveLevel}` : "SURFACE/PLOT_GLOBAL_3H";
         const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle);
         win.obsTime = latestFile;
+        updateWindowTitle(win);
       } else {
         const pLayer = group.layers?.find((l) => l.type === "contour" || l.type === "wind");
         const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", win.level || 500);
         win.forecastCycle = cycles[0];
+        updateWindowTitle(win);
         if (getActiveWindow() === win) {
           setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 });
         }
@@ -220,10 +224,12 @@ async function bootstrap() {
         const obsPath = group.id?.includes("upper") ? `UPPER_AIR/PLOT/${effectiveLevel}` : "SURFACE/PLOT_GLOBAL_3H";
         const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle);
         win.obsTime = latestFile;
+        updateWindowTitle(win);
       } else {
         const pLayer = group.layers?.find((l) => l.type === "contour" || l.type === "wind");
         const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", win.level || 500);
         win.forecastCycle = cycles[0];
+        updateWindowTitle(win);
         setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 });
       }
       await loadPresetGroup(map, group, win.period, overrideLevel, win);
@@ -264,11 +270,13 @@ async function bootstrap() {
       const obsPath = model === "SURFACE" ? `SURFACE/${element}` : (model === "UPPER_AIR" ? `UPPER_AIR/${element}/${win.level || 500}` : `${model}/${element}`);
       const latestFile = await syncObservationTimeline(obsPath, obsTime || win.obsTime, winBannerTitle);
       win.obsTime = latestFile;
+      updateWindowTitle(win);
       if (model === "UPPER_AIR") await loadUpperAirComposite(map, win.level || 500, latestFile, win);
       else await loadObservationProduct(map, model, element, win.level, latestFile, win);
     } else {
       const cycles = await resolveForecastCycles(model, element, win.level || 500);
       win.forecastCycle = cycles[0];
+      updateWindowTitle(win);
       setTimelineMode("nwp", { period: win.period ?? 24, winTitle: winBannerTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 });
       await loadWeatherField(map, model, element, win.level, win.period, null, win);
     }
@@ -289,6 +297,7 @@ async function bootstrap() {
     }
     if (typeof data === "object" && data !== null && data.isObs) {
       win.obsTime = data.file;
+      updateWindowTitle(win);
       const prevContours = getLayersForWindow(win)
         .filter((l) => l.type === "contour" && (l.model === "SURFACE" || l.model === "UPPER_AIR"))
         .map((l) => ({
@@ -323,6 +332,7 @@ async function bootstrap() {
       win.forecastCycle = data.initCycle;
       const period = typeof data.period === "number" ? data.period : (win.period ?? 24);
       win.period = period;
+      updateWindowTitle(win);
       clearAllWeatherLayersFromMap(map, win);
       const activeGroup = win.activeGroup;
       if (activeGroup) {
@@ -345,6 +355,7 @@ async function bootstrap() {
       const expectedSeq = win.loadSeq;
       win.period = period;
       appState.set("period", period);
+      updateWindowTitle(win);
       const activeGroup = win.activeGroup;
       if (activeGroup) {
         await loadPresetGroup(map, activeGroup, period, win.level, win, true, expectedSeq);
@@ -376,7 +387,10 @@ async function loadWeatherField(map, model, element, level, period, customOption
   let cycle = win?.forecastCycle;
   if (!cycle) {
     cycle = await resolveLatestForecastCycle(model, element, level);
-    if (win) win.forecastCycle = cycle;
+    if (win) {
+      win.forecastCycle = cycle;
+      updateWindowTitle(win);
+    }
   }
   const file = `${cycle}.${String(period).padStart(3, "0")}`;
   const path = `${model}/${element}/${level}`;
@@ -746,6 +760,7 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
     if (!win.forecastCycle || !cycles.includes(win.forecastCycle)) {
       win.forecastCycle = cycles[0];
     }
+    updateWindowTitle(win);
     setTimelineMode("nwp", { period: curPeriod, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 });
   }
 
@@ -782,7 +797,10 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
         let file = win?.obsTime;
         if (!file || (group.isObservation && level !== null)) {
           file = await syncObservationTimeline(obsPath, win?.obsTime, winTitle, win);
-          if (win) win.obsTime = file;
+          if (win) {
+            win.obsTime = file;
+            updateWindowTitle(win);
+          }
         }
         const stationLayerId = (layer.model === "UPPER_AIR" && targetLevel) ? `upperair-obs-${targetLevel}` : layer.id;
         await loadObservationProduct(map, layer.model, layer.element, targetLevel, file, win, obsPath, expectedSeq, stationLayerId);
@@ -890,6 +908,9 @@ async function changeVerticalLevel(map, direction, explicitLevel = null, win = g
     const model = win?.model || "ECMWF_HR";
     const element = win?.element || "TMP";
     const period = win?.period ?? 24;
+    if (win) {
+      updateWindowTitle(win, `${targetLevel} hPa ${element} (${model})`);
+    }
     await loadWeatherField(map, model, element, targetLevel, period, null, win, false, currentSeq);
   }
 }

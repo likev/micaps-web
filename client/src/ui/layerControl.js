@@ -211,7 +211,7 @@ export function removeLayer(layerId, winOrId = null) {
 export function syncLayerControlForWindow(win) {
   if (!win) return;
   currentActiveWinId = win.id || "default";
-  currentActiveWinTitle = win.activeGroup ? `W${win.winIdx + 1}: ${win.activeGroup.name}` : `Window ${win.winIdx + 1}`;
+  currentActiveWinTitle = win.title ? `W${win.winIdx + 1}: ${win.title}` : (win.activeGroup ? `W${win.winIdx + 1}: ${win.activeGroup.name}` : `Window ${win.winIdx + 1}`);
   const panel = document.getElementById("layer-control");
   if (panel) renderLayersManager(panel);
 }

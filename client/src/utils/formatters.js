@@ -37,19 +37,22 @@ export function formatElementUnit(element = "TMP") {
 }
 
 export function formatObsTimestamp(fileStr = "") {
-  if (!fileStr || fileStr.length < 10) return fileStr || "--";
-  const y = fileStr.slice(0, 4);
-  const m = fileStr.slice(4, 6);
-  const d = fileStr.slice(6, 8);
-  const h = fileStr.slice(8, 10);
-  const min = fileStr.length >= 12 ? fileStr.slice(10, 12) : "00";
+  if (!fileStr) return "--";
+  const clean = fileStr.includes("/") ? fileStr.split("/").pop() : fileStr;
+  if (clean.length < 10) return clean || "--";
+  const y = clean.slice(0, 4);
+  const m = clean.slice(4, 6);
+  const d = clean.slice(6, 8);
+  const h = clean.slice(8, 10);
+  const min = clean.length >= 12 ? clean.slice(10, 12) : "00";
 
   return `${y}-${m}-${d} ${h}:${min} (UTC+8)`;
 }
 
 export function formatForecastInitTime(cycleStr = "") {
   if (!cycleStr) return "--";
-  const clean = cycleStr.split(".")[0];
+  const raw = cycleStr.includes("/") ? cycleStr.split("/").pop() : cycleStr;
+  const clean = raw.split(".")[0];
   if (clean.length >= 8) {
     const y = clean.length === 8 ? `20${clean.slice(0, 2)}` : clean.slice(0, 4);
     const m = clean.length === 8 ? clean.slice(2, 4) : clean.slice(4, 6);
@@ -62,7 +65,8 @@ export function formatForecastInitTime(cycleStr = "") {
 
 export function formatForecastValidTime(cycleStr = "", leadHours = 0) {
   if (!cycleStr) return `Analysis + ${leadHours}h`;
-  const clean = cycleStr.split(".")[0];
+  const raw = cycleStr.includes("/") ? cycleStr.split("/").pop() : cycleStr;
+  const clean = raw.split(".")[0];
   if (clean.length >= 8) {
     const y = parseInt(clean.length === 8 ? `20${clean.slice(0, 2)}` : clean.slice(0, 4), 10);
     const m = parseInt(clean.length === 8 ? clean.slice(2, 4) : clean.slice(4, 6), 10) - 1;

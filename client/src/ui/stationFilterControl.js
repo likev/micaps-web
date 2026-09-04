@@ -92,7 +92,7 @@ export function renderStationFilterSection(layer) {
       </div>
 
       <!-- Rule Rows Container -->
-      <div class="filter-rules-list" style="display: flex; flex-direction: column; gap: 4px;">
+      <div class="filter-rules-list">
         ${rules.map((rule, idx) => renderSingleRuleRow(rule, idx, rules.length, logic, upper)).join("")}
       </div>
 
@@ -107,7 +107,7 @@ export function renderStationFilterSection(layer) {
       </div>
 
       <!-- Quick Filter Presets -->
-      <div class="config-quick-presets" style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px;">
+      <div class="config-quick-presets">
         ${
           upper
             ? `
@@ -139,40 +139,40 @@ function renderSingleRuleRow(rule, idx, totalCount, logic, upper = false) {
   const isRange = rule.op === "between" || rule.op === "..";
 
   return `
-    <div class="config-row filter-rule-row ${isHidden ? "hidden" : ""}" data-rule-idx="${idx}" style="${isHidden ? "display: none;" : "display: flex;"} align-items: center; gap: 4px; background: #161b22; padding: 3px 4px; border-radius: 4px; border: 1px solid #30363d;">
-      <span style="font-size: 10px; color: #8b949e; min-width: 14px;">#${idx + 1}</span>
-      <select class="sel-rule-field" data-rule-idx="${idx}" style="flex: 1.1; min-width: 72px; background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 3px; font-size: 11px; padding: 2px 2px;">
+    <div class="config-row filter-rule-row ${isHidden ? "hidden" : ""}" data-rule-idx="${idx}" style="${isHidden ? "display: none;" : ""}">
+      <span class="rule-index">#${idx + 1}</span>
+      <select class="sel-rule-field" data-rule-idx="${idx}" title="Filter field">
         <option value="none" ${!rule.field || rule.field === "none" ? "selected" : ""}>- Field -</option>
         ${
           upper
             ? `
-        <option value="Height" ${rule.field === "Height" ? "selected" : ""}>Height (gpm)</option>
-        <option value="TT" ${rule.field === "TT" ? "selected" : ""}>TT (Temp °C)</option>
-        <option value="Td" ${rule.field === "Td" ? "selected" : ""}>Td (Dew °C)</option>
+        <option value="Height" ${rule.field === "Height" ? "selected" : ""}>HGT (gpm)</option>
+        <option value="TT" ${rule.field === "TT" ? "selected" : ""}>TT (°C)</option>
+        <option value="Td" ${rule.field === "Td" ? "selected" : ""}>Td (°C)</option>
         <option value="Wind" ${rule.field === "Wind" ? "selected" : ""}>Wind (m/s)</option>
         `
             : `
-        <option value="TT" ${rule.field === "TT" ? "selected" : ""}>TT (Temp °C)</option>
-        <option value="Td" ${rule.field === "Td" ? "selected" : ""}>Td (Dew °C)</option>
+        <option value="TT" ${rule.field === "TT" ? "selected" : ""}>TT (°C)</option>
+        <option value="Td" ${rule.field === "Td" ? "selected" : ""}>Td (°C)</option>
         <option value="Wind" ${rule.field === "Wind" ? "selected" : ""}>Wind (m/s)</option>
         <option value="Rain" ${rule.field === "Rain" ? "selected" : ""}>Rain (mm)</option>
-        <option value="Rain6" ${rule.field === "Rain6" ? "selected" : ""}>6h Rain (mm)</option>
+        <option value="Rain6" ${rule.field === "Rain6" ? "selected" : ""}>Rain6 (mm)</option>
         <option value="Visibility" ${rule.field === "Visibility" ? "selected" : ""}>Vis (km)</option>
         <option value="SLP" ${rule.field === "SLP" ? "selected" : ""}>SLP (hPa)</option>
         `
         }
       </select>
-      <select class="sel-rule-op" data-rule-idx="${idx}" style="width: 52px; background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 3px; font-size: 11px; padding: 2px 1px; text-align: center;">
+      <select class="sel-rule-op" data-rule-idx="${idx}" title="Comparison operator">
         <option value=">" ${rule.op === ">" ? "selected" : ""}>&gt;</option>
         <option value=">=" ${rule.op === ">=" ? "selected" : ""}>&ge;</option>
         <option value="<" ${rule.op === "<" ? "selected" : ""}>&lt;</option>
         <option value="<=" ${rule.op === "<=" ? "selected" : ""}>&le;</option>
         <option value="=" ${rule.op === "=" ? "selected" : ""}>=</option>
-        <option value="between" ${isRange ? "selected" : ""}>10..30</option>
+        <option value="between" ${isRange ? "selected" : ""}>..</option>
       </select>
-      <input type="number" class="ipt-rule-val" data-rule-idx="${idx}" placeholder="${isRange ? "min" : "val"}" value="${rule.val ?? ""}" style="width: ${isRange ? "36px" : "48px"}; background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 3px; font-size: 11px; padding: 2px 3px;" />
-      ${isRange ? `<input type="number" class="ipt-rule-val2" data-rule-idx="${idx}" placeholder="max" value="${rule.val2 ?? ""}" style="width: 36px; background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 3px; font-size: 11px; padding: 2px 3px;" />` : ""}
-      ${totalCount > 1 ? `<button type="button" class="btn-remove-rule" data-rule-idx="${idx}" style="background: none; border: none; color: #f85149; font-size: 12px; cursor: pointer; padding: 0 2px;" title="Remove rule">✕</button>` : ""}
+      <input type="number" class="ipt-rule-val ${isRange ? "range" : ""}" data-rule-idx="${idx}" placeholder="${isRange ? "min" : "val"}" value="${rule.val ?? ""}" title="${isRange ? "Minimum value" : "Filter value"}" />
+      ${isRange ? `<input type="number" class="ipt-rule-val2 range" data-rule-idx="${idx}" placeholder="max" value="${rule.val2 ?? ""}" title="Maximum value" />` : ""}
+      ${totalCount > 1 ? `<button type="button" class="btn-remove-rule" data-rule-idx="${idx}" title="Remove rule">✕</button>` : ""}
     </div>
   `;
 }

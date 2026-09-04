@@ -9,22 +9,23 @@ import {
 } from "../src/layers/rasterLayer.js";
 
 beforeAll(() => {
-  if (typeof document === "undefined") {
-    globalThis.document = {
-      createElement: (tag) => {
-        if (tag === "canvas") {
-          return {
-            width: 0,
-            height: 0,
-            getContext: () => ({
-              createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }),
-              putImageData: () => {},
-            }),
-            toDataURL: () => "data:image/png;base64,mock",
-          };
-        }
-        return {};
-      },
+  if (typeof globalThis.document === "undefined") {
+    globalThis.document = {};
+  }
+  if (!globalThis.document.createElement) {
+    globalThis.document.createElement = (tag) => {
+      if (tag === "canvas") {
+        return {
+          width: 0,
+          height: 0,
+          getContext: () => ({
+            createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }),
+            putImageData: () => {},
+          }),
+          toDataURL: () => "data:image/png;base64,mock",
+        };
+      }
+      return {};
     };
   }
 });

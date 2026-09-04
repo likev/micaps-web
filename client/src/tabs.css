@@ -252,6 +252,8 @@
   align-items: center;
   gap: 6px;
   overflow: hidden;
+  min-width: 0;
+  flex: 1;
 }
 
 .win-badge {
@@ -262,6 +264,7 @@
   border-radius: 3px;
   font-weight: 700;
   font-family: var(--font-mono, monospace);
+  flex-shrink: 0;
 }
 
 .window-panel.active .win-badge {
@@ -275,6 +278,7 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
+  min-width: 0;
 }
 
 .win-actions {

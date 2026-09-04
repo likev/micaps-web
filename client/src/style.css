@@ -199,7 +199,9 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
   position: absolute;
   top: 12px;
   right: 12px;
-  width: 320px;
+  width: 330px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
   background: var(--bg-panel);
   backdrop-filter: blur(12px);
   border: 1px solid var(--border-color);
@@ -424,17 +426,146 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
   overflow: hidden;
 }
 
-.filter-rule-row {
-  justify-content: flex-start;
-  flex-wrap: nowrap;
+/* Station Filter Multi-Rule Builder */
+.config-filter-section {
+  margin-top: 8px;
+  border-top: 1px solid #30363d;
+  padding-top: 6px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.filter-rule-row .sel-rule-field,
-.filter-rule-row .sel-rule-op,
+.filter-rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 2px;
+}
+
+.filter-rule-row {
+  display: flex !important;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: nowrap !important;
+  gap: 4px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 3px 4px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  min-height: 28px;
+}
+
+.filter-rule-row.hidden {
+  display: none !important;
+}
+
+.filter-rule-row .rule-index {
+  font-size: 10px;
+  color: #8b949e;
+  width: 14px;
+  min-width: 14px;
+  flex-shrink: 0;
+  text-align: center;
+  line-height: 1;
+}
+
+.filter-rule-row .sel-rule-field {
+  flex: 1 1 72px;
+  min-width: 64px;
+  max-width: 82px;
+  background: #21262d;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  border-radius: 3px;
+  font-size: 11px;
+  padding: 2px 2px;
+  height: 22px;
+  box-sizing: border-box;
+}
+
+.filter-rule-row .sel-rule-op {
+  width: 38px;
+  flex: 0 0 38px;
+  background: #21262d;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  border-radius: 3px;
+  font-size: 11px;
+  padding: 2px 1px;
+  text-align: center;
+  height: 22px;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
 .filter-rule-row .ipt-rule-val,
 .filter-rule-row .ipt-rule-val2 {
-  min-width: 0;
-  flex-shrink: 1;
+  background: #21262d;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  border-radius: 3px;
+  font-size: 11px;
+  padding: 2px 2px;
+  text-align: center;
+  height: 22px;
+  box-sizing: border-box;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.filter-rule-row .ipt-rule-val:not(.range) {
+  width: 48px;
+  flex: 0 0 48px;
+}
+
+.filter-rule-row .ipt-rule-val.range,
+.filter-rule-row .ipt-rule-val2.range {
+  width: 36px;
+  flex: 0 0 36px;
+}
+
+.filter-rule-row input[type="number"]::-webkit-outer-spin-button,
+.filter-rule-row input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.filter-rule-row .btn-remove-rule {
+  background: none;
+  border: none;
+  color: #f85149;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.8;
+  transition: opacity 0.15s ease;
+  line-height: 1;
+}
+
+.filter-rule-row .btn-remove-rule:hover {
+  opacity: 1;
+  color: #ff7b72;
+}
+
+.config-quick-presets {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.btn-multi-filter-preset {
+  white-space: nowrap;
 }
 
 .layer-config {
