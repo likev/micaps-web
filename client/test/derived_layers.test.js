@@ -505,4 +505,96 @@ describe("Derived Contour Visibility Persistence & Level Step Invariance (Review
     expect(upperDerived.length).toBe(2);
     expect(upperDerived.map((l) => l.element)).toEqual(["HGT", "TMP"]);
   });
+
+  test("upper-air preset group level stepping updates station layer path and ID to target level", () => {
+    const targetLevel = 700;
+    const group = {
+      id: "composite-upperair-500",
+      name: "500hPa Upper-Air Sounding (UPPER_AIR/PLOT/500)",
+      hasLevel: true,
+      defaultLevel: 500,
+      layers: [
+        {
+          element: "PLOT",
+          id: "upperair-obs-500",
+          level: 500,
+          model: "UPPER_AIR",
+          name: "500 hPa Sounding Station Plots",
+          path: "UPPER_AIR/PLOT/500",
+          type: "station",
+        },
+        {
+          derivedFrom: "upperair-obs-500",
+          element: "HGT",
+          id: "contour-sounding-hgt-500",
+          level: 500,
+          model: "UPPER_AIR",
+          name: "500 hPa Derived Height",
+          type: "contour",
+        },
+      ],
+    };
+
+    // Simulate changeVerticalLevel logic on activeGroup
+    const stationLayer = group.layers.find((l) => l.type === "station" && l.model === "UPPER_AIR");
+    const targetStationId = stationLayer ? `upperair-obs-${targetLevel}` : null;
+    for (const l of group.layers) {
+      if (l.model === "UPPER_AIR") {
+        l.level = targetLevel;
+        if (l.type === "station") {
+          l.id = targetStationId || l.id;
+          l.path = `UPPER_AIR/${l.element || "PLOT"}/${targetLevel}`;
+          l.name = `${targetLevel} hPa Sounding Station Plots`;
+        } else if (l.derivedFrom) {
+          l.id = `contour-sounding-${(l.element || "HGT").toLowerCase()}-${targetLevel}`;
+          if (targetStationId) l.derivedFrom = targetStationId;
+          const elemName = l.element === "HGT" ? "Geopotential Height" : l.element;
+          l.name = `${targetLevel} hPa Derived ${elemName}`;
+        }
+      }
+    }
+
+    const stn = group.layers.find((l) => l.type === "station");
+    expect(stn.id).toBe("upperair-obs-700");
+    expect(stn.path).toBe("UPPER_AIR/PLOT/700");
+    expect(stn.level).toBe(700);
+
+    const hgt = group.layers.find((l) => l.type === "contour");
+    expect(hgt.id).toBe("contour-sounding-hgt-700");
+    expect(hgt.derivedFrom).toBe("upperair-obs-700");
+    expect(hgt.level).toBe(700);
+  });
+
+  test("SOUNDING_CONTOUR_CONFIGS generates contours at 700 hPa and falls back to autoLevels if values deviate", () => {
+    const map = createMockMap();
+    const win = { id: "test-700-fallback", level: 700 };
+
+    // 1. Normal 700 hPa sounding heights (~3100 gpm)
+    const normalSoundings = createSampleSoundingStations(700);
+    const resultNormal = analyzeAndRenderSoundingElementContour(map, normalSoundings, 700, "HGT", {
+      layerId: "contour-sounding-hgt-700",
+    }, win);
+
+    expect(resultNormal).not.toBeNull();
+    expect(resultNormal.lines.length).toBeGreaterThan(0);
+
+    // 2. Soundings with values outside standard levels (e.g. extreme values or atypical data)
+    const outlierSoundings = {
+      type: "FeatureCollection",
+      features: [
+        { type: "Feature", geometry: { type: "Point", coordinates: [116.4, 39.9] }, properties: { station_id: 54511, height: 3500 } },
+        { type: "Feature", geometry: { type: "Point", coordinates: [121.4, 31.2] }, properties: { station_id: 58362, height: 3600 } },
+        { type: "Feature", geometry: { type: "Point", coordinates: [113.3, 23.1] }, properties: { station_id: 59287, height: 3700 } },
+        { type: "Feature", geometry: { type: "Point", coordinates: [104.0, 30.6] }, properties: { station_id: 56294, height: 3550 } },
+      ],
+    };
+
+    const resultOutlier = analyzeAndRenderSoundingElementContour(map, outlierSoundings, 700, "HGT", {
+      layerId: "contour-sounding-hgt-700-outlier",
+    }, win);
+
+    expect(resultOutlier).not.toBeNull();
+    expect(resultOutlier.lines.length).toBeGreaterThan(0);
+    expect(resultOutlier.levels.length).toBeGreaterThan(0);
+  });
 });

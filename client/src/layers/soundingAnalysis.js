@@ -5,21 +5,21 @@ import { addOrUpdateLayer } from "../ui/layerControl.js";
 import { smoothGrid2D } from "../utils/smoothContour.js";
 
 const standardHgtLevels = {
-  1000: [0, 40, 80, 120, 160, 200, 240, 280],
-  925: [640, 680, 720, 760, 800, 840, 880, 920, 960],
-  850: [1320, 1360, 1400, 1440, 1480, 1520, 1560, 1600, 1640],
-  700: [2800, 2840, 2880, 2920, 2960, 3000, 3040, 3080, 3120, 3160, 3200],
-  500: [5200, 5240, 5280, 5320, 5360, 5400, 5440, 5480, 5520, 5560, 5600, 5640, 5680, 5720, 5760, 5800, 5840, 5880, 5920, 5960, 6000],
-  400: [6800, 6880, 6960, 7040, 7120, 7200, 7280, 7360, 7440, 7520, 7600],
-  300: [8800, 8900, 9000, 9100, 9200, 9300, 9400, 9500, 9600],
-  250: [9800, 10000, 10200, 10400, 10600, 10800, 11000, 11200],
-  200: [11200, 11400, 11600, 11800, 12000, 12200, 12400, 12600],
-  150: [13200, 13400, 13600, 13800, 14000, 14200, 14400],
-  100: [15600, 15800, 16000, 16200, 16400, 16600, 16800, 17000],
-  70: [17800, 18000, 18200, 18400, 18600, 18800, 19000],
-  50: [20000, 20200, 20400, 20600, 20800, 21000, 21200],
-  30: [23200, 23400, 23600, 23800, 24000, 24200],
-  10: [30000, 30400, 30800, 31200, 31600, 32000],
+  1000: [-80, -40, 0, 40, 80, 120, 160, 200, 240, 280, 320],
+  925: [600, 640, 680, 720, 760, 800, 840, 880, 920, 960, 1000, 1040],
+  850: [1240, 1280, 1320, 1360, 1400, 1440, 1480, 1520, 1560, 1600, 1640, 1680, 1720],
+  700: [2680, 2720, 2760, 2800, 2840, 2880, 2920, 2960, 3000, 3040, 3080, 3120, 3160, 3200, 3240, 3280, 3320],
+  500: [5000, 5080, 5160, 5200, 5240, 5280, 5320, 5360, 5400, 5440, 5480, 5520, 5560, 5600, 5640, 5680, 5720, 5760, 5800, 5840, 5880, 5920, 5960, 6000, 6040, 6080],
+  400: [6720, 6800, 6880, 6960, 7040, 7120, 7200, 7280, 7360, 7440, 7520, 7600, 7680],
+  300: [8600, 8700, 8800, 8900, 9000, 9100, 9200, 9300, 9400, 9500, 9600, 9700, 9800],
+  250: [9600, 9800, 10000, 10200, 10400, 10600, 10800, 11000, 11200, 11400],
+  200: [11000, 11200, 11400, 11600, 11800, 12000, 12200, 12400, 12600, 12800],
+  150: [13000, 13200, 13400, 13600, 13800, 14000, 14200, 14400, 14600],
+  100: [15400, 15600, 15800, 16000, 16200, 16400, 16600, 16800, 17000, 17200],
+  70: [17600, 17800, 18000, 18200, 18400, 18600, 18800, 19000, 19200],
+  50: [19800, 20000, 20200, 20400, 20600, 20800, 21000, 21200, 21400],
+  30: [23000, 23200, 23400, 23600, 23800, 24000, 24200, 24400],
+  10: [29600, 30000, 30400, 30800, 31200, 31600, 32000, 32400],
 };
 
 const boldMapHgt = {
@@ -46,8 +46,8 @@ export const SOUNDING_CONTOUR_CONFIGS = {
       if (typeof p.slp === "number" && p.slp > 300 && p.slp < 1000) return p.slp * 10;
       return null;
     },
-    getLevels: (level, minV, maxV) => standardHgtLevels[level] || griddata.autoLevels(minV, maxV, 8),
-    getBoldValues: (level) => boldMapHgt[level] || [],
+    getLevels: (level, minV, maxV) => standardHgtLevels[Number(level)] || standardHgtLevels[level] || griddata.autoLevels(minV, maxV, 8),
+    getBoldValues: (level) => boldMapHgt[Number(level)] || boldMapHgt[level] || [],
   },
   TMP: {
     name: "Temperature",
@@ -249,7 +249,20 @@ function calculateFieldContours(stationsGeoJSON, valueExtractor, config = {}) {
     levels = griddata.autoLevels(minV, maxV, 8);
   }
 
-  const lines = griddata.contour({ data: interpolated, rows: y.length, cols: x.length }, { x, y, levels });
+  let lines = griddata.contour({ data: interpolated, rows: y.length, cols: x.length }, { x, y, levels });
+  if ((!lines || lines.length === 0) && values.length > 0) {
+    const minV = Math.min(...values);
+    const maxV = Math.max(...values);
+    if (maxV > minV) {
+      const fallbackLevels = griddata.autoLevels(minV, maxV, 8);
+      const fallbackLines = griddata.contour({ data: interpolated, rows: y.length, cols: x.length }, { x, y, levels: fallbackLevels });
+      if (fallbackLines && fallbackLines.length > 0) {
+        lines = fallbackLines;
+        levels = fallbackLevels;
+      }
+    }
+  }
+
   if (Array.isArray(lines)) {
     for (const f of lines) {
       if (!f.properties) f.properties = {};

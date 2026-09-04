@@ -145,7 +145,8 @@ async function bootstrap() {
       updateWindowTitle(win, group.name);
       setWindowHeaderPreset(win, group.id);
       if (win.isObservation) {
-        const obsPath = group.id?.includes("upper") ? "UPPER_AIR/PLOT/500" : "SURFACE/PLOT_GLOBAL_3H";
+        const effectiveLevel = win.level || group.defaultLevel || 500;
+        const obsPath = group.id?.includes("upper") ? `UPPER_AIR/PLOT/${effectiveLevel}` : "SURFACE/PLOT_GLOBAL_3H";
         const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle);
         win.obsTime = latestFile;
       } else {
@@ -162,7 +163,7 @@ async function bootstrap() {
       if (!win.map) return;
       win.level = level;
       if (win.activeGroup) {
-        await loadPresetGroup(win.map, win.activeGroup, win.period, level, win);
+        await changeVerticalLevel(win.map, 0, level, win);
       } else {
         await loadWeatherField(win.map, win.model, win.element, level, win.period, null, win);
       }
@@ -211,11 +212,12 @@ async function bootstrap() {
       win.isObservation = Boolean(group.isObservation);
       win.forecastCycle = null;
       if (overrideLevel !== null) win.level = overrideLevel;
+      const effectiveLevel = overrideLevel || win.level || group.defaultLevel || 500;
       const winTitle = `W${win.winIdx + 1}: ${group.name}`;
       updateWindowTitle(win, group.name);
       setWindowHeaderPreset(win, group.id);
       if (win.isObservation) {
-        const obsPath = group.id?.includes("upper") ? "UPPER_AIR/PLOT/500" : "SURFACE/PLOT_GLOBAL_3H";
+        const obsPath = group.id?.includes("upper") ? `UPPER_AIR/PLOT/${effectiveLevel}` : "SURFACE/PLOT_GLOBAL_3H";
         const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle);
         win.obsTime = latestFile;
       } else {
@@ -718,7 +720,10 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
   if (win) {
     if (level !== null) win.level = level;
     win.period = curPeriod;
-    updateWindowTitle(win, group.name);
+    const titleName = group.hasLevel && level !== null
+      ? group.name.replace(/\d+\s*hPa/i, `${level}hPa`)
+      : group.name;
+    updateWindowTitle(win, titleName);
     setWindowHeaderPreset(win, group.id);
   }
   if (win && getActiveWindow() === win) {
@@ -769,15 +774,18 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
           colormap: resolveColormap(group, render, targetLevel),
         }, win, isTimeStep, expectedSeq);
       } else if (layer.type === "station") {
-        const obsPath = layer.path || (layer.model === "UPPER_AIR"
-          ? `UPPER_AIR/${layer.element}/${targetLevel || 500}`
-          : `${layer.model}/${layer.element}`);
+        const obsPath = (layer.model === "UPPER_AIR" && targetLevel)
+          ? `UPPER_AIR/${layer.element || "PLOT"}/${targetLevel}`
+          : (layer.path || (layer.model === "UPPER_AIR"
+            ? `UPPER_AIR/${layer.element || "PLOT"}/${targetLevel || 500}`
+            : `${layer.model}/${layer.element}`));
         let file = win?.obsTime;
-        if (!file) {
-          file = await syncObservationTimeline(obsPath, null, winTitle);
+        if (!file || (group.isObservation && level !== null)) {
+          file = await syncObservationTimeline(obsPath, win?.obsTime, winTitle, win);
           if (win) win.obsTime = file;
         }
-        await loadObservationProduct(map, layer.model, layer.element, targetLevel, file, win, layer.path, expectedSeq, layer.id);
+        const stationLayerId = (layer.model === "UPPER_AIR" && targetLevel) ? `upperair-obs-${targetLevel}` : layer.id;
+        await loadObservationProduct(map, layer.model, layer.element, targetLevel, file, win, obsPath, expectedSeq, stationLayerId);
       }
     })
   );
@@ -817,6 +825,9 @@ async function changeVerticalLevel(map, direction, explicitLevel = null, win = g
 
   const activeGroup = win?.activeGroup;
   if (activeGroup && activeGroup.hasLevel) {
+    const stationLayer = activeGroup.layers?.find((l) => l.type === "station" && l.model === "UPPER_AIR");
+    const targetStationId = stationLayer ? `upperair-obs-${targetLevel}` : null;
+
     const prevContours = getLayersForWindow(win)
       .filter((l) => l.type === "contour" && l.model === "UPPER_AIR")
       .map((l) => ({
@@ -825,7 +836,7 @@ async function changeVerticalLevel(map, direction, explicitLevel = null, win = g
         element: l.element,
         level: targetLevel,
         config: { ...(l.config || {}) },
-        derivedFrom: l.derivedFrom,
+        derivedFrom: targetStationId || l.derivedFrom,
         visible: l.visible !== false,
       }));
     if (prevContours.length > 0) {
@@ -833,11 +844,18 @@ async function changeVerticalLevel(map, direction, explicitLevel = null, win = g
     }
     if (activeGroup.layers) {
       for (const l of activeGroup.layers) {
-        if (l.derivedFrom && l.model === "UPPER_AIR") {
+        if (l.model === "UPPER_AIR") {
           l.level = targetLevel;
-          l.id = `contour-sounding-${(l.element || "HGT").toLowerCase()}-${targetLevel}`;
-          const elemName = l.element === "HGT" ? "Geopotential Height" : (l.element === "TMP" ? "Temperature" : l.element);
-          l.name = `${targetLevel} hPa Derived ${elemName}`;
+          if (l.type === "station") {
+            l.id = targetStationId || l.id;
+            l.path = `UPPER_AIR/${l.element || "PLOT"}/${targetLevel}`;
+            l.name = `${targetLevel} hPa Sounding Station Plots`;
+          } else if (l.derivedFrom) {
+            l.id = `contour-sounding-${(l.element || "HGT").toLowerCase()}-${targetLevel}`;
+            if (targetStationId) l.derivedFrom = targetStationId;
+            const elemName = l.element === "HGT" ? "Geopotential Height" : (l.element === "TMP" ? "Temperature" : l.element);
+            l.name = `${targetLevel} hPa Derived ${elemName}`;
+          }
         }
       }
     }
