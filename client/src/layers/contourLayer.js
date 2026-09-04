@@ -218,6 +218,8 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
 
   // --- ISOLINES (Contour Lines) & LABELS (Every 200px) ---
   if (isolines) {
+    const labelSize = typeof options.labelSize === "number" && options.labelSize > 0 ? options.labelSize : 13;
+    const labelTextSize = ["case", ["to-boolean", ["get", "isBold"]], labelSize + 1, labelSize];
     if (map.getSource(isolineSrcId)) {
       map.getSource(isolineSrcId).setData(isolines);
       if (map.getLayer(isolineLayerId)) {
@@ -228,6 +230,14 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
       if (map.getLayer(isolineLabelLayerId)) {
         map.setLayoutProperty(isolineLabelLayerId, "visibility", visibleIsoline ? "visible" : "none");
         map.setPaintProperty(isolineLabelLayerId, "text-color", lineColor);
+        // Migrate pre-existing label layers (created with text-size 11) to current spec
+        // and honour per-layer labelSize on data refresh without requiring remove/recreate.
+        try {
+          map.setLayoutProperty(isolineLabelLayerId, "text-size", labelTextSize);
+          map.setLayoutProperty(isolineLabelLayerId, "symbol-spacing", 160);
+          map.setLayoutProperty(isolineLabelLayerId, "text-ignore-placement", ["case", ["to-boolean", ["get", "isBold"]], true, false]);
+          map.setPaintProperty(isolineLabelLayerId, "text-halo-width", 2.0);
+        } catch { /* ignore style-spec errors on older layers */ }
       }
     } else {
       map.addSource(isolineSrcId, {
@@ -257,18 +267,18 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
         source: isolineSrcId,
         layout: {
           "symbol-placement": "line",
-          "symbol-spacing": 200, // Label contour value every 200px
+          "symbol-spacing": 160,
           "text-field": ["coalesce", ["get", "label"], ["to-string", ["get", "value"]]],
-          "text-size": 11,
+          "text-size": labelTextSize,
           "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
           "text-allow-overlap": false,
-          "text-ignore-placement": false,
+          "text-ignore-placement": ["case", ["to-boolean", ["get", "isBold"]], true, false],
           "visibility": visibleIsoline ? "visible" : "none",
         },
         paint: {
           "text-color": lineColor,
           "text-halo-color": "rgba(10, 15, 25, 0.95)",
-          "text-halo-width": 1.5,
+          "text-halo-width": 2.0,
         },
       });
     }
@@ -327,6 +337,14 @@ export function setLayerIsolineStyle(map, layerId, config = {}) {
   }
   if (map.getLayer(isolineLabelLayerId)) {
     map.setPaintProperty(isolineLabelLayerId, "text-color", lineColor);
+    if (typeof config.labelSize === "number" && config.labelSize > 0) {
+      map.setLayoutProperty(isolineLabelLayerId, "text-size", [
+        "case",
+        ["to-boolean", ["get", "isBold"]],
+        config.labelSize + 1,
+        config.labelSize,
+      ]);
+    }
   }
 }
 

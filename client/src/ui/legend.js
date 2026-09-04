@@ -10,7 +10,8 @@ export function updateLegend(element = "TMP", colormap = null, zMin = undefined,
     windowLegends.set(winId, new Map());
   }
   const elMap = windowLegends.get(winId);
-  elMap.set(element, { element, colormap, zMin, zMax });
+  const winPrefix = win && typeof win.winIdx === "number" ? `W${win.winIdx + 1}` : null;
+  elMap.set(element, { element, colormap, zMin, zMax, winPrefix });
 
   renderLegendPanel(winId, panelId);
 }
@@ -37,6 +38,7 @@ export function syncLegendForWindow(win = null, panelId = "legend-panel") {
 }
 
 function renderLegendPanel(winId, panelId = "legend-panel") {
+  if (typeof document === "undefined") return;
   const panel = document.getElementById(panelId);
   if (!panel) return;
 
@@ -77,10 +79,12 @@ function renderLegendPanel(winId, panelId = "legend-panel") {
       }
     }
 
+    const displayTitle = item.winPrefix ? `[${item.winPrefix}] ${element}` : element;
+
     return `
       <div class="legend-item">
         <div class="legend-header">
-          <span class="legend-title">${element}</span>
+          <span class="legend-title">${displayTitle}</span>
           <span class="legend-unit">${unit ? `(${unit})` : ""}</span>
         </div>
         <div class="legend-bar" role="img" aria-label="${element} color scale ${zMin ?? ''} to ${zMax ?? ''} ${unit}" style="background: ${grad};"></div>

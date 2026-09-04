@@ -44,12 +44,15 @@ export function setStationConfig(map, config) {
   updateVisibleMarkersForMap(map);
 }
 
-export function renderStationWeatherPlots(map, geojson, visible = true) {
+export function renderStationWeatherPlots(map, geojson, visible = true, config = null) {
   if (!map || !geojson || !geojson.features) return;
   lastStationGeoJSON = geojson;
   const state = getState(map);
   state.geojson = geojson;
   if (visible !== undefined) state.visible = Boolean(visible);
+  if (config) {
+    state.config = { ...state.config, ...config };
+  }
 
   if (state.moveListener) {
     map.off("moveend", state.moveListener);
@@ -305,7 +308,7 @@ export function updateVisibleMarkersForMap(map) {
 
   const bounds = map.getBounds();
   const curZoom = map.getZoom();
-  const scale = curZoom < 4.5 ? 0.75 : (curZoom < 6.5 ? 0.88 : 1.0);
+  const scale = curZoom < 4.5 ? 0.9 : (curZoom < 6.5 ? 1.0 : 1.15);
 
   // 1. Group in-bounds stations matching filters into 100x100px screen pixel grid bins
   const screenBins = new Map();
@@ -347,7 +350,7 @@ export function updateVisibleMarkersForMap(map) {
     const el = document.createElement("div");
     el.className = "station-plot-marker";
     el.style.fontFamily = "'SF Mono', -apple-system, monospace";
-    el.style.fontSize = "10px";
+    el.style.fontSize = "13px";
     el.style.color = "#ffffff";
     el.style.pointerEvents = "none";
 
@@ -399,51 +402,51 @@ export function updateVisibleMarkersForMap(map) {
     const barbSVG = getWindBarbSVG(ws, wd, 100);
 
     el.innerHTML = `
-      <div style="position: relative; width: 48px; height: 48px; pointer-events: none; transform: scale(${scale}); transform-origin: center center;">
-        <!-- Wind Barb / Direction & Speed (Centered at 24, 24) -->
+      <div style="position: relative; width: 56px; height: 56px; pointer-events: none; transform: scale(${scale}); transform-origin: center center;">
+        <!-- Wind Barb / Direction & Speed (Centered at 28, 28) -->
         ${showWind ? `
-        <div style="position: absolute; top: -26px; left: -26px; width: 100px; height: 100px; pointer-events: none; z-index: 1;">
+        <div style="position: absolute; top: -22px; left: -22px; width: 100px; height: 100px; pointer-events: none; z-index: 1;">
           ${barbSVG}
         </div>` : ""}
         <!-- Center Sky Cover Circle (or small station dot if cloud is hidden) -->
         ${showCloud ? `
-        <div style="position: absolute; top: 16px; left: 16px; width: 16px; height: 16px; pointer-events: none; z-index: 2;">
+        <div style="position: absolute; top: 20px; left: 20px; width: 16px; height: 16px; pointer-events: none; z-index: 2;">
           ${skySVG}
         </div>` : `
-        <div style="position: absolute; top: 22px; left: 22px; width: 4px; height: 4px; border-radius: 50%; background: #e3b341; pointer-events: none; z-index: 2; box-shadow: 0 0 2px #000;"></div>`}
+        <div style="position: absolute; top: 26px; left: 26px; width: 4px; height: 4px; border-radius: 50%; background: #e3b341; pointer-events: none; z-index: 2; box-shadow: 0 0 2px #000;"></div>`}
         <!-- TT: Temperature (°C) Top-Left in Bold Red/Orange -->
         ${showTemp && tt ? `
-        <div style="position: absolute; top: 4px; left: 0px; width: 18px; text-align: right; color: #f85149; font-weight: 700; font-size: 11px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+        <div style="position: absolute; top: 4px; left: 0px; width: 22px; text-align: right; color: #f85149; font-weight: 700; font-size: 13px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
           ${tt}
         </div>` : ""}
         <!-- TdTd: Dew Point (°C) Bottom-Left in Emerald Green -->
         ${showDewpoint && td ? `
-        <div style="position: absolute; bottom: 4px; left: 0px; width: 18px; text-align: right; color: #56d364; font-weight: 600; font-size: 11px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+        <div style="position: absolute; bottom: 4px; left: 0px; width: 22px; text-align: right; color: #56d364; font-weight: 700; font-size: 13px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
           ${td}
         </div>` : ""}
         <!-- ww: Present Weather Symbol (Middle Left) -->
         ${showWeather && ww ? `
-        <div style="position: absolute; top: 16px; left: -2px; width: 16px; text-align: center; color: #e3b341; font-size: 13px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+        <div style="position: absolute; top: 20px; left: -2px; width: 20px; text-align: center; color: #e3b341; font-size: 15px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
           ${ww}
         </div>` : ""}
         <!-- VV: Visibility (Far-Left in Golden Yellow) -->
         ${showVisibility && vis ? `
-        <div style="position: absolute; top: 18px; left: -22px; width: 20px; text-align: right; color: #ffd33d; font-weight: 700; font-size: 10px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+        <div style="position: absolute; top: 20px; left: -26px; width: 24px; text-align: right; color: #ffd33d; font-weight: 700; font-size: 12px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
           ${vis}
         </div>` : ""}
         <!-- PPP: Sea-Level Pressure (Top Right in Cyan/Blue) -->
         ${showPressure && ppp ? `
-        <div style="position: absolute; top: 4px; left: 30px; width: 22px; text-align: left; color: #79c0ff; font-weight: 700; font-size: 11px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+        <div style="position: absolute; top: 4px; left: 34px; width: 26px; text-align: left; color: #79c0ff; font-weight: 700; font-size: 13px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
           ${ppp}
         </div>` : ""}
         <!-- R6: 6h Precipitation (Middle Right in Sky Blue) -->
         ${showRain6 && rain6 ? `
-        <div style="position: absolute; top: 18px; left: 30px; width: 24px; text-align: left; color: #38bdf8; font-weight: 700; font-size: 10px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+        <div style="position: absolute; top: 20px; left: 34px; width: 26px; text-align: left; color: #38bdf8; font-weight: 700; font-size: 12px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
           ${rain6}
         </div>` : ""}
         <!-- ppa: 3h Pressure Tendency & Diff (Bottom Right in Light Blue) -->
         ${showTendency && (pDiff || pTend) ? `
-        <div style="position: absolute; bottom: 4px; left: 30px; width: 24px; text-align: left; font-size: 9px; font-weight: 500; color: #a5d6ff; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+        <div style="position: absolute; bottom: 4px; left: 34px; width: 26px; text-align: left; font-size: 11px; font-weight: 600; color: #a5d6ff; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
           ${pDiff}${pTend}
         </div>` : ""}
       </div>

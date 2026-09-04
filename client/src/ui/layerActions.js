@@ -15,7 +15,7 @@ import { fetchGridBinaryStream, fetchGridData, fetchStationObservations } from "
 import { appState } from "../store/appState.js";
 import { getActiveWindow } from "./tabWindowManager.js";
 import { getLayersForWindow } from "./layerControl.js";
-import { updateLegend } from "./legend.js";
+import { updateLegend, removeLegend } from "./legend.js";
 import { upsertDerivedLayerToPreset, removeDerivedLayerFromPreset } from "../config/presets.js";
 
 const paletteSeq = new Map();
@@ -27,7 +27,16 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
       setLayerIsobandVisibility(map, layerId, value && layer.config?.showFill);
       setLayerIsolineVisibility(map, layerId, value && layer.config?.showLine);
       if (layer.config?.showRaster) {
-        setRasterVisibility(map, value, layerId);
+        if (value) {
+          const { rasterLayerId } = getRasterDOMIds(layerId);
+          if (map.getLayer(rasterLayerId)) {
+            setRasterVisibility(map, true, layerId);
+          } else {
+            triggerRasterOverlay(map, layer, win);
+          }
+        } else {
+          setRasterVisibility(map, false, layerId);
+        }
       }
       if (layer.config?.showWind) {
         if (value) {
@@ -65,6 +74,17 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
       provLayers.forEach((id) => { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", showProvinces ? "visible" : "none"); });
       cityLayers.forEach((id) => { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", showCities ? "visible" : "none"); });
       if (map.getLayer("graticule-lines")) map.setLayoutProperty("graticule-lines", "visibility", showGraticule ? "visible" : "none");
+    }
+
+    // Synchronize legend lifecycle on layer visibility change (contour/wind only;
+    // station plots never had legends — avoid creating PLOT_* entries with fallback ticks)
+    if ((layer.type === "contour" || layer.type === "wind") && layer.element) {
+      if (value) {
+        const colormap = layer.colormap || layer.config?.palettePath || layer.element;
+        updateLegend(layer.element, colormap, layer.gridData?.stats?.min, layer.gridData?.stats?.max, win);
+      } else {
+        removeLegend(layer.element, win);
+      }
     }
   } else if (action === "config") {
     if (layer.type === "pmtiles") {
@@ -104,12 +124,13 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
           map.setPaintProperty(rasterLayerId, "raster-opacity", value.opacity);
         }
       }
-      if (value.lineWidth !== undefined || value.lineColor !== undefined || value.boldValues !== undefined || value.boldLineWidth !== undefined) {
+      if (value.lineWidth !== undefined || value.lineColor !== undefined || value.boldValues !== undefined || value.boldLineWidth !== undefined || value.labelSize !== undefined) {
         setLayerIsolineStyle(map, layerId, {
           lineWidth: layer.config?.lineWidth,
           lineColor: layer.config?.lineColor,
           boldValues: layer.config?.boldValues,
           boldLineWidth: layer.config?.boldLineWidth,
+          labelSize: layer.config?.labelSize,
         });
       }
 
@@ -309,6 +330,9 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
       });
     }
   } else if (action === "remove") {
+    if ((layer.type === "contour" || layer.type === "wind") && layer.element) {
+      removeLegend(layer.element, win);
+    }
     if (layer.type === "contour" || layer.type === "wind") {
       removeContourLayer(map, layerId);
       removeRasterLayer(map, layerId);

@@ -356,6 +356,9 @@
           "id": "surface-obs",
           "model": "SURFACE",
           "name": "Surface Station Observations",
+          "render": {
+            "showRain6": true
+          },
           "type": "station"
         },
         {

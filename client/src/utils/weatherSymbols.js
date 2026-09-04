@@ -27,12 +27,12 @@ export function getSkyCoverSVG(octas = 0, size = 18) {
       fillContent = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#e6edf3"/>`;
       break;
     default: // Obscured / missing
-      fillContent = `<line x1="${cx - r}" y1="${cy - r}" x2="${cx + r}" y2="${cy + r}" stroke="#e6edf3" stroke-width="1.5"/><line x1="${cx + r}" y1="${cy - r}" x2="${cx - r}" y2="${cy + r}" stroke="#e6edf3" stroke-width="1.5"/>`;
+      fillContent = `<line x1="${cx - r}" y1="${cy - r}" x2="${cx + r}" y2="${cy + r}" stroke="#e6edf3" stroke-width="2.0"/><line x1="${cx + r}" y1="${cy - r}" x2="${cx - r}" y2="${cy + r}" stroke="#e6edf3" stroke-width="2.0"/>`;
   }
 
   return `
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <circle cx="${cx}" cy="${cy}" r="${r}" fill="rgba(13,17,23,0.8)" stroke="#e6edf3" stroke-width="1.5"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="rgba(13,17,23,0.8)" stroke="#e6edf3" stroke-width="2.0"/>
       ${fillContent}
     </svg>
   `;
@@ -87,7 +87,7 @@ export function getWindBarbSVG(speed = 0, dir = 0, size = 100) {
     const pY = cy + pos * Math.sin(angleRad);
     const bX = pX + 15 * Math.cos(barbAngle);
     const bY = pY + 15 * Math.sin(barbAngle);
-    barbsSVG += `<line x1="${pX}" y1="${pY}" x2="${bX}" y2="${bY}" stroke="#58a6ff" stroke-width="1.8" stroke-linecap="round"/>`;
+    barbsSVG += `<line x1="${pX}" y1="${pY}" x2="${bX}" y2="${bY}" stroke="#58a6ff" stroke-width="2.2" stroke-linecap="round"/>`;
     pos -= 6.5;
     remSpeed -= 4;
   }
@@ -100,13 +100,13 @@ export function getWindBarbSVG(speed = 0, dir = 0, size = 100) {
     const pY = cy + barbPos * Math.sin(angleRad);
     const bX = pX + 8 * Math.cos(barbAngle);
     const bY = pY + 8 * Math.sin(barbAngle);
-    barbsSVG += `<line x1="${pX}" y1="${pY}" x2="${bX}" y2="${bY}" stroke="#58a6ff" stroke-width="1.8" stroke-linecap="round"/>`;
+    barbsSVG += `<line x1="${pX}" y1="${pY}" x2="${bX}" y2="${bY}" stroke="#58a6ff" stroke-width="2.2" stroke-linecap="round"/>`;
   }
 
   return `
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
       <!-- Wind Staff -->
-      <line x1="${xStart}" y1="${yStart}" x2="${xEnd}" y2="${yEnd}" stroke="#58a6ff" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="${xStart}" y1="${yStart}" x2="${xEnd}" y2="${yEnd}" stroke="#58a6ff" stroke-width="2.2" stroke-linecap="round"/>
       <!-- Feathers & Flags (4 m/s full, 2 m/s half, 20 m/s pennant) -->
       ${barbsSVG}
     </svg>

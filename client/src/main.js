@@ -8,12 +8,12 @@ import { handleLayerAction, triggerStationStreamlines, triggerRasterOverlay } fr
 import { initTooltip } from "./ui/tooltip.js";
 import { renderContourLayers, removeAllContourLayers } from "./layers/contourLayer.js";
 import { renderBinaryRaster, renderGridRaster, removeRasterLayer } from "./layers/rasterLayer.js";
-import { renderStationWeatherPlots, setStationVisibility, removeStationLayer } from "./layers/stationLayer.js";
+import { renderStationWeatherPlots, setStationVisibility, removeStationLayer, setStationConfig } from "./layers/stationLayer.js";
 import { renderWindStreamlines, stopWindAnimation, renderGridWindBarbs, removeGridWindBarbs } from "./layers/windLayer.js";
 import { analyzeAndRenderSoundingContours, analyzeAndRenderSoundingElementContour } from "./layers/soundingAnalysis.js";
 import { analyzeAndRenderSurfaceContours, analyzeAndRenderSurfaceSLPContours } from "./layers/surfaceAnalysis.js";
 import { fetchGridData, fetchGridBinaryStream, fetchStationObservations } from "./api/catalogApi.js";
-import { updateLegend, clearLegends, syncLegendForWindow } from "./ui/legend.js";
+import { updateLegend, removeLegend, clearLegends, syncLegendForWindow } from "./ui/legend.js";
 import { initKeyboardShortcuts } from "./ui/keyboardShortcuts.js";
 import { initConfigEditor, openConfigTab } from "./ui/configEditor.js";
 import { appState } from "./store/appState.js";
@@ -41,6 +41,8 @@ function ensureErrorToast() {
     el = document.createElement("div");
     el.id = "error-toast";
     el.className = "hidden";
+    el.setAttribute("role", "alert");
+    el.setAttribute("aria-live", "polite");
     el.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#21262d;color:#f85149;border:1px solid #da3633;border-radius:6px;padding:8px 14px;font-size:12px;z-index:9999;max-width:80vw;box-shadow:0 4px 12px rgba(0,0,0,0.4);";
     document.body.appendChild(el);
   }
@@ -280,6 +282,7 @@ async function bootstrap() {
       setTimelineMode("nwp", { period: win.period ?? 24, winTitle: winBannerTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 });
       await loadWeatherField(map, model, element, win.level, win.period, null, win);
     }
+    if (win?.layerSnapshots) win.layerSnapshots = null;
   });
 
   // ── Layer Control ────────────────────────────────────────────────────────
@@ -339,6 +342,7 @@ async function bootstrap() {
         await loadPresetGroup(map, activeGroup, period, win.level, win, false);
       } else {
         await loadWeatherField(map, win.model, win.element, win.level, period, null, win, false);
+        if (win?.layerSnapshots) win.layerSnapshots = null;
       }
     } else {
       let period = win.period ?? 24;
@@ -399,23 +403,25 @@ async function loadWeatherField(map, model, element, level, period, customOption
   const name = isWind ? `${level} hPa Wind Field (${model})` : `${level} hPa ${element} (${model})`;
 
   const existingLayer = getLayerById(layerId, win);
-  const exCfg = existingLayer?.config || {};
+  const snap = win?.layerSnapshots?.find((s) => s.id === layerId || (s.element === element && s.model === model));
+  const exCfg = existingLayer?.config || snap?.config || {};
 
   const isHeight = element === "HGT";
   const isTemp = element === "TMP";
   const defaultLineColor = isHeight ? "#58a6ff" : (isTemp ? "#f85149" : "#ffffff");
-  const lineColor = existingLayer?.color || exCfg.lineColor || customOptions?.lineColor || defaultLineColor;
+  const lineColor = existingLayer?.color || snap?.color || exCfg.lineColor || customOptions?.lineColor || defaultLineColor;
   const opacity = exCfg.opacity ?? customOptions?.opacity ?? 0.75;
   const showFill = exCfg.showFill ?? customOptions?.showFill ?? (!isHeight && !isWind);
   const showLine = exCfg.showLine ?? customOptions?.showLine ?? !isWind;
   const lineWidth = exCfg.lineWidth ?? customOptions?.lineWidth ?? 1.4;
   const showWind = exCfg.showWind ?? customOptions?.showWind ?? isWind;
   const showBarbs = exCfg.showBarbs ?? customOptions?.showBarbs ?? false;
-  const showRaster = exCfg.showRaster ?? false;
+  const showRaster = exCfg.showRaster ?? customOptions?.showRaster ?? Boolean(appState.state?.layers?.raster);
   const savedPalettePath = exCfg.palettePath || null;
-  const isVisible = existingLayer ? existingLayer.visible !== false : true;
+  const isVisible = existingLayer ? (existingLayer.visible !== false) : (snap ? snap.visible !== false : true);
   const smooth = exCfg.smooth ?? customOptions?.smooth ?? true;
   const smoothIterations = exCfg.smoothIterations ?? customOptions?.smoothIterations ?? 2;
+  const labelSize = exCfg.labelSize ?? customOptions?.labelSize;
 
   try {
     const gridData = await fetchGridData(path, file);
@@ -491,8 +497,10 @@ async function loadWeatherField(map, model, element, level, period, customOption
         lineColor,
         opacity,
         lineWidth,
-        boldValues: customOptions?.boldValues,
-        boldLineWidth: customOptions?.boldLineWidth,
+        boldValues: exCfg.boldValues ?? customOptions?.boldValues,
+        boldLineWidth: exCfg.boldLineWidth ?? customOptions?.boldLineWidth,
+        labelSize,
+        palettePath: savedPalettePath,
         showRaster,
         showWind: false,
         showBarbs: false,
@@ -508,7 +516,7 @@ async function loadWeatherField(map, model, element, level, period, customOption
       syncLayerControlForWindow(win);
     }
 
-    if ((showRaster || appState.state.layers.raster) && isVisible) {
+    if (showRaster && isVisible) {
       if (gridData && (gridData.values || (gridData.u && gridData.v))) {
         renderGridRaster(map, gridData, element, colormap, { layerId, opacity });
       } else {
@@ -530,7 +538,11 @@ async function loadWeatherField(map, model, element, level, period, customOption
       }
     }
 
-    updateLegend(element, colormap, gridData.stats?.min, gridData.stats?.max, win);
+    if (isVisible) {
+      updateLegend(element, colormap, gridData.stats?.min, gridData.stats?.max, win);
+    } else {
+      removeLegend(element, win);
+    }
   } catch (err) {
     console.error(`[Bootstrap] Field load failed for ${path}/${file}:`, err);
     showErrorToast(`Failed to load ${element} ${level}hPa: ${err.message || err}`);
@@ -552,14 +564,23 @@ async function loadUpperAirComposite(map, level = 500, obsTime = "20260828170000
     return; // Discard stale in-flight response from fast navigation
   }
   appState.set("stationData", stations);
-  renderStationWeatherPlots(map, stations, appState.state.layers.station);
   const activeGroup = win?.activeGroup;
   const groupStationLayer = activeGroup?.layers?.find((l) => l.type === "station");
   const layerId = groupStationLayer?.id || "station-upper";
-  const stnConfig = { ...(groupStationLayer?.render || {}), ...(groupStationLayer?.config || {}) };
-  const stnLayer = addOrUpdateLayer({ id: layerId, name: `${curLevel} hPa Sounding Station Plots`, type: "station", color: "#e3b341", visible: true, removable: true, stationsGeoJSON: stations, model: "UPPER_AIR", level: curLevel, config: stnConfig }, win);
+  const existingStn = getLayerById(layerId, win);
+  const snapStn = win?.layerSnapshots?.find((s) => s.id === layerId || (s.type === "station" && s.model === "UPPER_AIR"));
+  const isVisible = existingStn ? (existingStn.visible !== false) : (snapStn ? snapStn.visible !== false : (appState.state.layers.station !== false));
+  const stnConfig = {
+    ...(groupStationLayer?.render || {}),
+    ...(groupStationLayer?.config || {}),
+    ...(snapStn?.config || {}),
+    ...(existingStn?.config || {}),
+  };
+  renderStationWeatherPlots(map, stations, isVisible, stnConfig);
+  setStationConfig(map, stnConfig);
+  const stnLayer = addOrUpdateLayer({ id: layerId, name: `${curLevel} hPa Sounding Station Plots`, type: "station", color: "#e3b341", visible: isVisible, removable: true, stationsGeoJSON: stations, model: "UPPER_AIR", level: curLevel, config: stnConfig }, win);
   if (win && getActiveWindow() === win) syncLayerControlForWindow(win);
-  if (stnLayer?.config?.showStreamlines) triggerStationStreamlines(map, stnLayer, win);
+  if (stnLayer?.config?.showStreamlines && isVisible) triggerStationStreamlines(map, stnLayer, win);
   if (stations?.features?.length >= 3) {
     const groupDerived = activeGroup?.layers?.filter((l) => l.type === "contour" && l.model === "UPPER_AIR" && Boolean(l.derivedFrom)) || [];
     if (groupDerived.length > 0) {
@@ -609,15 +630,24 @@ async function loadObservationProduct(map, model, element, level, file, win = ge
       return; // Discard stale in-flight response from fast navigation
     }
     appState.set("stationData", stations);
-    renderStationWeatherPlots(map, stations, appState.state.layers.station);
     const activeGroup = win?.activeGroup;
     const groupStationLayer = activeGroup?.layers?.find((l) => l.id === customStationLayerId || l.type === "station");
     const layerId = customStationLayerId || groupStationLayer?.id || (model === "UPPER_AIR" ? "station-upper" : `station-${model.toLowerCase()}`);
+    const existingStn = getLayerById(layerId, win);
+    const snapStn = win?.layerSnapshots?.find((s) => s.id === layerId || (s.type === "station" && s.model === model));
+    const isVisible = existingStn ? (existingStn.visible !== false) : (snapStn ? snapStn.visible !== false : (appState.state.layers.station !== false));
     const name = model === "UPPER_AIR" ? `${level || 500} hPa Sounding Station Plots` : `${model === "SURFACE" ? "Surface" : "Upper Air"} Station Observations`;
-    const stnConfig = { ...(groupStationLayer?.render || {}), ...(groupStationLayer?.config || {}) };
-    const stnLayer = addOrUpdateLayer({ id: layerId, name, type: "station", color: "#e3b341", visible: true, removable: true, stationsGeoJSON: stations, model, element, level, config: stnConfig }, win);
+    const stnConfig = {
+      ...(groupStationLayer?.render || {}),
+      ...(groupStationLayer?.config || {}),
+      ...(snapStn?.config || {}),
+      ...(existingStn?.config || {}),
+    };
+    renderStationWeatherPlots(map, stations, isVisible, stnConfig);
+    setStationConfig(map, stnConfig);
+    const stnLayer = addOrUpdateLayer({ id: layerId, name, type: "station", color: "#e3b341", visible: isVisible, removable: true, stationsGeoJSON: stations, model, element, level, config: stnConfig }, win);
     if (win && getActiveWindow() === win) syncLayerControlForWindow(win);
-    if (stnLayer?.config?.showStreamlines) triggerStationStreamlines(map, stnLayer, win);
+    if (stnLayer?.config?.showStreamlines && isVisible) triggerStationStreamlines(map, stnLayer, win);
     if (model === "SURFACE" && stations?.features?.length >= 3) {
       const groupDerived = activeGroup?.layers?.filter((l) => l.type === "contour" && l.model === "SURFACE" && Boolean(l.derivedFrom)) || [];
       if (groupDerived.length > 0) {
@@ -706,6 +736,27 @@ async function loadObservationProduct(map, model, element, level, file, win = ge
 
 export function clearAllWeatherLayersFromMap(map, win = null) {
   if (!map) return;
+  // Snapshot visibility/config before wiping so every clear path (preset reload,
+  // init-cycle change, catalog load, level change) can restore operator state.
+  // Only snapshot once per cycle — changeVerticalLevel pre-snapshots before
+  // delegating here, so never overwrite a fresher snapshot with an emptied list.
+  if (win && !win.layerSnapshots) {
+    try {
+      const prev = getLayersForWindow(win);
+      if (prev && prev.length > 0) {
+        win.layerSnapshots = prev.map((l) => ({
+          id: l.id,
+          type: l.type,
+          model: l.model,
+          element: l.element,
+          visible: l.visible !== false,
+          config: { ...(l.config || {}) },
+          color: l.color,
+          colormap: l.colormap,
+        }));
+      }
+    } catch { /* snapshot is best-effort */ }
+  }
   try {
     removeAllContourLayers(map);
     stopWindAnimation(map);
@@ -812,6 +863,11 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
     // Rollback period assignment if all layer loads failed
     win.period = prevPeriod;
   }
+  // Snapshots are one-shot: consumed by the loaders above (existing+snap merge).
+  // Clear here so a later unrelated preset cannot inherit stale visibility.
+  if (win?.layerSnapshots) {
+    win.layerSnapshots = null;
+  }
 }
 
 async function changeVerticalLevel(map, direction, explicitLevel = null, win = getActiveWindow()) {
@@ -840,6 +896,21 @@ async function changeVerticalLevel(map, direction, explicitLevel = null, win = g
   if (win && getActiveWindow() === win) appState.set("level", targetLevel);
   setNavBarLevel(targetLevel);
   setWindowHeaderLevel(win, targetLevel);
+
+  // Snapshot all window layers before level change to preserve visibility and config
+  const prevLayers = getLayersForWindow(win);
+  if (prevLayers && prevLayers.length > 0) {
+    win.layerSnapshots = prevLayers.map((l) => ({
+      id: l.id,
+      type: l.type,
+      model: l.model,
+      element: l.element,
+      visible: l.visible !== false,
+      config: { ...(l.config || {}) },
+      color: l.color,
+      colormap: l.colormap,
+    }));
+  }
 
   const activeGroup = win?.activeGroup;
   if (activeGroup && activeGroup.hasLevel) {
@@ -912,6 +983,10 @@ async function changeVerticalLevel(map, direction, explicitLevel = null, win = g
       updateWindowTitle(win, `${targetLevel} hPa ${element} (${model})`);
     }
     await loadWeatherField(map, model, element, targetLevel, period, null, win, false, currentSeq);
+  }
+
+  if (win?.layerSnapshots) {
+    win.layerSnapshots = null;
   }
 }
 

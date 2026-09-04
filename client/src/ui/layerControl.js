@@ -282,12 +282,15 @@ function renderLayersManager(panel) {
   layers.forEach((layer) => {
     // Visibility toggle (eye button)
     const visBtn = panel.querySelector(`.btn-vis[data-layer-id="${layer.id}"]`);
+    const rowEl = panel.querySelector(`.layer-row[data-layer-id="${layer.id}"]`);
     if (visBtn) {
       visBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         layer.visible = !layer.visible;
         visBtn.classList.toggle("active", layer.visible);
-        visBtn.innerHTML = layer.visible ? "👁" : "👁‍🗨";
+        visBtn.innerHTML = layer.visible ? "👁" : "🚫";
+        visBtn.setAttribute("aria-pressed", layer.visible ? "true" : "false");
+        if (rowEl) rowEl.classList.toggle("layer-hidden", !layer.visible);
         if (onLayerActionCallback) onLayerActionCallback("visibility", layer.id, layer.visible, layer, currentActiveWinId);
       });
     }
@@ -303,7 +306,6 @@ function renderLayersManager(panel) {
     }
 
     // Config accordion trigger (click on layer row or ⚙)
-    const rowEl = panel.querySelector(`.layer-row[data-layer-id="${layer.id}"]`);
     const configDrawer = panel.querySelector(`.layer-config[data-layer-id="${layer.id}"]`);
     const configBtn = panel.querySelector(`.btn-config[data-layer-id="${layer.id}"]`);
 
@@ -358,6 +360,7 @@ function renderLayersManager(panel) {
       bindProp(".input-line-width", "change", (e) => { layer.config.lineWidth = parseFloat(e.target.value) || 2.0; autoSaveLayerConfig(layer); });
       bindProp(".input-bold-values", "change", (e) => { layer.config.boldValues = parseBoldValues(e.target.value); autoSaveLayerConfig(layer); });
       bindProp(".input-bold-line-width", "change", (e) => { layer.config.boldLineWidth = parseFloat(e.target.value) || 4.0; autoSaveLayerConfig(layer); });
+      bindProp(".input-label-size", "change", (e) => { layer.config.labelSize = parseInt(e.target.value, 10) || 13; autoSaveLayerConfig(layer); });
       bindProp(".chk-show-raster", "change", (e) => { layer.config.showRaster = e.target.checked; autoSaveLayerConfig(layer); });
       bindProp(".chk-smooth-lines", "change", (e) => { layer.config.smooth = e.target.checked; autoSaveLayerConfig(layer); });
       bindProp(".chk-show-wind", "change", (e) => { layer.config.showWind = e.target.checked; autoSaveLayerConfig(layer); });
@@ -541,10 +544,10 @@ function renderLayerRow(layer) {
 
   return `
     <div class="layer-item" data-layer-id="${layer.id}" role="group" aria-label="${layer.name}">
-      <div class="layer-row" data-layer-id="${layer.id}" title="${layer.name} (Click to configure)" role="button" tabindex="0" aria-expanded="${layer.isExpanded ? "true" : "false"}" aria-label="Configure ${layer.name}">
+      <div class="layer-row ${layer.visible ? "" : "layer-hidden"}" data-layer-id="${layer.id}" title="${layer.name} (Click to configure)" role="button" tabindex="0" aria-expanded="${layer.isExpanded ? "true" : "false"}" aria-label="Configure ${layer.name}">
         <!-- Visibility Eye Toggle Button -->
         <button class="btn-vis ${layer.visible ? "active" : ""}" data-layer-id="${layer.id}" title="Toggle Visibility" aria-label="Toggle visibility for ${layer.name}" aria-pressed="${layer.visible ? "true" : "false"}">
-          ${layer.visible ? "👁" : "👁‍🗨"}
+          ${layer.visible ? "👁" : "🚫"}
         </button>
 
         <!-- Layer Color Dot -->
@@ -622,6 +625,13 @@ function renderLayerRow(layer) {
                   <span style="color: #8b949e;">px</span>
                 </div>
               </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 100%; box-sizing: border-box; padding-left: 20px; font-size: 11px; flex-wrap: wrap; gap: 4px; min-width: 0;">
+                <span style="color: #8b949e; flex-shrink: 0;">Label Size:</span>
+                <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap; min-width: 0;">
+                  <input type="number" class="input-label-size" min="9" max="24" step="1" value="${layer.config?.labelSize !== undefined ? layer.config.labelSize : 13}" style="width: 40px; min-width: 0; height: 20px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; text-align: center; font-size: 11px;" title="Contour Value Label Font Size" />
+                  <span style="color: #8b949e;">px</span>
+                </div>
+              </div>
             </div>
 
             <div class="config-row">
@@ -688,7 +698,7 @@ function renderLayerRow(layer) {
             </div>
             <div class="config-row" style="margin-top:4px; border-top: 1px solid var(--border-color); padding-top:6px;">
               <label style="color: var(--text-secondary); font-size:11px; display:flex; align-items:center; gap:4px;">🎨 Theme</label>
-              <select class="sel-basemap-scheme" style="background: var(--bg-secondary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:4px; padding:3px 6px; font-size:11px; min-width:140px;">
+              <select class="sel-basemap-scheme" style="background: var(--bg-secondary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:4px; padding:3px 6px; font-size:11px; min-width:140px; max-width:100%;">
                 <option value="dark" ${(layer.config?.scheme || "dark") === "dark" ? "selected" : ""}>🌙 Midnight Slate (Dark)</option>
                 <option value="light" ${layer.config?.scheme === "light" ? "selected" : ""}>☀️ Daybreak Neutral (Light)</option>
                 <option value="micaps" ${layer.config?.scheme === "micaps" ? "selected" : ""}>🌐 MICAPS Classic (Navy)</option>

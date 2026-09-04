@@ -157,7 +157,7 @@ export function initTimeSlider(containerId = "timeslider-container", onTimeChang
   container.innerHTML = `
     <div class="timeline-stepper">
       <button id="btn-prev" class="step-nav-btn" title="Previous Step">◀</button>
-      <button id="btn-play" class="play-btn" title="Play / Pause Animation">▶</button>
+      <button id="btn-play" class="play-btn" title="Play / Pause Animation" aria-label="Play / Pause Animation" aria-pressed="false">▶</button>
       <button id="btn-next" class="step-nav-btn" title="Next Step">▶</button>
       <div class="step-length-control">
         <label for="select-step-length" class="step-length-label">Step:</label>
@@ -415,7 +415,11 @@ export function step(delta) {
 
 function startPlayback() {
   const btnPlay = document.getElementById("btn-play");
-  if (btnPlay) btnPlay.textContent = "❚❚";
+  if (btnPlay) {
+    btnPlay.textContent = "❚❚";
+    btnPlay.classList.add("active");
+    btnPlay.setAttribute("aria-pressed", "true");
+  }
   appState.set("isPlaying", true);
 
   playTimer = setInterval(() => {
@@ -429,7 +433,11 @@ function pausePlayback() {
     playTimer = null;
   }
   const btnPlay = document.getElementById("btn-play");
-  if (btnPlay) btnPlay.textContent = "▶";
+  if (btnPlay) {
+    btnPlay.textContent = "▶";
+    btnPlay.classList.remove("active");
+    btnPlay.setAttribute("aria-pressed", "false");
+  }
   appState.set("isPlaying", false);
 }
 
@@ -504,12 +512,14 @@ export function setTimelineMode(mode, customData = {}) {
 }
 
 // Pause playback when window/tab is hidden to save resources and avoid background fetch spam
-if (typeof document !== "undefined" && !document.__timeSliderVisibilityBound) {
+if (typeof document !== "undefined" && typeof document.addEventListener === "function" && !document.__timeSliderVisibilityBound) {
   document.__timeSliderVisibilityBound = true;
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) pausePlayback();
   });
-  window.addEventListener("blur", () => pausePlayback());
+  if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+    window.addEventListener("blur", () => pausePlayback());
+  }
 }
 
 export function getPeriodStepSeq() { return periodStepSeq; }
