@@ -4,7 +4,7 @@ import { initNavBar, refreshNavBarPresets, setNavBarLevel, setNavBarPreset } fro
 import { initCatalogDrawer } from "./ui/catalogDrawer.js";
 import { initLayerControl, addOrUpdateLayer, syncLayerControlForWindow, clearWindowWeatherLayers, getLayerById, getLayersForWindow } from "./ui/layerControl.js";
 import { initTimeSlider, setTimelineMode, setTimeSliderVisible, step as timeSliderStep } from "./ui/timeSlider.js";
-import { handleLayerAction, triggerStationStreamlines } from "./ui/layerActions.js";
+import { handleLayerAction, triggerStationStreamlines, triggerRasterOverlay } from "./ui/layerActions.js";
 import { initTooltip } from "./ui/tooltip.js";
 import { renderContourLayers, removeAllContourLayers } from "./layers/contourLayer.js";
 import { renderBinaryRaster, renderGridRaster, removeRasterLayer } from "./layers/rasterLayer.js";
@@ -287,7 +287,24 @@ async function bootstrap() {
     }
     if (typeof data === "object" && data !== null && data.isObs) {
       win.obsTime = data.file;
-      clearAllWeatherLayersFromMap(map, win);
+      const prevContours = getLayersForWindow(win)
+        .filter((l) => l.type === "contour" && (l.model === "SURFACE" || l.model === "UPPER_AIR"))
+        .map((l) => ({
+          id: l.id,
+          model: l.model,
+          element: l.element,
+          level: l.level,
+          config: { ...(l.config || {}) },
+          derivedFrom: l.derivedFrom,
+          visible: l.visible !== false,
+        }));
+      win.derivedContourSnapshots = prevContours;
+
+      // Stop previous station wind animation, wind barbs, and raster layers before reload
+      stopWindAnimation(map);
+      removeGridWindBarbs(map);
+      removeRasterLayer(map);
+
       if (win.activeGroup) {
         await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, true);
       } else {
@@ -505,13 +522,14 @@ async function loadWeatherField(map, model, element, level, period, customOption
 }
 
 async function loadUpperAirComposite(map, level = 500, obsTime = "20260828170000.000", win = getActiveWindow(), expectedSeq = null) {
-  const path = `UPPER_AIR/PLOT/${level || 500}`;
+  const curLevel = level || 500;
+  const path = `UPPER_AIR/PLOT/${curLevel}`;
   let stations;
   try {
     stations = await fetchStationObservations(path, obsTime);
   } catch (err) {
     console.error("[Main] Upper-air composite load error:", err);
-    showErrorToast(`Upper-air load failed (${level}hPa): ${err.message || err}`);
+    showErrorToast(`Upper-air load failed (${curLevel}hPa): ${err.message || err}`);
     return;
   }
   if (win && expectedSeq !== null && expectedSeq !== undefined && win.loadSeq !== expectedSeq) {
@@ -519,22 +537,55 @@ async function loadUpperAirComposite(map, level = 500, obsTime = "20260828170000
   }
   appState.set("stationData", stations);
   renderStationWeatherPlots(map, stations, appState.state.layers.station);
-  const stnLayer = addOrUpdateLayer({ id: "station-upper", name: `${level || 500} hPa Sounding Station Plots`, type: "station", color: "#e3b341", visible: true, removable: true, stationsGeoJSON: stations }, win);
+  const activeGroup = win?.activeGroup;
+  const groupStationLayer = activeGroup?.layers?.find((l) => l.type === "station");
+  const layerId = groupStationLayer?.id || "station-upper";
+  const stnConfig = { ...(groupStationLayer?.render || {}), ...(groupStationLayer?.config || {}) };
+  const stnLayer = addOrUpdateLayer({ id: layerId, name: `${curLevel} hPa Sounding Station Plots`, type: "station", color: "#e3b341", visible: true, removable: true, stationsGeoJSON: stations, model: "UPPER_AIR", level: curLevel, config: stnConfig }, win);
   if (win && getActiveWindow() === win) syncLayerControlForWindow(win);
+  if (stnLayer?.config?.showStreamlines) triggerStationStreamlines(map, stnLayer, win);
   if (stations?.features?.length >= 3) {
-    const winLayers = getLayersForWindow(win);
-    const activeUpperContours = winLayers.filter((l) => l.type === "contour" && l.model === "UPPER_AIR");
-    if (activeUpperContours.length > 0) {
-      for (const cLayer of activeUpperContours) {
-        analyzeAndRenderSoundingElementContour(map, stations, level || 500, cLayer.element || "HGT", cLayer.config || {}, win);
+    const groupDerived = activeGroup?.layers?.filter((l) => l.type === "contour" && l.model === "UPPER_AIR" && Boolean(l.derivedFrom)) || [];
+    if (groupDerived.length > 0) {
+      for (const cLayer of groupDerived) {
+        const elem = (cLayer.element || "HGT").toUpperCase();
+        const cfg = { ...(cLayer.render || cLayer.config || {}) };
+        cfg.layerId = `contour-sounding-${elem.toLowerCase()}-${curLevel}`;
+        cfg.derivedFrom = cLayer.derivedFrom || layerId;
+        const snap = win?.derivedContourSnapshots?.find((s) => s.id === cfg.layerId || (s.model === "UPPER_AIR" && s.element === elem));
+        const isVisible = snap ? snap.visible !== false : cLayer.visible !== false;
+        cfg.visible = isVisible;
+        analyzeAndRenderSoundingElementContour(map, stations, curLevel, elem, cfg, win);
+        const renderedLayer = getLayersForWindow(win).find((l) => l.id === cfg.layerId);
+        if (renderedLayer && (renderedLayer.config?.showRaster || cLayer.render?.showRaster) && isVisible) {
+          triggerRasterOverlay(map, renderedLayer, win);
+        }
       }
     } else {
-      analyzeAndRenderSoundingContours(map, stations, level || 500, {}, win);
+      const winLayers = getLayersForWindow(win);
+      let activeUpperContours = winLayers.filter((l) => l.type === "contour" && l.model === "UPPER_AIR");
+      if (activeUpperContours.length === 0 && Array.isArray(win?.derivedContourSnapshots)) {
+        activeUpperContours = win.derivedContourSnapshots.filter((l) => l.model === "UPPER_AIR");
+      }
+      if (activeUpperContours.length > 0) {
+        for (const cLayer of activeUpperContours) {
+          const isVisible = cLayer.visible !== false;
+          const cfg = { ...(cLayer.config || {}), visible: isVisible, layerId: `contour-sounding-${(cLayer.element || "HGT").toLowerCase()}-${curLevel}` };
+          analyzeAndRenderSoundingElementContour(map, stations, curLevel, cLayer.element || "HGT", cfg, win);
+          const renderedLayer = getLayersForWindow(win).find((l) => l.id === cfg.layerId);
+          if (renderedLayer && (renderedLayer.config?.showRaster || cLayer.config?.showRaster) && isVisible) {
+            triggerRasterOverlay(map, renderedLayer, win);
+          }
+        }
+      } else {
+        analyzeAndRenderSoundingContours(map, stations, curLevel, {}, win);
+      }
     }
+    if (win?.derivedContourSnapshots) win.derivedContourSnapshots = null;
   }
 }
 
-async function loadObservationProduct(map, model, element, level, file, win = getActiveWindow(), customPath = null, expectedSeq = null) {
+async function loadObservationProduct(map, model, element, level, file, win = getActiveWindow(), customPath = null, expectedSeq = null, customStationLayerId = null) {
   const path = customPath || (model === "SURFACE" ? `SURFACE/${element}` : (model === "UPPER_AIR" ? `UPPER_AIR/${element}/${level || 500}` : `${model}/${element}`));
   try {
     const stations = await fetchStationObservations(path, file);
@@ -543,32 +594,93 @@ async function loadObservationProduct(map, model, element, level, file, win = ge
     }
     appState.set("stationData", stations);
     renderStationWeatherPlots(map, stations, appState.state.layers.station);
-    const layerId = model === "UPPER_AIR" ? "station-upper" : `station-${model.toLowerCase()}`;
+    const activeGroup = win?.activeGroup;
+    const groupStationLayer = activeGroup?.layers?.find((l) => l.id === customStationLayerId || l.type === "station");
+    const layerId = customStationLayerId || groupStationLayer?.id || (model === "UPPER_AIR" ? "station-upper" : `station-${model.toLowerCase()}`);
     const name = model === "UPPER_AIR" ? `${level || 500} hPa Sounding Station Plots` : `${model === "SURFACE" ? "Surface" : "Upper Air"} Station Observations`;
-    const stnLayer = addOrUpdateLayer({ id: layerId, name, type: "station", color: "#e3b341", visible: true, removable: true, stationsGeoJSON: stations }, win);
+    const stnConfig = { ...(groupStationLayer?.render || {}), ...(groupStationLayer?.config || {}) };
+    const stnLayer = addOrUpdateLayer({ id: layerId, name, type: "station", color: "#e3b341", visible: true, removable: true, stationsGeoJSON: stations, model, element, level, config: stnConfig }, win);
     if (win && getActiveWindow() === win) syncLayerControlForWindow(win);
     if (stnLayer?.config?.showStreamlines) triggerStationStreamlines(map, stnLayer, win);
     if (model === "SURFACE" && stations?.features?.length >= 3) {
-      const winLayers = getLayersForWindow(win);
-      const activeSurfaceContours = winLayers.filter((l) => l.type === "contour" && l.model === "SURFACE");
-      if (activeSurfaceContours.length > 0) {
-        for (const cLayer of activeSurfaceContours) {
-          analyzeAndRenderSurfaceContours(map, stations, cLayer.element || "SLP", cLayer.config || {}, win);
+      const groupDerived = activeGroup?.layers?.filter((l) => l.type === "contour" && l.model === "SURFACE" && Boolean(l.derivedFrom)) || [];
+      if (groupDerived.length > 0) {
+        for (const cLayer of groupDerived) {
+          const elem = (cLayer.element || "SLP").toUpperCase();
+          const cfg = { ...(cLayer.render || cLayer.config || {}) };
+          if (cLayer.id) cfg.layerId = cLayer.id;
+          cfg.derivedFrom = cLayer.derivedFrom || layerId;
+          const snap = win?.derivedContourSnapshots?.find((s) => s.id === (cfg.layerId || cLayer.id) || (s.model === "SURFACE" && s.element === elem));
+          const isVisible = snap ? snap.visible !== false : cLayer.visible !== false;
+          cfg.visible = isVisible;
+          analyzeAndRenderSurfaceContours(map, stations, elem, cfg, win);
+          const renderedLayer = getLayersForWindow(win).find((l) => l.id === (cfg.layerId || `contour-surface-${elem.toLowerCase()}`));
+          if (renderedLayer && (renderedLayer.config?.showRaster || cLayer.render?.showRaster) && isVisible) {
+            triggerRasterOverlay(map, renderedLayer, win);
+          }
         }
       } else {
-        analyzeAndRenderSurfaceContours(map, stations, "SLP", {}, win);
+        const winLayers = getLayersForWindow(win);
+        let activeSurfaceContours = winLayers.filter((l) => l.type === "contour" && l.model === "SURFACE");
+        if (activeSurfaceContours.length === 0 && Array.isArray(win?.derivedContourSnapshots)) {
+          activeSurfaceContours = win.derivedContourSnapshots.filter((l) => l.model === "SURFACE");
+        }
+        if (activeSurfaceContours.length > 0) {
+          for (const cLayer of activeSurfaceContours) {
+            const isVisible = cLayer.visible !== false;
+            const cfg = { ...(cLayer.config || {}), visible: isVisible };
+            if (cLayer.id) cfg.layerId = cLayer.id;
+            analyzeAndRenderSurfaceContours(map, stations, cLayer.element || "SLP", cfg, win);
+            const renderedLayer = getLayersForWindow(win).find((l) => l.id === (cfg.layerId || `contour-surface-${(cLayer.element || "SLP").toLowerCase()}`));
+            if (renderedLayer && (renderedLayer.config?.showRaster || cLayer.config?.showRaster) && isVisible) {
+              triggerRasterOverlay(map, renderedLayer, win);
+            }
+          }
+        } else {
+          analyzeAndRenderSurfaceContours(map, stations, "SLP", {}, win);
+        }
       }
+      if (win?.derivedContourSnapshots) win.derivedContourSnapshots = null;
     }
     if (model === "UPPER_AIR" && stations?.features?.length >= 3) {
-      const winLayers = getLayersForWindow(win);
-      const activeUpperContours = winLayers.filter((l) => l.type === "contour" && l.model === "UPPER_AIR");
-      if (activeUpperContours.length > 0) {
-        for (const cLayer of activeUpperContours) {
-          analyzeAndRenderSoundingElementContour(map, stations, level || 500, cLayer.element || "HGT", cLayer.config || {}, win);
+      const curLevel = level || 500;
+      const groupDerived = activeGroup?.layers?.filter((l) => l.type === "contour" && l.model === "UPPER_AIR" && Boolean(l.derivedFrom)) || [];
+      if (groupDerived.length > 0) {
+        for (const cLayer of groupDerived) {
+          const elem = (cLayer.element || "HGT").toUpperCase();
+          const cfg = { ...(cLayer.render || cLayer.config || {}) };
+          cfg.layerId = `contour-sounding-${elem.toLowerCase()}-${curLevel}`;
+          cfg.derivedFrom = cLayer.derivedFrom || layerId;
+          const snap = win?.derivedContourSnapshots?.find((s) => s.id === cfg.layerId || (s.model === "UPPER_AIR" && s.element === elem));
+          const isVisible = snap ? snap.visible !== false : cLayer.visible !== false;
+          cfg.visible = isVisible;
+          analyzeAndRenderSoundingElementContour(map, stations, curLevel, elem, cfg, win);
+          const renderedLayer = getLayersForWindow(win).find((l) => l.id === cfg.layerId);
+          if (renderedLayer && (renderedLayer.config?.showRaster || cLayer.render?.showRaster) && isVisible) {
+            triggerRasterOverlay(map, renderedLayer, win);
+          }
         }
       } else {
-        analyzeAndRenderSoundingContours(map, stations, level || 500, {}, win);
+        const winLayers = getLayersForWindow(win);
+        let activeUpperContours = winLayers.filter((l) => l.type === "contour" && l.model === "UPPER_AIR");
+        if (activeUpperContours.length === 0 && Array.isArray(win?.derivedContourSnapshots)) {
+          activeUpperContours = win.derivedContourSnapshots.filter((l) => l.model === "UPPER_AIR");
+        }
+        if (activeUpperContours.length > 0) {
+          for (const cLayer of activeUpperContours) {
+            const isVisible = cLayer.visible !== false;
+            const cfg = { ...(cLayer.config || {}), visible: isVisible, layerId: `contour-sounding-${(cLayer.element || "HGT").toLowerCase()}-${curLevel}` };
+            analyzeAndRenderSoundingElementContour(map, stations, curLevel, cLayer.element || "HGT", cfg, win);
+            const renderedLayer = getLayersForWindow(win).find((l) => l.id === cfg.layerId);
+            if (renderedLayer && (renderedLayer.config?.showRaster || cLayer.config?.showRaster) && isVisible) {
+              triggerRasterOverlay(map, renderedLayer, win);
+            }
+          }
+        } else {
+          analyzeAndRenderSoundingContours(map, stations, curLevel, {}, win);
+        }
       }
+      if (win?.derivedContourSnapshots) win.derivedContourSnapshots = null;
     }
   } catch (err) {
     console.error("[Main] Observation load error:", err);
@@ -644,6 +756,11 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
       }
 
       if (layer.type === "contour" || layer.type === "wind") {
+        if (layer.derivedFrom) {
+          // Skip loadWeatherField for station-derived contours;
+          // station pass derives them once station data is fetched.
+          return;
+        }
         const render = layer.render || {};
         await loadWeatherField(map, layer.model, layer.element, targetLevel, curPeriod, {
           ...render,
@@ -660,7 +777,7 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
           file = await syncObservationTimeline(obsPath, null, winTitle);
           if (win) win.obsTime = file;
         }
-        await loadObservationProduct(map, layer.model, layer.element, targetLevel, file, win, layer.path, expectedSeq);
+        await loadObservationProduct(map, layer.model, layer.element, targetLevel, file, win, layer.path, expectedSeq, layer.id);
       }
     })
   );
@@ -700,9 +817,47 @@ async function changeVerticalLevel(map, direction, explicitLevel = null, win = g
 
   const activeGroup = win?.activeGroup;
   if (activeGroup && activeGroup.hasLevel) {
+    const prevContours = getLayersForWindow(win)
+      .filter((l) => l.type === "contour" && l.model === "UPPER_AIR")
+      .map((l) => ({
+        id: `contour-sounding-${(l.element || "HGT").toLowerCase()}-${targetLevel}`,
+        model: l.model,
+        element: l.element,
+        level: targetLevel,
+        config: { ...(l.config || {}) },
+        derivedFrom: l.derivedFrom,
+        visible: l.visible !== false,
+      }));
+    if (prevContours.length > 0) {
+      win.derivedContourSnapshots = prevContours;
+    }
+    if (activeGroup.layers) {
+      for (const l of activeGroup.layers) {
+        if (l.derivedFrom && l.model === "UPPER_AIR") {
+          l.level = targetLevel;
+          l.id = `contour-sounding-${(l.element || "HGT").toLowerCase()}-${targetLevel}`;
+          const elemName = l.element === "HGT" ? "Geopotential Height" : (l.element === "TMP" ? "Temperature" : l.element);
+          l.name = `${targetLevel} hPa Derived ${elemName}`;
+        }
+      }
+    }
     await loadPresetGroup(map, activeGroup, win.period, targetLevel, win, false, currentSeq);
   } else if (win?.isObservation || win?.model === "UPPER_AIR") {
+    const prevContours = getLayersForWindow(win)
+      .filter((l) => l.type === "contour" && l.model === "UPPER_AIR")
+      .map((l) => ({
+        id: `contour-sounding-${(l.element || "HGT").toLowerCase()}-${targetLevel}`,
+        model: l.model,
+        element: l.element,
+        level: targetLevel,
+        config: { ...(l.config || {}) },
+        derivedFrom: l.derivedFrom,
+        visible: l.visible !== false,
+      }));
     clearAllWeatherLayersFromMap(map, win);
+    if (prevContours.length > 0) {
+      win.derivedContourSnapshots = prevContours;
+    }
     const obsPath = `UPPER_AIR/PLOT/${targetLevel}`;
     const winTitle = `W${(win?.winIdx ?? 0) + 1}: Upper-Air ${targetLevel}hPa Sounding`;
     const file = await syncObservationTimeline(obsPath, null, winTitle, win);

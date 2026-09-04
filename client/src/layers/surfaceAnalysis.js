@@ -245,6 +245,7 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
     layerId,
     showFill: Boolean(options.showFill),
     showLine: options.showLine !== false,
+    visible: options.visible !== false,
     lineColor,
     lineWidth: options.lineWidth || 2.0,
     boldLineWidth: options.boldLineWidth || 4.0,
@@ -262,6 +263,8 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
     element: cfg.element,
     model: "SURFACE",
     level: null,
+    derivedFrom: options.derivedFrom || "surface-obs",
+    visible: options.visible !== false,
     gridData: {
       header: {
         start_lon: minLon,

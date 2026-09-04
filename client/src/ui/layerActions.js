@@ -16,6 +16,7 @@ import { appState } from "../store/appState.js";
 import { getActiveWindow } from "./tabWindowManager.js";
 import { getLayersForWindow } from "./layerControl.js";
 import { updateLegend } from "./legend.js";
+import { upsertDerivedLayerToPreset, removeDerivedLayerFromPreset } from "../config/presets.js";
 
 const paletteSeq = new Map();
 
@@ -242,12 +243,69 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
     const isUpper = (layer?.model === "UPPER_AIR") || (layer?.id && layer.id.includes("upper")) || (layer?.name && (layer.name.includes("Sounding") || layer.name.includes("Upper")));
     if (isUpper) {
       const level = layer?.level || win?.level || 500;
-      import("../layers/soundingAnalysis.js").then(({ analyzeAndRenderSoundingElementContour }) => {
-        analyzeAndRenderSoundingElementContour(map, geojson, level, elem, {}, win);
+      import("../layers/soundingAnalysis.js").then(({ analyzeAndRenderSoundingElementContour, SOUNDING_CONTOUR_CONFIGS }) => {
+        const liveLayerId = `contour-sounding-${elem.toLowerCase()}-${level}`;
+        const cfg = SOUNDING_CONTOUR_CONFIGS?.[elem];
+        const defaultColor = cfg?.defaultColor || (elem === "TMP" ? "#f85149" : "#58a6ff");
+        const activeGroup = win?.activeGroup || appState.get("activeGroup");
+        const stnLayerInGroup = activeGroup?.layers?.find((l) => l.type === "station");
+        const derivedFrom = stnLayerInGroup?.id || layer?.id || `upperair-obs-${level}`;
+
+        analyzeAndRenderSoundingElementContour(map, geojson, level, elem, {
+          layerId: liveLayerId,
+          lineColor: defaultColor,
+          derivedFrom,
+        }, win);
+
+        if (activeGroup?.id) {
+          const derivedEntry = {
+            id: liveLayerId,
+            model: "UPPER_AIR",
+            element: elem,
+            level,
+            name: `${level} hPa Derived ${cfg?.name || elem}`,
+            type: "contour",
+            derivedFrom,
+            render: {
+              showFill: false,
+              showLine: true,
+              lineColor: defaultColor,
+            },
+          };
+          upsertDerivedLayerToPreset(activeGroup.id, derivedEntry);
+        }
       });
     } else {
-      import("../layers/surfaceAnalysis.js").then(({ analyzeAndRenderSurfaceContours }) => {
-        analyzeAndRenderSurfaceContours(map, geojson, elem, {}, win);
+      import("../layers/surfaceAnalysis.js").then(({ analyzeAndRenderSurfaceContours, SURFACE_CONTOUR_CONFIGS }) => {
+        const liveLayerId = `contour-surface-${elem.toLowerCase()}`;
+        const cfg = SURFACE_CONTOUR_CONFIGS?.[elem];
+        const defaultColor = cfg?.defaultColor || "#58a6ff";
+        const activeGroup = win?.activeGroup || appState.get("activeGroup");
+        const stnLayerInGroup = activeGroup?.layers?.find((l) => l.type === "station");
+        const derivedFrom = stnLayerInGroup?.id || layer?.id || "surface-obs";
+
+        analyzeAndRenderSurfaceContours(map, geojson, elem, {
+          layerId: liveLayerId,
+          lineColor: defaultColor,
+          derivedFrom,
+        }, win);
+
+        if (activeGroup?.id) {
+          const derivedEntry = {
+            id: liveLayerId,
+            model: "SURFACE",
+            element: elem,
+            name: `Surface Derived ${cfg?.name || elem}`,
+            type: "contour",
+            derivedFrom,
+            render: {
+              showFill: false,
+              showLine: true,
+              lineColor: defaultColor,
+            },
+          };
+          upsertDerivedLayerToPreset(activeGroup.id, derivedEntry);
+        }
       });
     }
   } else if (action === "remove") {
@@ -256,6 +314,17 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
       removeRasterLayer(map, layerId);
       if (layer.config?.showWind) stopWindAnimation(map);
       if (layer.config?.showBarbs) removeGridWindBarbs(map);
+
+      // Persist deletion of derived contour layer from preset configuration
+      const activeGroup = win?.activeGroup || appState.get("activeGroup");
+      if (activeGroup?.id && (layer.derivedFrom || layer.id?.startsWith("contour-surface-") || layer.id?.startsWith("contour-sounding-"))) {
+        removeDerivedLayerFromPreset(activeGroup.id, layer);
+      }
+      if (Array.isArray(win?.derivedContourSnapshots)) {
+        win.derivedContourSnapshots = win.derivedContourSnapshots.filter(
+          (s) => s.id !== layer.id && !(s.model === layer.model && s.element === layer.element)
+        );
+      }
     } else if (layer.type === "station") {
       setStationVisibility(map, false);
       if (layer.config?.showStreamlines) stopWindAnimation(map);
@@ -277,7 +346,7 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
   }
 }
 
-async function triggerRasterOverlay(map, layer = null, win = null) {
+export async function triggerRasterOverlay(map, layer = null, win = null) {
   if (!map) return;
 
   // If no specific layer is supplied (e.g. global aux raster action), trigger for all active weather layers in window

@@ -331,6 +331,11 @@ function renderChips() {
       chipsContainer.appendChild(btn);
     });
   }
+
+  // Auto-scroll active chip into view
+  try {
+    chipsContainer.querySelector(".chip-btn.active")?.scrollIntoView({ inline: "end", block: "nearest" });
+  } catch {}
 }
 
 function updateLabels() {

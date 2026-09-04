@@ -89,7 +89,14 @@ export function autoSaveLayerConfig(layer) {
     for (const preset of CURRENT_CONFIG.presets) {
       if (!Array.isArray(preset.layers)) continue;
       for (const pLayer of preset.layers) {
-        if (pLayer.id === layer.id || (pLayer.model === layer.model && pLayer.element === layer.element && (pLayer.level === layer.level || pLayer.level === null || pLayer.level === undefined))) {
+        const isDerivedMatch = Boolean(
+          pLayer.derivedFrom &&
+          pLayer.model === layer.model &&
+          pLayer.element === layer.element &&
+          (!layer.derivedFrom || pLayer.derivedFrom === layer.derivedFrom)
+        );
+        const isStandardMatch = pLayer.id === layer.id || (pLayer.model === layer.model && pLayer.element === layer.element && (pLayer.level === layer.level || pLayer.level === null || pLayer.level === undefined));
+        if (isDerivedMatch || isStandardMatch) {
           if (!pLayer.render) pLayer.render = {};
           if (layer.config) {
             // Contour & Wind properties
@@ -135,6 +142,62 @@ export function autoSaveLayerConfig(layer) {
   }
 
   if (matched) {
+    if (autoSaveTimer) clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(() => {
+      savePresetConfig(CURRENT_CONFIG).catch((err) => console.warn("[ConfigAutoSave] Failed to auto-save:", err));
+    }, 400);
+  }
+}
+
+export function upsertDerivedLayerToPreset(presetId, layerEntry) {
+  if (!layerEntry || !CURRENT_CONFIG) return;
+  const groups = Array.isArray(CURRENT_CONFIG) ? CURRENT_CONFIG : CURRENT_CONFIG.presets;
+  if (!Array.isArray(groups)) return;
+  const preset = groups.find((p) => p.id === presetId);
+  if (!preset || !Array.isArray(preset.layers)) return;
+
+  const elem = layerEntry.element;
+  const model = layerEntry.model;
+
+  // Match existing derived layer in this preset by (model, element, derivedFrom) or id
+  const existing = preset.layers.find((l) =>
+    (l.derivedFrom && l.model === model && l.element === elem) ||
+    l.id === layerEntry.id
+  );
+
+  if (existing) {
+    if (layerEntry.id) existing.id = layerEntry.id;
+    if (layerEntry.level !== undefined) existing.level = layerEntry.level;
+    if (layerEntry.name) existing.name = layerEntry.name;
+    if (layerEntry.render) {
+      existing.render = { ...(existing.render || {}), ...layerEntry.render };
+    }
+  } else {
+    preset.layers.push(layerEntry);
+  }
+
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => {
+    savePresetConfig(CURRENT_CONFIG).catch((err) => console.warn("[ConfigAutoSave] Failed to auto-save:", err));
+  }, 400);
+}
+
+export function removeDerivedLayerFromPreset(presetId, layerMatcher) {
+  if (!layerMatcher || !CURRENT_CONFIG) return;
+  const groups = Array.isArray(CURRENT_CONFIG) ? CURRENT_CONFIG : CURRENT_CONFIG.presets;
+  if (!Array.isArray(groups)) return;
+  const preset = groups.find((p) => p.id === presetId);
+  if (!preset || !Array.isArray(preset.layers)) return;
+
+  const idx = preset.layers.findIndex((l) => {
+    if (!l.derivedFrom) return false;
+    if (layerMatcher.id && l.id === layerMatcher.id) return true;
+    if (layerMatcher.model && layerMatcher.element && l.model === layerMatcher.model && l.element === layerMatcher.element) return true;
+    return false;
+  });
+
+  if (idx !== -1) {
+    preset.layers.splice(idx, 1);
     if (autoSaveTimer) clearTimeout(autoSaveTimer);
     autoSaveTimer = setTimeout(() => {
       savePresetConfig(CURRENT_CONFIG).catch((err) => console.warn("[ConfigAutoSave] Failed to auto-save:", err));

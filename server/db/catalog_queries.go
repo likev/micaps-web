@@ -111,7 +111,7 @@ func GetFileList(client *CQLClient, dataPath string, limit int) ([]model.FileEnt
 
 	var lastErr error
 	for _, cPath := range candidates {
-		query := fmt.Sprintf(`SELECT column1, value FROM micapsdataserver.treeview WHERE "dataPath" = '%s' LIMIT %d`, cPath, limit)
+		query := fmt.Sprintf(`SELECT column1, value FROM micapsdataserver.treeview WHERE "dataPath" = '%s' ORDER BY column1 DESC LIMIT %d`, cPath, limit)
 		rows, err := client.Query(query)
 		if err != nil {
 			lastErr = err

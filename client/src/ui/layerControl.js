@@ -480,21 +480,21 @@ function renderLayersManager(panel) {
   bindAuxCheckbox("chk-wind", "wind");
 }
 
-function renderStationDrawerHTML(layer) {
+export function renderStationDrawerHTML(layer) {
   const upper = isUpperAirStationLayer(layer);
   const items = upper ? [
     ["chk-station-temp", layer.config?.showTemp !== false, "Temperature (TT)"],
-    ["chk-station-dewpoint", layer.config?.showDewpoint !== false, "Dew Point / Dep (Td)"],
-    ["chk-station-pressure", layer.config?.showPressure !== false, "Geopotential Height (H)"],
+    ["chk-station-dewpoint", layer.config?.showDewpoint !== false, "Dew Point (Td)"],
+    ["chk-station-pressure", layer.config?.showPressure !== false, "Height (H)"],
     ["chk-station-wind", layer.config?.showWind !== false, "Wind Barbs (FF/dd)"],
   ] : [
     ["chk-station-temp", layer.config?.showTemp !== false, "Temperature (TT)"],
     ["chk-station-dewpoint", layer.config?.showDewpoint !== false, "Dew Point (Td)"],
-    ["chk-station-pressure", layer.config?.showPressure !== false, "Sea Level Pressure (SLP)"],
+    ["chk-station-pressure", layer.config?.showPressure !== false, "Pressure (SLP)"],
     ["chk-station-wind", layer.config?.showWind !== false, "Wind Barbs (FF/dd)"],
     ["chk-station-cloud", Boolean(layer.config?.showCloud), "Cloud Cover (N)"],
-    ["chk-station-weather", Boolean(layer.config?.showWeather), "Weather Symbol (ww)"],
-    ["chk-station-tendency", Boolean(layer.config?.showTendency), "3h Tendency (ppa)"],
+    ["chk-station-weather", Boolean(layer.config?.showWeather), "Weather (ww)"],
+    ["chk-station-tendency", Boolean(layer.config?.showTendency), "Tendency (ppa)"],
     ["chk-station-vis", Boolean(layer.config?.showVisibility), "Visibility (VV)"],
     ["chk-station-rain6", Boolean(layer.config?.showRain6), "6h Rain (R6)"],
   ];
@@ -506,6 +506,7 @@ function renderStationDrawerHTML(layer) {
         <input type="checkbox" class="chk-station-streamlines" ${layer.config?.showStreamlines ? "checked" : ""} />
         <span style="color: #58a6ff; font-weight: 600;">Wind Streamlines (Flow Analysis)</span>
       </label>
+    </div>
     <div class="config-row station-contour-selector-row" style="flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 6px; padding-top: 6px; border-top: 1px solid #30363d; width: 100%;">
       <label style="color: var(--text-secondary, #8b949e); font-size: 11px; display: flex; align-items: center; gap: 4px; font-weight: 600;">
         <span>📈 Add Contour Layer</span>

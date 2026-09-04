@@ -357,6 +357,19 @@
           "model": "SURFACE",
           "name": "Surface Station Observations",
           "type": "station"
+        },
+        {
+          "derivedFrom": "surface-obs",
+          "element": "SLP",
+          "id": "contour-surface-slp",
+          "model": "SURFACE",
+          "name": "Surface Derived Sea Level Pressure",
+          "render": {
+            "lineColor": "#58a6ff",
+            "showFill": false,
+            "showLine": true
+          },
+          "type": "contour"
         }
       ],
       "name": "Surface Synoptic (Plots + SLP Isobars)"
@@ -376,6 +389,34 @@
           "name": "500 hPa Sounding Station Plots",
           "path": "UPPER_AIR/PLOT/500",
           "type": "station"
+        },
+        {
+          "derivedFrom": "upperair-obs-500",
+          "element": "HGT",
+          "id": "contour-sounding-hgt-500",
+          "level": 500,
+          "model": "UPPER_AIR",
+          "name": "500 hPa Derived Height",
+          "render": {
+            "lineColor": "#58a6ff",
+            "showFill": false,
+            "showLine": true
+          },
+          "type": "contour"
+        },
+        {
+          "derivedFrom": "upperair-obs-500",
+          "element": "TMP",
+          "id": "contour-sounding-tmp-500",
+          "level": 500,
+          "model": "UPPER_AIR",
+          "name": "500 hPa Derived Temperature",
+          "render": {
+            "lineColor": "#f85149",
+            "showFill": false,
+            "showLine": true
+          },
+          "type": "contour"
         }
       ],
       "name": "500hPa Upper-Air Sounding (UPPER_AIR/PLOT/500)"
