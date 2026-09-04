@@ -79,16 +79,20 @@ micaps-web/
 │   ├── model/
 │   │   └── types.go                  # Data structures and GeoJSON models
 │   ├── parser/
-│   │   ├── decompress.go             # Gzip blob decompressor
-│   │   ├── grid_header.go            # 278-byte MICAPS Type 4/11 header parser
-│   │   ├── grid_data.go              # Grid Float32 payload decoding
-│   │   └── station_parser.go         # 288-byte station header & observation decoder
-│   └── static/
-│       └── map-china.pmtiles         # Offline China vector tiles (borders & provinces)
+│       ├── decompress.go             # Gzip blob decompressor
+│       ├── grid_header.go            # 278-byte MICAPS Type 4/11 header parser
+│       ├── grid_data.go              # Grid Float32 payload decoding
+│       └── station_parser.go         # 288-byte station header & observation decoder
 ├── client/                           # Frontend Meteorological Workstation
 │   ├── index.html                    # Workstation HTML shell
 │   ├── package.json                  # Dependencies, build scripts & test runner
-│   ├── config.json                   # Runtime-editable meteorological configuration (presets & colormaps)
+│   ├── config.json                   # Runtime-editable meteorological configuration (presets, colormaps & derived layers)
+│   ├── map/
+│   │   └── map-china.pmtiles         # Offline China vector tiles (borders & provinces)
+│   ├── palettes/                     # CMA standard colormaps & color tables (served directly, not bundled)
+│   ├── dist/                         # Compiled bundle (strictly assets/ and index.html; no config, palettes, or map)
+│   │   ├── assets/
+│   │   └── index.html
 │   ├── src/
 │   │   ├── main.js                   # Application bootstrap & lifecycle orchestrator
 │   │   ├── style.css                 # Dark meteorological theme stylesheet
@@ -111,24 +115,34 @@ micaps-web/
 
 ## 3. Development & Build Workflows
 
-### Frontend Development & Build (Client)
+The application uses a unified Go server architecture. A separate frontend development server (such as Vite dev server) is not required because the Go backend (`micaps-server`) directly serves both the API routes and all frontend resources:
+- **Compiled Web Application**: Served from `client/dist/` with single-page application (SPA) fallback to `index.html`.
+- **Runtime Configuration**: Served and persisted directly to `client/config.json` via `/api/config` and `/config.json`.
+- **Offline Vector Basemap**: Served directly from `client/map/map-china.pmtiles` with HTTP 206 partial content range requests via `/map-china.pmtiles`.
+- **Color Palettes**: Served dynamically from `client/palettes/` via `/palettes/*`.
 
-The frontend is built using Vite and bundled into `client/dist`. The Go backend serves these compiled static assets directly from filesystem or embedded distribution.
+### Frontend Build (Client)
+
+The frontend JavaScript and CSS modules are compiled using Vite into `client/dist`.
+
+> [!IMPORTANT]
+> Non-bundled assets remain strictly outside `client/dist`:
+> - **`client/config.json`**: Only exists at `client/config.json`. It is never copied into or bundled with `client/dist/`, ensuring live configuration edits take effect without requiring frontend rebuilds.
+> - **`client/palettes/`** and **`client/map/`**: Color tables and PMTiles vector tiles are served directly from their respective source folders by the Go server.
+> 
+> Consequently, `client/dist/` contains solely `index.html` and the hashed JavaScript/CSS assets in `assets/`.
 
 ```bash
 cd client
 
-# Install dependencies (requires Bun 1.4)
+# Install dependencies (requires Bun 1.4 or Node)
 bun install
 
-# Launch local Vite dev server with hot reload
-bun run dev
-
-# Build production distribution and client.zip package
-bun run build:all
+# Build production bundle into client/dist
+bun run build
 ```
 
-### Backend Build (Server)
+### Backend Build & Execution (Server)
 
 ```bash
 cd server
@@ -141,6 +155,9 @@ go build -o micaps-server cmd/main.go
 
 # Cross-compile Windows 10/11 x86-64 binary
 GOOS=windows GOARCH=amd64 go build -o micaps-server.exe cmd/main.go
+
+# Run server (automatically serves client/dist, client/config.json, client/palettes, and client/map)
+./micaps-server -mock
 ```
 
 ---
@@ -210,7 +227,10 @@ Individual test suites:
 | Endpoint | Method | Description |
 | :--- | :--- | :--- |
 | `/api/status` | `GET` | Health check, uptime, and database connection status. |
-| `/api/config` | `GET`, `POST` | Read or save runtime `config.json` preset configurations. |
+| `/api/config` | `GET`, `POST` | Read or save runtime `client/config.json` preset configurations. |
+| `/config.json` | `GET` | SPA handler direct route serving runtime `client/config.json`. |
+| `/palettes/*` | `GET` | Dynamic static file route serving CMA color palettes directly from `client/palettes/`. |
+| `/map-china.pmtiles` | `GET` | HTTP 206 range-request endpoint serving offline China vector basemap tiles from `client/map/map-china.pmtiles`. |
 | `/api/catalog/models` | `GET` | Returns 4-tier model hierarchy (Global NWP, Regional, Guidance, Observations). |
 | `/api/catalog/tree` | `GET` | Returns directory file tree for a given data path. |
 | `/api/catalog/levels` | `GET` | Returns isobaric pressure levels (`1000`, `850`, `500`, `200` hPa). |
@@ -218,7 +238,6 @@ Individual test suites:
 | `/api/data/grid` | `GET` | Returns decoded NWP grid GeoJSON with 2D scalar/vector arrays. |
 | `/api/data/grid/binary` | `GET` | Streams raw Little-Endian `Float32Array` bytes for zero-copy Canvas/WebGL raster rendering. |
 | `/api/data/station` | `GET` | Returns WMO/CMA synoptic station observations as GeoJSON Point `FeatureCollection`. |
-| `/map-china.pmtiles` | `GET` | HTTP 206 range-request endpoint serving offline China vector basemap tiles. |
 
 ---
 
