@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "package": "rm -f ../client.zip && cd .. && zip -r client.zip client/dist/ client/palettes/ --exclude \"client/dist/map-china.pmtiles\" && cd client",
+    "package": "rm -f ../client.zip && cd .. && zip -r client.zip client/dist/ client/palettes/ client/config.json --exclude \"*.pmtiles*\" && cd client",
     "build:all": "vite build && npm run package",
     "preview": "vite preview",
     "test": "bun test"
