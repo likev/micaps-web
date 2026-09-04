@@ -5,7 +5,7 @@ import fs from "fs";
 
 describe("Configuration File Validation & Auto-Save (config.json)", () => {
   test("config.json is human-readable, multi-line indented and contains preset groups", () => {
-    const raw = fs.readFileSync("./public/config.json", "utf8");
+    const raw = fs.readFileSync("./config.json", "utf8");
     const lines = raw.split("\n");
     expect(lines.length).toBeGreaterThan(50); // Must not be minified into 1 line
 

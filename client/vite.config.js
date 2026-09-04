@@ -53,6 +53,26 @@ export default defineConfig({
           }
           next();
         });
+
+        server.middlewares.use("/config.json", (req, res, next) => {
+          const filePath = path.resolve(__dirname, "config.json");
+          if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+            res.setHeader("Content-Type", "application/json");
+            fs.createReadStream(filePath).pipe(res);
+            return;
+          }
+          next();
+        });
+      },
+    },
+    {
+      name: "copy-config-json",
+      closeBundle() {
+        const src = path.resolve(__dirname, "config.json");
+        const dst = path.resolve(__dirname, "dist", "config.json");
+        if (fs.existsSync(src)) {
+          fs.copyFileSync(src, dst);
+        }
       },
     },
   ],

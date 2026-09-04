@@ -84,24 +84,23 @@ func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 
 	distDir := h.Cfg.StaticDir
 	var candidates []string
+	candidates = append(candidates,
+		"client/config.json",
+		"../client/config.json",
+		"config.json",
+	)
 	if distDir != "" {
 		candidates = append(candidates,
 			filepath.Join(distDir, "config.json"),
-			filepath.Join(distDir, "config/config.json"),
 		)
 	}
 	if exePath, err := os.Executable(); err == nil {
 		exeDir := filepath.Dir(exePath)
-		candidates = append(candidates, filepath.Join(exeDir, "config.json"))
+		candidates = append(candidates,
+			filepath.Join(exeDir, "client/config.json"),
+			filepath.Join(exeDir, "config.json"),
+		)
 	}
-	candidates = append(candidates,
-		"config.json",
-		"client/dist/config.json",
-		"../client/dist/config.json",
-		"client/public/config.json",
-		"../client/public/config.json",
-		"client/config.json",
-	)
 
 	var configPath string
 	for _, p := range candidates {
@@ -111,7 +110,7 @@ func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if configPath == "" {
-		configPath = filepath.Join(distDir, "config.json")
+		configPath = "client/config.json"
 	}
 
 	if r.Method == http.MethodPost || r.Method == http.MethodPut {
@@ -133,17 +132,30 @@ func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 		reValColor := regexp.MustCompile(`\{\s*"val":\s*(-?[\d.]+),\s*"color":\s*(\[[^\]]+\])\s*\}`)
 		str = reValColor.ReplaceAllString(str, `{ "val": $1, "color": $2 }`)
 
-		// Strictly save only to client/dist/config.json (the runtime configuration)
-		targetSavePath := filepath.Join(distDir, "config.json")
-		if distDir == "" {
-			targetSavePath = "client/dist/config.json"
+		// Strictly save to client/config.json
+		targetSavePath := "client/config.json"
+		if _, err := os.Stat("client/config.json"); err != nil {
+			if _, err2 := os.Stat("../client/config.json"); err2 == nil {
+				targetSavePath = "../client/config.json"
+			}
 		}
 		if err := os.WriteFile(targetSavePath, []byte(str), 0644); err != nil {
+			http.Error(w, `{"error":"Save error: `+err.Error()+`"}`, http.StatusInternalServerError)
+			return
+		}
+
+		// Also sync to distDir / client/dist if present
+		if distDir != "" {
+			_ = os.WriteFile(filepath.Join(distDir, "config.json"), []byte(str), 0644)
+		}
+		if _, err := os.Stat("client/dist/config.json"); err == nil {
 			_ = os.WriteFile("client/dist/config.json", []byte(str), 0644)
+		} else if _, err := os.Stat("../client/dist/config.json"); err == nil {
+			_ = os.WriteFile("../client/dist/config.json", []byte(str), 0644)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok","message":"Configuration saved successfully to client/dist/config.json"}`))
+		w.Write([]byte(`{"status":"ok","message":"Configuration saved successfully to client/config.json"}`))
 		return
 	}
 
@@ -171,10 +183,9 @@ func (h *StaticHandler) SPAHandler(w http.ResponseWriter, r *http.Request) {
 	// If requesting /config.json specifically and not in distDir, try fallback paths
 	if r.URL.Path == "/config.json" || r.URL.Path == "config.json" {
 		fallbackPaths := []string{
-			"client/public/config.json",
-			"../client/public/config.json",
-			"client/dist/config.json",
 			"client/config.json",
+			"../client/config.json",
+			"client/dist/config.json",
 			"config.json",
 		}
 		for _, fp := range fallbackPaths {

@@ -107,8 +107,8 @@ function createSampleSoundingStations(level = 500) {
 }
 
 describe("Derived Layer Config Specification & Declared Presets", () => {
-  test("public/config.json declares derived contour layers for surface and upper-air presets", () => {
-    const raw = fs.readFileSync("./public/config.json", "utf8");
+  test("config.json declares derived contour layers for surface and upper-air presets", () => {
+    const raw = fs.readFileSync("./config.json", "utf8");
     const parsed = JSON.parse(raw);
 
     // Surface preset check

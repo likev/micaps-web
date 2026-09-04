@@ -88,9 +88,7 @@ micaps-web/
 ├── client/                           # Frontend Meteorological Workstation
 │   ├── index.html                    # Workstation HTML shell
 │   ├── package.json                  # Dependencies, build scripts & test runner
-│   ├── vite.config.js                # Vite build configuration
-│   ├── public/
-│   │   └── config.json               # Runtime-editable meteorological configuration (presets & colormaps)
+│   ├── config.json                   # Runtime-editable meteorological configuration (presets & colormaps)
 │   ├── src/
 │   │   ├── main.js                   # Application bootstrap & lifecycle orchestrator
 │   │   ├── style.css                 # Dark meteorological theme stylesheet
@@ -149,7 +147,7 @@ GOOS=windows GOARCH=amd64 go build -o micaps-server.exe cmd/main.go
 
 ## 4. Runtime Configuration Schema (config.json)
 
-Composite presets and named colormaps are loaded from `client/public/config.json` at startup rather than bundled into the JavaScript. The file structure is:
+Composite presets and named colormaps are loaded from `client/config.json` at startup rather than bundled into the JavaScript. The file structure is:
 
 ```json
 {
