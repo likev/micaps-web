@@ -160,6 +160,9 @@ export const SURFACE_CONTOUR_CONFIGS = {
     defaultColor: "#e3b341",
     colormap: "DTD",
     boldValues: [2, 10],
+    showFill: false,
+    showLine: false,
+    showRaster: true,
     extract: (p) => {
       const tKeys = ["temperature", "temp", "TEM", "TT", "T", "TMP", "t", "temp_max", "tem"];
       let t = null;
@@ -350,17 +353,24 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
     const layerId = options.layerId || `contour-surface-${elementKey.toLowerCase()}`;
     const lineColor = options.lineColor || cfg.defaultColor;
 
+    const isDTD = elementKey === "DTD";
+    const showFill = options.showFill !== undefined ? Boolean(options.showFill) : (cfg.showFill !== undefined ? Boolean(cfg.showFill) : false);
+    const showLine = options.showLine !== undefined ? Boolean(options.showLine) : (cfg.showLine !== undefined ? Boolean(cfg.showLine) : (isDTD ? false : true));
+    const showRaster = options.showRaster !== undefined ? Boolean(options.showRaster) : (cfg.showRaster !== undefined ? Boolean(cfg.showRaster) : (isDTD ? true : false));
+    const palettePath = options.palettePath || cfg.palettePath || null;
+    const colormap = options.colormap || (palettePath ? `palette:${layerId}` : (cfg.colormap || cfg.element));
+
     renderCustomContourGeoJSON(map, isobandFC, isolineFC, {
       layerId,
-      showFill: Boolean(options.showFill),
-      showLine: options.showLine !== false,
+      showFill,
+      showLine,
       visible: options.visible !== false,
       lineColor,
       lineWidth: options.lineWidth || 2.0,
       boldLineWidth: options.boldLineWidth || 4.0,
       boldValues,
       element: cfg.element,
-      colormap: cfg.colormap || undefined,
+      colormap,
       smooth: options.smooth !== false,
       smoothIterations: options.smoothIterations ?? 2,
       labelSize: options.labelSize,
@@ -375,6 +385,7 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
       level: null,
       derivedFrom: options.derivedFrom || "surface-obs",
       visible: options.visible !== false,
+      colormap,
       gridData: {
         header: {
           start_lon: x[0],
@@ -391,8 +402,9 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
       color: lineColor,
       removable: true,
       config: {
-        showFill: Boolean(options.showFill),
-        showLine: options.showLine !== false,
+        showFill,
+        showLine,
+        showRaster,
         lineColor,
         opacity: options.opacity ?? 0.75,
         lineWidth: options.lineWidth || 2.0,
@@ -401,6 +413,7 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
         smooth: options.smooth !== false,
         smoothIterations: options.smoothIterations ?? 2,
         labelSize: options.labelSize,
+        palettePath,
       },
     }, win);
 

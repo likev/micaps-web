@@ -226,6 +226,9 @@ export const SOUNDING_CONTOUR_CONFIGS = {
       return [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30];
     },
     getBoldValues: () => [2, 10],
+    showFill: false,
+    showLine: false,
+    showRaster: true,
   },
 };
 
@@ -271,19 +274,26 @@ export function analyzeAndRenderSoundingElementContour(map, stationsGeoJSON, lev
     const layerId = options.layerId || `contour-sounding-${elementKey.toLowerCase()}-${level}`;
     const lineColor = options.lineColor || cfg.defaultColor;
 
+    const isDTD = elementKey === "DTD";
+    const showFill = options.showFill !== undefined ? Boolean(options.showFill) : (cfg.showFill !== undefined ? Boolean(cfg.showFill) : false);
+    const showLine = options.showLine !== undefined ? Boolean(options.showLine) : (cfg.showLine !== undefined ? Boolean(cfg.showLine) : (isDTD ? false : true));
+    const showRaster = options.showRaster !== undefined ? Boolean(options.showRaster) : (cfg.showRaster !== undefined ? Boolean(cfg.showRaster) : (isDTD ? true : false));
+    const palettePath = options.palettePath || cfg.palettePath || null;
+    const colormap = options.colormap || (palettePath ? `palette:${layerId}` : (cfg.colormap || cfg.element));
+
     const isolineFC = { type: "FeatureCollection", features: result.lines };
     const isobandFC = result.fills ? { type: "FeatureCollection", features: result.fills } : null;
     renderCustomContourGeoJSON(map, isobandFC, isolineFC, {
       layerId,
-      showFill: Boolean(options.showFill),
-      showLine: options.showLine !== false,
+      showFill,
+      showLine,
       visible: options.visible !== false,
       lineColor,
       lineWidth: options.lineWidth || 2.0,
       boldLineWidth: options.boldLineWidth || 4.0,
       boldValues,
       element: cfg.element,
-      colormap: cfg.colormap || undefined,
+      colormap,
       smooth: options.smooth !== false,
       smoothIterations: options.smoothIterations ?? 2,
       labelSize: options.labelSize,
@@ -298,12 +308,14 @@ export function analyzeAndRenderSoundingElementContour(map, stationsGeoJSON, lev
       level,
       derivedFrom: options.derivedFrom || `upperair-obs-${level}`,
       visible: options.visible !== false,
+      colormap,
       gridData: result.gridData,
       color: lineColor,
       removable: true,
       config: {
-        showFill: Boolean(options.showFill),
-        showLine: options.showLine !== false,
+        showFill,
+        showLine,
+        showRaster,
         lineColor,
         opacity: options.opacity ?? 0.75,
         lineWidth: options.lineWidth || 2.0,
@@ -312,6 +324,7 @@ export function analyzeAndRenderSoundingElementContour(map, stationsGeoJSON, lev
         smooth: options.smooth !== false,
         smoothIterations: options.smoothIterations ?? 2,
         labelSize: options.labelSize,
+        palettePath,
       },
     }, win);
 

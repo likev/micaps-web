@@ -350,11 +350,14 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
         const activeGroup = win?.activeGroup || appState.get("activeGroup");
         const stnLayerInGroup = activeGroup?.layers?.find((l) => l.type === "station");
         const derivedFrom = stnLayerInGroup?.id || layer?.id || `upperair-obs-${level}`;
+        const isDTD = elem === "DTD";
+        const dtdDefaults = isDTD ? { showFill: false, showLine: false, showRaster: true } : {};
 
         analyzeAndRenderSoundingElementContour(map, geojson, level, elem, {
           layerId: liveLayerId,
           lineColor: defaultColor,
           derivedFrom,
+          ...dtdDefaults,
         }, win);
 
         if (activeGroup?.id) {
@@ -368,11 +371,19 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
             derivedFrom,
             render: {
               showFill: false,
-              showLine: true,
+              showLine: isDTD ? false : true,
+              showRaster: isDTD ? true : false,
               lineColor: defaultColor,
             },
           };
           upsertDerivedLayerToPreset(activeGroup.id, derivedEntry);
+        }
+        if (isDTD) {
+          const renderedLayer = getLayersForWindow(win).find((l) => l.id === liveLayerId);
+          if (renderedLayer) {
+            triggerRasterOverlay(map, renderedLayer, win);
+            updateLegend(elem, renderedLayer.colormap || "DTD", renderedLayer.gridData?.stats?.min, renderedLayer.gridData?.stats?.max, win);
+          }
         }
       });
     } else {
@@ -383,11 +394,14 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
         const activeGroup = win?.activeGroup || appState.get("activeGroup");
         const stnLayerInGroup = activeGroup?.layers?.find((l) => l.type === "station");
         const derivedFrom = stnLayerInGroup?.id || layer?.id || "surface-obs";
+        const isDTD = elem === "DTD";
+        const dtdDefaults = isDTD ? { showFill: false, showLine: false, showRaster: true } : {};
 
         analyzeAndRenderSurfaceContours(map, geojson, elem, {
           layerId: liveLayerId,
           lineColor: defaultColor,
           derivedFrom,
+          ...dtdDefaults,
         }, win);
 
         if (activeGroup?.id) {
@@ -400,11 +414,19 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
             derivedFrom,
             render: {
               showFill: false,
-              showLine: true,
+              showLine: isDTD ? false : true,
+              showRaster: isDTD ? true : false,
               lineColor: defaultColor,
             },
           };
           upsertDerivedLayerToPreset(activeGroup.id, derivedEntry);
+        }
+        if (isDTD) {
+          const renderedLayer = getLayersForWindow(win).find((l) => l.id === liveLayerId);
+          if (renderedLayer) {
+            triggerRasterOverlay(map, renderedLayer, win);
+            updateLegend(elem, renderedLayer.colormap || "DTD", renderedLayer.gridData?.stats?.min, renderedLayer.gridData?.stats?.max, win);
+          }
         }
       });
     }
@@ -497,8 +519,23 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
 
   const layerId = layer?.id || (layer?.type === "wind" || layer?.element === "WIND" ? "wind-WIND" : (layer?.element ? `contour-${layer.element}` : "default"));
   const element = layer?.element || win?.element || "TMP";
-  const colormap = layer?.colormap || layer?.render?.colormap || win?.colormap || element;
+  let colormap = layer?.colormap || layer?.render?.colormap || win?.colormap || element;
   const opacity = layer?.config?.opacity !== undefined ? layer.config.opacity : 0.85;
+
+  const palettePath = layer?.config?.palettePath || layer?.render?.palettePath;
+  if (palettePath) {
+    const paletteKey = `palette:${layerId}`;
+    try {
+      const { loadXMLPalette } = await import("../utils/paletteLoader.js");
+      const { setColormaps, COLORMAPS } = await import("../utils/colormaps.js");
+      const stops = await loadXMLPalette(palettePath);
+      if (stops) {
+        setColormaps({ ...COLORMAPS, [paletteKey]: stops });
+        if (layer) layer.colormap = paletteKey;
+        colormap = paletteKey;
+      }
+    } catch {}
+  }
 
   // 1. Direct in-memory gridData from layer (e.g. RH, HGT, Wind, Surface SLP, or Sounding Analysis)
   if (layer?.gridData) {

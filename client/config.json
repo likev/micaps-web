@@ -233,10 +233,17 @@
           "name": "Relative Humidity (Fills)",
           "render": {
             "colormap": "RH",
+            "lineColor": "#ffffff",
             "lineWidth": 2,
             "opacity": 0.55,
+            "palettePath": "/palettes/RH/dark-850hpa-850hPa比湿.xml",
+            "showBarbs": false,
             "showFill": true,
-            "showLine": false
+            "showLine": false,
+            "showRaster": false,
+            "showWind": false,
+            "smooth": true,
+            "smoothIterations": 2
           },
           "type": "contour"
         },
@@ -412,8 +419,9 @@
           "name": "Surface Derived Dew-Point Depression",
           "render": {
             "lineColor": "#e3b341",
-            "showFill": true,
-            "showLine": true
+            "showFill": false,
+            "showLine": false,
+            "showRaster": true
           },
           "type": "contour"
         }
@@ -516,9 +524,9 @@
             "lineColor": "#e3b341",
             "lineWidth": 2,
             "opacity": 0.75,
-            "showFill": true,
-            "showLine": true,
-            "showRaster": false,
+            "showFill": false,
+            "showLine": false,
+            "showRaster": true,
             "smooth": true,
             "smoothIterations": 2
           },

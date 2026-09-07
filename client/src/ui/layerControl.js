@@ -121,10 +121,21 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
   const existingIdx = layers.findIndex((l) => l.id === layerDef.id);
 
   if (existingIdx >= 0) {
+    const prevLayer = layers[existingIdx];
+    const mergedConfig = {
+      ...prevLayer.config,
+      ...layerDef.config,
+    };
+    if (prevLayer.config?.palettePath && (layerDef.config?.palettePath === undefined || layerDef.config?.palettePath === null)) {
+      mergedConfig.palettePath = prevLayer.config.palettePath;
+    }
+    const mergedColormap = layerDef.colormap || (mergedConfig.palettePath ? `palette:${prevLayer.id}` : prevLayer.colormap);
     layers[existingIdx] = {
-      ...layers[existingIdx],
+      ...prevLayer,
       ...layerDef,
-      config: { ...layers[existingIdx].config, ...layerDef.config },
+      isExpanded: prevLayer.isExpanded !== undefined ? prevLayer.isExpanded : Boolean(layerDef.isExpanded),
+      colormap: mergedColormap,
+      config: mergedConfig,
     };
   } else {
     const baseConfig = layerDef.type === "station" ? (isUpperAirStationLayer(layerDef) ? {
@@ -164,17 +175,18 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
         showWind: layerDef.config?.showWind !== undefined ? layerDef.config.showWind : true,
         showBarbs: layerDef.config?.showBarbs !== undefined ? layerDef.config.showBarbs : false,
         showRaster: layerDef.config?.showRaster !== undefined ? layerDef.config.showRaster : false,
+        palettePath: layerDef.config?.palettePath || null,
       } : {
-        showFill: layerDef.config?.showFill !== undefined ? layerDef.config.showFill : (layerDef.element !== "HGT" && layerDef.type !== "wind"),
-        showLine: layerDef.config?.showLine !== undefined ? layerDef.config.showLine : true,
+        showFill: layerDef.config?.showFill !== undefined ? layerDef.config.showFill : (layerDef.element !== "HGT" && layerDef.element !== "DTD" && layerDef.type !== "wind"),
+        showLine: layerDef.config?.showLine !== undefined ? layerDef.config.showLine : (layerDef.element === "DTD" ? false : true),
         opacity: layerDef.config?.opacity || 0.75,
-        lineColor: layerDef.config?.lineColor || (layerDef.element === "HGT" ? "#58a6ff" : layerDef.element === "TMP" ? "#f85149" : "#ffffff"),
+        lineColor: layerDef.config?.lineColor || (layerDef.element === "HGT" ? "#58a6ff" : layerDef.element === "TMP" ? "#f85149" : layerDef.element === "DTD" ? "#e3b341" : "#ffffff"),
         lineWidth: layerDef.config?.lineWidth !== undefined ? layerDef.config.lineWidth : 2.0,
-        boldValues: layerDef.config?.boldValues || (layerDef.element === "HGT" ? [5880, 588] : layerDef.element === "SLP" ? [1010] : layerDef.element === "TMP" ? [0] : []),
+        boldValues: layerDef.config?.boldValues || (layerDef.element === "HGT" ? [5880, 588] : layerDef.element === "SLP" ? [1010] : layerDef.element === "TMP" ? [0] : layerDef.element === "DTD" ? [2, 10] : []),
         boldLineWidth: layerDef.config?.boldLineWidth !== undefined ? layerDef.config.boldLineWidth : 4.0,
         showWind: layerDef.config?.showWind !== undefined ? layerDef.config.showWind : false,
         showBarbs: layerDef.config?.showBarbs !== undefined ? layerDef.config.showBarbs : false,
-        showRaster: layerDef.config?.showRaster !== undefined ? layerDef.config.showRaster : false,
+        showRaster: layerDef.config?.showRaster !== undefined ? layerDef.config.showRaster : (layerDef.element === "DTD" ? true : false),
         palettePath: layerDef.config?.palettePath || null,
         ...(layerDef.config || {}),
       });
@@ -869,19 +881,22 @@ async function populatePaletteSelect(configDrawer, layer) {
     }
 
     if (layer.config?.palettePath) {
-      paletteSel.value = layer.config.palettePath;
-      if (paletteSel.value !== layer.config.palettePath) {
-        // Requested palette path not available in this category's files
-        layer.config.palettePath = null;
-        autoSaveLayerConfig(layer);
-        if (gradientPreview) gradientPreview.style.background = "linear-gradient(to right, #888, #fff)";
-      } else {
-        const stops = await loadXMLPalette(layer.config.palettePath);
+      const targetPath = layer.config.palettePath;
+      const cleanTarget = targetPath.replace(/^\//, "");
+      const matchingOpt = Array.from(paletteSel.options).find(
+        (o) => o.value === targetPath || (o.value && o.value.replace(/^\//, "") === cleanTarget)
+      );
+      if (matchingOpt) {
+        paletteSel.value = matchingOpt.value;
+        layer.config.palettePath = matchingOpt.value;
+        const stops = await loadXMLPalette(matchingOpt.value);
         if (paletteLoadSeq.get(layer.id) !== seq) return;
         if (stops && gradientPreview && gradientPreview.isConnected) {
           const colors = stops.map((s) => `rgba(${s.color.slice(0, 3).join(",")},${((s.color[3] ?? 255) / 255).toFixed(2)})`).join(", ");
           gradientPreview.style.background = `linear-gradient(to right, ${colors})`;
         }
+      } else {
+        if (gradientPreview) gradientPreview.style.background = "linear-gradient(to right, #888, #fff)";
       }
     } else {
       if (gradientPreview) gradientPreview.style.background = "linear-gradient(to right, #888, #fff)";

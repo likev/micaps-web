@@ -383,7 +383,7 @@ describe("4. End-to-End Render & Layer Registration (§5-J4)", () => {
     expect(dtdLayer).toBeDefined();
     expect(dtdLayer.element).toBe("DTD");
     expect(dtdLayer.config.showFill).toBe(true);
-    expect(dtdLayer.config.showLine).toBe(true);
+    expect(dtdLayer.config.showLine).toBe(false);
   });
 
   test("analyzeAndRenderSoundingElementContour renders 700 hPa DTD with fills and correct name", () => {
@@ -403,6 +403,29 @@ describe("4. End-to-End Render & Layer Registration (§5-J4)", () => {
     expect(dtdLayer.name).toBe("700 hPa Dew-Point Depression (Sounding Analysis)");
     expect(dtdLayer.element).toBe("DTD");
     expect(dtdLayer.config.showFill).toBe(true);
+  });
+
+  test("analyzeAndRenderSurfaceContours and analyzeAndRenderSoundingElementContour default to showFill: false, showLine: false, showRaster: true for DTD", () => {
+    const map = createMockMap();
+    const stnsSurface = createSampleSurfaceStationGeoJSON();
+    const win = { id: "win-dtd-defaults" };
+    clearWindowWeatherLayers(win);
+
+    analyzeAndRenderSurfaceContours(map, stnsSurface, "DTD", {}, win);
+    const layers = getLayersForWindow(win);
+    const sfcLayer = layers.find((l) => l.id === "contour-surface-dtd");
+    expect(sfcLayer).toBeDefined();
+    expect(sfcLayer.config.showFill).toBe(false);
+    expect(sfcLayer.config.showLine).toBe(false);
+    expect(sfcLayer.config.showRaster).toBe(true);
+
+    const stnsUpper = createSampleSoundingStationGeoJSON(500);
+    analyzeAndRenderSoundingElementContour(map, stnsUpper, 500, "DTD", {}, win);
+    const upperLayer = layers.find((l) => l.id === "contour-sounding-dtd-500");
+    expect(upperLayer).toBeDefined();
+    expect(upperLayer.config.showFill).toBe(false);
+    expect(upperLayer.config.showLine).toBe(false);
+    expect(upperLayer.config.showRaster).toBe(true);
   });
 });
 
@@ -685,8 +708,9 @@ describe("11. Preset Configuration Validation in config.json (§5-E)", () => {
     expect(surfaceDtd.element).toBe("DTD");
     expect(surfaceDtd.model).toBe("SURFACE");
     expect(surfaceDtd.derivedFrom).toBe("surface-obs");
-    expect(surfaceDtd.render.showFill).toBe(true);
-    expect(surfaceDtd.render.showLine).toBe(true);
+    expect(surfaceDtd.render.showFill).toBe(false);
+    expect(surfaceDtd.render.showLine).toBe(false);
+    expect(surfaceDtd.render.showRaster).toBe(true);
     expect(surfaceDtd.render.lineColor).toBe("#e3b341");
 
     // Upper-air 500 hPa preset
@@ -698,8 +722,9 @@ describe("11. Preset Configuration Validation in config.json (§5-E)", () => {
     expect(upperDtd.model).toBe("UPPER_AIR");
     expect(upperDtd.level).toBe(500);
     expect(upperDtd.derivedFrom).toBe("upperair-obs-500");
-    expect(upperDtd.render.showFill).toBe(true);
-    expect(upperDtd.render.showLine).toBe(true);
+    expect(upperDtd.render.showFill).toBe(false);
+    expect(upperDtd.render.showLine).toBe(false);
+    expect(upperDtd.render.showRaster).toBe(true);
     expect(upperDtd.render.lineColor).toBe("#e3b341");
 
     // Opt-in check: station layers in config.json must NOT specify showDTD: true
