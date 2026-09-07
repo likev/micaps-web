@@ -1,5 +1,41 @@
 {
+  "basemap": {
+    "scheme": "dark",
+    "showCities": false,
+    "showGraticule": false,
+    "showProvinces": false
+  },
   "colormaps": {
+    "DTD": [
+      {
+        "color": [20, 90, 200, 255],
+        "val": 0
+      },
+      {
+        "color": [40, 160, 140, 255],
+        "val": 2
+      },
+      {
+        "color": [90, 190, 90, 255],
+        "val": 5
+      },
+      {
+        "color": [220, 220, 80, 255],
+        "val": 8
+      },
+      {
+        "color": [240, 150, 40, 255],
+        "val": 12
+      },
+      {
+        "color": [220, 70, 40, 255],
+        "val": 18
+      },
+      {
+        "color": [140, 40, 30, 255],
+        "val": 30
+      }
+    ],
     "HGT": [
       {
         "color": [40, 30, 150, 255],
@@ -182,12 +218,6 @@
         "val": 45
       }
     ]
-  },
-  "basemap": {
-    "scheme": "dark",
-    "showGraticule": true,
-    "showProvinces": true,
-    "showCities": true
   },
   "presets": [
     {
@@ -373,6 +403,19 @@
             "showLine": true
           },
           "type": "contour"
+        },
+        {
+          "derivedFrom": "surface-obs",
+          "element": "DTD",
+          "id": "contour-surface-dtd",
+          "model": "SURFACE",
+          "name": "Surface Derived Dew-Point Depression",
+          "render": {
+            "lineColor": "#e3b341",
+            "showFill": true,
+            "showLine": true
+          },
+          "type": "contour"
         }
       ],
       "name": "Surface Synoptic (Plots + SLP Isobars)"
@@ -391,6 +434,22 @@
           "model": "UPPER_AIR",
           "name": "500 hPa Sounding Station Plots",
           "path": "UPPER_AIR/PLOT/500",
+          "render": {
+            "filterLogic": "AND",
+            "filterRules": [
+              {
+                "field": "none",
+                "op": "\u003e",
+                "val": "",
+                "val2": ""
+              }
+            ],
+            "showDewpoint": true,
+            "showPressure": true,
+            "showStreamlines": false,
+            "showTemp": true,
+            "showWind": true
+          },
           "type": "station"
         },
         {
@@ -401,9 +460,19 @@
           "model": "UPPER_AIR",
           "name": "500 hPa Derived Height",
           "render": {
+            "boldLineWidth": 4,
+            "boldValues": [
+              5880,
+              588
+            ],
             "lineColor": "#58a6ff",
+            "lineWidth": 2,
+            "opacity": 0.75,
             "showFill": false,
-            "showLine": true
+            "showLine": true,
+            "showRaster": false,
+            "smooth": true,
+            "smoothIterations": 2
           },
           "type": "contour"
         },
@@ -415,9 +484,43 @@
           "model": "UPPER_AIR",
           "name": "500 hPa Derived Temperature",
           "render": {
+            "boldLineWidth": 4,
+            "boldValues": [
+              0,
+              -20
+            ],
             "lineColor": "#f85149",
+            "lineWidth": 2,
+            "opacity": 0.75,
             "showFill": false,
-            "showLine": true
+            "showLine": true,
+            "showRaster": false,
+            "smooth": true,
+            "smoothIterations": 2
+          },
+          "type": "contour"
+        },
+        {
+          "derivedFrom": "upperair-obs-500",
+          "element": "DTD",
+          "id": "contour-sounding-dtd-500",
+          "level": 500,
+          "model": "UPPER_AIR",
+          "name": "500 hPa Derived Dew-Point Depression",
+          "render": {
+            "boldLineWidth": 4,
+            "boldValues": [
+              2,
+              10
+            ],
+            "lineColor": "#e3b341",
+            "lineWidth": 2,
+            "opacity": 0.75,
+            "showFill": true,
+            "showLine": true,
+            "showRaster": false,
+            "smooth": true,
+            "smoothIterations": 2
           },
           "type": "contour"
         }

@@ -8,6 +8,7 @@ import {
   formatObsTimestamp,
   formatForecastInitTime,
   formatForecastValidTime,
+  formatContourLabel,
 } from "../src/utils/formatters.js";
 
 describe("Meteorological Parameter and Date/Time Formatters", () => {
@@ -50,5 +51,27 @@ describe("Meteorological Parameter and Date/Time Formatters", () => {
     expect(valid).toContain("2026-08-29");
     expect(valid).toContain("12:00");
     expect(valid).toContain("(+024h)");
+  });
+
+  test("formatContourLabel formats geopotential height in decameters (dam) and other elements", () => {
+    // 500 hPa height in gpm -> dam (5880 -> 588)
+    expect(formatContourLabel(5880, "HGT")).toBe("588");
+    expect(formatContourLabel(5840, "HGT")).toBe("584");
+    expect(formatContourLabel(5920, "HGT")).toBe("592");
+    expect(formatContourLabel(3120, "HEIGHT")).toBe("312");
+    expect(formatContourLabel(1520, "HGT")).toBe("152");
+
+    // If already in decameters (e.g. < 1000 gpm or isDam=true)
+    expect(formatContourLabel(588, "HGT")).toBe("588");
+    expect(formatContourLabel(588, "HGT", true)).toBe("588");
+    expect(formatContourLabel(5880, "HGT", true)).toBe("5880");
+
+    // Temperature and DTD formats (1 decimal place)
+    expect(formatContourLabel(-12.4, "TMP")).toBe("-12.4");
+    expect(formatContourLabel(4.0, "DTD")).toBe("4");
+    expect(formatContourLabel(4.25, "DTD")).toBe("4.3");
+
+    // Default rounding for other elements
+    expect(formatContourLabel(1013.25, "PRS")).toBe("1013");
   });
 });

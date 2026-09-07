@@ -54,6 +54,15 @@ const DEFAULT_COLORMAPS = {
     { val: 100, color: [128, 0, 64, 255] },
     { val: 250, color: [80, 0, 0, 255] },
   ],
+  DTD: [
+    { val: 0, color: [20, 90, 200, 255] },
+    { val: 2, color: [40, 160, 140, 255] },
+    { val: 5, color: [90, 190, 90, 255] },
+    { val: 8, color: [220, 220, 80, 255] },
+    { val: 12, color: [240, 150, 40, 255] },
+    { val: 18, color: [220, 70, 40, 255] },
+    { val: 30, color: [140, 40, 30, 255] },
+  ],
 };
 
 const FALLBACK_COLORMAP = DEFAULT_COLORMAPS.TMP;
@@ -109,11 +118,12 @@ export function getColor(val, element = "TMP", colormap = null, zMin = undefined
   const cmUpper = (typeof colormap === "string" ? colormap : "").toUpperCase();
 
   // Fixed physical scale fields must NEVER be dynamically stretched:
-  // RH (0..100%), WIND (0..45 m/s), TMP (-40..40 C), RAIN (0..250 mm)
+  // RH (0..100%), WIND (0..45 m/s), TMP (-40..40 C), RAIN (0..250 mm), DTD (0..30 C)
   const isFixedPhysical = elUpper === "RH" || cmUpper.includes("RH") ||
                           elUpper === "WIND" || cmUpper.includes("WIND") ||
                           elUpper === "TMP" || cmUpper.includes("TMP") ||
-                          elUpper === "RAIN" || cmUpper.includes("RAIN");
+                          elUpper === "RAIN" || cmUpper.includes("RAIN") ||
+                          elUpper === "DTD" || cmUpper.includes("DTD");
 
   const isHGT = elUpper === "HGT" || cmUpper.includes("HGT");
   const isSLP = elUpper === "SLP" || cmUpper.includes("SLP");
@@ -207,6 +217,9 @@ export function getElementLevels(element = "TMP", zMin, zMax, colormap = null) {
   }
   if (elUpper === "WIND") {
     return [4, 8, 12, 16, 20, 24, 28, 32, 40];
+  }
+  if (elUpper === "DTD") {
+    return [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30];
   }
 
   if (zMin !== undefined && zMax !== undefined && zMax > zMin) {

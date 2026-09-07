@@ -127,19 +127,12 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
       config: { ...layers[existingIdx].config, ...layerDef.config },
     };
   } else {
-    layers.push({
-      id: layerDef.id || `layer-${Date.now()}`,
-      name: layerDef.name || "Layer",
-      type: layerDef.type || "contour",
-      removable: layerDef.removable !== undefined ? layerDef.removable : true,
-      visible: layerDef.visible !== undefined ? layerDef.visible : true,
-      isExpanded: Boolean(layerDef.isExpanded),
-      color: layerDef.color || (layerDef.element === "HGT" ? "#58a6ff" : layerDef.element === "TMP" ? "#f85149" : "#388bfd"),
-      config: layerDef.type === "station" ? (isUpperAirStationLayer(layerDef) ? {
+    const baseConfig = layerDef.type === "station" ? (isUpperAirStationLayer(layerDef) ? {
         showTemp: layerDef.config?.showTemp !== undefined ? layerDef.config.showTemp : true,
         showDewpoint: layerDef.config?.showDewpoint !== undefined ? layerDef.config.showDewpoint : true,
         showPressure: layerDef.config?.showPressure !== undefined ? layerDef.config.showPressure : true,
         showWind: layerDef.config?.showWind !== undefined ? layerDef.config.showWind : true,
+        showDTD: layerDef.config?.showDTD !== undefined ? layerDef.config.showDTD : false,
         showStreamlines: layerDef.config?.showStreamlines !== undefined ? layerDef.config.showStreamlines : false,
         filterField1: layerDef.config?.filterField1 || "none",
         filterOp1: layerDef.config?.filterOp1 || ">=",
@@ -158,6 +151,7 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
         showTendency: layerDef.config?.showTendency !== undefined ? layerDef.config.showTendency : false,
         showVisibility: layerDef.config?.showVisibility !== undefined ? layerDef.config.showVisibility : false,
         showRain6: layerDef.config?.showRain6 !== undefined ? layerDef.config.showRain6 : false,
+        showDTD: layerDef.config?.showDTD !== undefined ? layerDef.config.showDTD : false,
         showStreamlines: layerDef.config?.showStreamlines !== undefined ? layerDef.config.showStreamlines : false,
         filterField1: layerDef.config?.filterField1 || "none",
         filterOp1: layerDef.config?.filterOp1 || ">",
@@ -171,7 +165,7 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
         showBarbs: layerDef.config?.showBarbs !== undefined ? layerDef.config.showBarbs : false,
         showRaster: layerDef.config?.showRaster !== undefined ? layerDef.config.showRaster : false,
       } : {
-        showFill: layerDef.config?.showFill !== undefined ? layerDef.config.showFill : true,
+        showFill: layerDef.config?.showFill !== undefined ? layerDef.config.showFill : (layerDef.element !== "HGT" && layerDef.type !== "wind"),
         showLine: layerDef.config?.showLine !== undefined ? layerDef.config.showLine : true,
         opacity: layerDef.config?.opacity || 0.75,
         lineColor: layerDef.config?.lineColor || (layerDef.element === "HGT" ? "#58a6ff" : layerDef.element === "TMP" ? "#f85149" : "#ffffff"),
@@ -182,9 +176,25 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
         showBarbs: layerDef.config?.showBarbs !== undefined ? layerDef.config.showBarbs : false,
         showRaster: layerDef.config?.showRaster !== undefined ? layerDef.config.showRaster : false,
         palettePath: layerDef.config?.palettePath || null,
-      }),
+        ...(layerDef.config || {}),
+      });
+
+    layers.push({
+      id: layerDef.id || `layer-${Date.now()}`,
+      name: layerDef.name || "Layer",
+      type: layerDef.type || "contour",
+      removable: layerDef.removable !== undefined ? layerDef.removable : true,
+      visible: layerDef.visible !== undefined ? layerDef.visible : true,
+      isExpanded: Boolean(layerDef.isExpanded),
+      color: layerDef.color || (layerDef.element === "HGT" ? "#58a6ff" : layerDef.element === "TMP" ? "#f85149" : "#388bfd"),
       ...layerDef,
+      config: baseConfig,
     });
+  }
+
+  const curLayer = existingIdx >= 0 ? layers[existingIdx] : layers[layers.length - 1];
+  if (curLayer.config && curLayer.config.showFill && curLayer.config.showRaster) {
+    curLayer.config.showRaster = false;
   }
 
   if (winId === currentActiveWinId) {
@@ -192,7 +202,7 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
     if (panel) renderLayersManager(panel);
   }
 
-  return existingIdx >= 0 ? layers[existingIdx] : layers[layers.length - 1];
+  return curLayer;
 }
 
 export function removeLayer(layerId, winOrId = null) {
@@ -400,7 +410,18 @@ function renderLayersManager(panel) {
         return { lineColor: e.target.value };
       };
 
-      bindProp(".chk-show-fill", "change", (e) => { layer.config.showFill = e.target.checked; autoSaveLayerConfig(layer); return { showFill: e.target.checked }; });
+      bindProp(".chk-show-fill", "change", (e) => {
+        layer.config.showFill = e.target.checked;
+        let showRaster = layer.config.showRaster;
+        if (e.target.checked) {
+          layer.config.showRaster = false;
+          showRaster = false;
+          const rasterEl = configDrawer.querySelector(".chk-show-raster");
+          if (rasterEl) rasterEl.checked = false;
+        }
+        autoSaveLayerConfig(layer);
+        return { showFill: e.target.checked, showRaster };
+      });
       bindProp(".chk-show-line", "change", (e) => { layer.config.showLine = e.target.checked; autoSaveLayerConfig(layer); return { showLine: e.target.checked }; });
       bindProp(".slider-fill-opacity", "input", (e) => { const op = parseInt(e.target.value, 10) / 100; layer.config.opacity = op; autoSaveLayerConfig(layer); return { opacity: op }; });
       bindProp(".color-picker-line", "input", (e) => { const res = updateColor(e); autoSaveLayerConfig(layer); return res; });
@@ -408,7 +429,18 @@ function renderLayersManager(panel) {
       bindProp(".input-bold-values", "change", (e) => { const bv = parseBoldValues(e.target.value); layer.config.boldValues = bv; autoSaveLayerConfig(layer); return { boldValues: bv }; });
       bindProp(".input-bold-line-width", "change", (e) => { const bw = parseFloat(e.target.value) || 4.0; layer.config.boldLineWidth = bw; autoSaveLayerConfig(layer); return { boldLineWidth: bw }; });
       bindProp(".input-label-size", "change", (e) => { const ls = parseInt(e.target.value, 10) || 13; layer.config.labelSize = ls; autoSaveLayerConfig(layer); return { labelSize: ls }; });
-      bindProp(".chk-show-raster", "change", (e) => { layer.config.showRaster = e.target.checked; autoSaveLayerConfig(layer); return { showRaster: e.target.checked }; });
+      bindProp(".chk-show-raster", "change", (e) => {
+        layer.config.showRaster = e.target.checked;
+        let showFill = layer.config.showFill;
+        if (e.target.checked) {
+          layer.config.showFill = false;
+          showFill = false;
+          const fillEl = configDrawer.querySelector(".chk-show-fill");
+          if (fillEl) fillEl.checked = false;
+        }
+        autoSaveLayerConfig(layer);
+        return { showRaster: e.target.checked, showFill };
+      });
       bindProp(".chk-smooth-lines", "change", (e) => { layer.config.smooth = e.target.checked; autoSaveLayerConfig(layer); return { smooth: e.target.checked }; });
       bindProp(".chk-show-wind", "change", (e) => { layer.config.showWind = e.target.checked; autoSaveLayerConfig(layer); return { showWind: e.target.checked }; });
       bindProp(".chk-show-barbs", "change", (e) => { layer.config.showBarbs = e.target.checked; autoSaveLayerConfig(layer); return { showBarbs: e.target.checked }; });
@@ -475,6 +507,7 @@ function renderLayersManager(panel) {
         [".chk-station-tendency", "showTendency"],
         [".chk-station-vis", "showVisibility"],
         [".chk-station-rain6", "showRain6"],
+        [".chk-station-dtd", "showDTD"],
         [".chk-station-streamlines", "showStreamlines"],
       ].forEach(([sel, key]) => bindStationCheckbox(sel, key));
 
@@ -527,8 +560,31 @@ function renderLayersManager(panel) {
     }
   });
 
-  // Bind auxiliary checkboxes for compatibility
-  bindAuxCheckbox("chk-raster", "raster");
+  // Bind auxiliary checkboxes for compatibility with mutual exclusivity between contour fills and raster
+  const chkRaster = document.getElementById("chk-raster");
+  const chkContourf = document.getElementById("chk-contourf");
+  if (chkRaster) {
+    chkRaster.addEventListener("change", (e) => {
+      if (e.target.checked && chkContourf) {
+        chkContourf.checked = false;
+        appState.setLayer("contourf", false);
+        if (onLayerActionCallback) onLayerActionCallback("aux", "contourf", false, null, currentActiveWinId);
+      }
+      appState.setLayer("raster", e.target.checked);
+      if (onLayerActionCallback) onLayerActionCallback("aux", "raster", e.target.checked, null, currentActiveWinId);
+    });
+  }
+  if (chkContourf) {
+    chkContourf.addEventListener("change", (e) => {
+      if (e.target.checked && chkRaster) {
+        chkRaster.checked = false;
+        appState.setLayer("raster", false);
+        if (onLayerActionCallback) onLayerActionCallback("aux", "raster", false, null, currentActiveWinId);
+      }
+      appState.setLayer("contourf", e.target.checked);
+      if (onLayerActionCallback) onLayerActionCallback("aux", "contourf", e.target.checked, null, currentActiveWinId);
+    });
+  }
   bindAuxCheckbox("chk-wind", "wind");
 }
 
@@ -537,11 +593,13 @@ export function renderStationDrawerHTML(layer) {
   const items = upper ? [
     ["chk-station-temp", layer.config?.showTemp !== false, "Temperature (TT)"],
     ["chk-station-dewpoint", layer.config?.showDewpoint !== false, "Dew Point (Td)"],
+    ["chk-station-dtd", Boolean(layer.config?.showDTD), "Dew-Pt Depres. (T−Td)"],
     ["chk-station-pressure", layer.config?.showPressure !== false, "Height (H)"],
     ["chk-station-wind", layer.config?.showWind !== false, "Wind Barbs (FF/dd)"],
   ] : [
     ["chk-station-temp", layer.config?.showTemp !== false, "Temperature (TT)"],
     ["chk-station-dewpoint", layer.config?.showDewpoint !== false, "Dew Point (Td)"],
+    ["chk-station-dtd", Boolean(layer.config?.showDTD), "Dew-Pt Depres. (T−Td)"],
     ["chk-station-pressure", layer.config?.showPressure !== false, "Pressure (SLP)"],
     ["chk-station-wind", layer.config?.showWind !== false, "Wind Barbs (FF/dd)"],
     ["chk-station-cloud", Boolean(layer.config?.showCloud), "Cloud Cover (N)"],
@@ -569,11 +627,13 @@ export function renderStationDrawerHTML(layer) {
             <option value="HGT">Geopotential Height (HGT)</option>
             <option value="TMP">Temperature (TMP)</option>
             <option value="TD">Dew Point (TD)</option>
+            <option value="DTD">Dew-Pt Depression (DTD)</option>
             <option value="WIND">Wind Speed (WIND)</option>
           ` : `
             <option value="SLP">Sea Level Pressure (SLP)</option>
             <option value="TMP">Temperature (TMP)</option>
             <option value="TD">Dew Point (TD)</option>
+            <option value="DTD">Dew-Pt Depression (DTD)</option>
             <option value="VIS">Visibility (VIS)</option>
             <option value="RAIN6">6h Precipitation (RAIN6)</option>
             <option value="WIND">Wind Speed (WIND)</option>

@@ -135,6 +135,9 @@ export function autoSaveLayerConfig(layer) {
             if (layer.config.filterField2 !== undefined) pLayer.render.filterField2 = layer.config.filterField2;
             if (layer.config.filterOp2 !== undefined) pLayer.render.filterOp2 = layer.config.filterOp2;
             if (layer.config.filterVal2 !== undefined) pLayer.render.filterVal2 = layer.config.filterVal2;
+            if (pLayer.render.showFill && pLayer.render.showRaster) {
+              pLayer.render.showRaster = false;
+            }
           }
           matched = true;
         }

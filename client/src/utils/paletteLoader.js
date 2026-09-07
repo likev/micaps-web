@@ -11,6 +11,7 @@ const ELEMENT_PALETTE_CATEGORY = {
   RADAR: "RADAR",
   CAPE:  "STABILITY",
   VIS:   "ENV_VIS",
+  DTD:   "TMP",
 };
 
 // Cache: category → [{name, path}]

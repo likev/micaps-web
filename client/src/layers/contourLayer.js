@@ -3,6 +3,7 @@ import * as griddata from "griddata";
 import { getElementLevels, getHexColor } from "../utils/colormaps.js";
 import { removeRasterLayer } from "./rasterLayer.js";
 import { smoothFeatureCollection, smoothGrid2D } from "../utils/smoothContour.js";
+import { formatContourLabel } from "../utils/formatters.js";
 
 export function parseBoldValues(boldInput, element = null) {
   if (!boldInput) {
@@ -146,11 +147,12 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
   try {
     const lines = griddata.contour(Z, { x, y, levels });
     if (Array.isArray(lines)) {
+      const isDam = (gridData.stats?.max !== undefined) ? gridData.stats.max < 2500 : false;
       for (const f of lines) {
         if (!f.properties) f.properties = {};
         const val = f.value ?? f.properties.value ?? f.properties.level ?? 0;
         f.properties.value = val;
-        f.properties.label = String(Math.round(val));
+        f.properties.label = formatContourLabel(val, element, isDam);
         f.properties.isBold = isFeatureBold(val, boldValues);
       }
       isolineFC.features = lines;

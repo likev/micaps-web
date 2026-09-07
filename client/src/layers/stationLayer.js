@@ -17,6 +17,7 @@ function getState(map) {
         showTemp: true,
         showDewpoint: true,
         showWind: true,
+        showDTD: false,
         showCloud: false,
         showWeather: false,
         showPressure: false,
@@ -175,12 +176,23 @@ function hashStation(id, lon, lat) {
   return (h >>> 0);
 }
 
-function getFieldValue(p, field) {
+export function getFieldValue(p, field) {
   switch (field) {
     case "TT":
       return extractTemp(p, ["temperature", "temp", "TEM", "TT", "T", "TMP", "t", "temp_max", "tem"]);
     case "Td":
       return extractTemp(p, ["dewpoint", "dew_point", "DPT", "TD", "Td", "td", "dew", "dpt"]);
+    case "DTD": {
+      const t = extractTemp(p, ["temperature", "temp", "TEM", "TT", "T", "TMP", "t", "temp_max", "tem"]);
+      const td = extractTemp(p, ["dewpoint", "dew_point", "DPT", "TD", "Td", "td", "dew", "dpt"]);
+      if (t === null || td === null) return null;
+      if (td > 50) return null;
+      if (td > t + 0.5) return null;
+      let dtd = t - td;
+      if (dtd < 0) dtd = 0;
+      if (dtd > 45) return null;
+      return dtd;
+    }
     case "Wind": {
       const ws = extractRawNumber(p, ["wind_speed", "windSpeed", "ws", "WIN_S_Avg", "WIN_S", "FF", "ff", "speed"], 0, 150);
       return ws !== null ? (ws > 100 ? ws / 10.0 : ws) : null;
@@ -292,11 +304,11 @@ export function matchesStationFilters(p, cfg) {
   const has2 = f2 !== "none" && val2 !== undefined && val2 !== null && val2 !== "" && !isNaN(Number(val2));
 
   if (!has1 && !has2) return true;
-  if (logic === "none" || !has2) return has1 ? evaluateSingleRule(p, { field: f1, op: op1, val: val1 }) : true;
-  if (!has1 && has2) return evaluateSingleRule(p, { field: f2, op: op2, val: val2 });
+  if (logic === "none" || !has2) return has1 ? evaluateSingleRule(p, { field: f1, op: op1, val: val1, val2: cfg.filterVal1_2 ?? cfg.filterVal2 }) : true;
+  if (!has1 && has2) return evaluateSingleRule(p, { field: f2, op: op2, val: val2, val2: cfg.filterVal2_2 });
 
-  const res1 = evaluateSingleRule(p, { field: f1, op: op1, val: val1 });
-  const res2 = evaluateSingleRule(p, { field: f2, op: op2, val: val2 });
+  const res1 = evaluateSingleRule(p, { field: f1, op: op1, val: val1, val2: cfg.filterVal1_2 ?? cfg.filterVal2 });
+  const res2 = evaluateSingleRule(p, { field: f2, op: op2, val: val2, val2: cfg.filterVal2_2 });
 
   if (logic === "OR" || logic === "or") {
     return res1 || res2;
@@ -387,12 +399,21 @@ export function updateVisibleMarkersForMap(map) {
     const showTemp = cfg.showTemp !== undefined ? Boolean(cfg.showTemp) : true;
     const showDewpoint = cfg.showDewpoint !== undefined ? Boolean(cfg.showDewpoint) : true;
     const showWind = cfg.showWind !== undefined ? Boolean(cfg.showWind) : true;
+    const showDTD = Boolean(cfg.showDTD);
     const showCloud = Boolean(cfg.showCloud);
     const showWeather = Boolean(cfg.showWeather);
     const showPressure = Boolean(cfg.showPressure);
     const showTendency = Boolean(cfg.showTendency);
     const showVisibility = Boolean(cfg.showVisibility);
     const showRain6 = Boolean(cfg.showRain6);
+
+    let dtd = "";
+    if (rawT !== null && rawTd !== null && rawTd <= 50 && rawTd <= rawT + 0.5) {
+      const dVal = rawT - rawTd;
+      if (dVal >= 0 && dVal <= 45) {
+        dtd = Math.round(dVal).toString();
+      }
+    }
 
     const rawVis = extractRawNumber(p, ["visibility", "VIS", "vis", "VV", "vv", "VIS_Avg", "VIS_Min"], 0, 150000);
     const vis = rawVis !== null ? (rawVis >= 1000 ? (rawVis / 1000).toFixed(rawVis % 1000 === 0 ? 0 : 1) : (rawVis < 10 ? rawVis.toFixed(1) : Math.round(rawVis).toString())) : "";
@@ -401,6 +422,23 @@ export function updateVisibleMarkersForMap(map) {
     const rain6 = rawRain6 !== null && rawRain6 > 0 ? (rawRain6 < 10 ? rawRain6.toFixed(1) : Math.round(rawRain6).toString()) : "";
 
     const ww = getWeatherSymbol(weatherCode);
+    const hasDTDPlot = Boolean(showDTD && dtd);
+    const hasVisPlot = Boolean(showVisibility && vis);
+    let wwHTML = "";
+    if (showWeather && ww) {
+      if (!hasDTDPlot) {
+        wwHTML = `
+        <div style="position: absolute; top: 20px; left: -2px; width: 20px; text-align: center; color: #e3b341; font-size: 15px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+          ${ww}
+        </div>`;
+      } else if (!hasVisPlot) {
+        wwHTML = `
+        <div style="position: absolute; top: 20px; left: -26px; width: 24px; text-align: center; color: #e3b341; font-size: 15px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+          ${ww}
+        </div>`;
+      }
+    }
+
     const skySVG = getSkyCoverSVG(cloudCover, 16);
     let barbSVG = "";
     if (ws !== null && ws >= 0) {
@@ -429,18 +467,20 @@ export function updateVisibleMarkersForMap(map) {
         <div style="position: absolute; top: 4px; left: 0px; width: 22px; text-align: right; color: #f85149; font-weight: 700; font-size: 13px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
           ${tt}
         </div>` : ""}
+        <!-- DTD: Dew-Point Depression (°C) Middle-Left in Orange -->
+        ${hasDTDPlot ? `
+        <div style="position: absolute; top: 20px; left: 0px; width: 22px; text-align: right; color: #f0883e; font-weight: 700; font-size: 12px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+          ${dtd}
+        </div>` : ""}
         <!-- TdTd: Dew Point (°C) Bottom-Left in Emerald Green -->
         ${showDewpoint && td ? `
         <div style="position: absolute; bottom: 4px; left: 0px; width: 22px; text-align: right; color: #56d364; font-weight: 700; font-size: 13px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
           ${td}
         </div>` : ""}
-        <!-- ww: Present Weather Symbol (Middle Left) -->
-        ${showWeather && ww ? `
-        <div style="position: absolute; top: 20px; left: -2px; width: 20px; text-align: center; color: #e3b341; font-size: 15px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
-          ${ww}
-        </div>` : ""}
+        <!-- ww: Present Weather Symbol (Middle Left or Displaced Far-Left) -->
+        ${wwHTML}
         <!-- VV: Visibility (Far-Left in Golden Yellow) -->
-        ${showVisibility && vis ? `
+        ${hasVisPlot ? `
         <div style="position: absolute; top: 20px; left: -26px; width: 24px; text-align: right; color: #ffd33d; font-weight: 700; font-size: 12px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
           ${vis}
         </div>` : ""}

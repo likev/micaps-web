@@ -23,6 +23,7 @@ import { resolveForecastCycles, resolveLatestForecastCycle, syncObservationTimel
 import {
   initTabWindowManager,
   getActiveWindow,
+  getWindowById,
   refreshPresetControls,
   toggleTabsAndSplit,
   updateWindowTitle,
@@ -414,12 +415,15 @@ async function loadWeatherField(map, model, element, level, period, customOption
   const defaultLineColor = isHeight ? "#58a6ff" : (isTemp ? "#f85149" : "#ffffff");
   const lineColor = existingLayer?.color || snap?.color || exCfg.lineColor || customOptions?.lineColor || defaultLineColor;
   const opacity = exCfg.opacity ?? customOptions?.opacity ?? 0.75;
-  const showFill = exCfg.showFill ?? customOptions?.showFill ?? (!isHeight && !isWind);
+  let showFill = exCfg.showFill ?? customOptions?.showFill ?? (!isHeight && !isWind);
   const showLine = exCfg.showLine ?? customOptions?.showLine ?? !isWind;
   const lineWidth = exCfg.lineWidth ?? customOptions?.lineWidth ?? 1.4;
   const showWind = exCfg.showWind ?? customOptions?.showWind ?? isWind;
   const showBarbs = exCfg.showBarbs ?? customOptions?.showBarbs ?? false;
-  const showRaster = exCfg.showRaster ?? customOptions?.showRaster ?? Boolean(appState.state?.layers?.raster);
+  let showRaster = exCfg.showRaster ?? customOptions?.showRaster ?? Boolean(appState.state?.layers?.raster);
+  if (showFill && showRaster) {
+    showRaster = false;
+  }
   const savedPalettePath = exCfg.palettePath || null;
   const isVisible = existingLayer ? (existingLayer.visible !== false) : (snap ? snap.visible !== false : true);
   const smooth = exCfg.smooth ?? customOptions?.smooth ?? true;
@@ -542,7 +546,8 @@ async function loadWeatherField(map, model, element, level, period, customOption
       }
     }
 
-    if (isVisible) {
+    const hasShading = isVisible && (Boolean(showFill) || Boolean(showRaster));
+    if (hasShading) {
       updateLegend(element, colormap, gridData.stats?.min, gridData.stats?.max, win);
     } else {
       removeLegend(element, win);
@@ -589,17 +594,28 @@ async function loadUpperAirComposite(map, level = 500, obsTime = "20260828170000
     const groupDerived = activeGroup?.layers?.filter((l) => l.type === "contour" && l.model === "UPPER_AIR" && Boolean(l.derivedFrom)) || [];
     if (groupDerived.length > 0) {
       for (const cLayer of groupDerived) {
-        const elem = (cLayer.element || "HGT").toUpperCase();
-        const cfg = { ...(cLayer.render || cLayer.config || {}) };
-        cfg.layerId = `contour-sounding-${elem.toLowerCase()}-${curLevel}`;
-        cfg.derivedFrom = cLayer.derivedFrom || layerId;
-        const snap = win?.derivedContourSnapshots?.find((s) => s.id === cfg.layerId || (s.model === "UPPER_AIR" && s.element === elem));
-        const isVisible = snap ? snap.visible !== false : cLayer.visible !== false;
-        cfg.visible = isVisible;
-        analyzeAndRenderSoundingElementContour(map, stations, curLevel, elem, cfg, win);
-        const renderedLayer = getLayersForWindow(win).find((l) => l.id === cfg.layerId);
-        if (renderedLayer && (renderedLayer.config?.showRaster || cLayer.render?.showRaster) && isVisible) {
-          triggerRasterOverlay(map, renderedLayer, win);
+        try {
+          const elem = (cLayer.element || "HGT").toUpperCase();
+          const cfg = { ...(cLayer.render || cLayer.config || {}) };
+          cfg.layerId = `contour-sounding-${elem.toLowerCase()}-${curLevel}`;
+          cfg.derivedFrom = cLayer.derivedFrom || layerId;
+          const snap = win?.derivedContourSnapshots?.find((s) => s.id === cfg.layerId || (s.model === "UPPER_AIR" && s.element === elem));
+          const isVisible = snap ? snap.visible !== false : cLayer.visible !== false;
+          cfg.visible = isVisible;
+          analyzeAndRenderSoundingElementContour(map, stations, curLevel, elem, cfg, win);
+          const renderedLayer = getLayersForWindow(win).find((l) => l.id === cfg.layerId);
+          if (renderedLayer && (renderedLayer.config?.showRaster || cLayer.render?.showRaster) && isVisible) {
+            triggerRasterOverlay(map, renderedLayer, win);
+          }
+          const hasShading = isVisible && (Boolean(renderedLayer?.config?.showFill ?? cfg.showFill) || Boolean(renderedLayer?.config?.showRaster ?? cLayer.render?.showRaster));
+          if (hasShading) {
+            const colormap = renderedLayer?.colormap || cfg.colormap || elem;
+            updateLegend(elem, colormap, renderedLayer?.gridData?.stats?.min, renderedLayer?.gridData?.stats?.max, win);
+          } else {
+            removeLegend(elem, win);
+          }
+        } catch (err) {
+          console.warn(`[Main] Sounding derived contour failed for ${cLayer.element}:`, err);
         }
       }
     } else {
@@ -610,12 +626,23 @@ async function loadUpperAirComposite(map, level = 500, obsTime = "20260828170000
       }
       if (activeUpperContours.length > 0) {
         for (const cLayer of activeUpperContours) {
-          const isVisible = cLayer.visible !== false;
-          const cfg = { ...(cLayer.config || {}), visible: isVisible, layerId: `contour-sounding-${(cLayer.element || "HGT").toLowerCase()}-${curLevel}` };
-          analyzeAndRenderSoundingElementContour(map, stations, curLevel, cLayer.element || "HGT", cfg, win);
-          const renderedLayer = getLayersForWindow(win).find((l) => l.id === cfg.layerId);
-          if (renderedLayer && (renderedLayer.config?.showRaster || cLayer.config?.showRaster) && isVisible) {
-            triggerRasterOverlay(map, renderedLayer, win);
+          try {
+            const isVisible = cLayer.visible !== false;
+            const cfg = { ...(cLayer.config || {}), visible: isVisible, layerId: `contour-sounding-${(cLayer.element || "HGT").toLowerCase()}-${curLevel}` };
+            analyzeAndRenderSoundingElementContour(map, stations, curLevel, cLayer.element || "HGT", cfg, win);
+            const renderedLayer = getLayersForWindow(win).find((l) => l.id === cfg.layerId);
+            if (renderedLayer && (renderedLayer.config?.showRaster || cLayer.config?.showRaster) && isVisible) {
+              triggerRasterOverlay(map, renderedLayer, win);
+            }
+            const hasShading = isVisible && (Boolean(renderedLayer?.config?.showFill ?? cfg.showFill) || Boolean(renderedLayer?.config?.showRaster ?? cLayer.config?.showRaster));
+            if (hasShading) {
+              const colormap = renderedLayer?.colormap || cfg.colormap || cLayer.element;
+              updateLegend(cLayer.element, colormap, renderedLayer?.gridData?.stats?.min, renderedLayer?.gridData?.stats?.max, win);
+            } else {
+              removeLegend(cLayer.element, win);
+            }
+          } catch (err) {
+            console.warn(`[Main] Sounding active contour failed for ${cLayer.element}:`, err);
           }
         }
       } else {
@@ -658,17 +685,28 @@ async function loadObservationProduct(map, model, element, level, file, win = ge
       const groupDerived = activeGroup?.layers?.filter((l) => l.type === "contour" && l.model === "SURFACE" && Boolean(l.derivedFrom)) || [];
       if (groupDerived.length > 0) {
         for (const cLayer of groupDerived) {
-          const elem = (cLayer.element || "SLP").toUpperCase();
-          const cfg = { ...(cLayer.render || cLayer.config || {}) };
-          if (cLayer.id) cfg.layerId = cLayer.id;
-          cfg.derivedFrom = cLayer.derivedFrom || layerId;
-          const snap = win?.derivedContourSnapshots?.find((s) => s.id === (cfg.layerId || cLayer.id) || (s.model === "SURFACE" && s.element === elem));
-          const isVisible = snap ? snap.visible !== false : cLayer.visible !== false;
-          cfg.visible = isVisible;
-          analyzeAndRenderSurfaceContours(map, stations, elem, cfg, win);
-          const renderedLayer = getLayersForWindow(win).find((l) => l.id === (cfg.layerId || `contour-surface-${elem.toLowerCase()}`));
-          if (renderedLayer && (renderedLayer.config?.showRaster || cLayer.render?.showRaster) && isVisible) {
-            triggerRasterOverlay(map, renderedLayer, win);
+          try {
+            const elem = (cLayer.element || "SLP").toUpperCase();
+            const cfg = { ...(cLayer.render || cLayer.config || {}) };
+            if (cLayer.id) cfg.layerId = cLayer.id;
+            cfg.derivedFrom = cLayer.derivedFrom || layerId;
+            const snap = win?.derivedContourSnapshots?.find((s) => s.id === (cfg.layerId || cLayer.id) || (s.model === "SURFACE" && s.element === elem));
+            const isVisible = snap ? snap.visible !== false : cLayer.visible !== false;
+            cfg.visible = isVisible;
+            analyzeAndRenderSurfaceContours(map, stations, elem, cfg, win);
+            const renderedLayer = getLayersForWindow(win).find((l) => l.id === (cfg.layerId || `contour-surface-${elem.toLowerCase()}`));
+            if (renderedLayer && (renderedLayer.config?.showRaster || cLayer.render?.showRaster) && isVisible) {
+              triggerRasterOverlay(map, renderedLayer, win);
+            }
+            const hasShading = isVisible && (Boolean(renderedLayer?.config?.showFill ?? cfg.showFill) || Boolean(renderedLayer?.config?.showRaster ?? cLayer.render?.showRaster));
+            if (hasShading) {
+              const colormap = renderedLayer?.colormap || cfg.colormap || elem;
+              updateLegend(elem, colormap, renderedLayer?.gridData?.stats?.min, renderedLayer?.gridData?.stats?.max, win);
+            } else {
+              removeLegend(elem, win);
+            }
+          } catch (err) {
+            console.warn(`[Main] Surface derived contour failed for ${cLayer.element}:`, err);
           }
         }
       } else {
@@ -679,13 +717,24 @@ async function loadObservationProduct(map, model, element, level, file, win = ge
         }
         if (activeSurfaceContours.length > 0) {
           for (const cLayer of activeSurfaceContours) {
-            const isVisible = cLayer.visible !== false;
-            const cfg = { ...(cLayer.config || {}), visible: isVisible };
-            if (cLayer.id) cfg.layerId = cLayer.id;
-            analyzeAndRenderSurfaceContours(map, stations, cLayer.element || "SLP", cfg, win);
-            const renderedLayer = getLayersForWindow(win).find((l) => l.id === (cfg.layerId || `contour-surface-${(cLayer.element || "SLP").toLowerCase()}`));
-            if (renderedLayer && (renderedLayer.config?.showRaster || cLayer.config?.showRaster) && isVisible) {
-              triggerRasterOverlay(map, renderedLayer, win);
+            try {
+              const isVisible = cLayer.visible !== false;
+              const cfg = { ...(cLayer.config || {}), visible: isVisible };
+              if (cLayer.id) cfg.layerId = cLayer.id;
+              analyzeAndRenderSurfaceContours(map, stations, cLayer.element || "SLP", cfg, win);
+              const renderedLayer = getLayersForWindow(win).find((l) => l.id === (cfg.layerId || `contour-surface-${(cLayer.element || "SLP").toLowerCase()}`));
+              if (renderedLayer && (renderedLayer.config?.showRaster || cLayer.config?.showRaster) && isVisible) {
+                triggerRasterOverlay(map, renderedLayer, win);
+              }
+              const hasShading = isVisible && (Boolean(renderedLayer?.config?.showFill ?? cfg.showFill) || Boolean(renderedLayer?.config?.showRaster ?? cLayer.config?.showRaster));
+              if (hasShading) {
+                const colormap = renderedLayer?.colormap || cfg.colormap || cLayer.element;
+                updateLegend(cLayer.element, colormap, renderedLayer?.gridData?.stats?.min, renderedLayer?.gridData?.stats?.max, win);
+              } else {
+                removeLegend(cLayer.element, win);
+              }
+            } catch (err) {
+              console.warn(`[Main] Surface active contour failed for ${cLayer.element}:`, err);
             }
           }
         } else {
@@ -699,17 +748,28 @@ async function loadObservationProduct(map, model, element, level, file, win = ge
       const groupDerived = activeGroup?.layers?.filter((l) => l.type === "contour" && l.model === "UPPER_AIR" && Boolean(l.derivedFrom)) || [];
       if (groupDerived.length > 0) {
         for (const cLayer of groupDerived) {
-          const elem = (cLayer.element || "HGT").toUpperCase();
-          const cfg = { ...(cLayer.render || cLayer.config || {}) };
-          cfg.layerId = `contour-sounding-${elem.toLowerCase()}-${curLevel}`;
-          cfg.derivedFrom = cLayer.derivedFrom || layerId;
-          const snap = win?.derivedContourSnapshots?.find((s) => s.id === cfg.layerId || (s.model === "UPPER_AIR" && s.element === elem));
-          const isVisible = snap ? snap.visible !== false : cLayer.visible !== false;
-          cfg.visible = isVisible;
-          analyzeAndRenderSoundingElementContour(map, stations, curLevel, elem, cfg, win);
-          const renderedLayer = getLayersForWindow(win).find((l) => l.id === cfg.layerId);
-          if (renderedLayer && (renderedLayer.config?.showRaster || cLayer.render?.showRaster) && isVisible) {
-            triggerRasterOverlay(map, renderedLayer, win);
+          try {
+            const elem = (cLayer.element || "HGT").toUpperCase();
+            const cfg = { ...(cLayer.render || cLayer.config || {}) };
+            cfg.layerId = `contour-sounding-${elem.toLowerCase()}-${curLevel}`;
+            cfg.derivedFrom = cLayer.derivedFrom || layerId;
+            const snap = win?.derivedContourSnapshots?.find((s) => s.id === cfg.layerId || (s.model === "UPPER_AIR" && s.element === elem));
+            const isVisible = snap ? snap.visible !== false : cLayer.visible !== false;
+            cfg.visible = isVisible;
+            analyzeAndRenderSoundingElementContour(map, stations, curLevel, elem, cfg, win);
+            const renderedLayer = getLayersForWindow(win).find((l) => l.id === cfg.layerId);
+            if (renderedLayer && (renderedLayer.config?.showRaster || cLayer.render?.showRaster) && isVisible) {
+              triggerRasterOverlay(map, renderedLayer, win);
+            }
+            const hasShading = isVisible && (Boolean(renderedLayer?.config?.showFill ?? cfg.showFill) || Boolean(renderedLayer?.config?.showRaster ?? cLayer.render?.showRaster));
+            if (hasShading) {
+              const colormap = renderedLayer?.colormap || cfg.colormap || elem;
+              updateLegend(elem, colormap, renderedLayer?.gridData?.stats?.min, renderedLayer?.gridData?.stats?.max, win);
+            } else {
+              removeLegend(elem, win);
+            }
+          } catch (err) {
+            console.warn(`[Main] Sounding derived contour failed for ${cLayer.element}:`, err);
           }
         }
       } else {
@@ -720,12 +780,23 @@ async function loadObservationProduct(map, model, element, level, file, win = ge
         }
         if (activeUpperContours.length > 0) {
           for (const cLayer of activeUpperContours) {
-            const isVisible = cLayer.visible !== false;
-            const cfg = { ...(cLayer.config || {}), visible: isVisible, layerId: `contour-sounding-${(cLayer.element || "HGT").toLowerCase()}-${curLevel}` };
-            analyzeAndRenderSoundingElementContour(map, stations, curLevel, cLayer.element || "HGT", cfg, win);
-            const renderedLayer = getLayersForWindow(win).find((l) => l.id === cfg.layerId);
-            if (renderedLayer && (renderedLayer.config?.showRaster || cLayer.config?.showRaster) && isVisible) {
-              triggerRasterOverlay(map, renderedLayer, win);
+            try {
+              const isVisible = cLayer.visible !== false;
+              const cfg = { ...(cLayer.config || {}), visible: isVisible, layerId: `contour-sounding-${(cLayer.element || "HGT").toLowerCase()}-${curLevel}` };
+              analyzeAndRenderSoundingElementContour(map, stations, curLevel, cLayer.element || "HGT", cfg, win);
+              const renderedLayer = getLayersForWindow(win).find((l) => l.id === cfg.layerId);
+              if (renderedLayer && (renderedLayer.config?.showRaster || cLayer.config?.showRaster) && isVisible) {
+                triggerRasterOverlay(map, renderedLayer, win);
+              }
+              const hasShading = isVisible && (Boolean(renderedLayer?.config?.showFill ?? cfg.showFill) || Boolean(renderedLayer?.config?.showRaster ?? cLayer.config?.showRaster));
+              if (hasShading) {
+                const colormap = renderedLayer?.colormap || cfg.colormap || cLayer.element;
+                updateLegend(cLayer.element, colormap, renderedLayer?.gridData?.stats?.min, renderedLayer?.gridData?.stats?.max, win);
+              } else {
+                removeLegend(cLayer.element, win);
+              }
+            } catch (err) {
+              console.warn(`[Main] Sounding active contour failed for ${cLayer.element}:`, err);
             }
           }
         } else {
@@ -886,6 +957,16 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
 }
 
 async function changeVerticalLevel(map, direction, explicitLevel = null, win = getActiveWindow()) {
+  const activeGroup = win?.activeGroup;
+  if (activeGroup && !activeGroup.hasLevel && (activeGroup.isObservation || activeGroup.id?.includes("surface"))) {
+    console.warn(`[Level] Current preset "${activeGroup.name}" does not have vertical levels.`);
+    return;
+  }
+  if (win && win.model === "SURFACE" && !activeGroup?.hasLevel) {
+    console.warn("[Level] Surface observations do not have vertical levels.");
+    return;
+  }
+
   const levels = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
   let targetLevel = explicitLevel;
 
@@ -927,7 +1008,6 @@ async function changeVerticalLevel(map, direction, explicitLevel = null, win = g
     }));
   }
 
-  const activeGroup = win?.activeGroup;
   if (activeGroup && activeGroup.hasLevel) {
     const stationLayer = activeGroup.layers?.find((l) => l.type === "station" && l.model === "UPPER_AIR");
     const targetStationId = stationLayer ? `upperair-obs-${targetLevel}` : null;
@@ -957,7 +1037,7 @@ async function changeVerticalLevel(map, direction, explicitLevel = null, win = g
           } else if (l.derivedFrom) {
             l.id = `contour-sounding-${(l.element || "HGT").toLowerCase()}-${targetLevel}`;
             if (targetStationId) l.derivedFrom = targetStationId;
-            const elemName = l.element === "HGT" ? "Geopotential Height" : (l.element === "TMP" ? "Temperature" : l.element);
+            const elemName = l.element === "HGT" ? "Geopotential Height" : (l.element === "TMP" ? "Temperature" : (l.element === "DTD" ? "Dew-Point Depression" : l.element));
             l.name = `${targetLevel} hPa Derived ${elemName}`;
           }
         }

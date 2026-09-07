@@ -52,6 +52,11 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
           ${levels.map((l) => `<option value="${l}" ${l === currentLevel ? "selected" : ""}>${l} hPa</option>`).join("")}
         </select>
       </div>
+
+      <div class="nav-keyboard-hint" title="Keyboard Shortcuts: ◀/▶ Step Time, ▲/▼ Step Level, F4/Alt+S Split View">
+        <span class="kbd-pill" title="Press Left/Right Arrow to step time">◀/▶ Time</span>
+        <span class="kbd-pill" title="Press Up/Down Arrow to step vertical level">▲/▼ Level</span>
+      </div>
     </div>
 
     <div class="nav-controls">

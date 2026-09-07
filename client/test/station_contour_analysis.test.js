@@ -186,6 +186,7 @@ describe("Surface Station Multi-Element Contour Analysis", () => {
     expect(SURFACE_CONTOUR_CONFIGS).toHaveProperty("VIS");
     expect(SURFACE_CONTOUR_CONFIGS).toHaveProperty("RAIN6");
     expect(SURFACE_CONTOUR_CONFIGS).toHaveProperty("WIND");
+    expect(SURFACE_CONTOUR_CONFIGS).toHaveProperty("DTD");
 
     const sampleProps = {
       temperature: 24.5,
@@ -202,6 +203,7 @@ describe("Surface Station Multi-Element Contour Analysis", () => {
     expect(SURFACE_CONTOUR_CONFIGS.VIS.extract(sampleProps)).toBe(15.0);
     expect(SURFACE_CONTOUR_CONFIGS.RAIN6.extract(sampleProps)).toBe(10.5);
     expect(SURFACE_CONTOUR_CONFIGS.WIND.extract(sampleProps)).toBe(4.2);
+    expect(SURFACE_CONTOUR_CONFIGS.DTD.extract(sampleProps)).toBe(8.3);
   });
 
   test("analyzeAndRenderSurfaceContours calculates and renders SLP, TMP, TD, VIS, RAIN6 contours", () => {
@@ -242,11 +244,12 @@ describe("Surface Station Multi-Element Contour Analysis", () => {
 });
 
 describe("Upper-Air Sounding Station Multi-Element Contour Analysis", () => {
-  test("SOUNDING_CONTOUR_CONFIGS contains valid extractors for HGT, TMP, TD, WIND", () => {
+  test("SOUNDING_CONTOUR_CONFIGS contains valid extractors for HGT, TMP, TD, WIND, DTD", () => {
     expect(SOUNDING_CONTOUR_CONFIGS).toHaveProperty("HGT");
     expect(SOUNDING_CONTOUR_CONFIGS).toHaveProperty("TMP");
     expect(SOUNDING_CONTOUR_CONFIGS).toHaveProperty("TD");
     expect(SOUNDING_CONTOUR_CONFIGS).toHaveProperty("WIND");
+    expect(SOUNDING_CONTOUR_CONFIGS).toHaveProperty("DTD");
 
     const sampleProps = {
       height: 5880,
@@ -259,6 +262,7 @@ describe("Upper-Air Sounding Station Multi-Element Contour Analysis", () => {
     expect(SOUNDING_CONTOUR_CONFIGS.TMP.extract(sampleProps)).toBe(-12.5);
     expect(SOUNDING_CONTOUR_CONFIGS.TD.extract(sampleProps)).toBe(-20.0);
     expect(SOUNDING_CONTOUR_CONFIGS.WIND.extract(sampleProps)).toBe(25.0);
+    expect(SOUNDING_CONTOUR_CONFIGS.DTD.extract(sampleProps)).toBe(7.5);
   });
 
   test("analyzeAndRenderSoundingElementContour calculates height with 5880 bold tagging and isotherms", () => {
@@ -275,6 +279,7 @@ describe("Upper-Air Sounding Station Multi-Element Contour Analysis", () => {
     const boldFeature = hgtSrc._data.features.find((f) => f.properties.value === 5880);
     if (boldFeature) {
       expect(boldFeature.properties.isBold).toBe(true);
+      expect(boldFeature.properties.label).toBe("588");
     }
 
     // Temperature (TMP) at 500 hPa

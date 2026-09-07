@@ -149,11 +149,13 @@ function renderSingleRuleRow(rule, idx, totalCount, logic, upper = false) {
         <option value="Height" ${rule.field === "Height" ? "selected" : ""}>HGT (gpm)</option>
         <option value="TT" ${rule.field === "TT" ? "selected" : ""}>TT (°C)</option>
         <option value="Td" ${rule.field === "Td" ? "selected" : ""}>Td (°C)</option>
+        <option value="DTD" ${rule.field === "DTD" ? "selected" : ""}>DTD (°C)</option>
         <option value="Wind" ${rule.field === "Wind" ? "selected" : ""}>Wind (m/s)</option>
         `
             : `
         <option value="TT" ${rule.field === "TT" ? "selected" : ""}>TT (°C)</option>
         <option value="Td" ${rule.field === "Td" ? "selected" : ""}>Td (°C)</option>
+        <option value="DTD" ${rule.field === "DTD" ? "selected" : ""}>DTD (°C)</option>
         <option value="Wind" ${rule.field === "Wind" ? "selected" : ""}>Wind (m/s)</option>
         <option value="Rain" ${rule.field === "Rain" ? "selected" : ""}>Rain (mm)</option>
         <option value="Rain6" ${rule.field === "Rain6" ? "selected" : ""}>Rain6 (mm)</option>

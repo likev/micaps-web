@@ -110,7 +110,7 @@ micaps-web/
 │   │   ├── store/                    # Reactive workstation state manager
 │   │   ├── ui/                       # Navbar, catalog drawer, layer control, time slider, tooltip
 │   │   └── utils/                    # CMA palettes, weather symbols, griddata-js adapter
-│   └── test/                         # Meteorological Unit Test Suite (84 bun tests)
+│   └── test/                         # Meteorological Unit Test Suite (117 bun tests across 14 files)
 │       ├── colormaps.test.js         # Dynamic colormaps & level scaling tests
 │       ├── weather_symbols.test.js   # WMO symbols & 110° wind barbs tests
 │       ├── contour_logic.test.js     # Characteristic bold contour tests
@@ -122,6 +122,8 @@ micaps-web/
 │       ├── smooth_contour.test.js    # Chaikin B-spline contour line smoothing tests
 │       ├── raster_layer.test.js      # Float32 offscreen canvas raster layer tests
 │       ├── ui_review2_fixes.test.js  # UI layer controls & window manager synchronization tests
+│       ├── ui_review3_fixes.test.js  # UI Review 3 CSS/layout, a11y, multi-window & analysis consistency tests
+│       ├── dtd_analysis.test.js      # Dew-point depression (DTD = T - Td) QC, contours, plots & collision tests
 │       └── window_title.test.js      # Multi-window viewport title generation tests
 ```
 
@@ -223,7 +225,7 @@ Comprehensive automated testing is maintained across both frontend meteorologica
 
 ### 5.1. Client Meteorological Test Suite (Bun Test)
 
-Run all 84 client-side unit tests covering meteorological objective analysis, contouring, symbology, and quality control:
+Run all 117 client-side unit tests across 14 test suites covering meteorological objective analysis, contouring, symbology, and quality control:
 
 ```bash
 cd client
@@ -232,7 +234,7 @@ bun test
 
 Individual test suites:
 - **`derived_layers.test.js`**: Sounding Height, Temperature, and Wind QC bounds filtering, ground elevation rejection, calm wind vector handling, streamline vector grid generation, and preset layer persistence.
-- **`station_contour_analysis.test.js`**: Delaunay triangulation, natural neighbor / IDW objective analysis interpolation, and surface sea-level pressure (SLP) contouring.
+- **`station_contour_analysis.test.js`**: Delaunay triangulation, natural neighbor / IDW objective analysis interpolation, surface sea-level pressure (SLP) contouring, and multi-element extractor verification.
 - **`smooth_contour.test.js`**: Chaikin B-spline corner smoothing and Douglas-Peucker simplification for smooth meteorological isolines.
 - **`colormaps.test.js`**: Dynamic colormap interpolation, discrete/continuous stops, and pressure level scaling.
 - **`weather_symbols.test.js`**: WMO standard present weather symbols and 110-degree wind barbs.
@@ -242,6 +244,8 @@ Individual test suites:
 - **`formatters.test.js`**: Meteorological unit formatting, coordinate rounding, and date/time conversions.
 - **`raster_layer.test.js`**: Offscreen canvas Float32Array raster rendering, range clamping, and opacity blending.
 - **`ui_review2_fixes.test.js`**: UI layer control state synchronization and multi-window manager callbacks.
+- **`ui_review3_fixes.test.js`**: UI layout contracts, CSS ellipsis, panel a11y, multi-window config recovery, step-length fallback, and layer label sizing.
+- **`dtd_analysis.test.js`**: Dew-point depression ($DTD = T - T_d$) multi-element extraction, physical supersaturation clamping & QC rejection, isobaric envelope validation, Delaunay triangulation & filled isoband contours, level-step layer renaming, station filter thresholding, station weather plot middle-left integer rendering with slot collision displacement/drop, and custom inverted moisture colormaps.
 - **`window_title.test.js`**: Dynamic multi-window viewport title generation from active layer metadata.
 
 ### 5.2. Server Binary Parser Test Suite (Go Test)
@@ -427,6 +431,27 @@ To eliminate gross errors (e.g. data transmission bitflips, misplaced pressure l
 | **10** | $[28000, 35000]$ | $[-90, -30]$ | $[-100, -30]$ | $60$ |
 
 Observations falling outside these envelopes are cleanly filtered out prior to triangulation, preventing isolated outliers from producing artificial circular contour bulls-eyes or distortion in the interpolated field.
+
+##### Derived Dew-Point Depression ($DTD = T - T_d$) Analysis & Quality Control
+
+Dew-point depression ($DTD = T - T_d$) is computed as a first-class derived scalar field across surface observations and upper-air soundings ([`client/src/layers/surfaceAnalysis.js`](file:///root/downloads/micaps-web/client/src/layers/surfaceAnalysis.js), [`client/src/layers/soundingAnalysis.js`](file:///root/downloads/micaps-web/client/src/layers/soundingAnalysis.js), [`client/src/layers/stationLayer.js`](file:///root/downloads/micaps-web/client/src/layers/stationLayer.js)):
+
+1. **Operand Validation (Q1)**:
+   - **Surface**: $T \in [-90, 65]^\circ\text{C}$ and $T_d \in [-90, 50]^\circ\text{C}$.
+   - **Upper-Air Soundings**: $T$ and $T_d$ must strictly pass the level-specific isobaric climatological envelopes defined above.
+2. **Supersaturation & Instrument Tolerance (Q2)**:
+   - Physical definition dictates $T_d \le T$. Due to sensor calibration tolerances and rounding in radiosondes and automatic weather stations, reported dewpoints slightly exceeding air temperature ($T_d > T$) are clamped to saturation:
+     $$\text{If } -0.5^\circ\text{C} \le T - T_d < 0^\circ\text{C} \implies DTD = 0.0^\circ\text{C}$$
+   - Unphysical observations where $T_d > T + 0.5^\circ\text{C}$ (i.e., $T - T_d < -0.5^\circ\text{C}$) represent severe gross instrument or decoding error and are rejected as null.
+3. **Meteorological Range Limits (Q3)**:
+   - Plausible tropospheric depression values are bounded by $0 \le DTD \le 45^\circ\text{C}$. Values exceeding $45^\circ\text{C}$ are discarded as invalid outliers.
+4. **Synoptic Contours & Isoline Rendering**:
+   - **Standard Operational Levels**: $[1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30]^\circ\text{C}$. If dynamic station range has $\max(DTD) < 5^\circ\text{C}$, automatic fallback intervals are generated via `griddata.autoLevels(minV, maxV, 8)`.
+   - **Characteristic Bold Isolines**: Highlighted at $2^\circ\text{C}$ (saturation / cloud ceiling boundary) and $10^\circ\text{C}$ (dry air boundary).
+   - **Fills & Colormap**: Renders filled isobands using an inverted moisture ramp (saturated $0^\circ\text{C}$ deep blue `#2c7bb6` $\to$ arid $30^\circ\text{C}$ dark crimson `#7f0000`) mapped to palette category `TMP`.
+5. **Station Weather Plotting & Collision Rules**:
+   - Opt-in plotting (`showDTD: false` default) displays an orange (`#f0883e`) 12px bold integer at middle-left (`left: 0`, `top: 20px`).
+   - Priority rule `DTD > ww`: When `showDTD` is active, present weather ($ww$) shifts to the far-left slot (`left: -26px`) only if visibility ($VIS$) is disabled; if $VIS$ is active, $ww$ is dropped (`VIS > ww`), preserving existing layout invariants without overlap.
 
 #### 8.5.4. Objective Analysis, Delaunay Triangulation & Vector Grid Synthesis
 

@@ -22,8 +22,11 @@ export function formatCoords(lon, lat) {
 export function formatElementUnit(element = "TMP") {
   switch (element) {
     case "TMP":
+    case "TD":
+    case "DTD":
       return "°C";
     case "RAIN":
+    case "RAIN6":
       return "mm";
     case "HGT":
       return "gpm";
@@ -31,9 +34,30 @@ export function formatElementUnit(element = "TMP") {
       return "%";
     case "WIND":
       return "m/s";
+    case "SLP":
+      return "hPa";
+    case "VIS":
+      return "km";
     default:
       return "";
   }
+}
+
+export function formatContourLabel(val, element = "", isDam = false) {
+  if (typeof val !== "number" || isNaN(val)) return String(val ?? "");
+  const elem = String(element || "").toUpperCase();
+  if (elem === "HGT" || elem === "HEIGHT") {
+    // Upper-air geopotential height in gpm (e.g. >= 1000) displayed in decameters (dam):
+    // 5880 gpm -> 588, 5840 gpm -> 584, 3120 gpm -> 312, 1520 gpm -> 152
+    if (!isDam && Math.abs(val) >= 1000) {
+      return String(Math.round(val / 10));
+    }
+    return String(Math.round(val));
+  }
+  if (elem === "TMP" || elem === "TD" || elem === "DTD" || elem === "VIS" || elem === "RAIN6") {
+    return String(Math.round(val * 10) / 10);
+  }
+  return String(Math.round(val));
 }
 
 export function formatObsTimestamp(fileStr = "") {

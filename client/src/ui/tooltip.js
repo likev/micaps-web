@@ -14,8 +14,11 @@ export function initTooltip(containerId = "tooltip") {
     }
 
     // Value threshold -90 filters missing/sentinel values (MICAPS uses -999); Antarctic -80 remains valid.
-    const tt = props.temperature > -90 ? `${props.temperature} °C` : "--";
-    const td = props.dewpoint > -90 ? `${props.dewpoint} °C` : "--";
+    const hasTT = typeof props.temperature === "number" && !isNaN(props.temperature) && props.temperature > -90;
+    const hasTd = typeof props.dewpoint === "number" && !isNaN(props.dewpoint) && props.dewpoint > -90;
+    const tt = hasTT ? `${props.temperature} °C` : "--";
+    const td = hasTd ? `${props.dewpoint} °C` : "--";
+    const dtd = (hasTT && hasTd) ? `${(props.temperature - props.dewpoint).toFixed(1)} °C` : "--";
     const slp = props.slp > 0 ? `${props.slp} hPa` : "--";
     const wind = props.wind_speed >= 0 ? `${props.wind_speed} m/s (${props.wind_dir}°)` : "--";
     const cloud = props.cloud_cover !== undefined ? `${props.cloud_cover}/8 octas` : "--";
@@ -29,6 +32,7 @@ export function initTooltip(containerId = "tooltip") {
       <div style="display: grid; grid-template-columns: auto auto; gap: 4px 12px;">
         <span>Temp (TT):</span> <strong style="color: #f85149;">${tt}</strong>
         <span>Dewpt (Td):</span> <strong style="color: #56d364;">${td}</strong>
+        <span>DTD (T−Td):</span> <strong style="color: #f0883e;">${dtd}</strong>
         <span>SLP (PPP):</span> <strong style="color: #79c0ff;">${slp}</strong>
         <span>Wind (ff/dd):</span> <strong>${wind}</strong>
         <span>Cloud (N):</span> <strong>${cloud}</strong>

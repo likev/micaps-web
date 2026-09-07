@@ -40,7 +40,7 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
           if (map.getLayer(rasterLayerId)) {
             setRasterVisibility(map, true, layerId);
           } else {
-            triggerRasterOverlay(map, layer, winObj);
+            triggerRasterOverlay(map, layer, win);
           }
         } else {
           setRasterVisibility(map, false, layerId);
@@ -87,7 +87,8 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
     // Synchronize legend lifecycle on layer visibility change (contour/wind only;
     // station plots never had legends — avoid creating PLOT_* entries with fallback ticks)
     if ((layer.type === "contour" || layer.type === "wind") && layer.element) {
-      if (value) {
+      const hasShading = value && (Boolean(layer.config?.showFill) || Boolean(layer.config?.showRaster));
+      if (hasShading) {
         const colormap = layer.colormap || layer.config?.palettePath || layer.element;
         updateLegend(layer.element, colormap, layer.gridData?.stats?.min, layer.gridData?.stats?.max, winObj);
       } else {
@@ -123,12 +124,41 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
         });
       }
     } else if (layer.type === "contour" || layer.type === "wind") {
-      if (value.showFill !== undefined) setLayerIsobandVisibility(map, layerId, layer.visible && value.showFill);
-      if (value.showLine !== undefined) setLayerIsolineVisibility(map, layerId, layer.visible && value.showLine);
+      if (!layer.config) layer.config = {};
+      if (value.showFill !== undefined) {
+        layer.config.showFill = value.showFill;
+        setLayerIsobandVisibility(map, layerId, layer.visible && value.showFill);
+        if (value.showFill) {
+          layer.config.showRaster = false;
+          setRasterVisibility(map, false, layerId);
+        }
+      }
+      if (value.showLine !== undefined) {
+        layer.config.showLine = value.showLine;
+        setLayerIsolineVisibility(map, layerId, layer.visible && value.showLine);
+      }
+      if (value.showRaster !== undefined) {
+        layer.config.showRaster = value.showRaster;
+        if (value.showRaster && layer.visible) {
+          layer.config.showFill = false;
+          setLayerIsobandVisibility(map, layerId, false);
+          const { rasterLayerId } = getRasterDOMIds(layerId);
+          if (map.getLayer(rasterLayerId)) {
+            setRasterVisibility(map, true, layerId);
+          } else {
+            triggerRasterOverlay(map, layer, winObj);
+          }
+        } else {
+          setRasterVisibility(map, false, layerId);
+        }
+      }
+
       const effectiveShowFill = value.showFill !== undefined ? value.showFill : Boolean(layer.config?.showFill);
-      const effectiveShowLine = value.showLine !== undefined ? value.showLine : Boolean(layer.config?.showLine);
-      if (layer.element && (value.showFill !== undefined || value.showLine !== undefined)) {
-        if (!layer.visible || (!effectiveShowFill && !effectiveShowLine)) {
+      const effectiveShowRaster = value.showRaster !== undefined ? value.showRaster : Boolean(layer.config?.showRaster);
+      const hasShading = Boolean(layer.visible && (effectiveShowFill || effectiveShowRaster));
+
+      if (layer.element && (value.showFill !== undefined || value.showRaster !== undefined || value.showLine !== undefined)) {
+        if (!hasShading) {
           removeLegend(layer.element, winObj);
         } else {
           const colormap = layer.colormap || layer.config?.palettePath || layer.element;
@@ -194,14 +224,6 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
         }
       }
 
-      if (value.showRaster !== undefined) {
-        if (value.showRaster && layer.visible) {
-          triggerRasterOverlay(map, layer, win);
-        } else {
-          setRasterVisibility(map, false, layerId);
-        }
-      }
-
       if (value.showWind !== undefined) {
         if (value.showWind && layer.visible) {
           triggerWindStreamlines(map, layer, win);
@@ -240,7 +262,12 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
               smoothIterations: layer.config?.smoothIterations,
               labelSize: layer.config?.labelSize,
             });
-            updateLegend(elem, elem, layer.gridData?.stats?.min, layer.gridData?.stats?.max, winObj);
+            const hasShading = (layer.visible !== false) && (Boolean(layer.config?.showFill) || Boolean(layer.config?.showRaster));
+            if (hasShading) {
+              updateLegend(elem, elem, layer.gridData?.stats?.min, layer.gridData?.stats?.max, winObj);
+            } else {
+              removeLegend(elem, winObj);
+            }
           }
           if (layer.config?.showRaster && layer.visible) {
             triggerRasterOverlay(map, layer, winObj);
@@ -278,7 +305,12 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
                       smoothIterations: layer.config?.smoothIterations,
                       labelSize: layer.config?.labelSize,
                     });
-                    updateLegend(elem, key, layer.gridData?.stats?.min, layer.gridData?.stats?.max, winObj);
+                    const hasShading = (layer.visible !== false) && (Boolean(layer.config?.showFill) || Boolean(layer.config?.showRaster));
+                    if (hasShading) {
+                      updateLegend(elem, key, layer.gridData?.stats?.min, layer.gridData?.stats?.max, winObj);
+                    } else {
+                      removeLegend(elem, winObj);
+                    }
                   }
                   if (layer.config?.showRaster && layer.visible) {
                     triggerRasterOverlay(map, layer, winObj);
@@ -403,10 +435,41 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
   } else if (action === "aux") {
     if (layerId === "raster") {
       if (value) {
+        const layers = getLayersForWindow(winObj);
+        layers.forEach((l) => {
+          if (l.type === "contour") {
+            l.config = { ...l.config, showFill: false, showRaster: true };
+            setLayerIsobandVisibility(map, l.id, false);
+          }
+        });
         triggerRasterOverlay(map, null, winObj);
       } else {
         setRasterVisibility(map, false);
+        const layers = getLayersForWindow(winObj);
+        layers.forEach((l) => {
+          if (l.config?.showRaster) l.config.showRaster = false;
+          const hasShading = (l.visible !== false) && Boolean(l.config?.showFill);
+          if (!hasShading && l.element) removeLegend(l.element, winObj);
+        });
       }
+    } else if (layerId === "contourf") {
+      const layers = getLayersForWindow(winObj);
+      const contourLayers = layers.filter((l) => l.type === "contour");
+      contourLayers.forEach((l) => {
+        l.config = { ...l.config, showFill: value };
+        setLayerIsobandVisibility(map, l.id, l.visible !== false && value);
+        if (value) {
+          l.config.showRaster = false;
+          setRasterVisibility(map, false, l.id);
+        }
+        const hasShading = (l.visible !== false) && (value || Boolean(l.config?.showRaster));
+        if (hasShading) {
+          const colormap = l.colormap || l.config?.palettePath || l.element;
+          updateLegend(l.element, colormap, l.gridData?.stats?.min, l.gridData?.stats?.max, winObj);
+        } else {
+          removeLegend(l.element, winObj);
+        }
+      });
     } else if (layerId === "wind") {
       if (value) {
         triggerWindStreamlines(map, null, winObj);
@@ -440,12 +503,18 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
   // 1. Direct in-memory gridData from layer (e.g. RH, HGT, Wind, Surface SLP, or Sounding Analysis)
   if (layer?.gridData) {
     renderGridRaster(map, layer.gridData, element, colormap, { layerId, opacity });
+    if (layer.visible !== false) {
+      updateLegend(element, colormap, layer.gridData.stats?.min, layer.gridData.stats?.max, win);
+    }
     return;
   }
 
   // 2. Wind gridData from window (if wind layer without attached gridData)
   if ((layer?.type === "wind" || layer?.element === "WIND") && win?.windGridData) {
     renderGridRaster(map, win.windGridData, "WIND", colormap, { layerId, opacity });
+    if (layer?.visible !== false) {
+      updateLegend("WIND", colormap, 0, undefined, win);
+    }
     return;
   }
 
@@ -484,6 +553,9 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
   fetchGridBinaryStream(path, file)
     .then((bin) => {
       renderBinaryRaster(map, bin, element, colormap, { layerId, opacity });
+      if (layer?.visible !== false) {
+        updateLegend(element, colormap, layer?.gridData?.stats?.min, layer?.gridData?.stats?.max, win);
+      }
     })
     .catch((err) => {
       console.warn(`[Raster] Binary stream fetch failed for ${path}/${file}, trying JSON gridData:`, err);
@@ -492,6 +564,9 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
           if (grid && (grid.values || (grid.u && grid.v))) {
             if (layer) layer.gridData = grid;
             renderGridRaster(map, grid, element, colormap, { layerId, opacity });
+            if (layer?.visible !== false) {
+              updateLegend(element, colormap, grid.stats?.min, grid.stats?.max, win);
+            }
           } else {
             notifyError(`Failed to load raster overlay data for ${element}.`);
           }
