@@ -34,17 +34,59 @@ const boldMapHgt = {
   100: [16600, 1660],
 };
 
+export const HGT_QC_BOUNDS = {
+  1000: [-400, 800],
+  925: [200, 1600],
+  850: [800, 2200],
+  700: [2200, 3800],
+  500: [4400, 6400],
+  400: [6000, 8200],
+  300: [7500, 11000],
+  250: [8500, 12200],
+  200: [9800, 13800],
+  150: [11500, 15800],
+  100: [14000, 18500],
+  70: [16000, 21000],
+  50: [18000, 23500],
+  30: [21000, 27500],
+  20: [23500, 30000],
+  10: [28000, 35000],
+};
+
+export const TMP_QC_BOUNDS = {
+  1000: [-60, 50],
+  925: [-60, 45],
+  850: [-50, 45],
+  700: [-50, 30],
+  500: [-60, 10],
+  400: [-70, 5],
+  300: [-80, 0],
+  250: [-85, -10],
+  200: [-85, -15],
+  150: [-90, -20],
+  100: [-95, -25],
+};
+
 export const SOUNDING_CONTOUR_CONFIGS = {
   HGT: {
     name: "Height",
     element: "HGT",
     unit: "gpm",
     defaultColor: "#58a6ff",
-    extract: (p) => {
-      if (typeof p.height === "number" && !isNaN(p.height) && p.height > -200 && p.height < 45000) return p.height;
-      if (typeof p.slp === "number" && p.slp > 2000) return p.slp;
-      if (typeof p.slp === "number" && p.slp > 300 && p.slp < 1000) return p.slp * 10;
-      return null;
+    extract: (p, level) => {
+      let val = null;
+      if (typeof p.height === "number" && !isNaN(p.height) && p.height > -9000) {
+        val = p.height;
+      }
+      if (val === null) return null;
+      const numLvl = Number(level);
+      const bounds = HGT_QC_BOUNDS[numLvl];
+      if (bounds) {
+        if (val < bounds[0] || val > bounds[1]) return null;
+      } else if (val <= -500 || val >= 45000) {
+        return null;
+      }
+      return val;
     },
     getLevels: (level, minV, maxV) => standardHgtLevels[Number(level)] || standardHgtLevels[level] || griddata.autoLevels(minV, maxV, 8),
     getBoldValues: (level) => boldMapHgt[Number(level)] || boldMapHgt[level] || [],
@@ -55,8 +97,15 @@ export const SOUNDING_CONTOUR_CONFIGS = {
     unit: "°C",
     defaultColor: "#f85149",
     colormap: "TMP",
-    extract: (p) => {
-      if (typeof p.temperature === "number" && !isNaN(p.temperature) && p.temperature > -90 && p.temperature < 60) {
+    extract: (p, level) => {
+      if (typeof p.temperature === "number" && !isNaN(p.temperature) && p.temperature > -9000) {
+        const numLvl = Number(level);
+        const bounds = TMP_QC_BOUNDS[numLvl];
+        if (bounds) {
+          if (p.temperature < bounds[0] || p.temperature > bounds[1]) return null;
+        } else if (p.temperature < -90 || p.temperature > 60) {
+          return null;
+        }
         return p.temperature;
       }
       return null;
@@ -74,8 +123,15 @@ export const SOUNDING_CONTOUR_CONFIGS = {
     unit: "°C",
     defaultColor: "#3fb950",
     colormap: "TMP",
-    extract: (p) => {
-      if (typeof p.dewpoint === "number" && !isNaN(p.dewpoint) && p.dewpoint > -90 && p.dewpoint < 50) {
+    extract: (p, level) => {
+      if (typeof p.dewpoint === "number" && !isNaN(p.dewpoint) && p.dewpoint > -9000) {
+        const numLvl = Number(level);
+        const bounds = TMP_QC_BOUNDS[numLvl];
+        if (bounds) {
+          if (p.dewpoint < bounds[0] - 25 || p.dewpoint > bounds[1]) return null;
+        } else if (p.dewpoint < -110 || p.dewpoint > 50) {
+          return null;
+        }
         return p.dewpoint;
       }
       return null;
@@ -123,13 +179,14 @@ export function analyzeAndRenderSoundingElementContour(map, stationsGeoJSON, lev
     return null;
   }
 
+  const numLevel = parseInt(level, 10) || 500;
   const elementKey = normalizeSoundingElementKey(rawElement);
   const cfg = SOUNDING_CONTOUR_CONFIGS[elementKey] || SOUNDING_CONTOUR_CONFIGS.HGT;
 
   const result = calculateFieldContours(stationsGeoJSON, cfg.extract, {
     element: cfg.element,
-    levels: options.levels || cfg.getLevels(level, -100, 100000),
-  });
+    levels: options.levels || cfg.getLevels(numLevel, -100, 100000),
+  }, numLevel);
 
   if (!result || !result.lines || result.lines.length === 0) {
     console.warn(`[SoundingAnalysis] No contour lines generated for ${elementKey}`);
@@ -202,14 +259,14 @@ export function analyzeAndRenderSoundingContours(map, stationsGeoJSON, level = 5
   return { hgtResult, tmpResult };
 }
 
-function calculateFieldContours(stationsGeoJSON, valueExtractor, config = {}) {
+function calculateFieldContours(stationsGeoJSON, valueExtractor, config = {}, level = 500) {
   const points = [];
   const values = [];
 
   for (const f of stationsGeoJSON.features) {
     if (!f.geometry || !f.geometry.coordinates) continue;
     const [lon, lat] = f.geometry.coordinates;
-    const val = valueExtractor(f.properties || {});
+    const val = valueExtractor(f.properties || {}, level);
     if (typeof val === "number" && !isNaN(val)) {
       points.push([lon, lat]);
       values.push(val);

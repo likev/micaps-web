@@ -10,7 +10,7 @@ import {
 import { handleLayerAction } from "../src/ui/layerActions.js";
 import { getLayersForWindow, clearWindowWeatherLayers, addOrUpdateLayer, renderStationDrawerHTML } from "../src/ui/layerControl.js";
 import { analyzeAndRenderSurfaceContours } from "../src/layers/surfaceAnalysis.js";
-import { analyzeAndRenderSoundingElementContour } from "../src/layers/soundingAnalysis.js";
+import { analyzeAndRenderSoundingElementContour, SOUNDING_CONTOUR_CONFIGS } from "../src/layers/soundingAnalysis.js";
 
 function createMockMap() {
   const sources = new Map();
@@ -596,5 +596,37 @@ describe("Derived Contour Visibility Persistence & Level Step Invariance (Review
     expect(resultOutlier).not.toBeNull();
     expect(resultOutlier.lines.length).toBeGreaterThan(0);
     expect(resultOutlier.levels.length).toBeGreaterThan(0);
+  });
+
+  test("Sounding Analysis QC Filters reject ground elevation and gross outliers at 500 hPa", () => {
+    // 1. Height QC at 500 hPa
+    const hgtExtract = SOUNDING_CONTOUR_CONFIGS.HGT.extract;
+    // Valid 500 hPa height: 5840 gpm
+    expect(hgtExtract({ height: 5840 }, 500)).toBe(5840);
+    expect(hgtExtract({ height: 5560 }, 500)).toBe(5560);
+
+    // Ground elevation mistakenly reported as height (< 4400 gpm at 500 hPa)
+    expect(hgtExtract({ height: 5 }, 500)).toBeNull();      // Kota Bharu 5m
+    expect(hgtExtract({ height: 27 }, 500)).toBeNull();     // Kuching 27m
+    expect(hgtExtract({ height: 91 }, 500)).toBeNull();     // Craiova 91m
+    expect(hgtExtract({ height: 1473 }, 500)).toBeNull();   // Grand Junction 1473m
+
+    // Gross transmission outliers (> 6400 gpm at 500 hPa)
+    expect(hgtExtract({ height: 7650 }, 500)).toBeNull();   // Davao typo (7650 gpm)
+    expect(hgtExtract({ height: 9600 }, 500)).toBeNull();   // 300 hPa level mixup (9600 gpm)
+    expect(hgtExtract({ height: 9620 }, 500)).toBeNull();   // Rapid City 300 hPa mixup (9620 gpm)
+
+    // Missing height (-9999) must return null and NOT fall back to surface SLP
+    expect(hgtExtract({ height: -9999, slp: 1013.2 }, 500)).toBeNull();
+    expect(hgtExtract({ height: -9999, slp: 584 }, 500)).toBeNull();
+
+    // 2. Temperature QC at 500 hPa
+    const tmpExtract = SOUNDING_CONTOUR_CONFIGS.TMP.extract;
+    expect(tmpExtract({ temperature: -15.4 }, 500)).toBe(-15.4);
+    expect(tmpExtract({ temperature: -5.0 }, 500)).toBe(-5.0);
+    // Outlier 31°C (station 29612 surface mixup) must be rejected (> 10°C at 500 hPa)
+    expect(tmpExtract({ temperature: 31.0 }, 500)).toBeNull();
+    // Missing temperature (-9999)
+    expect(tmpExtract({ temperature: -9999 }, 500)).toBeNull();
   });
 });

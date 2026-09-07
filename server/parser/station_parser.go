@@ -83,7 +83,7 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 			ind += 10
 		}
 
-		var temp, dewPoint, slp, stnPress, height, pDiff3h, windSpeed, windDir, vis, rain1h, rain3h, rain6h, rain12h, rain24h float32 = -9999, -9999, -9999, -9999, -9999, 0, 0, 0, 10, 0, 0, 0, 0, 0
+		var temp, dewPoint, slp, stnPress, height, elevation, pDiff3h, windSpeed, windDir, vis, rain1h, rain3h, rain6h, rain12h, rain24h float32 = -9999, -9999, -9999, -9999, -9999, -9999, 0, 0, 0, 10, 0, 0, 0, 0, 0
 		var dewDepression float32 = -9999
 		var cloudCover, weatherCode, pTendency int16 = 0, 0, 0
 
@@ -142,11 +142,11 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 				if valFloat >= 0 && valFloat < 100 {
 					dewDepression = valFloat
 				}
-			case 421, 419, 1: // Geopotential Height (Upper Air decameters or gpm)
+			case 421, 419: // Geopotential Height (Upper Air decameters or gpm)
 				height = normalizeHeight(valFloat)
 			case 3: // Station elevation (测站高度 in meters)
-				if height <= -9000 && valFloat > -500 && valFloat < 9000 {
-					height = valFloat
+				if valFloat > -500 && valFloat < 9000 {
+					elevation = valFloat
 				}
 			case 401, 5, 101: // Sea Level Pressure (SLP)
 				slp = normalizePress(valFloat)
@@ -206,6 +206,7 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 			"temperature":   round1(temp),
 			"dewpoint":      round1(dewPoint),
 			"height":        round1(height),
+			"elevation":     round1(elevation),
 			"slp":           round1(slp),
 			"press_stn":     round1(stnPress),
 			"slp_encoded":   encodeSLP(slp),
@@ -284,7 +285,7 @@ func normalizeHeight(val float32) float32 {
 	if val < -9000 || val > 90000 || val == 9999.0 || val == 999.0 || val == -999.0 {
 		return -9999
 	}
-	// In upper-air sounding observation transmissions (Element 421 / 1002 / 1004 / 1):
+	// In upper-air sounding observation transmissions (Element 421 / 419):
 	// Values are transmitted in decameters (dam):
 	// - 1000hPa & 925hPa: -20 to 120 dam (e.g. 15.2 dam -> 152 gpm, 81.1 dam -> 811 gpm)
 	// - 850hPa to 300hPa: 120 to 1000 dam (e.g. 151.4 dam -> 1514 gpm, 571 dam -> 5710 gpm)

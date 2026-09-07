@@ -96,3 +96,78 @@ func TestStationParserPrecipitation(t *testing.T) {
 		t.Errorf("expected press_diff_3h 1.5, got %v", props["press_diff_3h"])
 	}
 }
+
+func TestStationParserHeightAndElevation(t *testing.T) {
+	var buf bytes.Buffer
+
+	// 0..271: Header pad
+	buf.Write(make([]byte, 272))
+	// 272..273: idType = 0 (numeric station ID)
+	binary.Write(&buf, binary.LittleEndian, int16(0))
+	// 274..287: remaining header pad
+	buf.Write(make([]byte, 14))
+	// 288..291: stationNumber = 2
+	binary.Write(&buf, binary.LittleEndian, uint32(2))
+	// 292..293: elementNumber = 2 (elem 3: elevation, elem 421: geopotential height)
+	binary.Write(&buf, binary.LittleEndian, uint16(2))
+
+	// Element descriptors:
+	// elem 3 (elevation, float32)
+	binary.Write(&buf, binary.LittleEndian, int16(3))
+	binary.Write(&buf, binary.LittleEndian, int16(5))
+	// elem 421 (height, float32)
+	binary.Write(&buf, binary.LittleEndian, int16(421))
+	binary.Write(&buf, binary.LittleEndian, int16(5))
+
+	// Station 1: PILOT station (72476, Grand Junction) - has elevation 1473m, but NO height (reports 0 elements or only elevation)
+	binary.Write(&buf, binary.LittleEndian, uint32(72476))
+	binary.Write(&buf, binary.LittleEndian, float32(-108.53))
+	binary.Write(&buf, binary.LittleEndian, float32(39.12))
+	binary.Write(&buf, binary.LittleEndian, int16(1)) // 1 element
+	binary.Write(&buf, binary.LittleEndian, int16(3)) // elem 3: elevation 1473m
+	binary.Write(&buf, binary.LittleEndian, math.Float32bits(1473.0))
+
+	// Station 2: Radiosonde station (54511, Beijing) - has elevation 35m and 500hPa height 584 dam (5840 gpm)
+	binary.Write(&buf, binary.LittleEndian, uint32(54511))
+	binary.Write(&buf, binary.LittleEndian, float32(116.40))
+	binary.Write(&buf, binary.LittleEndian, float32(39.90))
+	binary.Write(&buf, binary.LittleEndian, int16(2)) // 2 elements
+	binary.Write(&buf, binary.LittleEndian, int16(3)) // elem 3: elevation 35m
+	binary.Write(&buf, binary.LittleEndian, math.Float32bits(35.0))
+	binary.Write(&buf, binary.LittleEndian, int16(421)) // elem 421: 584 dam
+	binary.Write(&buf, binary.LittleEndian, math.Float32bits(584.0))
+
+	fc, err := ParseStationData(buf.Bytes())
+	if err != nil {
+		t.Fatalf("ParseStationData failed: %v", err)
+	}
+
+	if len(fc.Features) != 2 {
+		t.Fatalf("expected 2 features, got %d", len(fc.Features))
+	}
+
+	// Verify Station 1 (PILOT station)
+	p1 := fc.Features[0].Properties
+	if p1["station_id"] != int32(72476) {
+		t.Errorf("expected station_id 72476, got %v", p1["station_id"])
+	}
+	if p1["elevation"] != float32(1473.0) {
+		t.Errorf("expected elevation 1473.0, got %v", p1["elevation"])
+	}
+	// Height MUST remain -9999 (missing) and NOT fall back to station elevation 1473!
+	if p1["height"] != float32(-9999.0) {
+		t.Errorf("expected height -9999.0 for PILOT station without height, got %v", p1["height"])
+	}
+
+	// Verify Station 2 (Sounding station)
+	p2 := fc.Features[1].Properties
+	if p2["station_id"] != int32(54511) {
+		t.Errorf("expected station_id 54511, got %v", p2["station_id"])
+	}
+	if p2["elevation"] != float32(35.0) {
+		t.Errorf("expected elevation 35.0, got %v", p2["elevation"])
+	}
+	if p2["height"] != float32(5840.0) {
+		t.Errorf("expected height 5840.0, got %v", p2["height"])
+	}
+}
