@@ -19,19 +19,22 @@ graph TD
         Gocql["gocql Session (CQL Binary Protocol v4)"]
         Decompress["Gzip Payload Decompressor"]
         Parser["MICAPS Binary Header Parser (278B Grid / 288B Station)"]
+        StationQC["Station Observation QC (Elevation vs HGT, Wind Normalization)"]
         RangeServer["Static & PMTiles Range Server (HTTP 206)"]
         MockEngine["Offline Mock Data Generator"]
 
         Config --> Gocql
         Tunnel -.->|Dev/Test| Translator --> Gocql
         DirectLAN -->|Production| Gocql
-        Gocql --> Decompress --> Parser
+        Gocql --> Decompress --> Parser --> StationQC
         MockEngine -.-> Parser
     end
 
     subgraph Frontend ["Web Meteorological Workstation (./client)"]
         MapLibre["MapLibre GL JS (WebGL Map Engine)"]
         PMTilesProto["Offline PMTiles Protocol (map-china.pmtiles)"]
+        QCFilter["Isobaric Climatological QC Filter (HGT/TMP/WIND Bounds)"]
+        ObjAnalysis["Objective Analysis (Delaunay Triangulation & IDW Grid)"]
         GridData["griddata-js (Marching Squares contour & contourf)"]
         
         RasterL["Offscreen Canvas Float32Array Raster Layer"]
@@ -41,14 +44,18 @@ graph TD
         UI["Workstation UI (Catalog Drawer, Layer Controls, Time Slider)"]
     end
 
-    subgraph Testing ["Fast Meteorological Unit Test Suite (Bun Test)"]
-        BunTest["Bun Test Runner (bun test)"]
-        BunTest -->|Test Colormaps, Symbols, Formatter, Contours| Frontend
+    subgraph Testing ["Automated Verification Test Suites"]
+        GoTest["Go Test Suite (Parser QC, MDFS Headers, Config)"]
+        BunTest["Bun Test Runner (84 Tests: QC, Contours, Palettes, Streamlines)"]
+        GoTest -->|Validate Parser & Normalization| Backend
+        BunTest -->|Test QC, Interpolation, Symbols, Formatter| Frontend
     end
 
-    Parser -->|REST JSON & Float32 Streams| Frontend
+    StationQC -->|GeoJSON Station Collections| QCFilter --> ObjAnalysis --> GridData --> ContourL
+    StationQC -->|GeoJSON Point Features| StationL
+    ObjAnalysis -->|Synthesized U/V Wind Grids| WindL
+    Parser -->|REST JSON & Float32 Streams| RasterL
     RangeServer -->|PMTiles Vector Chunks| PMTilesProto --> MapLibre
-    GridData --> ContourL
 ```
 
 ---
@@ -82,7 +89,8 @@ micaps-web/
 │       ├── decompress.go             # Gzip blob decompressor
 │       ├── grid_header.go            # 278-byte MICAPS Type 4/11 header parser
 │       ├── grid_data.go              # Grid Float32 payload decoding
-│       └── station_parser.go         # 288-byte station header & observation decoder
+│       ├── station_parser.go         # 288-byte station header & observation decoder (QC & elevation/height)
+│       └── station_parser_test.go    # Go unit tests for station QC, rain, elevation vs height, & calm winds
 ├── client/                           # Frontend Meteorological Workstation
 │   ├── index.html                    # Workstation HTML shell
 │   ├── package.json                  # Dependencies, build scripts & test runner
@@ -97,18 +105,24 @@ micaps-web/
 │   │   ├── main.js                   # Application bootstrap & lifecycle orchestrator
 │   │   ├── style.css                 # Dark meteorological theme stylesheet
 │   │   ├── api/                      # REST & binary stream fetchers
-│   │   ├── layers/                   # MapLibre, Deck.gl, Canvas & SVG layer renderers
+│   │   ├── layers/                   # MapLibre, Deck.gl, Canvas, Sounding & Surface analysis layers
 │   │   ├── map/                      # MapLibre GL setup, PMTiles protocol, graticule lines
 │   │   ├── store/                    # Reactive workstation state manager
 │   │   ├── ui/                       # Navbar, catalog drawer, layer control, time slider, tooltip
 │   │   └── utils/                    # CMA palettes, weather symbols, griddata-js adapter
-│   └── test/                         # Meteorological Unit Test Suite
+│   └── test/                         # Meteorological Unit Test Suite (84 bun tests)
 │       ├── colormaps.test.js         # Dynamic colormaps & level scaling tests
 │       ├── weather_symbols.test.js   # WMO symbols & 110° wind barbs tests
 │       ├── contour_logic.test.js     # Characteristic bold contour tests
 │       ├── config.test.js            # config.json validation & compact formatting tests
 │       ├── timeslider.test.js        # Timeline stepper, init-time, & sounding filter tests
-│       └── formatters.test.js        # Meteorological unit and date formatting tests
+│       ├── formatters.test.js        # Meteorological unit and date formatting tests
+│       ├── derived_layers.test.js    # Sounding Height/Temp/Wind QC, layer auto-save & streamlines tests
+│       ├── station_contour_analysis.test.js # Delaunay triangulation & IDW objective analysis tests
+│       ├── smooth_contour.test.js    # Chaikin B-spline contour line smoothing tests
+│       ├── raster_layer.test.js      # Float32 offscreen canvas raster layer tests
+│       ├── ui_review2_fixes.test.js  # UI layer controls & window manager synchronization tests
+│       └── window_title.test.js      # Multi-window viewport title generation tests
 ```
 
 ---
@@ -203,9 +217,13 @@ Composite presets and named colormaps are loaded from `client/config.json` at st
 
 ---
 
-## 5. Meteorological Unit Testing (Bun Test)
+## 5. Meteorological Unit Testing (Bun Test & Go Test)
 
-Run the entire suite of meteorological algorithms, colormap calculations, WMO symbol rendering, and configuration formatting tests:
+Comprehensive automated testing is maintained across both frontend meteorological algorithms and backend binary parsers.
+
+### 5.1. Client Meteorological Test Suite (Bun Test)
+
+Run all 84 client-side unit tests covering meteorological objective analysis, contouring, symbology, and quality control:
 
 ```bash
 cd client
@@ -213,12 +231,34 @@ bun test
 ```
 
 Individual test suites:
-- **`colormaps.test.js`**: Verify meteorological colormaps and dynamic level scaling.
-- **`weather_symbols.test.js`**: Verify WMO standard symbols and 110-degree wind barbs.
-- **`contour_logic.test.js`**: Verify characteristic bold contour line matching logic.
-- **`config.test.js`**: Verify configuration format and preset schema.
-- **`timeslider.test.js`**: Verify timeline step-lengths, upper-air 08:00/20:00 UTC+8 filtering, and forecast init-cycles.
-- **`formatters.test.js`**: Verify date/time, cycle, and coordinate formatting.
+- **`derived_layers.test.js`**: Sounding Height, Temperature, and Wind QC bounds filtering, ground elevation rejection, calm wind vector handling, streamline vector grid generation, and preset layer persistence.
+- **`station_contour_analysis.test.js`**: Delaunay triangulation, natural neighbor / IDW objective analysis interpolation, and surface sea-level pressure (SLP) contouring.
+- **`smooth_contour.test.js`**: Chaikin B-spline corner smoothing and Douglas-Peucker simplification for smooth meteorological isolines.
+- **`colormaps.test.js`**: Dynamic colormap interpolation, discrete/continuous stops, and pressure level scaling.
+- **`weather_symbols.test.js`**: WMO standard present weather symbols and 110-degree wind barbs.
+- **`contour_logic.test.js`**: Characteristic bold contour line matching (e.g. 588 dam subtropical high, 0°C isotherm).
+- **`config.test.js`**: `config.json` schema validation, preset loading, and compact JSON serialization.
+- **`timeslider.test.js`**: Timeline stepper intervals, upper-air synoptic sounding 08:00 / 20:00 UTC+8 filtering, and NWP forecast init-cycles.
+- **`formatters.test.js`**: Meteorological unit formatting, coordinate rounding, and date/time conversions.
+- **`raster_layer.test.js`**: Offscreen canvas Float32Array raster rendering, range clamping, and opacity blending.
+- **`ui_review2_fixes.test.js`**: UI layer control state synchronization and multi-window manager callbacks.
+- **`window_title.test.js`**: Dynamic multi-window viewport title generation from active layer metadata.
+
+### 5.2. Server Binary Parser Test Suite (Go Test)
+
+Run backend binary parser tests covering MDFS Diamond 1/2 station observation decoding, precipitation parsing, elevation/height separation, and upper-air wind quality control:
+
+```bash
+cd server
+go test -v ./...
+```
+
+Key Go test coverage:
+- **`parser/station_parser_test.go`**:
+  - `TestStationParserPrecipitation`: Multi-element surface station decoding (SLP, 3h pressure tendency, 6h cumulative rain).
+  - `TestStationParserHeightAndElevation`: Strict decoupling of station ground elevation (element 3, meters) from isobaric geopotential height (element 421/419, dam to gpm) to prevent PILOT station elevations from corrupting upper-air height fields.
+  - `TestStationParserWindQC`: Normalization of missing flags (`9999`, negative values), calm wind direction consistency ($ws=0 \implies wd=0$), gross speed outlier rejection ($>150\text{ m/s} \to -9999$), and tenths-of-a-meter scaling.
+- **`config/config_test.go`**: Verification of `MICAPS.exe.config` XML discovery, IP fallback lists, and CLI runtime argument overrides.
 
 ---
 
@@ -320,3 +360,106 @@ To avoid race conditions and stale state in multi-field composite views (e.g. co
   - Layer: `${layerId}-raster-layer`
 - **Captured Layer Context**: Layer records in `windowLayersMap` retain their own `{ path, file, gridData, colormap, element, level, model }`.
 - **Wind Raster Consistency**: Wind magnitude raster overlays compute from the captured $U/V$ components directly or the decoded speed matrix, ensuring 100% geometric and scalar alignment with animated streamlines and wind barbs.
+
+---
+
+### 8.5. Meteorological Observation Quality Control (QC) & Objective Analysis Pipeline
+
+Raw meteorological observation streams transmitted via MDFS / Cassandra (Diamond 1 surface and Diamond 2 upper-air soundings) often contain telecommunication corruptions, PILOT balloon omissions, element mixups, and flag values that must be sanitized before presentation or spatial interpolation. MICAPS-Web implements a dual-stage quality control architecture spanning the Go backend decoder and the frontend client analysis engine.
+
+#### 8.5.1. Separation of Station Surface Elevation vs. Isobaric Geopotential Height
+
+In WMO and CMA synoptic reporting standards:
+- **Station Surface Elevation (`props["elevation"]`)**: Decoded from element descriptor `3` (`测站高度`). Represents the geometric height of the station barometer or ground surface above mean sea level in meters ($m$).
+- **Isobaric Geopotential Height (`props["height"]`)**: Decoded from element descriptors `421` or `419` (`等压面位势高度`). Represents the work done against gravity to reach that pressure surface, reported in geopotential decameters ($dam$) or meters ($gpm$).
+
+**The PILOT Station Trap**:
+Upper-air directories (`UPPER_AIR/PLOT/<level>`) aggregate both full radiosonde balloon soundings (TEMP messages measuring $P, T, T_d, U, V$) and pilot balloon optical/radar tracking stations (PILOT messages measuring only upper-air wind vectors $U, V$). PILOT stations report station surface elevation in element 3, but do **not** measure isobaric geopotential height (element 421 is absent).
+
+If a parser treats element 3 as a fallback for missing element 421:
+- A mountain PILOT station at Grand Junction ($1473\text{ m}$) would report a 500 hPa height of $1473\text{ gpm}$ instead of the expected $\sim 5840\text{ gpm}$!
+- Lowland coastal PILOT stations (e.g. Kota Bharu at $5\text{ m}$, Kuching at $27\text{ m}$) would report heights near zero.
+
+**Architecture Fix ([`server/parser/station_parser.go`](file:///root/downloads/micaps-web/server/parser/station_parser.go))**:
+1. Element 3 is decoded strictly into `props["elevation"]`.
+2. Elements 421 and 419 are decoded strictly into `props["height"]` (converted $dam \to gpm$ via $\times 10$ if values are in decameter range $[20, 4500]$).
+3. If element 421/419 is absent, `props["height"]` defaults to `-9999` (missing). No fallback to element 3 is permitted.
+4. Longitude (element 1) is completely excluded from height property decoding.
+
+#### 8.5.2. Upper-Air Wind Quality Control & Calm Consistency
+
+Upper-air wind observations are subject to multi-stage QC in both backend parsing and client-side processing:
+
+1. **Flag Normalization**:
+   - Sentinels (`9999`, `999`, `999.9`, negative values, or encoded codes $\ge 9000$) are normalized to `-9999` (null).
+2. **Tenths-of-a-Meter Scaling**:
+   - Upstream MDFS decoders occasionally transmit raw wind speed in units of $0.1\text{ m/s}$ (e.g., $185\text{ m/s}$ encoded as integer $1850$). Speeds in the range $(100, 1500]$ are divided by $10.0$.
+   - Speeds exceeding $150\text{ m/s}$ are rejected as physical impossibilities (set to `-9999`).
+3. **Calm Wind Consistency**:
+   - When wind speed is calm ($ws = 0\text{ m/s}$ or $ws < 0.5\text{ m/s}$), the wind direction is normalized to $0^\circ$, and Cartesian components are set to $u = 0, v = 0$.
+   - A non-calm wind observation requires a valid direction $wd \in [0, 360]$. Missing directions are **never** defaulted to $0^\circ$ (which represents true North), preventing artificial northerly wind vectors from contaminating spatial vector fields.
+4. **Synoptic Station Plotting Symbology ([`client/src/layers/stationLayer.js`](file:///root/downloads/micaps-web/client/src/layers/stationLayer.js))**:
+   - Missing wind ($ws = \text{null}$ or $-9999$): No wind barb or calm circle is rendered.
+   - Calm wind ($ws < 1.5\text{ m/s}$): A calm wind circle ($\odot$) is rendered centered on the station coordinates; barb shafts and feathers are omitted.
+   - Active wind ($ws \ge 1.5\text{ m/s}$ and $wd \in [0, 360]$): A directional WMO standard wind barb with 110-degree flags is rendered, oriented along the incoming wind azimuth.
+
+#### 8.5.3. Isobaric Level-Specific Climatological QC Bounds Table
+
+To eliminate gross errors (e.g. data transmission bitflips, misplaced pressure level records, or residual surface values) before Delaunay triangulation and objective contouring, the client analysis engine ([`client/src/layers/soundingAnalysis.js`](file:///root/downloads/micaps-web/client/src/layers/soundingAnalysis.js)) verifies observations against physical climatological bounds tailored to each standard pressure level:
+
+| Pressure Level ($hPa$) | Geopotential Height ($gpm$) | Temperature ($^\circ C$) | Dewpoint ($^\circ C$) | Max Wind Speed ($m/s$) |
+| :---: | :---: | :---: | :---: | :---: |
+| **1000** | $[-400, 800]$ | $[-60, 55]$ | $[-70, 40]$ | $50$ |
+| **925** | $[200, 1400]$ | $[-55, 50]$ | $[-70, 35]$ | $60$ |
+| **850** | $[800, 2200]$ | $[-50, 45]$ | $[-70, 30]$ | $70$ |
+| **700** | $[2200, 3800]$ | $[-50, 30]$ | $[-75, 25]$ | $80$ |
+| **500** | $[4400, 6400]$ | $[-60, 10]$ | $[-80, 5]$ | $95$ |
+| **400** | $[6000, 8200]$ | $[-70, 0]$ | $[-85, 0]$ | $110$ |
+| **300** | $[7500, 11000]$ | $[-80, 0]$ | $[-90, -5]$ | $140$ |
+| **250** | $[8500, 12200]$ | $[-85, -10]$ | $[-95, -10]$ | $140$ |
+| **200** | $[9800, 13800]$ | $[-85, -15]$ | $[-95, -15]$ | $140$ |
+| **150** | $[11500, 15800]$ | $[-90, -20]$ | $[-100, -20]$ | $120$ |
+| **100** | $[14000, 18500]$ | $[-90, -25]$ | $[-100, -25]$ | $85$ |
+| **70** | $[16000, 20500]$ | $[-90, -30]$ | $[-100, -30]$ | $80$ |
+| **50** | $[18000, 23000]$ | $[-90, -30]$ | $[-100, -30]$ | $75$ |
+| **30** | $[21000, 26500]$ | $[-90, -30]$ | $[-100, -30]$ | $70$ |
+| **20** | $[23500, 29500]$ | $[-90, -30]$ | $[-100, -30]$ | $65$ |
+| **10** | $[28000, 35000]$ | $[-90, -30]$ | $[-100, -30]$ | $60$ |
+
+Observations falling outside these envelopes are cleanly filtered out prior to triangulation, preventing isolated outliers from producing artificial circular contour bulls-eyes or distortion in the interpolated field.
+
+#### 8.5.4. Objective Analysis, Delaunay Triangulation & Vector Grid Synthesis
+
+The client-side objective analysis pipeline converts sparse, irregular station soundings into continuous vector and scalar fields in real time:
+
+```mermaid
+graph LR
+    Stations["Raw GeoJSON Stations"] --> QC["Level Climatological QC Filter"]
+    QC --> Extracted["Validated Point Samples (Lon, Lat, Value)"]
+    
+    subgraph Scalar Pipeline ["Scalar Field Contouring"]
+        Extracted --> Delaunay["Delaunay Triangulation (d3-delaunay)"]
+        Delaunay --> IDW["Grid Resampling (0.5° Regular Mesh via IDW)"]
+        IDW --> Marching["Marching Squares (griddata-js)"]
+        Marching --> Chaikin["Chaikin B-Spline Smoothing"]
+        Chaikin --> ContourOverlay["MapLibre Isoband & Isoline Overlays"]
+    end
+
+    subgraph Vector Pipeline ["Vector Wind Field Streamlines"]
+        Extracted --> WindGrid["Station Wind Grid Resampler (u, v Components)"]
+        WindGrid --> ParticleSim["Offscreen Particle Simulator (Canvas2D)"]
+        ParticleSim --> StreamlineLayer["WebGL / Canvas Streamlines Overlay"]
+    end
+```
+
+1. **Delaunay Triangulation & Adaptive IDW**:
+   - Validated station points form a planar Delaunay mesh.
+   - An adaptive regular grid ($0.5^\circ \times 0.5^\circ$ spacing) is interpolated using Inverse Distance Weighting (IDW) bounded by local Delaunay neighbor search to preserve sharp baroclinic fronts while suppressing edge extrapolation artifacts.
+2. **Marching Squares & B-Spline Smoothing**:
+   - `griddata-js` extracts isobands (filled polygons) and isolines (contour paths).
+   - Isolines undergo Chaikin algorithm corner cuts followed by Douglas-Peucker simplification, producing professional, cartographic-grade meteorological isolines.
+   - Characteristic synoptic isolines (such as the 588 dam subtropical ridge line or the 0°C freezing isotherm) are identified and highlighted with custom stroke weights and colors.
+3. **Station Wind Grid Synthesis**:
+   - Upper-air vector winds $(u, v)$ from soundings are gridded into a regular 2D vector field via [`generateStationWindGrid`](file:///root/downloads/micaps-web/client/src/layers/windLayer.js).
+   - This grid drives the client-side particle engine to render real-time animated streamlines directly from sparse station soundings without requiring gridded NWP model files.
+
