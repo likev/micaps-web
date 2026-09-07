@@ -126,28 +126,54 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
       }
       if (value.lineWidth !== undefined || value.lineColor !== undefined || value.boldValues !== undefined || value.boldLineWidth !== undefined || value.labelSize !== undefined) {
         setLayerIsolineStyle(map, layerId, {
-          lineWidth: layer.config?.lineWidth,
-          lineColor: layer.config?.lineColor,
-          boldValues: layer.config?.boldValues,
-          boldLineWidth: layer.config?.boldLineWidth,
-          labelSize: layer.config?.labelSize,
+          lineWidth: value.lineWidth ?? layer.config?.lineWidth,
+          lineColor: value.lineColor ?? layer.config?.lineColor,
+          boldLineWidth: value.boldLineWidth ?? layer.config?.boldLineWidth,
+          labelSize: value.labelSize ?? layer.config?.labelSize,
+          ...(value.boldValues !== undefined ? { boldValues: value.boldValues ?? layer.config?.boldValues } : {}),
         });
       }
 
-      if (value.smooth !== undefined && layer.type === "contour" && layer.gridData) {
-        renderContourLayers(map, layer.gridData, layer.element || "TMP", {
-          ...layer.config,
-          layerId,
-          smooth: value.smooth,
-          showFill: layer.visible && layer.config?.showFill,
-          showLine: layer.visible && layer.config?.showLine,
-          opacity: layer.config?.opacity,
-          lineColor: layer.config?.lineColor,
-          lineWidth: layer.config?.lineWidth,
-          boldValues: layer.config?.boldValues,
-          boldLineWidth: layer.config?.boldLineWidth,
-          colormap: layer.colormap,
-        });
+      if (value.smooth !== undefined && layer.type === "contour") {
+        const isUpper = (layer.model === "UPPER_AIR") || (layer.id && layer.id.startsWith("contour-sounding-"));
+        const isSurface = (layer.model === "SURFACE_ANALYSIS") || (layer.id && layer.id.startsWith("contour-surface-"));
+        if (isUpper || isSurface) {
+          const geojson = layer?.stationsGeoJSON || getStationGeoJSON(map) || win?.stationsGeoJSON || appState.get("stationData");
+          if (geojson && geojson.features && geojson.features.length >= 3) {
+            if (isUpper) {
+              const level = layer.level || win?.level || 500;
+              import("../layers/soundingAnalysis.js").then(({ analyzeAndRenderSoundingElementContour }) => {
+                analyzeAndRenderSoundingElementContour(map, geojson, level, layer.element, {
+                  ...layer.config,
+                  layerId,
+                  smooth: value.smooth,
+                }, win);
+              });
+            } else {
+              import("../layers/surfaceAnalysis.js").then(({ analyzeAndRenderSurfaceContours }) => {
+                analyzeAndRenderSurfaceContours(map, geojson, layer.element, {
+                  ...layer.config,
+                  layerId,
+                  smooth: value.smooth,
+                }, win);
+              });
+            }
+          }
+        } else if (layer.gridData) {
+          renderContourLayers(map, layer.gridData, layer.element || "TMP", {
+            ...layer.config,
+            layerId,
+            smooth: value.smooth,
+            showFill: layer.visible && layer.config?.showFill,
+            showLine: layer.visible && layer.config?.showLine,
+            opacity: layer.config?.opacity,
+            lineColor: layer.config?.lineColor,
+            lineWidth: layer.config?.lineWidth,
+            boldValues: layer.config?.boldValues,
+            boldLineWidth: layer.config?.boldLineWidth,
+            colormap: layer.colormap,
+          });
+        }
       }
 
       if (value.showRaster !== undefined) {

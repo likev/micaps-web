@@ -54,9 +54,9 @@ describe("UI Review 2: CSS Overflow Verifications", () => {
   const styleCss = fs.readFileSync("./src/style.css", "utf8");
   const tabsCss = fs.readFileSync("./src/tabs.css", "utf8");
 
-  test("O1: .panel has overflow-y: auto and .layers-manage-container has max-height budget", () => {
+  test("O1: .panel has overflow-y: auto and .layers-manage-container expands naturally without max-height clipping", () => {
     expect(styleCss).toMatch(/\.panel\s*\{[^}]*overflow-y:\s*auto/);
-    expect(styleCss).toMatch(/\.layers-manage-container\s*\{[^}]*max-height:\s*min\(400px,\s*calc\(100vh\s*-\s*200px\)\)/);
+    expect(styleCss).not.toMatch(/\.layers-manage-container\s*\{[^}]*max-height:/);
   });
 
   test("O2: .timeline-info has flex-wrap and valid-label has text-overflow ellipsis", () => {
@@ -205,6 +205,12 @@ describe("UI Review 2: Layer Consistency & Addenda", () => {
     ]);
   });
 
+  test("Contour label layer does not use data expressions in text-ignore-placement and prioritizes bold via symbol-sort-key", () => {
+    const contourLayerJs = fs.readFileSync("./src/layers/contourLayer.js", "utf8");
+    expect(contourLayerJs).not.toMatch(/"text-ignore-placement":\s*\[/);
+    expect(contourLayerJs).toContain('"symbol-sort-key"');
+  });
+
   test("Addendum §7: Barb lines and sky cover circles have increased stroke widths", () => {
     const sky = getSkyCoverSVG(4, 16);
     expect(sky).toContain('stroke-width="2.0"');
@@ -218,5 +224,84 @@ describe("UI Review 2: Layer Consistency & Addenda", () => {
     renderStationWeatherPlots(map, { type: "FeatureCollection", features: [] }, true);
     setStationConfig(map, { showRain6: true });
     expect(true).toBe(true);
+  });
+
+  test("Color picker: setLayerIsolineStyle preserves contour features and uses to-boolean", () => {
+    const map = createMockMap();
+    let setDataCalled = false;
+    map.addSource("contour-sounding-tmp-500-isoline-source", {
+      type: "geojson",
+      data: {
+        type: "FeatureCollection",
+        features: [
+          { properties: { value: -20, isBold: true } },
+          { properties: { value: -24, isBold: false } },
+          { properties: { value: -28, isBold: false } },
+        ],
+      },
+    });
+    const src = map.getSource("contour-sounding-tmp-500-isoline-source");
+    const origSetData = src.setData.bind(src);
+    src.setData = (d) => {
+      setDataCalled = true;
+      origSetData(d);
+    };
+
+    map.addLayer({
+      id: "contour-sounding-tmp-500-isoline-layer",
+      type: "line",
+      paint: {},
+    });
+    map.addLayer({
+      id: "contour-sounding-tmp-500-isoline-label-layer",
+      type: "symbol",
+      paint: {},
+    });
+
+    setLayerIsolineStyle(map, "contour-sounding-tmp-500", { lineColor: "#ffaa00" });
+
+    // Changing color should NOT call setData or destroy features
+    expect(setDataCalled).toBe(false);
+
+    const layer = map.getLayer("contour-sounding-tmp-500-isoline-layer");
+    expect(layer.paint["line-color"]).toEqual([
+      "case",
+      ["to-boolean", ["get", "isBold"]],
+      "#ffaa00",
+      "#ffaa00",
+    ]);
+  });
+
+  test("handleLayerAction for lineColor delta does not re-render contours", () => {
+    const map = createMockMap();
+    map.addLayer({
+      id: "contour-tmp-isoline-layer",
+      type: "line",
+      paint: {},
+    });
+    map.addLayer({
+      id: "contour-tmp-isoline-label-layer",
+      type: "symbol",
+      paint: {},
+    });
+
+    const layer = {
+      id: "contour-tmp",
+      type: "contour",
+      element: "TMP",
+      visible: true,
+      config: { lineColor: "#ffffff", lineWidth: 2, smooth: true },
+      gridData: null,
+    };
+
+    handleLayerAction(map, "config", "contour-tmp", { lineColor: "#00ffcc" }, layer, { id: "win-1", winIdx: 0 });
+
+    const isolineLayer = map.getLayer("contour-tmp-isoline-layer");
+    expect(isolineLayer.paint["line-color"]).toEqual([
+      "case",
+      ["to-boolean", ["get", "isBold"]],
+      "#00ffcc",
+      "#00ffcc",
+    ]);
   });
 });

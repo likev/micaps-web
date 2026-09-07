@@ -83,7 +83,7 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 			ind += 10
 		}
 
-		var temp, dewPoint, slp, stnPress, height, pDiff3h, windSpeed, windDir, vis, rain1h, rain6h, rain24h float32 = -9999, -9999, -9999, -9999, -9999, 0, 0, 0, 10, 0, 0, 0
+		var temp, dewPoint, slp, stnPress, height, pDiff3h, windSpeed, windDir, vis, rain1h, rain3h, rain6h, rain12h, rain24h float32 = -9999, -9999, -9999, -9999, -9999, 0, 0, 0, 10, 0, 0, 0, 0, 0
 		var dewDepression float32 = -9999
 		var cloudCover, weatherCode, pTendency int16 = 0, 0, 0
 
@@ -142,35 +142,51 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 				if valFloat >= 0 && valFloat < 100 {
 					dewDepression = valFloat
 				}
-			case 421, 1002, 1004, 1: // Geopotential Height (Upper Air decameters or gpm)
+			case 421, 419, 1: // Geopotential Height (Upper Air decameters or gpm)
 				height = normalizeHeight(valFloat)
-			case 1003, 401, 5, 101: // Sea Level Pressure (SLP)
+			case 3: // Station elevation (测站高度 in meters)
+				if height <= -9000 && valFloat > -500 && valFloat < 9000 {
+					height = valFloat
+				}
+			case 401, 5, 101: // Sea Level Pressure (SLP)
 				slp = normalizePress(valFloat)
-			case 1001, 402: // Station Pressure
+			case 407, 402: // Station Pressure
 				stnPress = normalizePress(valFloat)
 				if slp <= -9000 || slp <= 0 {
 					slp = stnPress
 				}
-			case 1005, 403, 6: // 3-hour pressure change
+			case 403, 6: // 3-hour pressure change
 				pDiff3h = valFloat
-			case 1007, 7, 404: // Pressure tendency
+			case 404, 7: // Pressure tendency
 				pTendency = int16(valInt)
 			case 1401, 20, 701, 702, 1402: // Cloud cover (0-8)
 				cloudCover = int16(valInt)
 			case 1601, 12, 901, 902: // Present weather code
 				weatherCode = int16(valInt)
 			case 201, 1101, 209, 21, 501: // Wind direction DD (0-360)
-				windDir = valFloat
+				windDir = normalizeWindDir(valFloat)
 			case 203, 1102, 211, 22, 502: // Wind speed FF (m/s)
-				windSpeed = valFloat
+				windSpeed = normalizeWindSpeed(valFloat)
 			case 1201, 1203, 1207, 27: // Visibility
 				vis = valFloat
-			case 1301, 11:
-				rain1h = valFloat
-			case 1302, 8:
-				rain6h = valFloat
-			case 1303, 9:
-				rain24h = valFloat
+			case 1001: // Precipitation (general)
+				r := normalizeRain(valFloat)
+				if rain6h == 0 {
+					rain6h = r
+				}
+				if rain1h == 0 {
+					rain1h = r
+				}
+			case 1003, 1301, 11: // 1-hour rain (mm)
+				rain1h = normalizeRain(valFloat)
+			case 1005: // 3-hour rain (mm)
+				rain3h = normalizeRain(valFloat)
+			case 1007, 1302, 8: // 6-hour rain (mm)
+				rain6h = normalizeRain(valFloat)
+			case 1009: // 12-hour rain (mm)
+				rain12h = normalizeRain(valFloat)
+			case 1011, 1303, 9: // 24-hour rain (mm)
+				rain24h = normalizeRain(valFloat)
 			}
 		}
 
@@ -201,7 +217,9 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 			"wind_dir":      round1(windDir),
 			"visibility":    round1(vis),
 			"rain_1h":       round1(rain1h),
+			"rain_3h":       round1(rain3h),
 			"rain_6h":       round1(rain6h),
+			"rain_12h":      round1(rain12h),
 			"rain_24h":      round1(rain24h),
 		}
 
@@ -292,3 +310,32 @@ func round1(val float32) float32 {
 	}
 	return float32(math.Round(float64(val)*10) / 10)
 }
+
+func normalizeRain(val float32) float32 {
+	if val < 0 || val >= 9990 || val == 999.0 || val == -999.0 {
+		return 0
+	}
+	if val > 1000 && val < 9990 {
+		return val / 10.0
+	}
+	return val
+}
+
+func normalizeWindDir(val float32) float32 {
+	if val < 0 || val > 360 || val >= 900 {
+		return 0
+	}
+	return val
+}
+
+func normalizeWindSpeed(val float32) float32 {
+	if val < 0 || val >= 900 || val == 9999.0 || val == 999.0 {
+		return 0
+	}
+	if val > 100 && val < 1000 { // tenths of m/s
+		return val / 10.0
+	}
+	return val
+}
+
+

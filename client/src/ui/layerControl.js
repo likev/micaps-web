@@ -335,13 +335,13 @@ function renderLayersManager(panel) {
 
     // Config controls for contour and wind layers
     if ((layer.type === "contour" || layer.type === "wind") && configDrawer) {
-      const bindProp = (sel, eventType, handler) => {
-        const el = configDrawer.querySelector(sel);
+      const bindProp = (selector, eventType, handler) => {
+        const el = configDrawer.querySelector(selector);
         if (el) {
           el.addEventListener("click", (e) => e.stopPropagation());
           el.addEventListener(eventType, (e) => {
-            handler(e);
-            if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer, currentActiveWinId);
+            const changed = handler(e);
+            if (onLayerActionCallback) onLayerActionCallback("config", layer.id, changed || layer.config, layer, currentActiveWinId);
           });
         }
       };
@@ -351,20 +351,21 @@ function renderLayersManager(panel) {
         layer.color = e.target.value;
         const dot = panel.querySelector(`.layer-item[data-layer-id="${layer.id}"] .layer-color-dot`);
         if (dot) dot.style.background = e.target.value;
+        return { lineColor: e.target.value };
       };
 
-      bindProp(".chk-show-fill", "change", (e) => { layer.config.showFill = e.target.checked; autoSaveLayerConfig(layer); });
-      bindProp(".chk-show-line", "change", (e) => { layer.config.showLine = e.target.checked; autoSaveLayerConfig(layer); });
-      bindProp(".slider-fill-opacity", "input", (e) => { layer.config.opacity = parseInt(e.target.value, 10) / 100; autoSaveLayerConfig(layer); });
-      bindProp(".color-picker-line", "input", (e) => { updateColor(e); autoSaveLayerConfig(layer); });
-      bindProp(".input-line-width", "change", (e) => { layer.config.lineWidth = parseFloat(e.target.value) || 2.0; autoSaveLayerConfig(layer); });
-      bindProp(".input-bold-values", "change", (e) => { layer.config.boldValues = parseBoldValues(e.target.value); autoSaveLayerConfig(layer); });
-      bindProp(".input-bold-line-width", "change", (e) => { layer.config.boldLineWidth = parseFloat(e.target.value) || 4.0; autoSaveLayerConfig(layer); });
-      bindProp(".input-label-size", "change", (e) => { layer.config.labelSize = parseInt(e.target.value, 10) || 13; autoSaveLayerConfig(layer); });
-      bindProp(".chk-show-raster", "change", (e) => { layer.config.showRaster = e.target.checked; autoSaveLayerConfig(layer); });
-      bindProp(".chk-smooth-lines", "change", (e) => { layer.config.smooth = e.target.checked; autoSaveLayerConfig(layer); });
-      bindProp(".chk-show-wind", "change", (e) => { layer.config.showWind = e.target.checked; autoSaveLayerConfig(layer); });
-      bindProp(".chk-show-barbs", "change", (e) => { layer.config.showBarbs = e.target.checked; autoSaveLayerConfig(layer); });
+      bindProp(".chk-show-fill", "change", (e) => { layer.config.showFill = e.target.checked; autoSaveLayerConfig(layer); return { showFill: e.target.checked }; });
+      bindProp(".chk-show-line", "change", (e) => { layer.config.showLine = e.target.checked; autoSaveLayerConfig(layer); return { showLine: e.target.checked }; });
+      bindProp(".slider-fill-opacity", "input", (e) => { const op = parseInt(e.target.value, 10) / 100; layer.config.opacity = op; autoSaveLayerConfig(layer); return { opacity: op }; });
+      bindProp(".color-picker-line", "input", (e) => { const res = updateColor(e); autoSaveLayerConfig(layer); return res; });
+      bindProp(".input-line-width", "change", (e) => { const w = parseFloat(e.target.value) || 2.0; layer.config.lineWidth = w; autoSaveLayerConfig(layer); return { lineWidth: w }; });
+      bindProp(".input-bold-values", "change", (e) => { const bv = parseBoldValues(e.target.value); layer.config.boldValues = bv; autoSaveLayerConfig(layer); return { boldValues: bv }; });
+      bindProp(".input-bold-line-width", "change", (e) => { const bw = parseFloat(e.target.value) || 4.0; layer.config.boldLineWidth = bw; autoSaveLayerConfig(layer); return { boldLineWidth: bw }; });
+      bindProp(".input-label-size", "change", (e) => { const ls = parseInt(e.target.value, 10) || 13; layer.config.labelSize = ls; autoSaveLayerConfig(layer); return { labelSize: ls }; });
+      bindProp(".chk-show-raster", "change", (e) => { layer.config.showRaster = e.target.checked; autoSaveLayerConfig(layer); return { showRaster: e.target.checked }; });
+      bindProp(".chk-smooth-lines", "change", (e) => { layer.config.smooth = e.target.checked; autoSaveLayerConfig(layer); return { smooth: e.target.checked }; });
+      bindProp(".chk-show-wind", "change", (e) => { layer.config.showWind = e.target.checked; autoSaveLayerConfig(layer); return { showWind: e.target.checked }; });
+      bindProp(".chk-show-barbs", "change", (e) => { layer.config.showBarbs = e.target.checked; autoSaveLayerConfig(layer); return { showBarbs: e.target.checked }; });
 
       // Palette picker: load element-filtered palette files into the select dropdown
       const paletteSel = configDrawer.querySelector(".sel-palette");
@@ -396,7 +397,7 @@ function renderLayersManager(panel) {
             }
           }
 
-          if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer, currentActiveWinId);
+          if (onLayerActionCallback) onLayerActionCallback("config", layer.id, { palettePath: path }, layer, currentActiveWinId);
         });
       }
     } // end if (layer.type === "contour" || layer.type === "wind")
@@ -411,7 +412,7 @@ function renderLayersManager(panel) {
             if (!layer.config) layer.config = {};
             layer.config[key] = e.target.checked;
             autoSaveLayerConfig(layer);
-            if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer, currentActiveWinId);
+            if (onLayerActionCallback) onLayerActionCallback("config", layer.id, { [key]: e.target.checked }, layer, currentActiveWinId);
           });
         }
       };
@@ -454,7 +455,7 @@ function renderLayersManager(panel) {
             if (!layer.config) layer.config = {};
             layer.config[key] = e.target.checked;
             autoSaveLayerConfig(layer);
-            if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer, currentActiveWinId);
+            if (onLayerActionCallback) onLayerActionCallback("config", layer.id, { [key]: e.target.checked }, layer, currentActiveWinId);
           });
         }
       };
@@ -472,7 +473,7 @@ function renderLayersManager(panel) {
           if (!layer.config) layer.config = {};
           layer.config.scheme = e.target.value;
           autoSaveLayerConfig(layer);
-          if (onLayerActionCallback) onLayerActionCallback("config", layer.id, layer.config, layer, currentActiveWinId);
+          if (onLayerActionCallback) onLayerActionCallback("config", layer.id, { scheme: e.target.value }, layer, currentActiveWinId);
         });
       }
     }

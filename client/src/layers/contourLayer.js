@@ -100,8 +100,28 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
     Z = smoothGrid2D(Z, 1, 0.4);
   }
 
+  // Ensure stats min/max are computed if missing (e.g. from interpolated/synthetic grids)
+  let zMin = gridData.stats?.min;
+  let zMax = gridData.stats?.max;
+  if ((zMin === undefined || zMax === undefined) && Array.isArray(gridData.values) && gridData.values.length > 0) {
+    let min = Infinity;
+    let max = -Infinity;
+    for (let i = 0; i < gridData.values.length; i++) {
+      const v = gridData.values[i];
+      if (typeof v === "number" && !isNaN(v) && v > -9990) {
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+    }
+    if (min !== Infinity && max !== -Infinity) {
+      zMin = min;
+      zMax = max;
+      if (!gridData.stats) gridData.stats = { min, max };
+    }
+  }
+
   // Determine isoline levels
-  const levels = getElementLevels(element, gridData.stats?.min, gridData.stats?.max, options.colormap);
+  const levels = options.levels || getElementLevels(element, zMin, zMax, options.colormap);
 
   // 1. Generate Isobands via griddata.contourf
   let isobandFC = { type: "FeatureCollection", features: [] };
@@ -171,13 +191,13 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
 
   const lineWidthExp = [
     "case",
-    ["boolean", ["get", "isBold"], false],
+    ["to-boolean", ["get", "isBold"]],
     boldLineWidth,
     lineWidth,
   ];
   const lineColorExp = [
     "case",
-    ["boolean", ["get", "isBold"], false],
+    ["to-boolean", ["get", "isBold"]],
     boldLineColor,
     lineColor,
   ];
@@ -235,7 +255,7 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
         try {
           map.setLayoutProperty(isolineLabelLayerId, "text-size", labelTextSize);
           map.setLayoutProperty(isolineLabelLayerId, "symbol-spacing", 160);
-          map.setLayoutProperty(isolineLabelLayerId, "text-ignore-placement", ["case", ["to-boolean", ["get", "isBold"]], true, false]);
+          map.setLayoutProperty(isolineLabelLayerId, "symbol-sort-key", ["case", ["to-boolean", ["get", "isBold"]], 0, 10]);
           map.setPaintProperty(isolineLabelLayerId, "text-halo-width", 2.0);
         } catch { /* ignore style-spec errors on older layers */ }
       }
@@ -272,7 +292,7 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
           "text-size": labelTextSize,
           "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
           "text-allow-overlap": false,
-          "text-ignore-placement": ["case", ["to-boolean", ["get", "isBold"]], true, false],
+          "symbol-sort-key": ["case", ["to-boolean", ["get", "isBold"]], 0, 10],
           "visibility": visibleIsoline ? "visible" : "none",
         },
         paint: {
@@ -307,26 +327,27 @@ export function setLayerIsolineStyle(map, layerId, config = {}) {
 
   if (config.boldValues !== undefined && map.getSource(isolineSrcId)) {
     const src = map.getSource(isolineSrcId);
-    if (src._data && Array.isArray(src._data.features)) {
+    const geojson = src?._data?.geojson || src?._data;
+    if (geojson && Array.isArray(geojson.features)) {
       const parsed = parseBoldValues(config.boldValues);
-      for (const f of src._data.features) {
+      for (const f of geojson.features) {
         if (f.properties) {
           f.properties.isBold = isFeatureBold(f.properties.value, parsed);
         }
       }
-      src.setData(src._data);
+      src.setData(geojson);
     }
   }
 
   const lineWidthExp = [
     "case",
-    ["boolean", ["get", "isBold"], false],
+    ["to-boolean", ["get", "isBold"]],
     boldLineWidth,
     lineWidth,
   ];
   const lineColorExp = [
     "case",
-    ["boolean", ["get", "isBold"], false],
+    ["to-boolean", ["get", "isBold"]],
     boldLineColor,
     lineColor,
   ];

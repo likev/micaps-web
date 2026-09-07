@@ -187,14 +187,17 @@ function getFieldValue(p, field) {
     }
     case "Rain": {
       const r1 = extractRawNumber(p, ["rain_1h", "RAIN_1H", "rain1h", "PRE_1h", "RAIN_1h", "RAIN"]);
+      const r3 = extractRawNumber(p, ["rain_3h", "RAIN_3H", "rain3h", "PRE_3h", "RAIN_3h"]);
       const r6 = extractRawNumber(p, ["rain_6h", "RAIN_6H", "rain6h", "PRE_6h", "RAIN_6h"]);
+      const r12 = extractRawNumber(p, ["rain_12h", "RAIN_12H", "rain12h", "PRE_12h", "RAIN_12h"]);
       const r24 = extractRawNumber(p, ["rain_24h", "RAIN_24H", "rain24h", "PRE_24h", "RAIN_24h"]);
-      return Math.max(r1 || 0, r6 || 0, r24 || 0);
+      const rGen = extractRawNumber(p, ["rain", "RAIN"]);
+      return Math.max(r1 || 0, r3 || 0, r6 || 0, r12 || 0, r24 || 0, rGen || 0);
     }
     case "Rain6":
     case "Rain6h":
     case "rain_6h": {
-      return extractRawNumber(p, ["rain_6h", "RAIN_6H", "rain6h", "PRE_6h", "RAIN_6h"], 0, 1000);
+      return extractRawNumber(p, ["rain_6h", "RAIN_6H", "rain6h", "PRE_6h", "RAIN_6h", "rain_3h", "rain_1h", "rain_12h", "rain_24h", "rain"], 0, 1000);
     }
     case "Visibility":
     case "Vis":
@@ -394,7 +397,7 @@ export function updateVisibleMarkersForMap(map) {
     const rawVis = extractRawNumber(p, ["visibility", "VIS", "vis", "VV", "vv", "VIS_Avg", "VIS_Min"], 0, 150000);
     const vis = rawVis !== null ? (rawVis >= 1000 ? (rawVis / 1000).toFixed(rawVis % 1000 === 0 ? 0 : 1) : (rawVis < 10 ? rawVis.toFixed(1) : Math.round(rawVis).toString())) : "";
 
-    const rawRain6 = extractRawNumber(p, ["rain_6h", "RAIN_6H", "rain6h", "PRE_6h", "RAIN_6h"], 0, 1000);
+    const rawRain6 = extractRawNumber(p, ["rain_6h", "RAIN_6H", "rain6h", "PRE_6h", "RAIN_6h", "rain_3h", "rain_1h", "rain_12h", "rain_24h", "rain"], 0, 1000);
     const rain6 = rawRain6 !== null && rawRain6 > 0 ? (rawRain6 < 10 ? rawRain6.toFixed(1) : Math.round(rawRain6).toString()) : "";
 
     const ww = getWeatherSymbol(weatherCode);

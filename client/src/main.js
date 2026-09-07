@@ -637,7 +637,9 @@ async function loadObservationProduct(map, model, element, level, file, win = ge
     const snapStn = win?.layerSnapshots?.find((s) => s.id === layerId || (s.type === "station" && s.model === model));
     const isVisible = existingStn ? (existingStn.visible !== false) : (snapStn ? snapStn.visible !== false : (appState.state.layers.station !== false));
     const name = model === "UPPER_AIR" ? `${level || 500} hPa Sounding Station Plots` : `${model === "SURFACE" ? "Surface" : "Upper Air"} Station Observations`;
+    const isRainProduct = /rain/i.test(element || "") || /rain/i.test(path || "");
     const stnConfig = {
+      ...(isRainProduct ? { showRain6: true } : {}),
       ...(groupStationLayer?.render || {}),
       ...(groupStationLayer?.config || {}),
       ...(snapStn?.config || {}),

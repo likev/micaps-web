@@ -23,7 +23,7 @@ export const BASEMAP_SCHEMES = {
       city: { color: "#52657e", width: 0.75, dasharray: [4, 3], opacity: 0.75 },
       county: { color: "#38475c", width: 0.50, dasharray: [2, 3], opacity: 0.58 },
     },
-    graticule: "rgba(148, 163, 184, 0.12)",
+    graticule: "rgba(148, 163, 184, 0.35)",
   },
   light: {
     id: "light",
@@ -44,7 +44,7 @@ export const BASEMAP_SCHEMES = {
       city: { color: "#8092a8", width: 0.75, dasharray: [4, 3], opacity: 0.75 },
       county: { color: "#b0c0d2", width: 0.50, dasharray: [2, 3], opacity: 0.60 },
     },
-    graticule: "rgba(71, 85, 105, 0.11)",
+    graticule: "rgba(71, 85, 105, 0.30)",
   },
   micaps: {
     id: "micaps",
@@ -65,7 +65,7 @@ export const BASEMAP_SCHEMES = {
       city: { color: "#0284c7", width: 0.75, dasharray: [4, 3], opacity: 0.78 },
       county: { color: "#0369a1", width: 0.50, dasharray: [2, 3], opacity: 0.60 },
     },
-    graticule: "rgba(56, 189, 248, 0.12)",
+    graticule: "rgba(56, 189, 248, 0.35)",
   },
 };
 

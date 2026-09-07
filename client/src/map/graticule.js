@@ -38,31 +38,51 @@ export function generateGraticuleGeoJSON(step = 10) {
 import { getBasemapScheme } from "./pmtilesLayers.js";
 
 export function addGraticuleLayers(map, schemeName = null) {
-  if (map.getSource("graticule-source")) return;
+  if (!map) return;
 
-  let graticuleColor = "rgba(255, 255, 255, 0.16)";
-  if (schemeName) {
-    try { graticuleColor = getBasemapScheme(schemeName).graticule; } catch {}
-  } else if (typeof document !== "undefined") {
-    const attr = document.documentElement.getAttribute("data-theme");
-    if (attr) { try { graticuleColor = getBasemapScheme(attr).graticule; } catch {} }
+  const doAdd = () => {
+    if (map.getSource("graticule-source")) return;
+
+    let graticuleColor = "rgba(255, 255, 255, 0.35)";
+    if (schemeName) {
+      try { graticuleColor = getBasemapScheme(schemeName).graticule; } catch {}
+    } else if (typeof document !== "undefined") {
+      const attr = document.documentElement.getAttribute("data-theme");
+      if (attr) { try { graticuleColor = getBasemapScheme(attr).graticule; } catch {} }
+    }
+
+    map.addSource("graticule-source", {
+      type: "geojson",
+      data: generateGraticuleGeoJSON(10),
+    });
+
+    const beforeId = map.getLayer("provinces-boundary")
+      ? "provinces-boundary"
+      : (map.getLayer("china-boundary") ? "china-boundary" : undefined);
+
+    map.addLayer(
+      {
+        id: "graticule-lines",
+        type: "line",
+        source: "graticule-source",
+        layout: {
+          visibility: "visible",
+        },
+        paint: {
+          "line-color": graticuleColor,
+          "line-width": 0.85,
+          "line-dasharray": [4, 4],
+        },
+      },
+      beforeId
+    );
+  };
+
+  if (map.isStyleLoaded && map.isStyleLoaded()) {
+    doAdd();
+  } else {
+    map.once("load", doAdd);
   }
-
-  map.addSource("graticule-source", {
-    type: "geojson",
-    data: generateGraticuleGeoJSON(10),
-  });
-
-  map.addLayer({
-    id: "graticule-lines",
-    type: "line",
-    source: "graticule-source",
-    paint: {
-      "line-color": graticuleColor,
-      "line-width": 0.75,
-      "line-dasharray": [4, 4],
-    },
-  });
 }
 
 export function updateGraticuleScheme(map, schemeName) {
