@@ -20,6 +20,7 @@ import { appState } from "./store/appState.js";
 import { loadPresetGroups } from "./config/presets.js";
 import { resolveColormap } from "./utils/colormaps.js";
 import { resolveForecastCycles, resolveLatestForecastCycle, syncObservationTimeline, invalidateForecastCyclesCache } from "./utils/timelineSync.js";
+import { schedulePrefetch } from "./services/prefetchService.js";
 import {
   initTabWindowManager,
   getActiveWindow,
@@ -586,6 +587,10 @@ async function loadWeatherField(map, model, element, level, period, customOption
     } else {
       removeLegend(element, win);
     }
+
+    if (win) {
+      schedulePrefetch(win);
+    }
   } catch (err) {
     console.error(`[Bootstrap] Field load failed for ${path}/${file}:`, err);
     showErrorToast(`Failed to load ${element} ${level}hPa: ${err.message || err}`);
@@ -843,6 +848,9 @@ async function loadUpperAirComposite(map, level = 500, obsTime = "20260828170000
   if (stations?.features?.length >= 3) {
     await renderSoundingDerivedContoursForStation(map, stations, curLevel, activeGroup, win, layerId);
   }
+  if (win) {
+    schedulePrefetch(win);
+  }
 }
 
 async function loadObservationProduct(map, model, element, level, file, win = getActiveWindow(), customPath = null, expectedSeq = null, customStationLayerId = null) {
@@ -879,6 +887,9 @@ async function loadObservationProduct(map, model, element, level, file, win = ge
     if (model === "UPPER_AIR" && stations?.features?.length >= 3) {
       const curLevel = level || 500;
       await renderSoundingDerivedContoursForStation(map, stations, curLevel, activeGroup, win, layerId);
+    }
+    if (win) {
+      schedulePrefetch(win);
     }
   } catch (err) {
     console.error("[Main] Observation load error:", err);
@@ -1029,15 +1040,18 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
   if (win?.layerSnapshots) {
     win.layerSnapshots = null;
   }
+  if (win) {
+    schedulePrefetch(win);
+  }
 }
 
 async function changeVerticalLevel(map, direction, explicitLevel = null, win = getActiveWindow()) {
   const activeGroup = win?.activeGroup;
-  if (activeGroup && !activeGroup.hasLevel && (activeGroup.isObservation || activeGroup.id?.includes("surface"))) {
+  if (activeGroup && !activeGroup.hasLevel) {
     console.warn(`[Level] Current preset "${activeGroup.name}" does not have vertical levels.`);
     return;
   }
-  if (win && win.model === "SURFACE" && !activeGroup?.hasLevel) {
+  if (win && (win.model === "SURFACE" || win.level === 0) && !activeGroup?.hasLevel) {
     console.warn("[Level] Surface observations do not have vertical levels.");
     return;
   }
@@ -1157,6 +1171,9 @@ async function changeVerticalLevel(map, direction, explicitLevel = null, win = g
 
   if (win?.layerSnapshots) {
     win.layerSnapshots = null;
+  }
+  if (win) {
+    schedulePrefetch(win);
   }
 }
 

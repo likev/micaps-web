@@ -107,6 +107,10 @@ export function filterObsFilesByStep(files, stepHours, isUpper = false) {
 }
 
 function updateStepLengthOptions(isUpper, currentStep) {
+  if (typeof document === "undefined") {
+    currentStepLength = parseInt(currentStep, 10) || (isUpper ? 12 : 6);
+    return;
+  }
   const selStep = document.getElementById("select-step-length");
   if (!selStep) return;
 
@@ -143,6 +147,7 @@ function updateStepLengthOptions(isUpper, currentStep) {
 }
 
 export function setTimeSliderVisible(visible = true) {
+  if (typeof document === "undefined") return;
   const container = document.getElementById("timeslider-container");
   if (!container) return;
   container.classList.toggle("hidden", !visible);
@@ -233,7 +238,7 @@ export function initTimeSlider(containerId = "timeslider-container", onTimeChang
 
 export function setStepLength(step, triggerCallback = false) {
   currentStepLength = parseInt(step, 10) || (currentMode === "obs" ? 3 : 6);
-  const selStep = document.getElementById("select-step-length");
+  const selStep = typeof document !== "undefined" ? document.getElementById("select-step-length") : null;
   if (selStep) {
     const hasOpt = selStep.options && Array.from(selStep.options).some((o) => String(o.value) === String(currentStepLength));
     if (hasOpt) {
@@ -291,6 +296,7 @@ export function setStepLength(step, triggerCallback = false) {
 }
 
 function renderChips() {
+  if (typeof document === "undefined") return;
   const chipsContainer = document.getElementById("timeline-chips");
   if (!chipsContainer) return;
   chipsContainer.innerHTML = "";
@@ -348,6 +354,7 @@ function renderChips() {
 }
 
 function updateLabels() {
+  if (typeof document === "undefined") return;
   const badge = document.getElementById("time-badge");
   const winBadge = document.getElementById("time-win-badge");
   const initWrapper = document.getElementById("time-init-wrapper");
@@ -423,11 +430,13 @@ export function step(delta) {
 }
 
 function startPlayback() {
-  const btnPlay = document.getElementById("btn-play");
-  if (btnPlay) {
-    btnPlay.textContent = "❚❚";
-    btnPlay.classList.add("active");
-    btnPlay.setAttribute("aria-pressed", "true");
+  if (typeof document !== "undefined") {
+    const btnPlay = document.getElementById("btn-play");
+    if (btnPlay) {
+      btnPlay.textContent = "❚❚";
+      btnPlay.classList.add("active");
+      btnPlay.setAttribute("aria-pressed", "true");
+    }
   }
   appState.set("isPlaying", true);
 
@@ -441,11 +450,13 @@ function pausePlayback() {
     clearInterval(playTimer);
     playTimer = null;
   }
-  const btnPlay = document.getElementById("btn-play");
-  if (btnPlay) {
-    btnPlay.textContent = "▶";
-    btnPlay.classList.remove("active");
-    btnPlay.setAttribute("aria-pressed", "false");
+  if (typeof document !== "undefined") {
+    const btnPlay = document.getElementById("btn-play");
+    if (btnPlay) {
+      btnPlay.textContent = "▶";
+      btnPlay.classList.remove("active");
+      btnPlay.setAttribute("aria-pressed", "false");
+    }
   }
   appState.set("isPlaying", false);
 }
@@ -532,4 +543,43 @@ if (typeof document !== "undefined" && typeof document.addEventListener === "fun
 }
 
 export function getPeriodStepSeq() { return periodStepSeq; }
+
+export function getAdjacentTimeSteps() {
+  const prevPeriodIdx = discretePeriods.length > 0 ? (currentPeriodIdx - 1 + discretePeriods.length) % discretePeriods.length : -1;
+  const nextPeriodIdx = discretePeriods.length > 0 ? (currentPeriodIdx + 1) % discretePeriods.length : -1;
+
+  const prevObsIdx = obsFiles.length > 0 ? (currentObsIdx - 1 + obsFiles.length) % obsFiles.length : -1;
+  const nextObsIdx = obsFiles.length > 0 ? (currentObsIdx + 1) % obsFiles.length : -1;
+
+  return {
+    mode: currentMode,
+    periods: {
+      prev: prevPeriodIdx !== -1 ? discretePeriods[prevPeriodIdx] : null,
+      current: discretePeriods[currentPeriodIdx] ?? null,
+      next: nextPeriodIdx !== -1 ? discretePeriods[nextPeriodIdx] : null,
+      cycle: currentInitCycle,
+    },
+    obsFiles: {
+      prev: prevObsIdx !== -1 ? obsFiles[prevObsIdx] : null,
+      current: currentObsIdx !== -1 ? obsFiles[currentObsIdx] : null,
+      next: nextObsIdx !== -1 ? obsFiles[nextObsIdx] : null,
+    },
+  };
+}
+
+export function getCurrentTimelineMode() {
+  return currentMode;
+}
+
+export function getCurrentTimelinePeriod() {
+  return discretePeriods[currentPeriodIdx] ?? null;
+}
+
+export function getCurrentTimelineObsFile() {
+  return obsFiles[currentObsIdx] ?? null;
+}
+
+export function getCurrentTimelineCycle() {
+  return currentInitCycle;
+}
 
