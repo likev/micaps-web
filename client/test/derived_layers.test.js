@@ -11,6 +11,7 @@ import { handleLayerAction } from "../src/ui/layerActions.js";
 import { getLayersForWindow, clearWindowWeatherLayers, addOrUpdateLayer, renderStationDrawerHTML } from "../src/ui/layerControl.js";
 import { analyzeAndRenderSurfaceContours } from "../src/layers/surfaceAnalysis.js";
 import { analyzeAndRenderSoundingElementContour, SOUNDING_CONTOUR_CONFIGS } from "../src/layers/soundingAnalysis.js";
+import { generateStationWindGrid } from "../src/layers/windLayer.js";
 
 function createMockMap() {
   const sources = new Map();
@@ -628,5 +629,42 @@ describe("Derived Contour Visibility Persistence & Level Step Invariance (Review
     expect(tmpExtract({ temperature: 31.0 }, 500)).toBeNull();
     // Missing temperature (-9999)
     expect(tmpExtract({ temperature: -9999 }, 500)).toBeNull();
+  });
+
+  test("Upper-Air Wind QC Filters reject level-specific outliers and missing directions", () => {
+    const windExtract = SOUNDING_CONTOUR_CONFIGS.WIND.extract;
+
+    // 1. Valid wind speeds
+    expect(windExtract({ wind_speed: 24.5 }, 500)).toBe(24.5);
+    expect(windExtract({ wind_speed: 65.0 }, 300)).toBe(65.0); // Valid jet stream at 300 hPa
+
+    // 2. Outliers by level
+    // 95 m/s at 925 hPa (Rio Branco outlier) -> must be rejected (> 60 m/s)
+    expect(windExtract({ wind_speed: 95.0 }, 925)).toBeNull();
+    // 86 m/s at 850 hPa (Essen Germany outlier) -> must be rejected (> 70 m/s)
+    expect(windExtract({ wind_speed: 86.0 }, 850)).toBeNull();
+    // 180 m/s (> 140 m/s physical upper limit) -> must be rejected
+    expect(windExtract({ wind_speed: 180.0 }, 300)).toBeNull();
+
+    // 3. Missing wind values
+    expect(windExtract({ wind_speed: -9999 }, 500)).toBeNull();
+    expect(windExtract({ wind_speed: 9999 }, 500)).toBeNull();
+
+    // 4. generateStationWindGrid with level QC
+    const testStations = {
+      type: "FeatureCollection",
+      features: [
+        { type: "Feature", geometry: { type: "Point", coordinates: [116.4, 39.9] }, properties: { station_id: 1, wind_speed: 20, wind_dir: 270 } },
+        { type: "Feature", geometry: { type: "Point", coordinates: [121.4, 31.2] }, properties: { station_id: 2, wind_speed: 0, wind_dir: 0 } }, // Calm
+        { type: "Feature", geometry: { type: "Point", coordinates: [113.3, 23.1] }, properties: { station_id: 3, wind_speed: 25, wind_dir: 180 } },
+        { type: "Feature", geometry: { type: "Point", coordinates: [104.0, 30.6] }, properties: { station_id: 4, wind_speed: 95, wind_dir: 180 } }, // Outlier at 925 hPa
+        { type: "Feature", geometry: { type: "Point", coordinates: [108.0, 34.0] }, properties: { station_id: 5, wind_speed: 30, wind_dir: -9999 } }, // Missing dir
+      ],
+    };
+
+    const grid925 = generateStationWindGrid(testStations, 925);
+    expect(grid925).not.toBeNull();
+    expect(grid925.u).toBeDefined();
+    expect(grid925.v).toBeDefined();
   });
 });

@@ -1,4 +1,6 @@
 // windLayer.js - Animated physical particle streamlines with bilinear velocity interpolation
+import { WIND_QC_BOUNDS } from "./soundingAnalysis.js";
+
 export function renderWindStreamlines(map, gridData) {
   if (!map || !gridData || !gridData.u || !gridData.v || !gridData.header) return;
 
@@ -388,10 +390,13 @@ export function removeGridWindBarbs(map = null) {
 }
 
 // Generate regular 2D (U, V) grid from sparse observation stations (Surface or Upper-Air)
-export function generateStationWindGrid(stationsGeoJSON) {
+export function generateStationWindGrid(stationsGeoJSON, level = null) {
   if (!stationsGeoJSON || !stationsGeoJSON.features || stationsGeoJSON.features.length < 3) {
     return null;
   }
+
+  const numLvl = Number(level);
+  const maxAllowedWs = (numLvl && WIND_QC_BOUNDS[numLvl]) ? WIND_QC_BOUNDS[numLvl][1] : 140;
 
   const points = [];
   const uVals = [];
@@ -408,8 +413,8 @@ export function generateStationWindGrid(stationsGeoJSON) {
       const v = p[k];
       if (v !== undefined && v !== null && v !== "" && v !== -9999 && v !== "-9999") {
         const num = typeof v === "number" ? v : parseFloat(v);
-        if (!isNaN(num) && num >= 0 && num <= 150) {
-          ws = num > 100 ? num / 10.0 : num;
+        if (!isNaN(num) && num >= 0 && num <= 900) {
+          ws = num;
           break;
         }
       }
@@ -428,15 +433,26 @@ export function generateStationWindGrid(stationsGeoJSON) {
       }
     }
 
+    // QC: reject speeds exceeding physical limits for level
+    if (ws !== null && (ws < 0 || ws > maxAllowedWs)) {
+      ws = null;
+    }
+
     let u = null;
     let v = null;
     if (typeof p.u === "number" && typeof p.v === "number" && !isNaN(p.u) && !isNaN(p.v)) {
       u = p.u;
       v = p.v;
-    } else if (ws !== null && wd !== null) {
-      const rad = (wd * Math.PI) / 180;
-      u = -ws * Math.sin(rad);
-      v = -ws * Math.cos(rad);
+    } else if (ws !== null) {
+      if (ws < 0.5) {
+        // Calm wind: (u, v) = (0, 0)
+        u = 0;
+        v = 0;
+      } else if (wd !== null && wd >= 0 && wd <= 360) {
+        const rad = (wd * Math.PI) / 180;
+        u = -ws * Math.sin(rad);
+        v = -ws * Math.cos(rad);
+      }
     }
 
     if (u !== null && v !== null && !isNaN(u) && !isNaN(v)) {

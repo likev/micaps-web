@@ -67,6 +67,25 @@ export const TMP_QC_BOUNDS = {
   100: [-95, -25],
 };
 
+export const WIND_QC_BOUNDS = {
+  1000: [0, 50],
+  925: [0, 60],
+  850: [0, 70],
+  700: [0, 80],
+  500: [0, 95],
+  400: [0, 115],
+  300: [0, 140],
+  250: [0, 140],
+  200: [0, 140],
+  150: [0, 100],
+  100: [0, 85],
+  70: [0, 80],
+  50: [0, 80],
+  30: [0, 80],
+  20: [0, 80],
+  10: [0, 85],
+};
+
 export const SOUNDING_CONTOUR_CONFIGS = {
   HGT: {
     name: "Height",
@@ -149,11 +168,19 @@ export const SOUNDING_CONTOUR_CONFIGS = {
     unit: "m/s",
     defaultColor: "#388bfd",
     colormap: "WIND",
-    extract: (p) => {
-      if (typeof p.wind_speed === "number" && !isNaN(p.wind_speed) && p.wind_speed >= 0 && p.wind_speed <= 200) {
-        return p.wind_speed > 100 ? p.wind_speed / 10.0 : p.wind_speed;
+    extract: (p, level) => {
+      if (typeof p.wind_speed !== "number" || isNaN(p.wind_speed) || p.wind_speed < 0 || p.wind_speed > 900) {
+        return null;
       }
-      return null;
+      const ws = p.wind_speed;
+      const numLvl = Number(level);
+      const bounds = WIND_QC_BOUNDS[numLvl];
+      if (bounds) {
+        if (ws < bounds[0] || ws > bounds[1]) return null;
+      } else if (ws < 0 || ws > 140) {
+        return null;
+      }
+      return ws;
     },
     getLevels: (level, minV, maxV) => {
       const standard = [4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 48, 56];

@@ -171,3 +171,91 @@ func TestStationParserHeightAndElevation(t *testing.T) {
 		t.Errorf("expected height 5840.0, got %v", p2["height"])
 	}
 }
+
+func TestStationParserWindQC(t *testing.T) {
+	var buf bytes.Buffer
+
+	// Header
+	buf.Write(make([]byte, 272))
+	binary.Write(&buf, binary.LittleEndian, int16(0)) // idType = 0
+	buf.Write(make([]byte, 14))
+	binary.Write(&buf, binary.LittleEndian, uint32(4)) // 4 stations
+	binary.Write(&buf, binary.LittleEndian, uint16(2)) // 2 elements (201: windDir, 203: windSpeed)
+
+	// Elem definitions: elem 201 (float32), elem 203 (float32)
+	binary.Write(&buf, binary.LittleEndian, int16(201))
+	binary.Write(&buf, binary.LittleEndian, int16(5))
+	binary.Write(&buf, binary.LittleEndian, int16(203))
+	binary.Write(&buf, binary.LittleEndian, int16(5))
+
+	// Station 1: Valid wind (270°, 24.5 m/s)
+	binary.Write(&buf, binary.LittleEndian, uint32(54511))
+	binary.Write(&buf, binary.LittleEndian, float32(116.4))
+	binary.Write(&buf, binary.LittleEndian, float32(39.9))
+	binary.Write(&buf, binary.LittleEndian, int16(2))
+	binary.Write(&buf, binary.LittleEndian, int16(201))
+	binary.Write(&buf, binary.LittleEndian, math.Float32bits(270.0))
+	binary.Write(&buf, binary.LittleEndian, int16(203))
+	binary.Write(&buf, binary.LittleEndian, math.Float32bits(24.5))
+
+	// Station 2: Calm wind (speed 0, dir not sent -> should resolve to dir 0)
+	binary.Write(&buf, binary.LittleEndian, uint32(58362))
+	binary.Write(&buf, binary.LittleEndian, float32(121.4))
+	binary.Write(&buf, binary.LittleEndian, float32(31.2))
+	binary.Write(&buf, binary.LittleEndian, int16(1))
+	binary.Write(&buf, binary.LittleEndian, int16(203))
+	binary.Write(&buf, binary.LittleEndian, math.Float32bits(0.0))
+
+	// Station 3: Outlier wind speed (> 150 m/s -> reject to -9999)
+	binary.Write(&buf, binary.LittleEndian, uint32(59287))
+	binary.Write(&buf, binary.LittleEndian, float32(113.3))
+	binary.Write(&buf, binary.LittleEndian, float32(23.1))
+	binary.Write(&buf, binary.LittleEndian, int16(2))
+	binary.Write(&buf, binary.LittleEndian, int16(201))
+	binary.Write(&buf, binary.LittleEndian, math.Float32bits(180.0))
+	binary.Write(&buf, binary.LittleEndian, int16(203))
+	binary.Write(&buf, binary.LittleEndian, math.Float32bits(1850.0))
+
+	// Station 4: Missing wind direction (dir 9999 -> -9999, speed 15.0 m/s)
+	binary.Write(&buf, binary.LittleEndian, uint32(56294))
+	binary.Write(&buf, binary.LittleEndian, float32(104.0))
+	binary.Write(&buf, binary.LittleEndian, float32(30.6))
+	binary.Write(&buf, binary.LittleEndian, int16(2))
+	binary.Write(&buf, binary.LittleEndian, int16(201))
+	binary.Write(&buf, binary.LittleEndian, math.Float32bits(9999.0))
+	binary.Write(&buf, binary.LittleEndian, int16(203))
+	binary.Write(&buf, binary.LittleEndian, math.Float32bits(15.0))
+
+	fc, err := ParseStationData(buf.Bytes())
+	if err != nil {
+		t.Fatalf("ParseStationData failed: %v", err)
+	}
+
+	if len(fc.Features) != 4 {
+		t.Fatalf("expected 4 features, got %d", len(fc.Features))
+	}
+
+	// 1. Valid wind
+	p1 := fc.Features[0].Properties
+	if p1["wind_dir"] != float32(270.0) || p1["wind_speed"] != float32(24.5) {
+		t.Errorf("Station 1: expected dir 270, speed 24.5, got dir %v, speed %v", p1["wind_dir"], p1["wind_speed"])
+	}
+
+	// 2. Calm wind
+	p2 := fc.Features[1].Properties
+	if p2["wind_speed"] != float32(0.0) || p2["wind_dir"] != float32(0.0) {
+		t.Errorf("Station 2 (calm): expected dir 0, speed 0, got dir %v, speed %v", p2["wind_dir"], p2["wind_speed"])
+	}
+
+	// 3. Outlier wind speed
+	p3 := fc.Features[2].Properties
+	if p3["wind_speed"] != float32(-9999.0) {
+		t.Errorf("Station 3 (outlier >150 m/s): expected speed -9999, got %v", p3["wind_speed"])
+	}
+
+	// 4. Missing wind direction
+	p4 := fc.Features[3].Properties
+	if p4["wind_dir"] != float32(-9999.0) || p4["wind_speed"] != float32(15.0) {
+		t.Errorf("Station 4 (missing dir 9999): expected dir -9999, speed 15.0, got dir %v, speed %v", p4["wind_dir"], p4["wind_speed"])
+	}
+}

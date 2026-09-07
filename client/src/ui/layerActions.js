@@ -550,9 +550,10 @@ async function triggerWindBarbs(map, layer = null, win = null) {
 }
 
 export async function triggerStationStreamlines(map, layer = null, win = null) {
+  const curLevel = layer?.level || win?.level || (layer?.model === "UPPER_AIR" ? 500 : null);
   const geojson = layer?.stationsGeoJSON || getStationGeoJSON(map) || win?.stationsGeoJSON || appState.get("stationData");
   if (geojson && geojson.features && geojson.features.length >= 3) {
-    const windGrid = generateStationWindGrid(geojson);
+    const windGrid = generateStationWindGrid(geojson, curLevel);
     if (windGrid) {
       if (layer) layer.gridData = windGrid;
       if (win) win.windGridData = windGrid;
@@ -564,7 +565,7 @@ export async function triggerStationStreamlines(map, layer = null, win = null) {
   // Fallback: If station GeoJSON is not yet in memory, fetch it via API
   const model = layer?.model || "SURFACE";
   const element = layer?.element || (model === "SURFACE" ? "PLOT_GLOBAL_3H" : "PLOT");
-  const level = layer?.level || 500;
+  const level = layer?.level || win?.level || 500;
   const path = layer?.path || (model === "SURFACE" ? `SURFACE/${element}` : `UPPER_AIR/${element}/${level}`);
   let file = layer?.file || win?.file || win?.obsTime || appState.get("obsTime") || appState.get("file");
   if (!file) {
@@ -584,7 +585,7 @@ export async function triggerStationStreamlines(map, layer = null, win = null) {
     .then((data) => {
       if (data && data.features && data.features.length >= 3) {
         if (layer) layer.stationsGeoJSON = data;
-        const windGrid = generateStationWindGrid(data);
+        const windGrid = generateStationWindGrid(data, level);
         if (windGrid) {
           if (layer) layer.gridData = windGrid;
           if (win) win.windGridData = windGrid;

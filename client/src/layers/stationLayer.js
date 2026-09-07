@@ -367,8 +367,8 @@ export function updateVisibleMarkersForMap(map) {
     const ppp = extractPressureOrHeight(p);
 
     const rawWs = extractRawNumber(p, ["wind_speed", "windSpeed", "ws", "WIN_S_Avg", "WIN_S", "FF", "ff", "speed"], 0, 150);
-    const ws = rawWs !== null ? (rawWs > 100 ? rawWs / 10.0 : rawWs) : 0;
-    const wd = extractRawNumber(p, ["wind_dir", "windDir", "wd", "WIN_D_Avg", "WIN_D", "DD", "dd", "dir"], 0, 360) ?? 0;
+    const ws = rawWs !== null ? (rawWs > 100 ? rawWs / 10.0 : rawWs) : null;
+    const wd = extractRawNumber(p, ["wind_dir", "windDir", "wd", "WIN_D_Avg", "WIN_D", "DD", "dd", "dir"], 0, 360);
 
     const rawCloud = extractRawNumber(p, ["cloud_cover", "cloudCover", "cloud", "CLO_Cov", "N", "n"], 0, 9);
     const cloudCover = rawCloud !== null ? Math.round(rawCloud) : 0;
@@ -402,7 +402,14 @@ export function updateVisibleMarkersForMap(map) {
 
     const ww = getWeatherSymbol(weatherCode);
     const skySVG = getSkyCoverSVG(cloudCover, 16);
-    const barbSVG = getWindBarbSVG(ws, wd, 100);
+    let barbSVG = "";
+    if (ws !== null && ws >= 0) {
+      if (ws < 1.5) {
+        barbSVG = getWindBarbSVG(0, 0, 100);
+      } else if (wd !== null && wd >= 0 && wd <= 360) {
+        barbSVG = getWindBarbSVG(ws, wd, 100);
+      }
+    }
 
     el.innerHTML = `
       <div style="position: relative; width: 56px; height: 56px; pointer-events: none; transform: scale(${scale}); transform-origin: center center;">

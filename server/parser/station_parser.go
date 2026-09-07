@@ -83,7 +83,8 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 			ind += 10
 		}
 
-		var temp, dewPoint, slp, stnPress, height, elevation, pDiff3h, windSpeed, windDir, vis, rain1h, rain3h, rain6h, rain12h, rain24h float32 = -9999, -9999, -9999, -9999, -9999, -9999, 0, 0, 0, 10, 0, 0, 0, 0, 0
+		var temp, dewPoint, slp, stnPress, height, elevation, pDiff3h, vis, rain1h, rain3h, rain6h, rain12h, rain24h float32 = -9999, -9999, -9999, -9999, -9999, -9999, 0, 10, 0, 0, 0, 0, 0
+		var windSpeed, windDir float32 = -9999, -9999
 		var dewDepression float32 = -9999
 		var cloudCover, weatherCode, pTendency int16 = 0, 0, 0
 
@@ -195,6 +196,12 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 			if dewPoint <= -9000 || dewPoint > temp {
 				dewPoint = temp - dewDepression
 			}
+		}
+
+		// Consistency check for calm wind:
+		// If wind speed is reported as 0 (calm), set wind direction to 0 if not provided
+		if windSpeed == 0 && windDir < 0 {
+			windDir = 0
 		}
 
 		if lon < -180 || lon > 180 || lat < -90 || lat > 90 || (lon == 0 && lat == 0) {
@@ -323,18 +330,22 @@ func normalizeRain(val float32) float32 {
 }
 
 func normalizeWindDir(val float32) float32 {
-	if val < 0 || val > 360 || val >= 900 {
-		return 0
+	if val < 0 || val > 360 || val >= 900 || val == 9999.0 || val == 999.0 || val < -9000 {
+		return -9999
 	}
 	return val
 }
 
 func normalizeWindSpeed(val float32) float32 {
-	if val < 0 || val >= 900 || val == 9999.0 || val == 999.0 {
-		return 0
+	if val < 0 || val >= 9000 || val == 9999.0 || val == 999.0 || val < -9000 {
+		return -9999
 	}
-	if val > 100 && val < 1000 { // tenths of m/s
-		return val / 10.0
+	if val > 100 && val <= 1500 { // tenths of m/s (e.g. 245 -> 24.5 m/s)
+		val = val / 10.0
+	}
+	// Physical limit check for synoptic wind speed (WMO max non-tornadic ~113 m/s; ceiling 150 m/s)
+	if val > 150 {
+		return -9999
 	}
 	return val
 }
