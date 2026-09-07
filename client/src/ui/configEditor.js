@@ -1,6 +1,6 @@
 // configEditor.js - Interactive Preset & Colormap Configuration Editor Tab
 import { PRESET_GROUPS, loadPresetGroups, savePresetConfig, formatCompactJSON } from "../config/presets.js";
-import { refreshPresetControls, getActiveWindow, focusWindow } from "./tabWindowManager.js";
+import { refreshPresetControls, getActiveWindow, focusWindow, getActiveTab } from "./tabWindowManager.js";
 import { refreshNavBarPresets } from "./navBar.js";
 import { appState } from "../store/appState.js";
 
@@ -10,6 +10,7 @@ let prevActiveTabId = null;
 let prevActiveWinIdx = null;
 let lastSavedText = "";
 let beforeUnloadHandler = null;
+let wasLayerControlOpen = false;
 
 function hasUnsavedChanges() {
   const ta = document.getElementById("config-json-textarea");
@@ -144,13 +145,21 @@ export function activateConfigTab() {
   }
 
   document.querySelectorAll(".tab-workspace").forEach((ws) => ws.classList.remove("active"));
-  // Ensure any active-single window highlight is cleared while config is open (state inconsistency fix)
-  document.querySelectorAll(".window-panel.active-single").forEach((wp) => wp.classList.remove("active-single"));
+  // Ensure both active and active-single window highlights are cleared while config is open (W1)
+  document.querySelectorAll(".window-panel").forEach((wp) => wp.classList.remove("active", "active-single"));
   const panel = document.getElementById("config-editor-panel");
   if (panel) panel.style.display = "flex";
 
   const layerPanel = document.getElementById("layer-control");
-  if (layerPanel) layerPanel.classList.add("hidden");
+  if (layerPanel) {
+    wasLayerControlOpen = !layerPanel.classList.contains("hidden");
+    layerPanel.classList.add("hidden");
+  }
+  const btnLayers = document.getElementById("btn-toggle-layers");
+  if (btnLayers) {
+    btnLayers.classList.remove("active");
+    btnLayers.setAttribute("aria-pressed", "false");
+  }
   const legendPanel = document.getElementById("legend-panel");
   if (legendPanel) legendPanel.classList.add("hidden");
 }
@@ -172,6 +181,11 @@ export function closeConfigTab() {
   if (prevActiveTabId !== null && prevActiveWinIdx !== null) {
     try { focusWindow(prevActiveTabId, prevActiveWinIdx); restored = true; } catch {}
   }
+  const activeTab = getActiveTab();
+  if (activeTab) {
+    const ws = document.getElementById(`tab-workspace-${activeTab.id}`);
+    if (ws) ws.classList.add("active");
+  }
   if (!restored) {
     const wsList = document.querySelectorAll(".tab-workspace");
     if (wsList.length > 0) {
@@ -181,6 +195,23 @@ export function closeConfigTab() {
     if (tabPills.length > 0) {
       tabPills[0].classList.add("active");
       tabPills[0].setAttribute("aria-selected", "true");
+    }
+  }
+
+  // Restore tabs-list hidden invariant for split mode (W2)
+  const tabsList = document.getElementById("tabs-list");
+  if (tabsList && activeTab) {
+    tabsList.classList.toggle("hidden", activeTab.layout !== "1x1");
+  }
+
+  // Restore layer panel and navbar layers button if open before config (W3)
+  if (wasLayerControlOpen) {
+    const layerPanel = document.getElementById("layer-control");
+    if (layerPanel) layerPanel.classList.remove("hidden");
+    const btnLayers = document.getElementById("btn-toggle-layers");
+    if (btnLayers) {
+      btnLayers.classList.add("active");
+      btnLayers.setAttribute("aria-pressed", "true");
     }
   }
 
@@ -224,8 +255,9 @@ function validateEditorContent() {
 
   try {
     const parsed = JSON.parse(textarea.value);
-    badge.className = "config-editor-status valid";
-    badge.textContent = "✓ Valid JSON";
+    const isDirty = hasUnsavedChanges();
+    badge.className = isDirty ? "config-editor-status dirty" : "config-editor-status valid";
+    badge.textContent = isDirty ? "● Unsaved (Valid JSON)" : "✓ Valid JSON";
     if (msg) msg.textContent = `Presets Count: ${Array.isArray(parsed) ? parsed.length : (parsed.presets?.length || 0)} groups loaded.`;
     return parsed;
   } catch (e) {
@@ -275,6 +307,10 @@ function bindEditorEvents(panel) {
 
   if (btnReload) {
     btnReload.addEventListener("click", async () => {
+      if (hasUnsavedChanges()) {
+        const ok = window.confirm("You have unsaved changes. Reload and discard edits?");
+        if (!ok) return;
+      }
       await loadCurrentConfigIntoEditor();
       if (msg) msg.textContent = "Configuration reloaded from server.";
     });

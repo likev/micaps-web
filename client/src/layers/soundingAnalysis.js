@@ -242,6 +242,7 @@ export function analyzeAndRenderSoundingElementContour(map, stationsGeoJSON, lev
     element: cfg.element,
     smooth: options.smooth !== false,
     smoothIterations: options.smoothIterations ?? 2,
+    labelSize: options.labelSize,
   });
 
   addOrUpdateLayer({
@@ -266,6 +267,7 @@ export function analyzeAndRenderSoundingElementContour(map, stationsGeoJSON, lev
       boldValues,
       smooth: options.smooth !== false,
       smoothIterations: options.smoothIterations ?? 2,
+      labelSize: options.labelSize,
     },
   }, win);
 

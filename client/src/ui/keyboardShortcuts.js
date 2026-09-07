@@ -2,7 +2,8 @@
 export function initKeyboardShortcuts({ onPeriodStep, onLevelStep, onToggleSplit }) {
   window.addEventListener("keydown", async (e) => {
     const tag = e.target && e.target.tagName;
-    if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
+    if (["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(tag)) return;
+    if (e.target?.closest?.("button, [role='button'], .maplibregl-canvas")) return;
     if (e.target?.isContentEditable) return;
     if (e.repeat) return;
 

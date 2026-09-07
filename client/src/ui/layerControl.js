@@ -133,7 +133,7 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
       type: layerDef.type || "contour",
       removable: layerDef.removable !== undefined ? layerDef.removable : true,
       visible: layerDef.visible !== undefined ? layerDef.visible : true,
-      isExpanded: false,
+      isExpanded: Boolean(layerDef.isExpanded),
       color: layerDef.color || (layerDef.element === "HGT" ? "#58a6ff" : layerDef.element === "TMP" ? "#f85149" : "#388bfd"),
       config: layerDef.type === "station" ? (isUpperAirStationLayer(layerDef) ? {
         showTemp: layerDef.config?.showTemp !== undefined ? layerDef.config.showTemp : true,
@@ -224,20 +224,47 @@ function renderLayersManager(panel) {
   const layers = getLayersForWindow(currentActiveWinId);
   const count = layers.length;
 
+  // Single-open invariant: ensure at most one layer is expanded on render
+  let foundExpanded = false;
+  layers.forEach((l) => {
+    if (l.isExpanded) {
+      if (foundExpanded) {
+        l.isExpanded = false;
+      } else {
+        foundExpanded = true;
+      }
+    }
+  });
+
   // Preserve scroll and focus across full rebuild
   const prevList = panel.querySelector("#layers-list");
   const prevScrollTop = prevList ? prevList.scrollTop : 0;
   const activeEl = document.activeElement;
   const activeElId = activeEl && activeEl.id ? activeEl.id : null;
-  // Save a fallback selector for elements without id (e.g. palette select): data-layer-id + class
+  // Save a fallback selector for elements without id (e.g. palette select, filter inputs): data-layer-id + class + data-rule-idx
   let activeFallbackSelector = null;
   if (activeEl && panel.contains(activeEl) && !activeElId) {
     const dlid = activeEl.getAttribute && activeEl.getAttribute("data-layer-id");
+    const ridx = activeEl.getAttribute && activeEl.getAttribute("data-rule-idx");
     const cls = activeEl.className ? String(activeEl.className).trim().split(/\s+/)[0] : null;
-    if (dlid && cls) activeFallbackSelector = `.${CSS.escape(cls)}[data-layer-id="${CSS.escape(dlid)}"]`;
-    else if (dlid) activeFallbackSelector = `[data-layer-id="${CSS.escape(dlid)}"]`;
-    else if (cls) activeFallbackSelector = `.${CSS.escape(cls)}`;
+    const ruleAttr = ridx !== null && ridx !== undefined ? `[data-rule-idx="${CSS.escape(ridx)}"]` : "";
+    if (dlid && cls) activeFallbackSelector = `.${CSS.escape(cls)}[data-layer-id="${CSS.escape(dlid)}"]${ruleAttr}`;
+    else if (dlid) activeFallbackSelector = `[data-layer-id="${CSS.escape(dlid)}"]${ruleAttr}`;
+    else if (cls) activeFallbackSelector = `.${CSS.escape(cls)}${ruleAttr}`;
+    else if (ruleAttr) activeFallbackSelector = ruleAttr;
   }
+
+  // Synchronize compatibility input states from actual layer models
+  const contourLayer = layers.find((l) => l.type === "contour");
+  const stationLayer = layers.find((l) => l.type === "station");
+  const pmtilesLayer = layers.find((l) => l.type === "pmtiles");
+  const isobandVis = contourLayer ? (contourLayer.visible && contourLayer.config?.showFill !== false) : true;
+  const isolineVis = contourLayer ? (contourLayer.visible && contourLayer.config?.showLine !== false) : true;
+  const stationVis = stationLayer ? stationLayer.visible : true;
+  const pmtilesVis = pmtilesLayer ? pmtilesLayer.visible : true;
+  const hasRaster = layers.some((l) => l.visible && l.config?.showRaster);
+  const hasWind = layers.some((l) => l.visible && l.config?.showWind);
+  const opacityVal = Math.round((contourLayer?.config?.opacity ?? 0.75) * 100);
 
   panel.innerHTML = `
     <div class="panel-title">
@@ -254,14 +281,14 @@ function renderLayersManager(panel) {
 
     <!-- Hidden compatibility elements for automated test suites -->
     <div style="display:none;">
-      <input type="checkbox" id="chk-contourf" checked />
-      <input type="checkbox" id="chk-contour" checked />
-      <input type="checkbox" id="chk-station" checked />
-      <input type="checkbox" id="chk-pmtiles" checked />
-      <input type="checkbox" id="chk-raster" />
-      <input type="checkbox" id="chk-wind" />
-      <input type="range" id="slider-opacity" min="10" max="100" value="75" />
-      <span id="opacity-val">75%</span>
+      <input type="checkbox" id="chk-contourf" ${isobandVis ? "checked" : ""} />
+      <input type="checkbox" id="chk-contour" ${isolineVis ? "checked" : ""} />
+      <input type="checkbox" id="chk-station" ${stationVis ? "checked" : ""} />
+      <input type="checkbox" id="chk-pmtiles" ${pmtilesVis ? "checked" : ""} />
+      <input type="checkbox" id="chk-raster" ${hasRaster ? "checked" : ""} />
+      <input type="checkbox" id="chk-wind" ${hasWind ? "checked" : ""} />
+      <input type="range" id="slider-opacity" min="10" max="100" value="${opacityVal}" />
+      <span id="opacity-val">${opacityVal}%</span>
     </div>
   `;
 
@@ -310,7 +337,7 @@ function renderLayersManager(panel) {
     const configBtn = panel.querySelector(`.btn-config[data-layer-id="${layer.id}"]`);
 
     if (rowEl && configDrawer) {
-      rowEl.addEventListener("click", () => {
+      const toggleDrawer = () => {
         const nextExpanded = !layer.isExpanded;
         if (nextExpanded) {
           // Accordion: close all other open drawers
@@ -319,16 +346,35 @@ function renderLayersManager(panel) {
               other.isExpanded = false;
               const otherDrawer = panel.querySelector(`.layer-config[data-layer-id="${other.id}"]`);
               const otherBtn = panel.querySelector(`.btn-config[data-layer-id="${other.id}"]`);
+              const otherRow = panel.querySelector(`.layer-row[data-layer-id="${other.id}"]`);
               if (otherDrawer) otherDrawer.classList.add("hidden");
-              if (otherBtn) otherBtn.classList.remove("open");
+              if (otherBtn) {
+                otherBtn.classList.remove("open");
+                otherBtn.setAttribute("aria-expanded", "false");
+              }
+              if (otherRow) {
+                otherRow.setAttribute("aria-expanded", "false");
+              }
             }
           });
         }
         layer.isExpanded = nextExpanded;
         configDrawer.classList.toggle("hidden", !layer.isExpanded);
-        if (configBtn) configBtn.classList.toggle("open", layer.isExpanded);
+        if (configBtn) {
+          configBtn.classList.toggle("open", layer.isExpanded);
+          configBtn.setAttribute("aria-expanded", layer.isExpanded ? "true" : "false");
+        }
+        rowEl.setAttribute("aria-expanded", layer.isExpanded ? "true" : "false");
         if (layer.isExpanded && (layer.type === "contour" || layer.type === "wind")) {
           populatePaletteSelect(configDrawer, layer);
+        }
+      };
+
+      rowEl.addEventListener("click", toggleDrawer);
+      rowEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          toggleDrawer();
         }
       });
     }
@@ -373,7 +419,9 @@ function renderLayersManager(panel) {
       if (paletteSel) {
         paletteSel.addEventListener("click", (e) => e.stopPropagation());
 
-        populatePaletteSelect(configDrawer, layer);
+        if (layer.isExpanded) {
+          populatePaletteSelect(configDrawer, layer);
+        }
 
         paletteSel.addEventListener("change", async (e) => {
           e.stopPropagation();
@@ -545,7 +593,7 @@ function renderLayerRow(layer) {
 
   return `
     <div class="layer-item" data-layer-id="${layer.id}" role="group" aria-label="${layer.name}">
-      <div class="layer-row ${layer.visible ? "" : "layer-hidden"}" data-layer-id="${layer.id}" title="${layer.name} (Click to configure)" role="button" tabindex="0" aria-expanded="${layer.isExpanded ? "true" : "false"}" aria-label="Configure ${layer.name}">
+      <div class="layer-row ${layer.visible ? "" : "layer-hidden"}" data-layer-id="${layer.id}" title="${layer.name} (Click to configure)" aria-expanded="${layer.isExpanded ? "true" : "false"}" aria-label="Configure ${layer.name}">
         <!-- Visibility Eye Toggle Button -->
         <button class="btn-vis ${layer.visible ? "active" : ""}" data-layer-id="${layer.id}" title="Toggle Visibility" aria-label="Toggle visibility for ${layer.name}" aria-pressed="${layer.visible ? "true" : "false"}">
           ${layer.visible ? "👁" : "🚫"}
@@ -566,7 +614,7 @@ function renderLayerRow(layer) {
         ${
           layer.removable
             ? `<button class="btn-remove" data-layer-id="${layer.id}" title="Remove Layer" aria-label="Remove ${layer.name}">✕</button>`
-            : `<span style="width: 22px; flex-shrink: 0;" aria-hidden="true"></span>`
+            : `<button class="btn-remove" data-layer-id="${layer.id}" disabled aria-disabled="true" style="opacity: 0.25; cursor: not-allowed; width: 22px; flex-shrink: 0;" title="Layer cannot be removed" aria-label="${layer.name} cannot be removed">✕</button>`
         }
       </div>
 
@@ -722,10 +770,13 @@ function bindAuxCheckbox(elementId, layerKey) {
 }
 
 async function populatePaletteSelect(configDrawer, layer) {
-  if (!configDrawer) return;
+  if (!configDrawer || !layer) return;
   const paletteSel = configDrawer.querySelector(".sel-palette");
   const gradientPreview = configDrawer.querySelector(".palette-gradient-preview");
   if (!paletteSel) return;
+
+  const seq = (paletteLoadSeq.get(layer.id) || 0) + 1;
+  paletteLoadSeq.set(layer.id, seq);
 
   const elem = (layer.element || "").toUpperCase();
   const category = getPaletteCategory(elem) || elem;
@@ -733,7 +784,7 @@ async function populatePaletteSelect(configDrawer, layer) {
 
   try {
     const files = await listPaletteFiles(category);
-    if (!paletteSel.isConnected) return;
+    if (!paletteSel.isConnected || paletteLoadSeq.get(layer.id) !== seq) return;
 
     const xmlFiles = files.filter((f) => f.name.endsWith(".xml"));
     while (paletteSel.options.length > 1) paletteSel.remove(1);
@@ -759,11 +810,21 @@ async function populatePaletteSelect(configDrawer, layer) {
 
     if (layer.config?.palettePath) {
       paletteSel.value = layer.config.palettePath;
-      const stops = await loadXMLPalette(layer.config.palettePath);
-      if (stops && gradientPreview && gradientPreview.isConnected) {
-        const colors = stops.map((s) => `rgba(${s.color.slice(0, 3).join(",")},${((s.color[3] ?? 255) / 255).toFixed(2)})`).join(", ");
-        gradientPreview.style.background = `linear-gradient(to right, ${colors})`;
+      if (paletteSel.value !== layer.config.palettePath) {
+        // Requested palette path not available in this category's files
+        layer.config.palettePath = null;
+        autoSaveLayerConfig(layer);
+        if (gradientPreview) gradientPreview.style.background = "linear-gradient(to right, #888, #fff)";
+      } else {
+        const stops = await loadXMLPalette(layer.config.palettePath);
+        if (paletteLoadSeq.get(layer.id) !== seq) return;
+        if (stops && gradientPreview && gradientPreview.isConnected) {
+          const colors = stops.map((s) => `rgba(${s.color.slice(0, 3).join(",")},${((s.color[3] ?? 255) / 255).toFixed(2)})`).join(", ");
+          gradientPreview.style.background = `linear-gradient(to right, ${colors})`;
+        }
       }
+    } else {
+      if (gradientPreview) gradientPreview.style.background = "linear-gradient(to right, #888, #fff)";
     }
   } catch (err) {
     console.error(`[Palette] Failed to populate palettes for ${category}:`, err);

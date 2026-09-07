@@ -511,7 +511,7 @@ describe("Derived Contour Visibility Persistence & Level Step Invariance (Review
     const targetLevel = 700;
     const group = {
       id: "composite-upperair-500",
-      name: "500hPa Upper-Air Sounding (UPPER_AIR/PLOT/500)",
+      name: "500 hPa Upper-Air Sounding",
       hasLevel: true,
       defaultLevel: 500,
       layers: [

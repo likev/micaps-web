@@ -29,6 +29,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
   font-weight: 600;
   font-size: 15px;
   letter-spacing: 0.5px;
+  flex-shrink: 0;
 }
 
 .brand-link {
@@ -64,6 +65,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .nav-status {
@@ -110,8 +112,8 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
 #main-content {
   position: relative;
   flex: 1;
+  min-height: 0;
   width: 100%;
-  height: calc(100vh - 144px); /* 48px navbar + 36px tabs-bar + 60px timeslider */
 }
 
 /* workspace-container fills all of main-content */
@@ -121,6 +123,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
   left: 0;
   right: 0;
   bottom: 0;
+  overflow: hidden;
 }
 
 /* Legacy single map-container fallback */
@@ -140,7 +143,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
   backdrop-filter: blur(12px);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  z-index: 500;
+  z-index: 600;
   box-shadow: 0 8px 24px rgba(0,0,0,0.5);
   display: flex;
   flex-direction: column;
@@ -161,12 +164,14 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
   align-items: center;
   font-weight: 600;
   font-size: 14px;
+  flex-shrink: 0;
 }
 
 .drawer-body {
   padding: 12px;
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -202,12 +207,12 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
   right: 12px;
   width: 330px;
   max-width: calc(100vw - 24px);
-  max-height: calc(100vh - 24px);
+  max-height: calc(100% - 24px);
   background: var(--bg-panel);
   backdrop-filter: blur(12px);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  z-index: 500;
+  z-index: 550;
   box-shadow: 0 8px 24px rgba(0,0,0,0.5);
   padding: 14px;
   display: flex;
@@ -217,8 +222,12 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
   overflow-y: auto;
 }
 
+.panel:empty {
+  display: none;
+}
+
 .panel.hidden,
-.hidden {
+.hidden:not(.drawer):not(.tooltip) {
   display: none !important;
 }
 
@@ -574,7 +583,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
 
 .layer-config {
   min-width: 0;
-  overflow-x: hidden;
+  overflow-x: auto;
 }
 
 .layer-config input,
@@ -586,6 +595,10 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
 .config-checkbox-item span {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  flex: 1;
+  min-width: 0;
 }
 
 .legend-panel {
@@ -646,12 +659,13 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
 }
 
 #timeslider-container {
-  height: 60px;
+  min-height: 60px;
+  height: auto;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-color);
   display: flex;
   align-items: center;
-  padding: 0 20px;
+  padding: 6px 20px;
   gap: 16px;
   z-index: 1000;
 }
@@ -736,6 +750,8 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
 #time-lead-wrapper {
   min-width: 0;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .valid-label {
@@ -751,7 +767,33 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
 .chip-btn { padding: 4px 10px; border-radius: 12px; background: #21262d; border: 1px solid var(--border-color); color: #8b949e; font-family: var(--font-mono); font-size: 11px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease; }
 .chip-btn:hover { background: #30363d; color: #c9d1d9; }
 .chip-btn.active { background: var(--accent-blue); border-color: #58a6ff; color: #ffffff; font-weight: bold; box-shadow: 0 0 8px rgba(56, 139, 253, 0.4); }
-.tooltip { position: absolute; pointer-events: none; background: rgba(10, 14, 22, 0.95); border: 1px solid var(--accent-blue); border-radius: 6px; padding: 8px 12px; font-size: 12px; font-family: var(--font-mono); box-shadow: 0 4px 16px rgba(0,0,0,0.6); z-index: 2000; transition: opacity 0.1s ease; }
-.tooltip.hidden { opacity: 0; }
+.tooltip { position: absolute; pointer-events: none; background: rgba(10, 14, 22, 0.95); border: 1px solid var(--accent-blue); border-radius: 6px; padding: 8px 12px; font-size: 12px; font-family: var(--font-mono); box-shadow: 0 4px 16px rgba(0,0,0,0.6); z-index: 2000; transition: opacity 0.1s ease; max-width: min(280px, 80vw); overflow-wrap: break-word; }
+.tooltip.hidden { opacity: 0; pointer-events: none; }
 .station-glyph { transform: translate(-50%, -50%); }
+
+@media (max-width: 768px) {
+  .nav-keyboard-hint,
+  .layout-label,
+  .step-length-label,
+  .init-time-label {
+    display: none !important;
+  }
+  .nav-status {
+    max-width: 110px;
+  }
+}
+
+@media (max-width: 520px) {
+  #navbar {
+    padding: 0 8px;
+    gap: 6px;
+  }
+  .nav-brand span.brand-badge {
+    display: none;
+  }
+  #timeslider-container {
+    padding: 6px 8px;
+    gap: 8px;
+  }
+}
 

@@ -1,23 +1,25 @@
 // legend.js - Color scale bar and label renderer for weather element fields
 import { getColormap, getCSSGradient } from "../utils/colormaps.js";
 import { formatElementUnit } from "../utils/formatters.js";
+import { getWindowById } from "./tabWindowManager.js";
 
 const windowLegends = new Map();
 
 export function updateLegend(element = "TMP", colormap = null, zMin = undefined, zMax = undefined, win = null, panelId = "legend-panel") {
-  const winId = win?.id || "default";
+  const winObj = typeof win === "string" ? getWindowById(win) : win;
+  const winId = typeof win === "string" ? win : (win?.id || "default");
   if (!windowLegends.has(winId)) {
     windowLegends.set(winId, new Map());
   }
   const elMap = windowLegends.get(winId);
-  const winPrefix = win && typeof win.winIdx === "number" ? `W${win.winIdx + 1}` : null;
+  const winPrefix = winObj && typeof winObj.winIdx === "number" ? `W${winObj.winIdx + 1}` : null;
   elMap.set(element, { element, colormap, zMin, zMax, winPrefix });
 
   renderLegendPanel(winId, panelId);
 }
 
 export function removeLegend(element, win = null, panelId = "legend-panel") {
-  const winId = win?.id || "default";
+  const winId = typeof win === "string" ? win : (win?.id || "default");
   if (windowLegends.has(winId)) {
     windowLegends.get(winId).delete(element);
     renderLegendPanel(winId, panelId);
@@ -25,7 +27,7 @@ export function removeLegend(element, win = null, panelId = "legend-panel") {
 }
 
 export function clearLegends(win = null, panelId = "legend-panel") {
-  const winId = win?.id || "default";
+  const winId = typeof win === "string" ? win : (win?.id || "default");
   if (windowLegends.has(winId)) {
     windowLegends.get(winId).clear();
     renderLegendPanel(winId, panelId);
@@ -33,7 +35,7 @@ export function clearLegends(win = null, panelId = "legend-panel") {
 }
 
 export function syncLegendForWindow(win = null, panelId = "legend-panel") {
-  const winId = win?.id || "default";
+  const winId = typeof win === "string" ? win : (win?.id || "default");
   renderLegendPanel(winId, panelId);
 }
 

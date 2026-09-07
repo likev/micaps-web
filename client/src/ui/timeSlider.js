@@ -156,9 +156,9 @@ export function initTimeSlider(containerId = "timeslider-container", onTimeChang
 
   container.innerHTML = `
     <div class="timeline-stepper">
-      <button id="btn-prev" class="step-nav-btn" title="Previous Step">◀</button>
+      <button id="btn-prev" class="step-nav-btn" title="Previous Step (wraps)">◀</button>
       <button id="btn-play" class="play-btn" title="Play / Pause Animation" aria-label="Play / Pause Animation" aria-pressed="false">▶</button>
-      <button id="btn-next" class="step-nav-btn" title="Next Step">▶</button>
+      <button id="btn-next" class="step-nav-btn" title="Next Step (wraps)">▶</button>
       <div class="step-length-control">
         <label for="select-step-length" class="step-length-label">Step:</label>
         <select id="select-step-length" class="step-length-select" title="Change timeline step length">
@@ -234,8 +234,17 @@ export function initTimeSlider(containerId = "timeslider-container", onTimeChang
 export function setStepLength(step, triggerCallback = false) {
   currentStepLength = parseInt(step, 10) || (currentMode === "obs" ? 3 : 6);
   const selStep = document.getElementById("select-step-length");
-  if (selStep && selStep.value !== String(currentStepLength)) {
-    selStep.value = String(currentStepLength);
+  if (selStep) {
+    const hasOpt = selStep.options && Array.from(selStep.options).some((o) => String(o.value) === String(currentStepLength));
+    if (hasOpt) {
+      selStep.value = String(currentStepLength);
+    } else if (selStep.options && selStep.options.length > 0) {
+      selStep.selectedIndex = 0;
+      selStep.value = selStep.options[0]?.value || "";
+      currentStepLength = parseInt(selStep.value, 10) || currentStepLength;
+    } else {
+      selStep.value = String(currentStepLength);
+    }
   }
 
   if (currentMode === "nwp") {
@@ -334,7 +343,7 @@ function renderChips() {
 
   // Auto-scroll active chip into view
   try {
-    chipsContainer.querySelector(".chip-btn.active")?.scrollIntoView({ inline: "end", block: "nearest" });
+    chipsContainer.querySelector(".chip-btn.active")?.scrollIntoView({ inline: "nearest", block: "nearest" });
   } catch {}
 }
 

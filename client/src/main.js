@@ -43,13 +43,13 @@ function ensureErrorToast() {
     el.className = "hidden";
     el.setAttribute("role", "alert");
     el.setAttribute("aria-live", "polite");
-    el.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#21262d;color:#f85149;border:1px solid #da3633;border-radius:6px;padding:8px 14px;font-size:12px;z-index:9999;max-width:80vw;box-shadow:0 4px 12px rgba(0,0,0,0.4);";
+    el.style.cssText = "position:fixed;bottom:76px;left:50%;transform:translateX(-50%);background:#21262d;color:#f85149;border:1px solid #da3633;border-radius:6px;padding:8px 14px;font-size:12px;z-index:9999;max-width:80vw;overflow-wrap:break-word;word-break:break-word;box-shadow:0 4px 12px rgba(0,0,0,0.4);";
     document.body.appendChild(el);
   }
   return el;
 }
 
-function showErrorToast(msg) {
+export function showErrorToast(msg) {
   const el = ensureErrorToast();
   el.textContent = msg;
   el.classList.remove("hidden");
@@ -286,8 +286,9 @@ async function bootstrap() {
   });
 
   // ── Layer Control ────────────────────────────────────────────────────────
-  initLayerControl("layer-control", (action, layerId, value, layer) => {
-    handleLayerAction(getMap(), action, layerId, value, layer, getActiveWindow());
+  initLayerControl("layer-control", (action, layerId, value, layer, winId) => {
+    const win = (winId ? getWindowById(winId) : null) || getActiveWindow();
+    handleLayerAction(win?.map || getMap(), action, layerId, value, layer, win);
   });
 
   // ── Time Slider ──────────────────────────────────────────────────────────
@@ -299,6 +300,8 @@ async function bootstrap() {
       win.stepLength = data.stepLength;
     }
     if (typeof data === "object" && data !== null && data.isObs) {
+      win.loadSeq = (win.loadSeq || 0) + 1;
+      const expectedSeq = win.loadSeq;
       win.obsTime = data.file;
       updateWindowTitle(win);
       const prevContours = getLayersForWindow(win)
@@ -320,15 +323,15 @@ async function bootstrap() {
       removeRasterLayer(map);
 
       if (win.activeGroup) {
-        await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, true);
+        await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, true, expectedSeq);
       } else {
         const model = win.model || "SURFACE";
         const element = win.element || "PLOT_GLOBAL_3H";
         const level = win.level;
         if (model === "UPPER_AIR") {
-          await loadUpperAirComposite(map, level || 500, data.file, win);
+          await loadUpperAirComposite(map, level || 500, data.file, win, expectedSeq);
         } else {
-          await loadObservationProduct(map, model, element, level, data.file, win);
+          await loadObservationProduct(map, model, element, level, data.file, win, null, expectedSeq);
         }
       }
     } else if (typeof data === "object" && data !== null && data.isInitChange) {
@@ -471,6 +474,7 @@ async function loadWeatherField(map, model, element, level, period, customOption
         colormap,
         smooth,
         smoothIterations,
+        labelSize,
       });
     }
 
@@ -788,7 +792,11 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
     if (level !== null) win.level = level;
     win.period = curPeriod;
     const titleName = group.hasLevel && level !== null
-      ? group.name.replace(/\d+\s*hPa/i, `${level}hPa`)
+      ? group.name
+        // Rewrite the level prefix ("500 hPa ..." -> "700 hPa ...", space included)
+        .replace(/\d+\s*hPa/i, `${level} hPa`)
+        // Drop any stale internal catalog-path suffix "(MODEL/ELEMENT/LEVEL)" from display names
+        .replace(/\s*\((?:SURFACE|UPPER_AIR)\/[^)]*\)/i, "")
       : group.name;
     updateWindowTitle(win, titleName);
     setWindowHeaderPreset(win, group.id);
@@ -814,7 +822,12 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
       win.forecastCycle = cycles[0];
     }
     updateWindowTitle(win);
-    setTimelineMode("nwp", { period: curPeriod, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 });
+    const nwpPayload = { period: curPeriod, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 };
+    if (getActiveWindow() === win) {
+      setTimelineMode("nwp", nwpPayload);
+    } else {
+      win._pendingNwp = nwpPayload;
+    }
   }
 
   console.log(`[PresetGroup] Loading "${group.name}" with levelOverride=${level}, period=+${curPeriod}h, cycle=${win?.forecastCycle}...`);
@@ -968,12 +981,12 @@ async function changeVerticalLevel(map, direction, explicitLevel = null, win = g
       win.derivedContourSnapshots = prevContours;
     }
     const obsPath = `UPPER_AIR/PLOT/${targetLevel}`;
-    const winTitle = `W${(win?.winIdx ?? 0) + 1}: Upper-Air ${targetLevel}hPa Sounding`;
+    const winTitle = `W${(win?.winIdx ?? 0) + 1}: Upper-Air ${targetLevel} hPa Sounding`;
     const file = await syncObservationTimeline(obsPath, null, winTitle, win);
     if (win && win.loadSeq !== currentSeq) return;
     if (win) {
       win.obsTime = file;
-      updateWindowTitle(win, `${targetLevel}hPa Upper-Air Sounding`);
+      updateWindowTitle(win, `${targetLevel} hPa Upper-Air Sounding`);
     }
     await loadObservationProduct(map, "UPPER_AIR", "PLOT", targetLevel, file, win, obsPath, currentSeq);
   } else {
@@ -992,8 +1005,10 @@ async function changeVerticalLevel(map, direction, explicitLevel = null, win = g
   }
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", bootstrap);
-} else {
-  bootstrap();
+if (typeof window !== "undefined" && typeof document !== "undefined" && typeof Bun === "undefined") {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bootstrap);
+  } else {
+    bootstrap();
+  }
 }

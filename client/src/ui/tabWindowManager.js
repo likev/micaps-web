@@ -28,6 +28,15 @@ export function getActiveWindow() {
   return tab.windows[tab.activeWinIdx] || tab.windows[0];
 }
 
+export function getWindowById(winId) {
+  if (!winId) return null;
+  for (const tab of tabs) {
+    const found = tab.windows?.find((w) => w.id === winId);
+    if (found) return found;
+  }
+  return null;
+}
+
 function renderTabsBar() {
   const tabsBar = document.getElementById("tabs-bar");
   if (!tabsBar) return;
@@ -194,6 +203,8 @@ function renderTabPillForWindow(tab, winObj) {
   pill.className = `tab-item ${wIdx === tab.activeWinIdx ? "active" : ""}`;
   pill.id = `tab-item-win-${wIdx}`;
   pill.dataset.winIdx = String(wIdx);
+  pill.setAttribute("role", "tab");
+  pill.setAttribute("aria-selected", wIdx === tab.activeWinIdx ? "true" : "false");
 
   pill.innerHTML = `
     <span class="tab-label" id="tab-label-${wIdx}">Tab ${wIdx + 1}</span>
@@ -397,9 +408,18 @@ function updateLayoutButtons(layout) {
   const tabsList = document.getElementById("tabs-list");
   const tab = getActiveTab();
 
-  if (btn1) btn1.classList.toggle("active", layout === "1x1");
-  if (btn2) btn2.classList.toggle("active", layout === "1x2");
-  if (btn4) btn4.classList.toggle("active", layout === "2x2");
+  if (btn1) {
+    btn1.classList.toggle("active", layout === "1x1");
+    btn1.setAttribute("aria-pressed", layout === "1x1" ? "true" : "false");
+  }
+  if (btn2) {
+    btn2.classList.toggle("active", layout === "1x2");
+    btn2.setAttribute("aria-pressed", layout === "1x2" ? "true" : "false");
+  }
+  if (btn4) {
+    btn4.classList.toggle("active", layout === "2x2");
+    btn4.setAttribute("aria-pressed", layout === "2x2" ? "true" : "false");
+  }
 
   if (tabsList) {
     tabsList.classList.toggle("hidden", layout !== "1x1");
@@ -410,6 +430,7 @@ function updateLayoutButtons(layout) {
     if (tab) {
       const isSync = tab.syncMap !== false;
       syncBtn.classList.toggle("active", isSync);
+      syncBtn.setAttribute("aria-pressed", isSync ? "true" : "false");
       syncBtn.textContent = isSync ? "Sync 🔗" : "Sync ✕";
       syncBtn.title = isSync
         ? "Camera sync enabled across windows (Click to toggle off)"
@@ -432,11 +453,23 @@ export function focusWindow(tabId, winIdx) {
   const activeWin = tab.windows[winIdx];
   if (!activeWin) return;
 
+  // Ensure workspace container for this tab is marked active
+  const ws = document.getElementById(`tab-workspace-${tab.id}`);
+  if (ws && !ws.classList.contains("active")) {
+    document.querySelectorAll(".tab-workspace").forEach((w) => w.classList.remove("active"));
+    ws.classList.add("active");
+  }
+
+  const pillEl = document.getElementById(`tab-item-win-${activeWin.winIdx}`);
+  const panelEl = document.getElementById(activeWin.panelId);
+
   // Avoid redundant work when already focused
   const alreadyFocused =
     tab.activeWinIdx === winIdx &&
     tab.windows[tab.activeWinIdx]?.id === activeWin.id &&
-    document.getElementById(activeWin.panelId)?.classList.contains("active");
+    panelEl?.classList.contains("active") &&
+    pillEl?.classList.contains("active") &&
+    ws?.classList.contains("active");
   if (alreadyFocused) {
     if (activeWin.map) setActiveMap(activeWin.map);
     return;
@@ -454,6 +487,7 @@ export function focusWindow(tabId, winIdx) {
     const pill = document.getElementById(`tab-item-win-${w.winIdx}`);
     if (pill) {
       pill.classList.toggle("active", w.winIdx === winIdx);
+      pill.setAttribute("aria-selected", w.winIdx === winIdx ? "true" : "false");
     }
   });
 
@@ -462,9 +496,6 @@ export function focusWindow(tabId, winIdx) {
     callbacks.onWindowInit?.(activeWin);
   } else {
     setActiveMap(activeWin.map);
-    setTimeout(() => {
-      activeWin.map.resize();
-    }, 50);
   }
 
   appState.set("activeWinId", activeWin.id);
@@ -484,6 +515,15 @@ export function focusWindow(tabId, winIdx) {
     delete activeWin._pendingTimeline;
     import("./timeSlider.js").then(({ setTimelineMode }) => {
       try { setTimelineMode("obs", pt); } catch {}
+    });
+  }
+
+  // Apply pending NWP timeline stored by loadPresetGroup for background windows
+  if (activeWin._pendingNwp) {
+    const pn = activeWin._pendingNwp;
+    delete activeWin._pendingNwp;
+    import("./timeSlider.js").then(({ setTimelineMode }) => {
+      try { setTimelineMode("nwp", pn); } catch {}
     });
   }
 
@@ -642,7 +682,7 @@ export function updateWindowTitle(win, text = null) {
   const el = document.getElementById(win.titleId);
   if (el) {
     el.textContent = fullTitle;
-    el.title = fullTitle;
+    el.title = fullTitle || "";
   }
 
   const tabLabel = document.getElementById(`tab-label-${win.winIdx}`);

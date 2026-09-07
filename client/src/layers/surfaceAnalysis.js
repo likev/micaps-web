@@ -254,6 +254,7 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
     colormap: cfg.colormap || undefined,
     smooth: options.smooth !== false,
     smoothIterations: options.smoothIterations ?? 2,
+    labelSize: options.labelSize,
   });
 
   addOrUpdateLayer({
@@ -290,6 +291,7 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
       boldValues,
       smooth: options.smooth !== false,
       smoothIterations: options.smoothIterations ?? 2,
+      labelSize: options.labelSize,
     },
   }, win);
 

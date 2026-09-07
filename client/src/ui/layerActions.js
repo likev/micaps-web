@@ -13,14 +13,22 @@ import { renderBinaryRaster, renderGridRaster, setRasterVisibility, removeRaster
 import { renderWindStreamlines, stopWindAnimation, renderGridWindBarbs, removeGridWindBarbs, generateStationWindGrid } from "../layers/windLayer.js";
 import { fetchGridBinaryStream, fetchGridData, fetchStationObservations } from "../api/catalogApi.js";
 import { appState } from "../store/appState.js";
-import { getActiveWindow } from "./tabWindowManager.js";
+import { getActiveWindow, getWindowById } from "./tabWindowManager.js";
 import { getLayersForWindow } from "./layerControl.js";
 import { updateLegend, removeLegend } from "./legend.js";
 import { upsertDerivedLayerToPreset, removeDerivedLayerFromPreset } from "../config/presets.js";
 
+function notifyError(msg) {
+  import("../main.js").then(({ showErrorToast }) => {
+    try { showErrorToast(msg); } catch {}
+  }).catch(() => {});
+}
+
 const paletteSeq = new Map();
 
 export function handleLayerAction(map, action, layerId, value, layer, win = getActiveWindow()) {
+  const winObj = typeof win === "string" ? (getWindowById(win) || getActiveWindow()) : (win || getActiveWindow());
+
   if (action === "visibility") {
     if (!layer) return;
     if (layer.type === "contour" || layer.type === "wind") {
@@ -32,7 +40,7 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
           if (map.getLayer(rasterLayerId)) {
             setRasterVisibility(map, true, layerId);
           } else {
-            triggerRasterOverlay(map, layer, win);
+            triggerRasterOverlay(map, layer, winObj);
           }
         } else {
           setRasterVisibility(map, false, layerId);
@@ -40,14 +48,14 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
       }
       if (layer.config?.showWind) {
         if (value) {
-          triggerWindStreamlines(map, layer, win);
+          triggerWindStreamlines(map, layer, winObj);
         } else {
           stopWindAnimation(map);
         }
       }
       if (layer.config?.showBarbs) {
         if (value) {
-          triggerWindBarbs(map, layer, win);
+          triggerWindBarbs(map, layer, winObj);
         } else {
           removeGridWindBarbs(map);
         }
@@ -56,7 +64,7 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
       setStationVisibility(map, value);
       if (layer.config?.showStreamlines) {
         if (value) {
-          triggerStationStreamlines(map, layer, win);
+          triggerStationStreamlines(map, layer, winObj);
         } else {
           stopWindAnimation(map);
         }
@@ -81,9 +89,9 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
     if ((layer.type === "contour" || layer.type === "wind") && layer.element) {
       if (value) {
         const colormap = layer.colormap || layer.config?.palettePath || layer.element;
-        updateLegend(layer.element, colormap, layer.gridData?.stats?.min, layer.gridData?.stats?.max, win);
+        updateLegend(layer.element, colormap, layer.gridData?.stats?.min, layer.gridData?.stats?.max, winObj);
       } else {
-        removeLegend(layer.element, win);
+        removeLegend(layer.element, winObj);
       }
     }
   } else if (action === "config") {
@@ -117,6 +125,16 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
     } else if (layer.type === "contour" || layer.type === "wind") {
       if (value.showFill !== undefined) setLayerIsobandVisibility(map, layerId, layer.visible && value.showFill);
       if (value.showLine !== undefined) setLayerIsolineVisibility(map, layerId, layer.visible && value.showLine);
+      const effectiveShowFill = value.showFill !== undefined ? value.showFill : Boolean(layer.config?.showFill);
+      const effectiveShowLine = value.showLine !== undefined ? value.showLine : Boolean(layer.config?.showLine);
+      if (layer.element && (value.showFill !== undefined || value.showLine !== undefined)) {
+        if (!layer.visible || (!effectiveShowFill && !effectiveShowLine)) {
+          removeLegend(layer.element, winObj);
+        } else {
+          const colormap = layer.colormap || layer.config?.palettePath || layer.element;
+          updateLegend(layer.element, colormap, layer.gridData?.stats?.min, layer.gridData?.stats?.max, winObj);
+        }
+      }
       if (value.opacity !== undefined) {
         setLayerIsobandOpacity(map, layerId, value.opacity);
         const { rasterLayerId } = getRasterDOMIds(layerId);
@@ -220,11 +238,12 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
               boldLineWidth: layer.config?.boldLineWidth,
               smooth: layer.config?.smooth,
               smoothIterations: layer.config?.smoothIterations,
+              labelSize: layer.config?.labelSize,
             });
-            updateLegend(elem, elem, layer.gridData?.stats?.min, layer.gridData?.stats?.max, win);
+            updateLegend(elem, elem, layer.gridData?.stats?.min, layer.gridData?.stats?.max, winObj);
           }
           if (layer.config?.showRaster && layer.visible) {
-            triggerRasterOverlay(map, layer, win);
+            triggerRasterOverlay(map, layer, winObj);
           }
         } else {
           const seq = (paletteSeq.get(layer.id) || 0) + 1;
@@ -257,11 +276,12 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
                       boldLineWidth: layer.config?.boldLineWidth,
                       smooth: layer.config?.smooth,
                       smoothIterations: layer.config?.smoothIterations,
+                      labelSize: layer.config?.labelSize,
                     });
-                    updateLegend(elem, key, layer.gridData?.stats?.min, layer.gridData?.stats?.max, win);
+                    updateLegend(elem, key, layer.gridData?.stats?.min, layer.gridData?.stats?.max, winObj);
                   }
                   if (layer.config?.showRaster && layer.visible) {
-                    triggerRasterOverlay(map, layer, win);
+                    triggerRasterOverlay(map, layer, winObj);
                   }
                 } catch { /* ignore colormap registration errors */ }
               });
@@ -284,6 +304,7 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
     const geojson = layer?.stationsGeoJSON || getStationGeoJSON(map) || win?.stationsGeoJSON || appState.get("stationData");
     if (!geojson || !geojson.features || geojson.features.length < 3) {
       console.warn("[LayerActions] Insufficient station data to generate contour for:", elem);
+      notifyError(`Insufficient station data (< 3 stations) to generate ${elem} contour.`);
       return;
     }
 
@@ -382,13 +403,13 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
   } else if (action === "aux") {
     if (layerId === "raster") {
       if (value) {
-        triggerRasterOverlay(map, null, win);
+        triggerRasterOverlay(map, null, winObj);
       } else {
         setRasterVisibility(map, false);
       }
     } else if (layerId === "wind") {
       if (value) {
-        triggerWindStreamlines(map, null, win);
+        triggerWindStreamlines(map, null, winObj);
       } else {
         stopWindAnimation(map);
       }
@@ -403,7 +424,7 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
   if (!layer) {
     const layers = getLayersForWindow(win);
     const weatherLayers = layers.filter(
-      (l) => (l.type === "contour" || l.type === "wind" || l.gridData) && l.visible !== false
+      (l) => (l.type === "contour" || l.type === "wind" || l.gridData) && l.visible !== false && l.config?.showRaster !== false
     );
     if (weatherLayers.length > 0) {
       weatherLayers.forEach((l) => triggerRasterOverlay(map, l, win));
@@ -466,16 +487,34 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
     })
     .catch((err) => {
       console.warn(`[Raster] Binary stream fetch failed for ${path}/${file}, trying JSON gridData:`, err);
-      fetchGridData(path, file).then((grid) => {
-        if (grid && (grid.values || (grid.u && grid.v))) {
-          if (layer) layer.gridData = grid;
-          renderGridRaster(map, grid, element, colormap, { layerId, opacity });
-        }
-      });
+      fetchGridData(path, file)
+        .then((grid) => {
+          if (grid && (grid.values || (grid.u && grid.v))) {
+            if (layer) layer.gridData = grid;
+            renderGridRaster(map, grid, element, colormap, { layerId, opacity });
+          } else {
+            notifyError(`Failed to load raster overlay data for ${element}.`);
+          }
+        })
+        .catch((jsonErr) => {
+          console.warn(`[Raster] JSON gridData fetch failed for ${path}/${file}:`, jsonErr);
+          notifyError(`Failed to load raster overlay for ${element}: ${jsonErr?.message || jsonErr}`);
+        });
     });
 }
 
 async function triggerWindStreamlines(map, layer = null, win = null) {
+  if (!layer) {
+    const layers = getLayersForWindow(win);
+    const windLayers = layers.filter(
+      (l) => (l.type === "wind" || l.element === "WIND") && l.visible !== false && l.config?.showWind !== false
+    );
+    if (windLayers.length > 0) {
+      windLayers.forEach((l) => triggerWindStreamlines(map, l, win));
+      return;
+    }
+  }
+
   let grid = layer?.gridData || win?.windGridData || win?.gridData || appState.get("gridData");
   if (grid && grid.u && grid.v) {
     renderWindStreamlines(map, grid);
@@ -509,6 +548,7 @@ async function triggerWindStreamlines(map, layer = null, win = null) {
     })
     .catch((err) => {
       console.warn("[Wind] Fetch wind failed:", err);
+      notifyError(`Failed to load wind streamlines for ${level}hPa: ${err?.message || err}`);
     });
 }
 
@@ -546,6 +586,7 @@ async function triggerWindBarbs(map, layer = null, win = null) {
     })
     .catch((err) => {
       console.warn("[Wind] Fetch wind barbs failed:", err);
+      notifyError(`Failed to load wind barbs for ${level}hPa: ${err?.message || err}`);
     });
 }
 
@@ -578,6 +619,7 @@ export async function triggerStationStreamlines(map, layer = null, win = null) {
 
   if (!file) {
     console.warn("[StationStreamlines] No obsTime/file available, aborting fetch");
+    notifyError("No observation time available for station streamlines.");
     return;
   }
 
@@ -591,7 +633,12 @@ export async function triggerStationStreamlines(map, layer = null, win = null) {
           if (win) win.windGridData = windGrid;
           renderWindStreamlines(map, windGrid);
         }
+      } else {
+        notifyError("Insufficient station observation data for streamlines.");
       }
     })
-    .catch((err) => console.warn("[StationStreamlines] Fetch failed:", err));
+    .catch((err) => {
+      console.warn("[StationStreamlines] Fetch failed:", err);
+      notifyError(`Failed to load station streamlines: ${err?.message || err}`);
+    });
 }

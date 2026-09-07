@@ -5,7 +5,9 @@ export function initTooltip(containerId = "tooltip") {
   const el = document.getElementById(containerId);
   if (!el) return;
 
-  window.__SHOW_TOOLTIP__ = (lngLat, props, cursorPos = null) => {
+  const targetGlobal = typeof window !== "undefined" ? window : globalThis;
+
+  targetGlobal.__SHOW_TOOLTIP__ = (lngLat, props, cursorPos = null) => {
     if (!props) {
       el.classList.add("hidden");
       return;
@@ -34,29 +36,29 @@ export function initTooltip(containerId = "tooltip") {
       </div>
     `;
 
-    // Dynamic positioning: if cursor position provided (via 3rd arg or props/cursorPos containing x/y), position near cursor; fallback to 20,60.
+    // Dynamic positioning: if cursor position provided, position near cursor; fallback to 20,60.
     let x = 20, y = 60;
     const pos = cursorPos || (props && typeof props.x === "number" && typeof props.y === "number" ? props : null) || (props && typeof props.clientX === "number" ? { x: props.clientX, y: props.clientY } : null);
-    if (pos && typeof pos.x === "number" && typeof pos.y === "number") {
-      x = pos.x + 16;
-      y = pos.y + 16;
+    const rawX = typeof pos?.x === "number" ? pos.x : (cursorPos && typeof cursorPos.clientX === "number" ? cursorPos.clientX : null);
+    const rawY = typeof pos?.y === "number" ? pos.y : (cursorPos && typeof cursorPos.clientY === "number" ? cursorPos.clientY : null);
+
+    if (rawX !== null && rawY !== null) {
+      x = rawX + 16;
+      y = rawY + 16;
       // Clamp to viewport to avoid overflow
-      const vw = window.innerWidth || 800;
-      const vh = window.innerHeight || 600;
-      // Approximate tooltip size 260x180; adjust after render if needed
+      const vw = (typeof window !== "undefined" && window.innerWidth) || 800;
+      const vh = (typeof window !== "undefined" && window.innerHeight) || 600;
       const estW = 280, estH = 180;
       if (x + estW > vw) x = Math.max(8, vw - estW - 8);
-      if (y + estH > vh) y = Math.max(8, pos.y - estH - 12);
-    } else if (cursorPos && typeof cursorPos.clientX === "number") {
-      x = cursorPos.clientX + 16;
-      y = cursorPos.clientY + 16;
+      if (y + estH > vh) y = Math.max(52, rawY - estH - 12);
+      if (y < 52) y = 52;
     }
     el.style.left = `${x}px`;
     el.style.top = `${y}px`;
     el.classList.remove("hidden");
   };
 
-  window.__HIDE_TOOLTIP__ = () => {
+  targetGlobal.__HIDE_TOOLTIP__ = () => {
     el.classList.add("hidden");
   };
 }

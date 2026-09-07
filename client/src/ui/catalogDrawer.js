@@ -66,7 +66,7 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
 
       <!-- Observation Time (Only for Observations) -->
       <div class="form-group hidden" id="group-obs-time" data-visible="false">
-        <label>Observation Time (UTC)</label>
+        <label>Observation Time (UTC) <span id="catalog-obs-status" style="font-size:10px; color:#8b949e; margin-left:6px;">(cached defaults)</span></label>
         <select id="select-obs-time" class="form-select">
           <option value="20260827200000.000" selected>2026-08-27 20:00:00 UTC</option>
           <option value="20260827174000.000">2026-08-27 17:40:00 UTC</option>
@@ -79,6 +79,7 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
       <button id="btn-load-product" class="btn btn-primary" style="margin-top: 8px; justify-content: center;">
         Load Meteorological Data
       </button>
+      <div id="catalog-drawer-msg" style="display:none; font-size:12px; margin-top:8px; padding:6px 10px; border-radius:4px;"></div>
     </div>
   `;
 
@@ -235,16 +236,27 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
               return `<option value="${f}" ${idx === 0 ? "selected" : ""}>${label}</option>`;
             })
             .join("");
+          const st = document.getElementById("catalog-obs-status");
+          if (st) { st.textContent = "(live)"; st.style.color = "#56d364"; }
         }
+      } else {
+        const st = document.getElementById("catalog-obs-status");
+        if (st) { st.textContent = "(fallback defaults)"; st.style.color = "#8b949e"; }
       }
     } catch (_) {
-      // keep hard-coded fallback
+      const st = document.getElementById("catalog-obs-status");
+      if (st) { st.textContent = "(fallback defaults)"; st.style.color = "#8b949e"; }
     }
   })();
 
   btnLoad.addEventListener("click", async () => {
     btnLoad.disabled = true;
     btnLoad.textContent = "Loading...";
+    const catalogMsg = document.getElementById("catalog-drawer-msg");
+    if (catalogMsg) {
+      catalogMsg.style.display = "none";
+      catalogMsg.textContent = "";
+    }
 
     const model = selectModel.value;
     const isObs = model === "SURFACE" || model === "UPPER_AIR";
@@ -277,6 +289,18 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
       drawer.classList.add("hidden");
     } catch (err) {
       console.error("[Catalog] Load error:", err);
+      const errMsg = err?.message || String(err);
+      if (catalogMsg) {
+        catalogMsg.style.display = "block";
+        catalogMsg.style.background = "rgba(248, 81, 73, 0.15)";
+        catalogMsg.style.color = "#f85149";
+        catalogMsg.style.border = "1px solid rgba(248, 81, 73, 0.4)";
+        catalogMsg.textContent = `Load failed: ${errMsg}`;
+      }
+      try {
+        const { showErrorToast } = await import("../main.js");
+        showErrorToast(`Product load failed: ${errMsg}`);
+      } catch {}
     } finally {
       btnLoad.disabled = false;
       btnLoad.textContent = "Load Meteorological Data";
