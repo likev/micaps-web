@@ -1,7 +1,11 @@
 // stationLayer.js - WMO & NOAA standard 9-point station weather plot model
-// Per-map-instance state via WeakMap — safe for multi-tab / 4-split windows
+// Direct HTML5 Canvas 2D Overlay with 60 FPS performance, Zero DOM markers, and Per-map WeakMap isolation
 import { getSkyCoverSVG, getWindBarbSVG, getWeatherSymbol, getPressureTendencyGlyph } from "../utils/weatherSymbols.js";
 import maplibregl from "maplibre-gl";
+
+// Safe requestAnimationFrame / cancelAnimationFrame
+const reqAnim = typeof requestAnimationFrame === "function" ? requestAnimationFrame : (cb) => setTimeout(cb, 16);
+const cancelAnim = typeof cancelAnimationFrame === "function" ? cancelAnimationFrame : (id) => clearTimeout(id);
 
 // Each map has its own state bucket so multiple maps don't share markers/data
 const mapState = new WeakMap();
@@ -11,8 +15,13 @@ function getState(map) {
   if (!mapState.has(map)) {
     mapState.set(map, {
       markers: [],
+      canvas: null,
+      ctx: null,
+      animId: null,
       geojson: null,
       visible: true,
+      activeVisibleStations: [],
+      renderedCount: 0,
       config: {
         showTemp: true,
         showDewpoint: true,
@@ -33,6 +42,8 @@ function getState(map) {
         filterVal2: "",
       },
       moveListener: null,
+      mouseMoveListener: null,
+      mouseOutListener: null,
     });
   }
   return mapState.get(map);
@@ -45,6 +56,42 @@ export function setStationConfig(map, config) {
   updateVisibleMarkersForMap(map);
 }
 
+export function ensureStationCanvas(map) {
+  if (!map || typeof map.getContainer !== "function") return null;
+  const container = map.getContainer();
+  if (!container) return null;
+  const state = getState(map);
+  let canvas = container.querySelector ? container.querySelector(".station-plot-canvas") : null;
+  if (!canvas && typeof document !== "undefined" && typeof document.createElement === "function") {
+    canvas = document.createElement("canvas");
+    canvas.className = "station-plot-canvas";
+    if (canvas.style) {
+      canvas.style.position = "absolute";
+      canvas.style.top = "0";
+      canvas.style.left = "0";
+      canvas.style.width = "100%";
+      canvas.style.height = "100%";
+      canvas.style.pointerEvents = "none";
+      canvas.style.zIndex = "410";
+    }
+    if (container.appendChild) {
+      container.appendChild(canvas);
+    }
+  }
+  if (canvas) {
+    state.canvas = canvas;
+    if (typeof canvas.getContext === "function") {
+      state.ctx = canvas.getContext("2d");
+    }
+  }
+  return canvas;
+}
+
+export function getStationCanvas(map) {
+  if (!map) return null;
+  return getState(map).canvas || null;
+}
+
 export function renderStationWeatherPlots(map, geojson, visible = true, config = null) {
   if (!map || !geojson || !geojson.features) return;
   lastStationGeoJSON = geojson;
@@ -55,15 +102,88 @@ export function renderStationWeatherPlots(map, geojson, visible = true, config =
     state.config = { ...state.config, ...config };
   }
 
-  if (state.moveListener) {
+  ensureStationCanvas(map);
+
+  if (state.moveListener && typeof map.off === "function") {
+    map.off("move", state.moveListener);
+    map.off("zoom", state.moveListener);
+    map.off("resize", state.moveListener);
     map.off("moveend", state.moveListener);
     map.off("zoomend", state.moveListener);
   }
-  state.moveListener = () => updateVisibleMarkersForMap(map);
-  map.on("moveend", state.moveListener);
-  map.on("zoomend", state.moveListener);
+
+  const scheduleDraw = () => {
+    if (state.animId) cancelAnim(state.animId);
+    state.animId = reqAnim(() => {
+      state.animId = null;
+      updateVisibleMarkersForMap(map);
+    });
+  };
+
+  state.moveListener = scheduleDraw;
+  if (typeof map.on === "function") {
+    map.on("move", scheduleDraw);
+    map.on("zoom", scheduleDraw);
+    map.on("resize", scheduleDraw);
+    map.on("moveend", scheduleDraw);
+    map.on("zoomend", scheduleDraw);
+
+    // Mouse hover listener for instant tooltip inspection
+    if (!state.mouseMoveListener) {
+      state.mouseMoveListener = (e) => handleStationHover(map, e);
+      state.mouseOutListener = () => handleStationMouseOut(map);
+      map.on("mousemove", state.mouseMoveListener);
+      map.on("mouseout", state.mouseOutListener);
+    }
+  }
 
   updateVisibleMarkersForMap(map);
+}
+
+function handleStationHover(map, e) {
+  const state = getState(map);
+  if (!state.visible || !state.activeVisibleStations || state.activeVisibleStations.length === 0) return;
+  if (!e || !e.point) return;
+
+  const px = e.point.x;
+  const py = e.point.y;
+  let hovered = null;
+  let minDist = 22; // Hit radius in screen pixels
+
+  for (const s of state.activeVisibleStations) {
+    const dist = Math.hypot(s.pt.x - px, s.pt.y - py);
+    if (dist < minDist) {
+      minDist = dist;
+      hovered = s;
+    }
+  }
+
+  const targetGlobal = typeof window !== "undefined" ? window : globalThis;
+  if (hovered) {
+    if (map.getCanvas && map.getCanvas()) {
+      map.getCanvas().style.cursor = "pointer";
+    }
+    if (typeof targetGlobal.__SHOW_TOOLTIP__ === "function") {
+      targetGlobal.__SHOW_TOOLTIP__([hovered.lon, hovered.lat], hovered.feature.properties, { x: px, y: py });
+    }
+  } else {
+    if (map.getCanvas && map.getCanvas()) {
+      map.getCanvas().style.cursor = "";
+    }
+    if (typeof targetGlobal.__HIDE_TOOLTIP__ === "function") {
+      targetGlobal.__HIDE_TOOLTIP__();
+    }
+  }
+}
+
+function handleStationMouseOut(map) {
+  if (map.getCanvas && map.getCanvas()) {
+    map.getCanvas().style.cursor = "";
+  }
+  const targetGlobal = typeof window !== "undefined" ? window : globalThis;
+  if (typeof targetGlobal.__HIDE_TOOLTIP__ === "function") {
+    targetGlobal.__HIDE_TOOLTIP__();
+  }
 }
 
 function isPointInBounds(bounds, lon, lat) {
@@ -316,21 +436,573 @@ export function matchesStationFilters(p, cfg) {
   return res1 && res2;
 }
 
-export function updateVisibleMarkersForMap(map) {
-  const state = getState(map);
-  clearStationMarkersForMap(map);
-  if (!state.visible || !state.geojson || !state.geojson.features) return;
+// ----------------------------------------------------------------------------
+// Direct Canvas 2D Overlay Rendering Methods
+// ----------------------------------------------------------------------------
 
-  const bounds = map.getBounds();
-  const curZoom = map.getZoom();
-  const scale = curZoom < 4.5 ? 0.9 : (curZoom < 6.5 ? 1.0 : 1.15);
+export function drawWindBarbCanvas(ctx, cx, cy, speed, dir, scale = 1.0) {
+  if (speed < 1.5) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, 10 * scale, 0, Math.PI * 2);
+    ctx.strokeStyle = "#58a6ff";
+    ctx.lineWidth = 1.3 * scale;
+    if (typeof ctx.setLineDash === "function") {
+      ctx.setLineDash([2.5 * scale, 2.5 * scale]);
+    }
+    ctx.stroke();
+    if (typeof ctx.setLineDash === "function") {
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+    return;
+  }
+
+  const skyRadius = 8 * scale;
+  const staffLength = 41 * scale;
+  const angleRad = ((dir - 90) * Math.PI) / 180;
+  const xStart = cx + skyRadius * Math.cos(angleRad);
+  const yStart = cy + skyRadius * Math.sin(angleRad);
+  const xEnd = cx + staffLength * Math.cos(angleRad);
+  const yEnd = cy + staffLength * Math.sin(angleRad);
+  const barbAngle = angleRad + ((70 * Math.PI) / 180);
+
+  ctx.save();
+  ctx.strokeStyle = "#58a6ff";
+  ctx.fillStyle = "#58a6ff";
+  ctx.lineWidth = 2.2 * scale;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "miter";
+
+  // Staff line
+  ctx.beginPath();
+  ctx.moveTo(xStart, yStart);
+  ctx.lineTo(xEnd, yEnd);
+  ctx.stroke();
+
+  let remSpeed = Math.round(speed);
+  let pos = staffLength;
+
+  // 1. Pennant flag (20 m/s pennants - CMA / GB/T 35663 standard)
+  while (remSpeed >= 18) {
+    const pX = cx + pos * Math.cos(angleRad);
+    const pY = cy + pos * Math.sin(angleRad);
+    const fX = pX + 17 * scale * Math.cos(barbAngle);
+    const fY = pY + 17 * scale * Math.sin(barbAngle);
+    const posNext = pos - 10 * scale;
+    const pX2 = cx + posNext * Math.cos(angleRad);
+    const pY2 = cy + posNext * Math.sin(angleRad);
+    ctx.beginPath();
+    ctx.moveTo(pX, pY);
+    ctx.lineTo(fX, fY);
+    ctx.lineTo(pX2, pY2);
+    ctx.closePath();
+    ctx.fill();
+    pos -= 11 * scale;
+    remSpeed -= 20;
+  }
+
+  // 2. Full barb / long feather (4 m/s full barb)
+  while (remSpeed >= 3.5) {
+    const pX = cx + pos * Math.cos(angleRad);
+    const pY = cy + pos * Math.sin(angleRad);
+    const bX = pX + 15 * scale * Math.cos(barbAngle);
+    const bY = pY + 15 * scale * Math.sin(barbAngle);
+    ctx.beginPath();
+    ctx.moveTo(pX, pY);
+    ctx.lineTo(bX, bY);
+    ctx.stroke();
+    pos -= 6.5 * scale;
+    remSpeed -= 4;
+  }
+
+  // 3. Half barb / short feather (2 m/s)
+  if (remSpeed >= 1.5) {
+    const barbPos = pos === staffLength ? staffLength - 6 * scale : pos;
+    const pX = cx + barbPos * Math.cos(angleRad);
+    const pY = cy + barbPos * Math.sin(angleRad);
+    const bX = pX + 8 * scale * Math.cos(barbAngle);
+    const bY = pY + 8 * scale * Math.sin(barbAngle);
+    ctx.beginPath();
+    ctx.moveTo(pX, pY);
+    ctx.lineTo(bX, bY);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+export function drawSkyCoverCanvas(ctx, cx, cy, octas = 0, scale = 1.0) {
+  const r = 8 * scale;
+  ctx.save();
+
+  // Background dark circle + white border
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(13, 17, 23, 0.85)";
+  ctx.fill();
+  ctx.strokeStyle = "#e6edf3";
+  ctx.lineWidth = 2.0 * scale;
+  ctx.stroke();
+
+  const o = Math.min(8, Math.max(0, octas));
+  ctx.fillStyle = "#e6edf3";
+
+  switch (o) {
+    case 0:
+      // Clear: open circle
+      break;
+    case 1:
+    case 2:
+      // 1/4 pie slice (top to right)
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, -Math.PI / 2, 0);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    case 3:
+    case 4:
+      // 1/2 vertical split
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, -Math.PI / 2, Math.PI / 2);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    case 5:
+    case 6:
+      // 3/4 filled (all except top-left)
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, -Math.PI / 2, Math.PI);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    case 7:
+    case 8:
+      // Solid overcast
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    default: {
+      // Obscured / missing: X cross
+      const d = r * 0.707;
+      ctx.strokeStyle = "#e6edf3";
+      ctx.lineWidth = 2.0 * scale;
+      ctx.beginPath();
+      ctx.moveTo(cx - d, cy - d);
+      ctx.lineTo(cx + d, cy + d);
+      ctx.moveTo(cx + d, cy - d);
+      ctx.lineTo(cx - d, cy + d);
+      ctx.stroke();
+      break;
+    }
+  }
+
+  ctx.restore();
+}
+
+export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0) {
+  const rawT = extractTemp(p, ["temperature", "temp", "TEM", "TT", "T", "TMP", "t", "temp_max", "tem"]);
+  const tt = rawT !== null ? Math.round(rawT).toString() : "";
+
+  const rawTd = extractTemp(p, ["dewpoint", "dew_point", "DPT", "TD", "Td", "td", "dew", "dpt"]);
+  const td = rawTd !== null ? Math.round(rawTd).toString() : "";
+
+  const ppp = extractPressureOrHeight(p);
+
+  const rawWs = extractRawNumber(p, ["wind_speed", "windSpeed", "ws", "WIN_S_Avg", "WIN_S", "FF", "ff", "speed"], 0, 150);
+  const ws = rawWs !== null ? (rawWs > 100 ? rawWs / 10.0 : rawWs) : null;
+  const wd = extractRawNumber(p, ["wind_dir", "windDir", "wd", "WIN_D_Avg", "WIN_D", "DD", "dd", "dir"], 0, 360);
+
+  const rawCloud = extractRawNumber(p, ["cloud_cover", "cloudCover", "cloud", "CLO_Cov", "N", "n"], 0, 9);
+  const cloudCover = rawCloud !== null ? Math.round(rawCloud) : 0;
+
+  const weatherCode = extractRawNumber(p, ["weather_code", "weatherCode", "weather", "Ww", "ww", "WEA"], 0, 99) || 0;
+
+  const pDiffRaw = extractRawNumber(p, ["press_diff_3h", "pDiff3h", "press_diff", "PRS_Change_3h", "p3"], -500, 500);
+  const pDiff = pDiffRaw !== null && Math.abs(pDiffRaw) > 0.05
+    ? `${pDiffRaw > 0 ? "+" : ""}${Math.abs(pDiffRaw) > 30 ? Math.round(pDiffRaw) : Math.round(pDiffRaw * 10)}`
+    : "";
+
+  const pTendCode = extractRawNumber(p, ["press_tend", "pTend", "PRS_Tendency", "a"], 0, 8);
+  const pTend = pTendCode !== null ? getPressureTendencyGlyph(pTendCode) : "";
+
+  const showTemp = cfg.showTemp !== undefined ? Boolean(cfg.showTemp) : true;
+  const showDewpoint = cfg.showDewpoint !== undefined ? Boolean(cfg.showDewpoint) : true;
+  const showWind = cfg.showWind !== undefined ? Boolean(cfg.showWind) : true;
+  const showDTD = Boolean(cfg.showDTD);
+  const showCloud = Boolean(cfg.showCloud);
+  const showWeather = Boolean(cfg.showWeather);
+  const showPressure = Boolean(cfg.showPressure);
+  const showTendency = Boolean(cfg.showTendency);
+  const showVisibility = Boolean(cfg.showVisibility);
+  const showRain6 = Boolean(cfg.showRain6);
+
+  let dtd = "";
+  if (rawT !== null && rawTd !== null && rawTd <= 50 && rawTd <= rawT + 0.5) {
+    const dVal = rawT - rawTd;
+    if (dVal >= 0 && dVal <= 45) {
+      dtd = Math.round(dVal).toString();
+    }
+  }
+
+  const rawVis = extractRawNumber(p, ["visibility", "VIS", "vis", "VV", "vv", "VIS_Avg", "VIS_Min"], 0, 150000);
+  const vis = rawVis !== null ? (rawVis >= 1000 ? (rawVis / 1000).toFixed(rawVis % 1000 === 0 ? 0 : 1) : (rawVis < 10 ? rawVis.toFixed(1) : Math.round(rawVis).toString())) : "";
+
+  const rawRain6 = extractRawNumber(p, ["rain_6h", "RAIN_6H", "rain6h", "PRE_6h", "RAIN_6h", "rain_3h", "rain_1h", "rain_12h", "rain_24h", "rain"], 0, 1000);
+  const rain6 = rawRain6 !== null && rawRain6 > 0 ? (rawRain6 < 10 ? rawRain6.toFixed(1) : Math.round(rawRain6).toString()) : "";
+
+  const ww = getWeatherSymbol(weatherCode);
+  const hasDTDPlot = Boolean(showDTD && dtd);
+  const hasVisPlot = Boolean(showVisibility && vis);
+
+  // 1. Wind Barb
+  if (showWind && ws !== null && ws >= 0) {
+    if (ws < 1.5) {
+      drawWindBarbCanvas(ctx, cx, cy, 0, 0, scale);
+    } else if (wd !== null && wd >= 0 && wd <= 360) {
+      drawWindBarbCanvas(ctx, cx, cy, ws, wd, scale);
+    }
+  }
+
+  // 2. Center Sky Cover or Station Dot
+  if (showCloud) {
+    drawSkyCoverCanvas(ctx, cx, cy, cloudCover, scale);
+  } else {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, 2.5 * scale, 0, Math.PI * 2);
+    ctx.fillStyle = "#e3b341";
+    ctx.fill();
+    ctx.strokeStyle = "#000000";
+    ctx.lineWidth = 0.8 * scale;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Text rendering with high-contrast dark halo
+  function drawPlotText(text, x, y, color, fontSize, align = "left", weight = "700") {
+    if (!text) return;
+    ctx.save();
+    ctx.font = `${weight} ${Math.round(fontSize * scale)}px 'SF Mono', -apple-system, monospace`;
+    ctx.textAlign = align;
+    ctx.textBaseline = "middle";
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.85)";
+    ctx.lineWidth = 2.5 * scale;
+    ctx.lineJoin = "round";
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+
+  // 3. TT (Temperature) - Top-Left in Bold Red
+  if (showTemp && tt) {
+    drawPlotText(tt, cx - 8 * scale, cy - 12 * scale, "#f85149", 13, "right", "700");
+  }
+
+  // 4. DTD (Dew-Point Depression) - Middle-Left in Bold Orange
+  if (hasDTDPlot) {
+    drawPlotText(dtd, cx - 8 * scale, cy, "#f0883e", 12, "right", "700");
+  }
+
+  // 5. TdTd (Dew Point) - Bottom-Left in Emerald Green
+  if (showDewpoint && td) {
+    drawPlotText(td, cx - 8 * scale, cy + 12 * scale, "#56d364", 13, "right", "700");
+  }
+
+  // 6. Weather (ww) and Visibility (VV) with DTD displacement collision rules
+  if (hasDTDPlot) {
+    if (!hasVisPlot && showWeather && ww) {
+      drawPlotText(ww, cx - 22 * scale, cy, "#e3b341", 15, "center", "normal");
+    } else if (hasVisPlot) {
+      drawPlotText(vis, cx - 22 * scale, cy, "#ffd33d", 12, "right", "700");
+    }
+  } else {
+    if (showWeather && ww) {
+      drawPlotText(ww, cx - 8 * scale, cy, "#e3b341", 15, "center", "normal");
+    }
+    if (hasVisPlot) {
+      drawPlotText(vis, cx - 22 * scale, cy, "#ffd33d", 12, "right", "700");
+    }
+  }
+
+  // 7. PPP (Pressure or Height) - Top-Right in Cyan/Blue
+  if (showPressure && ppp) {
+    drawPlotText(ppp, cx + 8 * scale, cy - 12 * scale, "#79c0ff", 13, "left", "700");
+  }
+
+  // 8. R6 (6h Rain) - Middle-Right in Sky Blue
+  if (showRain6 && rain6) {
+    drawPlotText(rain6, cx + 8 * scale, cy, "#38bdf8", 12, "left", "700");
+  }
+
+  // 9. ppa (3h Pressure Tendency & Diff) - Bottom-Right in Light Blue
+  if (showTendency && (pDiff || pTend)) {
+    drawPlotText(`${pDiff}${pTend}`, cx + 8 * scale, cy + 12 * scale, "#a5d6ff", 11, "left", "600");
+  }
+}
+
+export function drawStationCanvas(map) {
+  const state = getState(map);
+  const canvas = ensureStationCanvas(map);
+  if (!canvas) return false;
+
+  const container = map.getContainer ? map.getContainer() : null;
+  if (!container) return false;
+
+  const rect = container.getBoundingClientRect ? container.getBoundingClientRect() : { width: 800, height: 600 };
+  const w = Math.round(rect.width) || 800;
+  const h = Math.round(rect.height) || 600;
+  const dpr = typeof window !== "undefined" ? Math.min(2, window.devicePixelRatio || 1) : 1;
+  const targetW = Math.round(w * dpr);
+  const targetH = Math.round(h * dpr);
+
+  if (canvas.width !== targetW || canvas.height !== targetH) {
+    canvas.width = targetW;
+    canvas.height = targetH;
+  }
+
+  const ctx = canvas.getContext ? canvas.getContext("2d") : state.ctx;
+  if (!ctx) return false;
+  state.ctx = ctx;
+
+  if (typeof ctx.setTransform === "function") {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  ctx.clearRect(0, 0, w, h);
+
+  if (!state.visible || !state.geojson || !state.geojson.features || state.geojson.features.length === 0) {
+    state.activeVisibleStations = [];
+    state.renderedCount = 0;
+    return true;
+  }
+
+  const bounds = typeof map.getBounds === "function" ? map.getBounds() : null;
+  const curZoom = typeof map.getZoom === "function" ? map.getZoom() : 5;
+  const scale = curZoom < 4.5 ? 0.85 : (curZoom < 6.5 ? 1.0 : 1.15);
 
   // 1. Group in-bounds stations matching filters into 100x100px screen pixel grid bins
   const screenBins = new Map();
   for (const f of state.geojson.features) {
+    if (!f.geometry || !Array.isArray(f.geometry.coordinates) || f.geometry.coordinates.length < 2) continue;
     const [lon, lat] = f.geometry.coordinates;
     if (!isPointInBounds(bounds, lon, lat)) continue;
     if (!matchesStationFilters(f.properties || {}, state.config)) continue;
+    if (typeof map.project !== "function") continue;
+
+    const pt = map.project([lon, lat]);
+    if (pt.x < -60 || pt.x > w + 60 || pt.y < -60 || pt.y > h + 60) continue;
+
+    const binKey = `${Math.floor(pt.x / 100)},${Math.floor(pt.y / 100)}`;
+    let list = screenBins.get(binKey);
+    if (!list) {
+      list = [];
+      screenBins.set(binKey, list);
+    }
+    list.push({ feature: f, pt, lon, lat });
+  }
+
+  // 2. In each 100x100px screen cell, show at most 5 stations (randomly sampled via stable hash)
+  const selectedStations = [];
+  for (const list of screenBins.values()) {
+    if (list.length <= 5) {
+      for (let i = 0; i < list.length; i++) selectedStations.push(list[i]);
+    } else {
+      list.sort((a, b) => {
+        const ha = hashStation(a.feature.properties?.station_id, a.lon, a.lat);
+        const hb = hashStation(b.feature.properties?.station_id, b.lon, b.lat);
+        return ha - hb;
+      });
+      for (let i = 0; i < 5; i++) selectedStations.push(list[i]);
+    }
+  }
+
+  // 3. Render each station onto the 2D canvas context
+  for (const s of selectedStations) {
+    renderStationPlotToCanvas(ctx, s.feature.properties || {}, s.pt.x, s.pt.y, state.config, scale);
+  }
+
+  state.activeVisibleStations = selectedStations;
+  state.renderedCount = selectedStations.length;
+  return true;
+}
+
+// ----------------------------------------------------------------------------
+// Fallback DOM Marker Generator for Headless / Unit Testing Environments
+// ----------------------------------------------------------------------------
+
+function createStationMarkerDOM(f, config, scale) {
+  const p = f.properties || {};
+  const el = document.createElement("div");
+  el.className = "station-plot-marker";
+  el.style.fontFamily = "'SF Mono', -apple-system, monospace";
+  el.style.fontSize = "13px";
+  el.style.color = "#ffffff";
+  el.style.pointerEvents = "none";
+
+  const rawT = extractTemp(p, ["temperature", "temp", "TEM", "TT", "T", "TMP", "t", "temp_max", "tem"]);
+  const tt = rawT !== null ? Math.round(rawT).toString() : "";
+
+  const rawTd = extractTemp(p, ["dewpoint", "dew_point", "DPT", "TD", "Td", "td", "dew", "dpt"]);
+  const td = rawTd !== null ? Math.round(rawTd).toString() : "";
+
+  const ppp = extractPressureOrHeight(p);
+
+  const rawWs = extractRawNumber(p, ["wind_speed", "windSpeed", "ws", "WIN_S_Avg", "WIN_S", "FF", "ff", "speed"], 0, 150);
+  const ws = rawWs !== null ? (rawWs > 100 ? rawWs / 10.0 : rawWs) : null;
+  const wd = extractRawNumber(p, ["wind_dir", "windDir", "wd", "WIN_D_Avg", "WIN_D", "DD", "dd", "dir"], 0, 360);
+
+  const rawCloud = extractRawNumber(p, ["cloud_cover", "cloudCover", "cloud", "CLO_Cov", "N", "n"], 0, 9);
+  const cloudCover = rawCloud !== null ? Math.round(rawCloud) : 0;
+
+  const weatherCode = extractRawNumber(p, ["weather_code", "weatherCode", "weather", "Ww", "ww", "WEA"], 0, 99) || 0;
+
+  const pDiffRaw = extractRawNumber(p, ["press_diff_3h", "pDiff3h", "press_diff", "PRS_Change_3h", "p3"], -500, 500);
+  const pDiff = pDiffRaw !== null && Math.abs(pDiffRaw) > 0.05
+    ? `${pDiffRaw > 0 ? "+" : ""}${Math.abs(pDiffRaw) > 30 ? Math.round(pDiffRaw) : Math.round(pDiffRaw * 10)}`
+    : "";
+
+  const pTendCode = extractRawNumber(p, ["press_tend", "pTend", "PRS_Tendency", "a"], 0, 8);
+  const pTend = pTendCode !== null ? getPressureTendencyGlyph(pTendCode) : "";
+
+  const cfg = config || {};
+  const showTemp = cfg.showTemp !== undefined ? Boolean(cfg.showTemp) : true;
+  const showDewpoint = cfg.showDewpoint !== undefined ? Boolean(cfg.showDewpoint) : true;
+  const showWind = cfg.showWind !== undefined ? Boolean(cfg.showWind) : true;
+  const showDTD = Boolean(cfg.showDTD);
+  const showCloud = Boolean(cfg.showCloud);
+  const showWeather = Boolean(cfg.showWeather);
+  const showPressure = Boolean(cfg.showPressure);
+  const showTendency = Boolean(cfg.showTendency);
+  const showVisibility = Boolean(cfg.showVisibility);
+  const showRain6 = Boolean(cfg.showRain6);
+
+  let dtd = "";
+  if (rawT !== null && rawTd !== null && rawTd <= 50 && rawTd <= rawT + 0.5) {
+    const dVal = rawT - rawTd;
+    if (dVal >= 0 && dVal <= 45) {
+      dtd = Math.round(dVal).toString();
+    }
+  }
+
+  const rawVis = extractRawNumber(p, ["visibility", "VIS", "vis", "VV", "vv", "VIS_Avg", "VIS_Min"], 0, 150000);
+  const vis = rawVis !== null ? (rawVis >= 1000 ? (rawVis / 1000).toFixed(rawVis % 1000 === 0 ? 0 : 1) : (rawVis < 10 ? rawVis.toFixed(1) : Math.round(rawVis).toString())) : "";
+
+  const rawRain6 = extractRawNumber(p, ["rain_6h", "RAIN_6H", "rain6h", "PRE_6h", "RAIN_6h", "rain_3h", "rain_1h", "rain_12h", "rain_24h", "rain"], 0, 1000);
+  const rain6 = rawRain6 !== null && rawRain6 > 0 ? (rawRain6 < 10 ? rawRain6.toFixed(1) : Math.round(rawRain6).toString()) : "";
+
+  const ww = getWeatherSymbol(weatherCode);
+  const hasDTDPlot = Boolean(showDTD && dtd);
+  const hasVisPlot = Boolean(showVisibility && vis);
+  let wwHTML = "";
+  if (showWeather && ww) {
+    if (!hasDTDPlot) {
+      wwHTML = `
+      <div style="position: absolute; top: 20px; left: -2px; width: 20px; text-align: center; color: #e3b341; font-size: 15px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+        ${ww}
+      </div>`;
+    } else if (!hasVisPlot) {
+      wwHTML = `
+      <div style="position: absolute; top: 20px; left: -26px; width: 24px; text-align: center; color: #e3b341; font-size: 15px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+        ${ww}
+      </div>`;
+    }
+  }
+
+  const skySVG = getSkyCoverSVG(cloudCover, 16);
+  let barbSVG = "";
+  if (ws !== null && ws >= 0) {
+    if (ws < 1.5) {
+      barbSVG = getWindBarbSVG(0, 0, 100);
+    } else if (wd !== null && wd >= 0 && wd <= 360) {
+      barbSVG = getWindBarbSVG(ws, wd, 100);
+    }
+  }
+
+  el.innerHTML = `
+    <div style="position: relative; width: 56px; height: 56px; pointer-events: none; transform: scale(${scale}); transform-origin: center center;">
+      <!-- Wind Barb / Direction & Speed (Centered at 28, 28) -->
+      ${showWind ? `
+      <div style="position: absolute; top: -22px; left: -22px; width: 100px; height: 100px; pointer-events: none; z-index: 1;">
+        ${barbSVG}
+      </div>` : ""}
+      <!-- Center Sky Cover Circle (or small station dot if cloud is hidden) -->
+      ${showCloud ? `
+      <div style="position: absolute; top: 20px; left: 20px; width: 16px; height: 16px; pointer-events: none; z-index: 2;">
+        ${skySVG}
+      </div>` : `
+      <div style="position: absolute; top: 26px; left: 26px; width: 4px; height: 4px; border-radius: 50%; background: #e3b341; pointer-events: none; z-index: 2; box-shadow: 0 0 2px #000;"></div>`}
+      <!-- TT: Temperature (°C) Top-Left in Bold Red/Orange -->
+      ${showTemp && tt ? `
+      <div style="position: absolute; top: 4px; left: 0px; width: 22px; text-align: right; color: #f85149; font-weight: 700; font-size: 13px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+        ${tt}
+      </div>` : ""}
+      <!-- DTD: Dew-Point Depression (°C) Middle-Left in Orange -->
+      ${hasDTDPlot ? `
+      <div style="position: absolute; top: 20px; left: 0px; width: 22px; text-align: right; color: #f0883e; font-weight: 700; font-size: 12px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+        ${dtd}
+      </div>` : ""}
+      <!-- TdTd: Dew Point (°C) Bottom-Left in Emerald Green -->
+      ${showDewpoint && td ? `
+      <div style="position: absolute; bottom: 4px; left: 0px; width: 22px; text-align: right; color: #56d364; font-weight: 700; font-size: 13px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+        ${td}
+      </div>` : ""}
+      <!-- ww: Present Weather Symbol (Middle Left or Displaced Far-Left) -->
+      ${wwHTML}
+      <!-- VV: Visibility (Far-Left in Golden Yellow) -->
+      ${hasVisPlot ? `
+      <div style="position: absolute; top: 20px; left: -26px; width: 24px; text-align: right; color: #ffd33d; font-weight: 700; font-size: 12px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+        ${vis}
+      </div>` : ""}
+      <!-- PPP: Sea-Level Pressure (Top Right in Cyan/Blue) -->
+      ${showPressure && ppp ? `
+      <div style="position: absolute; top: 4px; left: 34px; width: 26px; text-align: left; color: #79c0ff; font-weight: 700; font-size: 13px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+        ${ppp}
+      </div>` : ""}
+      <!-- R6: 6h Precipitation (Middle Right in Sky Blue) -->
+      ${showRain6 && rain6 ? `
+      <div style="position: absolute; top: 20px; left: 34px; width: 26px; text-align: left; color: #38bdf8; font-weight: 700; font-size: 12px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+        ${rain6}
+      </div>` : ""}
+      <!-- ppa: 3h Pressure Tendency & Diff (Bottom Right in Light Blue) -->
+      ${showTendency && (pDiff || pTend) ? `
+      <div style="position: absolute; bottom: 4px; left: 34px; width: 26px; text-align: left; font-size: 11px; font-weight: 600; color: #a5d6ff; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
+        ${pDiff}${pTend}
+      </div>` : ""}
+    </div>
+  `;
+  return el;
+}
+
+export function updateVisibleMarkersForMap(map) {
+  const state = getState(map);
+
+  // 1. Primary Direct Canvas 2D Overlay Rendering (Zero DOM markers, 60 FPS locked)
+  const drawnOnCanvas = drawStationCanvas(map);
+  if (drawnOnCanvas) {
+    clearStationMarkersForMap(map);
+    return;
+  }
+
+  // 2. Fallback for headless unit testing environments without MapLibre container
+  clearStationMarkersForMap(map);
+  if (!state.visible || !state.geojson || !state.geojson.features) return;
+
+  const bounds = typeof map.getBounds === "function" ? map.getBounds() : null;
+  const curZoom = typeof map.getZoom === "function" ? map.getZoom() : 5;
+  const scale = curZoom < 4.5 ? 0.9 : (curZoom < 6.5 ? 1.0 : 1.15);
+
+  const screenBins = new Map();
+  for (const f of state.geojson.features) {
+    if (!f.geometry || !Array.isArray(f.geometry.coordinates) || f.geometry.coordinates.length < 2) continue;
+    const [lon, lat] = f.geometry.coordinates;
+    if (!isPointInBounds(bounds, lon, lat)) continue;
+    if (!matchesStationFilters(f.properties || {}, state.config)) continue;
+    if (typeof map.project !== "function") continue;
 
     const pt = map.project([lon, lat]);
     const binKey = `${Math.floor(pt.x / 100)},${Math.floor(pt.y / 100)}`;
@@ -342,13 +1014,11 @@ export function updateVisibleMarkersForMap(map) {
     list.push(f);
   }
 
-  // 2. In each 100x100px screen cell, show at most 5 stations (randomly sampled)
   const selectedFeatures = [];
   for (const list of screenBins.values()) {
     if (list.length <= 5) {
       for (let i = 0; i < list.length; i++) selectedFeatures.push(list[i]);
     } else {
-      // Sort by stable pseudorandom hash to pick top 5 without visual jitter
       list.sort((a, b) => {
         const ha = hashStation(a.properties?.station_id, a.geometry.coordinates[0], a.geometry.coordinates[1]);
         const hb = hashStation(b.properties?.station_id, b.geometry.coordinates[0], b.geometry.coordinates[1]);
@@ -358,154 +1028,12 @@ export function updateVisibleMarkersForMap(map) {
     }
   }
 
-  // 3. Render markers for the selected features
   for (const f of selectedFeatures) {
     const [lon, lat] = f.geometry.coordinates;
-    const p = f.properties || {};
-    const el = document.createElement("div");
-    el.className = "station-plot-marker";
-    el.style.fontFamily = "'SF Mono', -apple-system, monospace";
-    el.style.fontSize = "13px";
-    el.style.color = "#ffffff";
-    el.style.pointerEvents = "none";
-
-    // 9-Position Synoptic Station Model Elements
-    const rawT = extractTemp(p, ["temperature", "temp", "TEM", "TT", "T", "TMP", "t", "temp_max", "tem"]);
-    const tt = rawT !== null ? Math.round(rawT).toString() : "";
-
-    const rawTd = extractTemp(p, ["dewpoint", "dew_point", "DPT", "TD", "Td", "td", "dew", "dpt"]);
-    const td = rawTd !== null ? Math.round(rawTd).toString() : "";
-
-    const ppp = extractPressureOrHeight(p);
-
-    const rawWs = extractRawNumber(p, ["wind_speed", "windSpeed", "ws", "WIN_S_Avg", "WIN_S", "FF", "ff", "speed"], 0, 150);
-    const ws = rawWs !== null ? (rawWs > 100 ? rawWs / 10.0 : rawWs) : null;
-    const wd = extractRawNumber(p, ["wind_dir", "windDir", "wd", "WIN_D_Avg", "WIN_D", "DD", "dd", "dir"], 0, 360);
-
-    const rawCloud = extractRawNumber(p, ["cloud_cover", "cloudCover", "cloud", "CLO_Cov", "N", "n"], 0, 9);
-    const cloudCover = rawCloud !== null ? Math.round(rawCloud) : 0;
-
-    const weatherCode = extractRawNumber(p, ["weather_code", "weatherCode", "weather", "Ww", "ww", "WEA"], 0, 99) || 0;
-
-    const pDiffRaw = extractRawNumber(p, ["press_diff_3h", "pDiff3h", "press_diff", "PRS_Change_3h", "p3"], -500, 500);
-    const pDiff = pDiffRaw !== null && Math.abs(pDiffRaw) > 0.05
-      ? `${pDiffRaw > 0 ? "+" : ""}${Math.abs(pDiffRaw) > 30 ? Math.round(pDiffRaw) : Math.round(pDiffRaw * 10)}`
-      : "";
-
-    const pTendCode = extractRawNumber(p, ["press_tend", "pTend", "PRS_Tendency", "a"], 0, 8);
-    const pTend = pTendCode !== null ? getPressureTendencyGlyph(pTendCode) : "";
-
-    const cfg = state.config || {};
-    const showTemp = cfg.showTemp !== undefined ? Boolean(cfg.showTemp) : true;
-    const showDewpoint = cfg.showDewpoint !== undefined ? Boolean(cfg.showDewpoint) : true;
-    const showWind = cfg.showWind !== undefined ? Boolean(cfg.showWind) : true;
-    const showDTD = Boolean(cfg.showDTD);
-    const showCloud = Boolean(cfg.showCloud);
-    const showWeather = Boolean(cfg.showWeather);
-    const showPressure = Boolean(cfg.showPressure);
-    const showTendency = Boolean(cfg.showTendency);
-    const showVisibility = Boolean(cfg.showVisibility);
-    const showRain6 = Boolean(cfg.showRain6);
-
-    let dtd = "";
-    if (rawT !== null && rawTd !== null && rawTd <= 50 && rawTd <= rawT + 0.5) {
-      const dVal = rawT - rawTd;
-      if (dVal >= 0 && dVal <= 45) {
-        dtd = Math.round(dVal).toString();
-      }
-    }
-
-    const rawVis = extractRawNumber(p, ["visibility", "VIS", "vis", "VV", "vv", "VIS_Avg", "VIS_Min"], 0, 150000);
-    const vis = rawVis !== null ? (rawVis >= 1000 ? (rawVis / 1000).toFixed(rawVis % 1000 === 0 ? 0 : 1) : (rawVis < 10 ? rawVis.toFixed(1) : Math.round(rawVis).toString())) : "";
-
-    const rawRain6 = extractRawNumber(p, ["rain_6h", "RAIN_6H", "rain6h", "PRE_6h", "RAIN_6h", "rain_3h", "rain_1h", "rain_12h", "rain_24h", "rain"], 0, 1000);
-    const rain6 = rawRain6 !== null && rawRain6 > 0 ? (rawRain6 < 10 ? rawRain6.toFixed(1) : Math.round(rawRain6).toString()) : "";
-
-    const ww = getWeatherSymbol(weatherCode);
-    const hasDTDPlot = Boolean(showDTD && dtd);
-    const hasVisPlot = Boolean(showVisibility && vis);
-    let wwHTML = "";
-    if (showWeather && ww) {
-      if (!hasDTDPlot) {
-        wwHTML = `
-        <div style="position: absolute; top: 20px; left: -2px; width: 20px; text-align: center; color: #e3b341; font-size: 15px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
-          ${ww}
-        </div>`;
-      } else if (!hasVisPlot) {
-        wwHTML = `
-        <div style="position: absolute; top: 20px; left: -26px; width: 24px; text-align: center; color: #e3b341; font-size: 15px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
-          ${ww}
-        </div>`;
-      }
-    }
-
-    const skySVG = getSkyCoverSVG(cloudCover, 16);
-    let barbSVG = "";
-    if (ws !== null && ws >= 0) {
-      if (ws < 1.5) {
-        barbSVG = getWindBarbSVG(0, 0, 100);
-      } else if (wd !== null && wd >= 0 && wd <= 360) {
-        barbSVG = getWindBarbSVG(ws, wd, 100);
-      }
-    }
-
-    el.innerHTML = `
-      <div style="position: relative; width: 56px; height: 56px; pointer-events: none; transform: scale(${scale}); transform-origin: center center;">
-        <!-- Wind Barb / Direction & Speed (Centered at 28, 28) -->
-        ${showWind ? `
-        <div style="position: absolute; top: -22px; left: -22px; width: 100px; height: 100px; pointer-events: none; z-index: 1;">
-          ${barbSVG}
-        </div>` : ""}
-        <!-- Center Sky Cover Circle (or small station dot if cloud is hidden) -->
-        ${showCloud ? `
-        <div style="position: absolute; top: 20px; left: 20px; width: 16px; height: 16px; pointer-events: none; z-index: 2;">
-          ${skySVG}
-        </div>` : `
-        <div style="position: absolute; top: 26px; left: 26px; width: 4px; height: 4px; border-radius: 50%; background: #e3b341; pointer-events: none; z-index: 2; box-shadow: 0 0 2px #000;"></div>`}
-        <!-- TT: Temperature (°C) Top-Left in Bold Red/Orange -->
-        ${showTemp && tt ? `
-        <div style="position: absolute; top: 4px; left: 0px; width: 22px; text-align: right; color: #f85149; font-weight: 700; font-size: 13px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
-          ${tt}
-        </div>` : ""}
-        <!-- DTD: Dew-Point Depression (°C) Middle-Left in Orange -->
-        ${hasDTDPlot ? `
-        <div style="position: absolute; top: 20px; left: 0px; width: 22px; text-align: right; color: #f0883e; font-weight: 700; font-size: 12px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
-          ${dtd}
-        </div>` : ""}
-        <!-- TdTd: Dew Point (°C) Bottom-Left in Emerald Green -->
-        ${showDewpoint && td ? `
-        <div style="position: absolute; bottom: 4px; left: 0px; width: 22px; text-align: right; color: #56d364; font-weight: 700; font-size: 13px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
-          ${td}
-        </div>` : ""}
-        <!-- ww: Present Weather Symbol (Middle Left or Displaced Far-Left) -->
-        ${wwHTML}
-        <!-- VV: Visibility (Far-Left in Golden Yellow) -->
-        ${hasVisPlot ? `
-        <div style="position: absolute; top: 20px; left: -26px; width: 24px; text-align: right; color: #ffd33d; font-weight: 700; font-size: 12px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
-          ${vis}
-        </div>` : ""}
-        <!-- PPP: Sea-Level Pressure (Top Right in Cyan/Blue) -->
-        ${showPressure && ppp ? `
-        <div style="position: absolute; top: 4px; left: 34px; width: 26px; text-align: left; color: #79c0ff; font-weight: 700; font-size: 13px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
-          ${ppp}
-        </div>` : ""}
-        <!-- R6: 6h Precipitation (Middle Right in Sky Blue) -->
-        ${showRain6 && rain6 ? `
-        <div style="position: absolute; top: 20px; left: 34px; width: 26px; text-align: left; color: #38bdf8; font-weight: 700; font-size: 12px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
-          ${rain6}
-        </div>` : ""}
-        <!-- ppa: 3h Pressure Tendency & Diff (Bottom Right in Light Blue) -->
-        ${showTendency && (pDiff || pTend) ? `
-        <div style="position: absolute; bottom: 4px; left: 34px; width: 26px; text-align: left; font-size: 11px; font-weight: 600; color: #a5d6ff; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
-          ${pDiff}${pTend}
-        </div>` : ""}
-      </div>
-    `;
-
+    const el = createStationMarkerDOM(f, state.config, scale);
     const marker = new maplibregl.Marker({ element: el })
       .setLngLat([lon, lat])
       .addTo(map);
-
     state.markers.push(marker);
   }
 }
@@ -519,8 +1047,17 @@ export function setStationVisibility(map, visible) {
   if (!map) return;
   const state = getState(map);
   state.visible = Boolean(visible);
+  if (state.canvas && state.canvas.style) {
+    state.canvas.style.display = state.visible ? "block" : "none";
+  }
   if (!state.visible) {
     clearStationMarkersForMap(map);
+    if (state.ctx && state.canvas) {
+      state.ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
+    }
+    state.activeVisibleStations = [];
+    state.renderedCount = 0;
+    handleStationMouseOut(map);
   } else {
     updateVisibleMarkersForMap(map);
   }
@@ -528,7 +1065,9 @@ export function setStationVisibility(map, visible) {
 
 export function clearStationMarkersForMap(map) {
   const state = getState(map);
-  for (const m of state.markers) m.remove();
+  for (const m of state.markers) {
+    if (m && typeof m.remove === "function") m.remove();
+  }
   state.markers = [];
 }
 
@@ -543,19 +1082,56 @@ export function getStationGeoJSON(map = null) {
 export function removeStationLayer(map) {
   if (!map) return;
   const state = getState(map);
-  clearStationMarkersForMap(map);
-  state.geojson = null;
-  state.visible = false;
-  if (state.moveListener) {
+  if (state.animId) {
+    cancelAnim(state.animId);
+    state.animId = null;
+  }
+  if (state.moveListener && typeof map.off === "function") {
+    map.off("move", state.moveListener);
+    map.off("zoom", state.moveListener);
+    map.off("resize", state.moveListener);
     map.off("moveend", state.moveListener);
+    map.off("zoomend", state.moveListener);
     state.moveListener = null;
   }
+  if (state.mouseMoveListener && typeof map.off === "function") {
+    map.off("mousemove", state.mouseMoveListener);
+    state.mouseMoveListener = null;
+  }
+  if (state.mouseOutListener && typeof map.off === "function") {
+    map.off("mouseout", state.mouseOutListener);
+    state.mouseOutListener = null;
+  }
+  if (state.canvas) {
+    if (state.ctx) {
+      state.ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
+    }
+    if (state.canvas.parentNode) {
+      state.canvas.parentNode.removeChild(state.canvas);
+    }
+    state.canvas = null;
+    state.ctx = null;
+  }
+  clearStationMarkersForMap(map);
+  state.activeVisibleStations = [];
+  state.renderedCount = 0;
+  state.geojson = null;
+  state.visible = false;
+  handleStationMouseOut(map);
 }
 
 // Expose station layer controller for automated testing (uses active map fallback)
 if (typeof window !== "undefined") {
   window.__STATION_LAYER__ = {
-    getVisibleCount: () => {
+    getVisibleCount: (map = null) => {
+      if (map && mapState.has(map)) {
+        const s = mapState.get(map);
+        return s.renderedCount || s.markers.length || 0;
+      }
+      if (window.__MAP__ && mapState.has(window.__MAP__)) {
+        const s = mapState.get(window.__MAP__);
+        return s.renderedCount || s.markers.length || 0;
+      }
       let total = 0;
       document.querySelectorAll(".station-plot-marker").forEach(() => total++);
       return total;

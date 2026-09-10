@@ -961,7 +961,7 @@ flowchart TD
 
     subgraph OptimizationPipelines ["Domain-Specific Optimization Architectures"]
         D1 --> P1["Grid Optimization Pipeline\n• 3-Stage BBox Crop + Cell-Count LOD (§8.8.4)\n• Offscreen Canvas Image Source (95% memory drop)\n• Zero-GeoJSON Canvas Wind Streamlines & Barbs\n• Debounced Viewport Re-render Engine"]
-        D2 --> P2["Station Point Optimization Pipeline\n• Viewport Geographic Bounds Culling (isPointInBounds)\n• Screen-Space 100x100px Spatial Binning\n• Level-of-Detail (LoD) Density Culling (<= 5 per cell)\n• WeakMap Marker Lifecycle & Isobaric QC Clamping"]
+        D2 --> P2["Station Point Optimization Pipeline\n• Direct HTML5 Canvas 2D Overlay (.station-plot-canvas, zIndex: 410)\n• Viewport Geographic Bounds Culling (isPointInBounds)\n• Screen-Space 100x100px Spatial Binning\n• Level-of-Detail (LoD) Density Culling (<= 5 per cell)\n• Zero DOM Markers (1 Node vs Thousands) & WeakMap State Isolation"]
         D3 --> P3["Analysis Grid Optimization Pipeline\n• §8.8.4 Stage 1 Bypass Gate (N_cells < 50,000)\n• Zero Pan/Zoom Re-render (Locked 60 FPS)\n• Native step = 1 Mesoscale Fidelity Locked\n• Shared DP Simplification + Chaikin Vertex Control"]
     end
 ```
@@ -972,11 +972,11 @@ flowchart TD
 | :--- | :--- | :--- | :--- |
 | **Data Nature** | Continuous uniform 2D scalar/vector matrix | Discrete, irregular geographic observation points | Synthesized continuous 2D scalar mesh (Delaunay + IDW) |
 | **Data Scale ($N$)** | $1.0\text{M}\text{--}6.5\text{M}$ grid cells ($0.1^\circ\text{--}0.25^\circ$ global) | Surface: $2,000\text{--}10,000$ points; Upper-air: $120\text{--}800$ points | Regional East Asia: $171 \times 101 \approx 17,271$ cells ($0.5^\circ$ grid) |
-| **Primary Memory Bottleneck** | V8 heap exhaustion from GeoJSON `MultiPolygon` isobands ($60\text{--}90\text{ MB}$) & CPU Marching Squares latency ($> 500\text{ ms}$) | DOM element / SVG marker bloat, layout thrashing, and visual clutter from overlapping station plots | Unnecessary CPU Marching Squares re-computations during smooth map navigation |
-| **Active Spatial Optimization** | **3-Stage Pipeline (§8.8.4)**:<br>1. Stage 2 BBox crop to visible extent $[W, S, E, N]$<br>2. Stage 3 cell-count LOD: $\text{step} = \lceil\sqrt{N_{\text{crop}} / 50,000}\rceil$<br>3. Debounced re-render (`contourReRender.js`) | **Screen-Space Culling & Density Binning**:<br>1. Viewport coordinate culling (`isPointInBounds`)<br>2. $100\times100\text{ px}$ screen-space spatial binning<br>3. LoD density capping (max 5 stations/cell via stable hash) | **Stage 1 Complete Bypass Gate**:<br>1. Evaluates $N_{\text{cells}} \approx 17,271 < 50,000$<br>2. BBox crop completely bypassed (`shouldBypassCrop` = `true`)<br>3. Step locked at `step = 1` (full native mesoscale fidelity)<br>4. Viewport re-render listeners bypassed (0 ms pan overhead) |
-| **Rendering Pathway** | Offscreen Canvas Image Source (`rasterLayer.js`) + LineString isolines (`contourLayer.js`) + HTML5 Canvas wind overlay (`windLayer.js`) | Direct DOM / SVG marker clusters managed via per-map `WeakMap` lifecycle | Shared `contourLayer.js` LineString pipeline with Douglas-Peucker simplification + optional Canvas raster |
-| **GeoJSON Heap Footprint** | $0\text{ MB}$ (Raster / Wind) or $2\text{--}4\text{ MB}$ (Cropped Isolines) | $\approx 200\text{ KB}\text{--}1.2\text{ MB}$ (raw GeoJSON in V8 heap) | $\approx 800\text{ KB}\text{--}1.8\text{ MB}$ (regional isoline GeoJSON) |
-| **Navigation FPS** | Locked $60\text{ FPS}$ (debounced dynamic re-sampling) | Locked $60\text{ FPS}$ (markers culled to visible viewport) | Locked $60\text{ FPS}$ (computed once, zero re-computations) |
+| **Primary Memory Bottleneck** | V8 heap exhaustion from GeoJSON `MultiPolygon` isobands ($60\text{--}90\text{ MB}$) & CPU Marching Squares latency ($> 500\text{ ms}$) | Legacy DOM marker tree bloat, layout thrashing, and composite latency from thousands of DOM elements | Unnecessary CPU Marching Squares re-computations during smooth map navigation |
+| **Active Spatial Optimization** | **3-Stage Pipeline (§8.8.4)**:<br>1. Stage 2 BBox crop to visible extent $[W, S, E, N]$<br>2. Stage 3 cell-count LOD: $\text{step} = \lceil\sqrt{N_{\text{crop}} / 50,000}\rceil$<br>3. Debounced re-render (`contourReRender.js`) | **Direct Canvas 2D Overlay Pipeline**:<br>1. Single full-screen `<canvas>` at `zIndex: 410`<br>2. Viewport coordinate culling (`isPointInBounds`)<br>3. $100\times100\text{ px}$ screen-space spatial binning<br>4. LoD density capping (max 5 stations/cell via stable hash)<br>5. Instant mouse hover inspection (`__SHOW_TOOLTIP__`) | **Stage 1 Complete Bypass Gate**:<br>1. Evaluates $N_{\text{cells}} \approx 17,271 < 50,000$<br>2. BBox crop completely bypassed (`shouldBypassCrop` = `true`)<br>3. Step locked at `step = 1` (full native mesoscale fidelity)<br>4. Viewport re-render listeners bypassed (0 ms pan overhead) |
+| **Rendering Pathway** | Offscreen Canvas Image Source (`rasterLayer.js`) + LineString isolines (`contourLayer.js`) + HTML5 Canvas wind overlay (`windLayer.js`) | Direct HTML5 Canvas 2D context drawing (`ctx.fillText`, `ctx.arc`, `ctx.lineTo`) managed via per-map `WeakMap` lifecycle | Shared `contourLayer.js` LineString pipeline with Douglas-Peucker simplification + optional Canvas raster |
+| **GeoJSON Heap Footprint** | $0\text{ MB}$ (Raster / Wind) or $2\text{--}4\text{ MB}$ (Cropped Isolines) | $\approx 200\text{ KB}\text{--}1.2\text{ MB}$ (raw GeoJSON in V8 heap, $0$ DOM markers) | $\approx 800\text{ KB}\text{--}1.8\text{ MB}$ (regional isoline GeoJSON) |
+| **Navigation FPS** | Locked $60\text{ FPS}$ (debounced dynamic re-sampling) | Locked $60\text{ FPS}$ (zero layout thrashing, continuous canvas rendering) | Locked $60\text{ FPS}$ (computed once, zero re-computations) |
 
 ---
 
@@ -991,11 +991,12 @@ graph TD
         NWPGrid["NWP 2D Vector Mesh (ECMWF / GFS u, v)"]
     end
 
-    subgraph StationEngine ["1. Synoptic Station Vector Engine (weatherSymbols.js & stationLayer.js)"]
-        SVGGen["getWindBarbSVG(speed, direction, baseSize)"]
-        MarkerOverlay["MapLibre HTML Marker Cluster Overlay"]
-        LoDCull["Spatial Clutter Avoidance & Level-of-Detail Culling"]
-        SVGGen --> MarkerOverlay --> LoDCull
+    subgraph StationEngine ["1. Synoptic Station Canvas Engine (weatherSymbols.js & stationLayer.js)"]
+        CanvasDirect["Direct HTML5 Canvas 2D Overlay (.station-plot-canvas, zIndex: 410)"]
+        WMOPlot["Integrated WMO 9-Position Canvas Drawing (TT, Td, DTD, PPP, R6, ppa, ww, vis)"]
+        BarbCanvas["Canvas 2D Barb & Sky Cover Drawing (ctx.lineTo, ctx.fill, ctx.arc)"]
+        LoDCull["Screen-Space Spatial Binning (100x100px) & LoD Culling (<= 5 per cell)"]
+        CanvasDirect --> WMOPlot --> BarbCanvas --> LoDCull
     end
 
     subgraph GridEngine ["2. Direct Canvas 2D Grid Engine (windLayer.js)"]
@@ -1025,7 +1026,7 @@ The speed is decomposed into a hierarchical sequence of geometric pennants (flag
 Wind speed is rounded to the nearest $2\text{ m/s}$ increment following operational meteorological thresholds:
 
 | Wind Speed ($m/s$) | Pennants ($20\text{ m/s}$) | Full Feathers ($4\text{ m/s}$) | Half Feathers ($2\text{ m/s}$) | Graphical Representation |
-| :---: | :---: | :---: | :---: | :--- |
+| :--- | :--- | :--- | :--- | :--- |
 | **$< 1.5$** | $0$ | $0$ | $0$ | Calm circle ($\odot$, radius $4.5\text{ px}$) |
 | **$[1.5, 3.5)$** | $0$ | $0$ | $1$ | 1 short feather (indented from staff tip) |
 | **$[3.5, 5.5)$** | $0$ | $1$ | $0$ | 1 long feather |
@@ -1052,11 +1053,13 @@ Wind speed is rounded to the nearest $2\text{ m/s}$ increment following operatio
 
 MICAPS-Web provides two specialized, high-performance rendering engines tailored to the differing topological requirements of discrete observational stations vs. dense gridded NWP fields:
 
-##### 1. Synoptic Station Plot Engine ([`weatherSymbols.js`](file:///root/downloads/micaps-web/client/src/utils/weatherSymbols.js) & [`stationLayer.js`](file:///root/downloads/micaps-web/client/src/layers/stationLayer.js))
-- **Vector SVG Generation**: Produces crisp, resolution-independent vector markup via `getWindBarbSVG(speed, direction, baseSize)`.
-- **Integrated WMO 9-Point Model**: Positioned at the station coordinate centroid, acting as the directional anchor for upper-air height, temperature, dewpoint, and surface weather parameter plots.
-- **Calm & Outlier Handling**: Observations $< 1.5\text{ m/s}$ render an inner calm circle (`<circle r="4.5">`); speeds $> 150\text{ m/s}$ or $-9999$ nulls are omitted.
-- **Level-of-Detail (LoD) Culling**: Dense station clusters are dynamically culled based on map zoom and screen-space collision radius, preventing overlap while maintaining primary sounding and surface station visibility.
+##### 1. Synoptic Station Direct Canvas 2D Engine ([`stationLayer.js`](file:///root/downloads/micaps-web/client/src/layers/stationLayer.js) & [`weatherSymbols.js`](file:///root/downloads/micaps-web/client/src/utils/weatherSymbols.js))
+- **Zero DOM Markers (Direct HTML5 Canvas 2D Overlay)**: Operates on a dedicated full-screen overlay `<canvas class="station-plot-canvas">` attached to the map container at `zIndex: 410`, replacing thousands of heavy DOM nodes with a single canvas element ($100\%$ elimination of layout thrashing and composite latency).
+- **Integrated WMO 9-Position Canvas Drawing**: Renders TT (Temperature), Td (Dew Point), DTD (Dew-point Depression), PPP (Pressure/Height), R6 (6h Rain), ppa (3h Tendency), ww (Weather Code), and VV (Visibility) directly via high-contrast Canvas 2D text drawing (`ctx.strokeText` halo + `ctx.fillText`) centered at the station centroid.
+- **Direct Canvas Barb & Sky Cover Symbology**: Draws the rotating staff line (`ctx.lineTo`), $20\text{ m/s}$ filled pennant polygons (`ctx.fill()`), $4\text{ m/s}$ and $2\text{ m/s}$ feathers, calm circles ($< 1.5\text{ m/s}$), and 0–8 octas sky cover pie slices directly on Canvas 2D.
+- **Locked 60 FPS Continuous Navigation**: Uses `requestAnimationFrame` scheduled on continuous map gestures (`move`, `zoom`, `resize`), eliminating the stutter and lag of legacy DOM marker repositioning.
+- **Interactive Mouse Hover Inspection**: Maintains active screen-projected station coordinates for fast spatial hit-testing on map `mousemove`, automatically raising the hover tooltip (`__SHOW_TOOLTIP__`) and changing the cursor to pointer when hovering within station proximity.
+- **Fallback Headless Compatibility**: Gracefully falls back to DOM marker generation in headless unit-testing environments lacking real WebGL/Canvas containers, ensuring complete automated test compatibility.
 
 ##### 2. NWP Gridded Vector Canvas Engine ([`windLayer.js`](file:///root/downloads/micaps-web/client/src/layers/windLayer.js))
 - **Direct Canvas 2D Pipeline**: Operates on a full-screen `<canvas class="wind-barb-canvas">` at `zIndex: 405`, completely bypassing GeoJSON allocations and worker tile serialization ($0\text{ MB}$ GeoJSON footprint).
