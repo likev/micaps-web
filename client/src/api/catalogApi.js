@@ -9,7 +9,7 @@ export async function fetchModels() {
   return await fetchJson("/api/catalog/models");
 }
 
-export async function fetchTree(path, limit = 50) {
+export async function fetchTree(path, limit = 100) {
   return await fetchJson("/api/catalog/tree", { path, limit });
 }
 

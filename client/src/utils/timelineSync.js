@@ -117,9 +117,9 @@ export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP",
     } catch (_) {}
   }
 
-  // 2. Second priority: Bounded treeview catalog query with limit=30
+  // 2. Second priority: Bounded treeview catalog query with limit=100
   try {
-    const fileEntries = await fetchTree(path, 30);
+    const fileEntries = await fetchTree(path, 100);
     const cycles = extractCyclesFromFiles(fileEntries);
     if (cycles.length > 0) {
       forecastCyclesCache[path] = { data: cycles, ts: Date.now() };
@@ -130,10 +130,10 @@ export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP",
     console.warn(`[Forecast] Fetch cycles failed for ${path}:`, err);
   }
 
-  // 3. Third priority: Bounded treeview catalog query on model/element path with limit=30
+  // 3. Third priority: Bounded treeview catalog query on model/element path with limit=100
   if (shortPath !== path) {
     try {
-      const fileEntries = await fetchTree(shortPath, 30);
+      const fileEntries = await fetchTree(shortPath, 100);
       const cycles = extractCyclesFromFiles(fileEntries);
       if (cycles.length > 0) {
         forecastCyclesCache[path] = { data: cycles, ts: Date.now() };
@@ -160,57 +160,55 @@ export async function resolveLatestForecastCycle(model = "ECMWF_HR", element = "
 
 export async function syncObservationTimeline(path, currentFile = null, winTitle = "", win = null) {
   const isUpper = path.includes("UPPER_AIR") || winTitle.toLowerCase().includes("upper") || winTitle.toLowerCase().includes("sounding");
-  const stepLength = isUpper ? 12 : 3;
+  const stepLength = (win && win.stepLength) ? win.stepLength : (isUpper ? 12 : 3);
   const applyTimeline = (file, files) => {
+    const timelineData = { file, files, winTitle, stepLength, path, isUpper };
     if (win) {
-      win._obsTimeline = { file, files };
+      win._obsTimeline = timelineData;
       if (getActiveWindow() === win) {
-        setTimelineMode("obs", { file, files, winTitle, stepLength, path });
+        setTimelineMode("obs", timelineData);
       } else {
-        win._pendingTimeline = { file, files, winTitle, stepLength, path };
+        win._pendingTimeline = timelineData;
       }
     } else {
-      setTimelineMode("obs", { file, files, winTitle, stepLength, path });
+      setTimelineMode("obs", timelineData);
     }
   };
   try {
-    const fileEntries = await fetchTree(path, 30);
+    const fileEntries = await fetchTree(path, 100);
     if (Array.isArray(fileEntries) && fileEntries.length > 0) {
       let validFiles = fileEntries.filter((f) => f.name && (f.size > 100 || f.size === 0)).map((f) => f.name);
       const hasObsFormat = validFiles.some((f) => f.length >= 14 && f.endsWith(".000"));
       const isMockFallback = !hasObsFormat;
-      validFiles = hasObsFormat ? validFiles.filter((f) => f.length >= 14 && f.endsWith(".000")) : DEFAULT_MOCK_OBS_FILES;
+      validFiles = hasObsFormat ? validFiles.filter((f) => f.length >= 14 && f.endsWith(".000")) : [...DEFAULT_MOCK_OBS_FILES];
       if (validFiles.length > 0) {
-        const recentFiles = !isMockFallback && validFiles.length >= 2 ? validFiles.slice(0, 10).reverse() : (validFiles.length >= 2 ? validFiles.slice(-10) : DEFAULT_MOCK_OBS_FILES);
-        // when falling back to mock, recentFiles should be mock files
-        let effectiveFiles = isMockFallback ? DEFAULT_MOCK_OBS_FILES : recentFiles;
-        if (isUpper) {
-          const upperFiltered = filterObsFilesByStep(effectiveFiles, stepLength, true);
-          if (upperFiltered.length > 0) {
-            effectiveFiles = upperFiltered;
-          }
-        }
-        let targetFile = currentFile && effectiveFiles.includes(currentFile) ? currentFile : effectiveFiles[effectiveFiles.length - 1];
-        if (isUpper && currentFile && !effectiveFiles.includes(currentFile)) {
+        const rawFiles = !isMockFallback && validFiles.length >= 2
+          ? validFiles.slice(0, 100).reverse()
+          : (validFiles.length >= 2 ? validFiles.slice(-100) : [...DEFAULT_MOCK_OBS_FILES]);
+
+        const filteredFiles = filterObsFilesByStep(rawFiles, stepLength, isUpper);
+        let targetFile = currentFile && filteredFiles.includes(currentFile)
+          ? currentFile
+          : (filteredFiles.length > 0 ? filteredFiles[filteredFiles.length - 1] : rawFiles[rawFiles.length - 1]);
+        if (isUpper && currentFile && !filteredFiles.includes(currentFile)) {
           // If a requested file was outside standard 08:00/20:00 soundings, lock to latest valid sounding
-          targetFile = effectiveFiles[effectiveFiles.length - 1];
+          targetFile = filteredFiles.length > 0 ? filteredFiles[filteredFiles.length - 1] : (rawFiles[rawFiles.length - 1] || currentFile);
         }
-        applyTimeline(targetFile, effectiveFiles);
+        applyTimeline(targetFile, rawFiles);
         return targetFile;
       }
     }
   } catch (err) {
     console.warn("[Main] Failed to query observation file tree for timeline:", err);
   }
-  let fallbackFiles = DEFAULT_MOCK_OBS_FILES;
-  if (isUpper) {
-    const upperFallback = filterObsFilesByStep(DEFAULT_MOCK_OBS_FILES, stepLength, true);
-    if (upperFallback.length > 0) fallbackFiles = upperFallback;
+  const rawFallback = [...DEFAULT_MOCK_OBS_FILES];
+  const filteredFallback = filterObsFilesByStep(rawFallback, stepLength, isUpper);
+  let fallbackFile = currentFile && filteredFallback.includes(currentFile)
+    ? currentFile
+    : (filteredFallback.length > 0 ? filteredFallback[filteredFallback.length - 1] : rawFallback[rawFallback.length - 1]);
+  if (isUpper && currentFile && !filteredFallback.includes(currentFile)) {
+    fallbackFile = filteredFallback.length > 0 ? filteredFallback[filteredFallback.length - 1] : (rawFallback[rawFallback.length - 1] || currentFile);
   }
-  let fallbackFile = currentFile && fallbackFiles.includes(currentFile) ? currentFile : fallbackFiles[fallbackFiles.length - 1];
-  if (isUpper && currentFile && !fallbackFiles.includes(currentFile)) {
-    fallbackFile = fallbackFiles[fallbackFiles.length - 1];
-  }
-  applyTimeline(fallbackFile, fallbackFiles);
+  applyTimeline(fallbackFile, rawFallback);
   return fallbackFile;
 }

@@ -297,6 +297,10 @@ async function bootstrap() {
       win.loadSeq = (win.loadSeq || 0) + 1;
       const expectedSeq = win.loadSeq;
       win.obsTime = data.file;
+      if (win._obsTimeline) {
+        win._obsTimeline.file = data.file;
+        if (data.stepLength) win._obsTimeline.stepLength = data.stepLength;
+      }
       updateWindowTitle(win);
       if (!win.layerSnapshots) {
         const prevLayers = getLayersForWindow(win);
@@ -1016,6 +1020,7 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
     }
     updateWindowTitle(win);
     const nwpPayload = { period: curPeriod, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 };
+    win._nwpTimeline = nwpPayload;
     if (getActiveWindow() === win) {
       setTimelineMode("nwp", nwpPayload);
     } else {

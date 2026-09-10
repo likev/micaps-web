@@ -241,15 +241,19 @@ export function removeDerivedLayerFromPreset(presetId, layerMatcher) {
   }
 }
 
-export const DEFAULT_MOCK_OBS_FILES = [
-  "20260827080000.000",
-  "20260827140000.000",
-  "20260827200000.000",
-  "20260828020000.000",
-  "20260828080000.000",
-  "20260828140000.000",
-  "20260828200000.000",
-  "20260829020000.000",
-  "20260829080000.000",
-  "20260829200000.000",
-];
+export const DEFAULT_MOCK_OBS_FILES = (() => {
+  const files = [];
+  // 55 files spanning 7 days (every 3h: 02, 05, 08, 11, 14, 17, 20, 23 UTC+8)
+  // from 2026-08-23 02:00:00 to 2026-08-29 20:00:00
+  const baseTime = Date.UTC(2026, 7, 23, 2, 0, 0);
+  for (let i = 0; i < 55; i++) {
+    const d = new Date(baseTime + i * 3 * 3600 * 1000);
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    const h = String(d.getUTCHours()).padStart(2, "0");
+    files.push(`${y}${m}${day}${h}0000.000`);
+  }
+  return files;
+})();
+

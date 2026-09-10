@@ -515,21 +515,31 @@ export function focusWindow(tabId, winIdx) {
     isObservation: activeWin.isObservation,
   });
 
-  // Apply pending observation timeline stored by syncObservationTimeline for background windows
+  // Apply pending or cached observation timeline for active window
   if (activeWin._pendingTimeline) {
     const pt = activeWin._pendingTimeline;
     delete activeWin._pendingTimeline;
     import("./timeSlider.js").then(({ setTimelineMode }) => {
       try { setTimelineMode("obs", pt); } catch {}
     });
+  } else if (activeWin.isObservation && activeWin._obsTimeline) {
+    const ot = activeWin._obsTimeline;
+    import("./timeSlider.js").then(({ setTimelineMode }) => {
+      try { setTimelineMode("obs", ot); } catch {}
+    });
   }
 
-  // Apply pending NWP timeline stored by loadPresetGroup for background windows
+  // Apply pending or cached NWP timeline for active window
   if (activeWin._pendingNwp) {
     const pn = activeWin._pendingNwp;
     delete activeWin._pendingNwp;
     import("./timeSlider.js").then(({ setTimelineMode }) => {
       try { setTimelineMode("nwp", pn); } catch {}
+    });
+  } else if (!activeWin.isObservation && activeWin._nwpTimeline) {
+    const nt = activeWin._nwpTimeline;
+    import("./timeSlider.js").then(({ setTimelineMode }) => {
+      try { setTimelineMode("nwp", nt); } catch {}
     });
   }
 

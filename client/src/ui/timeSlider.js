@@ -2,6 +2,7 @@ import { appState } from "../store/appState.js";
 import { formatLeadTime, formatObsTimestamp, formatForecastInitTime, formatForecastValidTime } from "../utils/formatters.js";
 import { generateDynamicForecastCycles } from "../utils/timelineSync.js";
 import { schedulePrefetch } from "../services/prefetchService.js";
+import { DEFAULT_MOCK_OBS_FILES } from "../config/presets.js";
 
 let playTimer = null;
 let currentMode = "nwp"; // "nwp" or "obs"
@@ -12,22 +13,9 @@ let currentPeriodIdx = 4; // default +024h
 let forecastCycles = generateDynamicForecastCycles(null, 10);
 let currentInitCycle = forecastCycles[0] || "26082820";
 
-let rawObsFiles = [
-  "20260827080000.000",
-  "20260827110000.000",
-  "20260827140000.000",
-  "20260827170000.000",
-  "20260827200000.000",
-  "20260828020000.000",
-  "20260828050000.000",
-  "20260828080000.000",
-  "20260828110000.000",
-  "20260828140000.000",
-  "20260828170000.000",
-  "20260828200000.000",
-];
+let rawObsFiles = [...DEFAULT_MOCK_OBS_FILES];
 let obsFiles = [...rawObsFiles];
-let currentObsIdx = obsFiles.length - 1;
+let currentObsIdx = Math.max(0, obsFiles.length - 1);
 
 let onTimeChangeCallback = null;
 let currentWinTitle = "";
@@ -60,12 +48,21 @@ export function getPeriodsForStep(step = 6) {
 export function filterObsFilesByStep(files, stepHours, isUpper = false) {
   if (!Array.isArray(files) || files.length === 0) return [];
 
+  const stepNum = parseInt(stepHours, 10) || (isUpper ? 12 : 3);
+
   if (isUpper) {
-    const stepNum = parseInt(stepHours, 10) || 12;
-    if (stepNum === 12) {
+    if (stepNum === 12 || stepNum === 24) {
+      if (stepNum === 24) {
+        const filtered24 = files.filter((f) => {
+          if (f.length < 10) return false;
+          const hour = parseInt(f.slice(8, 10), 10);
+          return hour === 8;
+        });
+        if (filtered24.length > 0) return filtered24;
+      }
       // ONLY select 08:00 and 20:00 (UTC+8), filter out 14:00 and 02:00
       const filtered = files.filter((f) => {
-        if (f.length < 10) return true;
+        if (f.length < 10) return false;
         const hour = parseInt(f.slice(8, 10), 10);
         return hour === 8 || hour === 20;
       });
@@ -76,7 +73,7 @@ export function filterObsFilesByStep(files, stepHours, isUpper = false) {
     } else if (stepNum === 6) {
       // 6h upper-air runs: 02:00, 08:00, 14:00, 20:00 (UTC+8)
       const filtered = files.filter((f) => {
-        if (f.length < 10) return true;
+        if (f.length < 10) return false;
         const hour = parseInt(f.slice(8, 10), 10);
         return hour === 2 || hour === 8 || hour === 14 || hour === 20;
       });
@@ -84,7 +81,40 @@ export function filterObsFilesByStep(files, stepHours, isUpper = false) {
     }
   }
 
-  if (stepHours <= 1) return [...files];
+  // Surface synoptic 24h interval: 08:00 UTC+8 daily
+  if (stepNum === 24) {
+    const synoptic24 = files.filter((f) => {
+      if (f.length < 10) return false;
+      const hour = parseInt(f.slice(8, 10), 10);
+      const min = parseInt(f.slice(10, 12) || "0", 10);
+      return hour === 8 && min === 0;
+    });
+    if (synoptic24.length >= 2) return synoptic24;
+  }
+
+  // Surface synoptic 12h interval: 08:00 and 20:00 UTC+8
+  if (stepNum === 12) {
+    const synoptic12 = files.filter((f) => {
+      if (f.length < 10) return false;
+      const hour = parseInt(f.slice(8, 10), 10);
+      const min = parseInt(f.slice(10, 12) || "0", 10);
+      return (hour === 8 || hour === 20) && min === 0;
+    });
+    if (synoptic12.length >= 2) return synoptic12;
+  }
+
+  // Surface synoptic 6h interval: 02:00, 08:00, 14:00, 20:00 UTC+8
+  if (stepNum === 6) {
+    const synoptic6 = files.filter((f) => {
+      if (f.length < 10) return false;
+      const hour = parseInt(f.slice(8, 10), 10);
+      const min = parseInt(f.slice(10, 12) || "0", 10);
+      return (hour === 2 || hour === 8 || hour === 14 || hour === 20) && min === 0;
+    });
+    if (synoptic6.length >= 2) return synoptic6;
+  }
+
+  if (stepNum <= 1) return [...files];
 
   const filtered = [];
   let lastTimeMs = 0;
@@ -96,7 +126,7 @@ export function filterObsFilesByStep(files, stepHours, isUpper = false) {
       const hour = parseInt(file.slice(8, 10), 10);
       const min = parseInt(file.slice(10, 12) || "0", 10);
       const timeMs = Date.UTC(year, month, day, hour, min);
-      if (lastTimeMs === 0 || Math.abs(timeMs - lastTimeMs) >= (stepHours * 3600000 - 1800000)) {
+      if (lastTimeMs === 0 || Math.abs(timeMs - lastTimeMs) >= (stepNum * 3600000 - 1800000)) {
         filtered.push(file);
         lastTimeMs = timeMs;
       }
@@ -286,7 +316,34 @@ export function setStepLength(step, triggerCallback = false) {
   } else {
     const curFile = obsFiles[currentObsIdx] || "";
     obsFiles = filterObsFilesByStep(rawObsFiles, currentStepLength, isUpperAirMode);
-    const newIdx = obsFiles.indexOf(curFile);
+    let newIdx = obsFiles.indexOf(curFile);
+    if (newIdx === -1 && curFile && obsFiles.length > 0) {
+      const curYear = parseInt(curFile.slice(0, 4), 10);
+      const curMonth = parseInt(curFile.slice(4, 6), 10) - 1;
+      const curDay = parseInt(curFile.slice(6, 8), 10);
+      const curHour = parseInt(curFile.slice(8, 10), 10);
+      const curMin = parseInt(curFile.slice(10, 12) || "0", 10);
+      const curTimeMs = Date.UTC(curYear, curMonth, curDay, curHour, curMin);
+
+      let minDiff = Infinity;
+      let closestIdx = obsFiles.length - 1;
+      obsFiles.forEach((f, idx) => {
+        if (f.length >= 10) {
+          const y = parseInt(f.slice(0, 4), 10);
+          const m = parseInt(f.slice(4, 6), 10) - 1;
+          const d = parseInt(f.slice(6, 8), 10);
+          const h = parseInt(f.slice(8, 10), 10);
+          const mn = parseInt(f.slice(10, 12) || "0", 10);
+          const tMs = Date.UTC(y, m, d, h, mn);
+          const diff = Math.abs(tMs - curTimeMs);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestIdx = idx;
+          }
+        }
+      });
+      newIdx = closestIdx;
+    }
     currentObsIdx = newIdx !== -1 ? newIdx : Math.max(0, obsFiles.length - 1);
     updateLabels();
     renderChips();
@@ -608,4 +665,13 @@ export function getCurrentTimelineObsFile() {
 export function getCurrentTimelineCycle() {
   return currentInitCycle;
 }
+
+export function getTimelineObsFiles() {
+  return [...obsFiles];
+}
+
+export function getRawObsFiles() {
+  return [...rawObsFiles];
+}
+
 

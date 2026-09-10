@@ -198,4 +198,66 @@ describe("Timeslider Step-Length & Discrete Periods", () => {
     const kept = await syncObservationTimeline("UPPER_AIR/PLOT/500", validSounding, "500 hPa Sounding");
     expect(kept).toBe(validSounding);
   });
+
+  test("Observation timeline step length 12h yields >= 14 chips for both surface and upper-air", async () => {
+    const { setTimelineMode, setStepLength, getTimelineObsFiles, getRawObsFiles } = await import("../src/ui/timeSlider.js");
+    const { DEFAULT_MOCK_OBS_FILES } = await import("../src/config/presets.js");
+
+    expect(DEFAULT_MOCK_OBS_FILES.length).toBeGreaterThanOrEqual(50);
+
+    // 1. Surface mode with default 3h step length
+    setTimelineMode("obs", {
+      files: DEFAULT_MOCK_OBS_FILES,
+      stepLength: 3,
+      path: "SURFACE/PLOT_GLOBAL_3H",
+      winTitle: "Surface Synoptic Plot",
+    });
+
+    const rawFiles = getRawObsFiles();
+    expect(rawFiles.length).toBeGreaterThanOrEqual(50);
+    expect(getTimelineObsFiles().length).toBeGreaterThanOrEqual(50);
+
+    // 2. Switch Surface step length to 12h: must produce >= 14 chips (not just 3!)
+    setStepLength(12);
+    const surface12hFiles = getTimelineObsFiles();
+    expect(surface12hFiles.length).toBeGreaterThanOrEqual(14);
+    // All files in 12h surface mode must align with synoptic 08:00 and 20:00 UTC+8
+    surface12hFiles.forEach((f) => {
+      const hour = parseInt(f.slice(8, 10), 10);
+      expect([8, 20]).toContain(hour);
+    });
+
+    // 3. Switch Surface step length to 6h: must produce >= 28 chips (02, 08, 14, 20)
+    setStepLength(6);
+    const surface6hFiles = getTimelineObsFiles();
+    expect(surface6hFiles.length).toBeGreaterThanOrEqual(28);
+    surface6hFiles.forEach((f) => {
+      const hour = parseInt(f.slice(8, 10), 10);
+      expect([2, 8, 14, 20]).toContain(hour);
+    });
+
+    // 4. Switch back to 3h: must restore all files without data loss
+    setStepLength(3);
+    expect(getTimelineObsFiles().length).toBe(rawFiles.length);
+
+    // 5. Upper-air mode with default 12h step length: must produce >= 14 chips (not just 5!)
+    setTimelineMode("obs", {
+      files: DEFAULT_MOCK_OBS_FILES,
+      stepLength: 12,
+      path: "UPPER_AIR/PLOT/500",
+      winTitle: "500 hPa Geopotential Height",
+      isUpper: true,
+    });
+    const upper12hFiles = getTimelineObsFiles();
+    expect(upper12hFiles.length).toBeGreaterThanOrEqual(14);
+    upper12hFiles.forEach((f) => {
+      const hour = parseInt(f.slice(8, 10), 10);
+      expect([8, 20]).toContain(hour);
+    });
+
+    // 6. Upper-air switched to 6h: must produce >= 28 chips
+    setStepLength(6);
+    const upper6hFiles = getTimelineObsFiles();
+    expect(upper6hFiles.length).toBeGreaterThanOrEqual(28);
+  });
 });

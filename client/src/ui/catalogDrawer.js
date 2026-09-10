@@ -210,7 +210,7 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
       let files = null;
       for (const p of candidatePaths) {
         try {
-          const res = await fetchTree(p);
+          const res = await fetchTree(p, 100);
           const arr = Array.isArray(res) ? res : res?.files || res?.data || null;
           if (Array.isArray(arr) && arr.length) {
             files = arr;
@@ -226,7 +226,7 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
         if (isUpper) {
           obsFiles = filterObsFilesByStep(obsFiles, 12, true);
         }
-        toUse = obsFiles.slice(0, 10);
+        toUse = obsFiles.slice(0, 100);
       }
       if (!toUse.length) {
         const { DEFAULT_MOCK_OBS_FILES } = await import("../config/presets.js");
@@ -235,7 +235,7 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
         if (isUpper) {
           fallback = filterObsFilesByStep(fallback, 12, true);
         }
-        toUse = fallback.slice(0, 10);
+        toUse = fallback.slice(0, 100);
       }
       if (toUse.length) {
         selectObsTime.innerHTML = toUse

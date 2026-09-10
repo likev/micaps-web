@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"micaps-web/db"
 )
@@ -33,15 +34,15 @@ func (h *CatalogHandler) TreeHandler(w http.ResponseWriter, r *http.Request) {
 	if h.MockMode {
 		isObs := strings.HasPrefix(dataPath, "SURFACE") || strings.HasPrefix(dataPath, "UPPER_AIR")
 		if isObs {
-			mockObsFiles := []map[string]interface{}{
-				{"name": "20260828170000.000", "size": 133979},
-				{"name": "20260828140000.000", "size": 169853},
-				{"name": "20260828110000.000", "size": 183551},
-				{"name": "20260828080000.000", "size": 207819},
-				{"name": "20260828050000.000", "size": 180591},
-				{"name": "20260828020000.000", "size": 249496},
-				{"name": "20260827200000.000", "size": 241557},
-				{"name": "20260827170000.000", "size": 125870},
+			mockObsFiles := make([]map[string]interface{}, 0, 60)
+			t := time.Date(2026, 8, 29, 20, 0, 0, 0, time.UTC)
+			for i := 0; i < 55; i++ {
+				fname := t.Format("20060102150405") + ".000"
+				mockObsFiles = append(mockObsFiles, map[string]interface{}{
+					"name": fname,
+					"size": 180000 + (i%5)*15000,
+				})
+				t = t.Add(-3 * time.Hour)
 			}
 			json.NewEncoder(w).Encode(mockObsFiles)
 			return
