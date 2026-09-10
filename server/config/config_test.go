@@ -4,6 +4,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -96,3 +97,55 @@ func TestGetLocalIPs(t *testing.T) {
 		seen[ipStr] = true
 	}
 }
+
+func TestFormatServerBanner(t *testing.T) {
+	testIPs := []string{"192.168.1.100", "10.0.0.5"}
+
+	// 1. Test plain banner (no color)
+	plainBanner := FormatServerBanner("8088", testIPs, false)
+	if !strings.Contains(plainBanner, "http://localhost:8088") {
+		t.Errorf("banner missing localhost url: %s", plainBanner)
+	}
+	if !strings.Contains(plainBanner, "http://192.168.1.100:8088") {
+		t.Errorf("banner missing network url: %s", plainBanner)
+	}
+	if !strings.Contains(plainBanner, "http://10.0.0.5:8088") {
+		t.Errorf("banner missing secondary network url: %s", plainBanner)
+	}
+	if !strings.Contains(plainBanner, "┌") || !strings.Contains(plainBanner, "┘") {
+		t.Errorf("banner missing box border characters: %s", plainBanner)
+	}
+
+	// Verify all boxed lines have identical character width
+	var bannerLines []string
+	for _, l := range strings.Split(plainBanner, "\n") {
+		if l != "" {
+			bannerLines = append(bannerLines, l)
+		}
+	}
+	if len(bannerLines) < 6 {
+		t.Fatalf("expected at least 6 banner lines, got %d", len(bannerLines))
+	}
+	expectedWidth := -1
+	for idx, line := range bannerLines {
+		runeCount := 0
+		for range line {
+			runeCount++
+		}
+		if expectedWidth == -1 {
+			expectedWidth = runeCount
+		} else if runeCount != expectedWidth {
+			t.Errorf("line %d width mismatch: got %d, expected %d. Line: %q", idx, runeCount, expectedWidth, line)
+		}
+	}
+
+	// 2. Test colorful banner
+	colorBanner := FormatServerBanner("8088", testIPs, true)
+	if !strings.Contains(colorBanner, "\033[36m") { // Cyan escape code
+		t.Errorf("colorful banner missing ANSI cyan escape code: %s", colorBanner)
+	}
+	if !strings.Contains(colorBanner, "\033[1;32m") { // Green escape code
+		t.Errorf("colorful banner missing ANSI green escape code: %s", colorBanner)
+	}
+}
+
