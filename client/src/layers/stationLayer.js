@@ -1,23 +1,25 @@
 // stationLayer.js - WMO & NOAA standard 9-point station weather plot model
 // Direct HTML5 Canvas 2D Overlay with 60 FPS performance, Zero DOM markers, and Per-map WeakMap isolation
-import { getSkyCoverSVG, getWindBarbSVG, getWeatherSymbol, getPressureTendencyGlyph } from "../utils/weatherSymbols.js";
-import maplibregl from "maplibre-gl";
+import { getWeatherSymbol, getPressureTendencyGlyph } from "../utils/weatherSymbols.js";
 
 // Safe requestAnimationFrame / cancelAnimationFrame
 const reqAnim = typeof requestAnimationFrame === "function" ? requestAnimationFrame : (cb) => setTimeout(cb, 16);
 const cancelAnim = typeof cancelAnimationFrame === "function" ? cancelAnimationFrame : (id) => clearTimeout(id);
 
-// Each map has its own state bucket so multiple maps don't share markers/data
+// Each map has its own state bucket so multiple maps don't share canvas/data
 const mapState = new WeakMap();
 let lastStationGeoJSON = null;
 
 function getState(map) {
   if (!mapState.has(map)) {
     mapState.set(map, {
-      markers: [],
       canvas: null,
       ctx: null,
       animId: null,
+      hoverAnimId: null,
+      lastHoverEvent: null,
+      activeBins: new Map(),
+      currentScale: 1.0,
       geojson: null,
       visible: true,
       activeVisibleStations: [],
@@ -50,8 +52,16 @@ function getState(map) {
 }
 
 export function setStationConfig(map, config) {
-  if (!map) return;
+  if (!map || !config) return;
   const state = getState(map);
+  let changed = false;
+  for (const k of Object.keys(config)) {
+    if (state.config[k] !== config[k]) {
+      changed = true;
+      break;
+    }
+  }
+  if (!changed) return;
   state.config = { ...state.config, ...config };
   updateVisibleMarkersForMap(map);
 }
@@ -130,7 +140,7 @@ export function renderStationWeatherPlots(map, geojson, visible = true, config =
 
     // Mouse hover listener for instant tooltip inspection
     if (!state.mouseMoveListener) {
-      state.mouseMoveListener = (e) => handleStationHover(map, e);
+      state.mouseMoveListener = (e) => onStationMouseMove(map, e);
       state.mouseOutListener = () => handleStationMouseOut(map);
       map.on("mousemove", state.mouseMoveListener);
       map.on("mouseout", state.mouseOutListener);
@@ -140,6 +150,25 @@ export function renderStationWeatherPlots(map, geojson, visible = true, config =
   updateVisibleMarkersForMap(map);
 }
 
+function onStationMouseMove(map, e) {
+  const state = getState(map);
+  if (!state.visible || !state.activeVisibleStations || state.activeVisibleStations.length === 0) return;
+  state.lastHoverEvent = e;
+
+  if (typeof requestAnimationFrame === "function") {
+    if (state.hoverAnimId) return;
+    state.hoverAnimId = requestAnimationFrame(() => {
+      state.hoverAnimId = null;
+      if (state.lastHoverEvent) {
+        handleStationHover(map, state.lastHoverEvent);
+      }
+    });
+  } else {
+    // Immediate execution in headless / test environments without native window.rAF
+    handleStationHover(map, e);
+  }
+}
+
 function handleStationHover(map, e) {
   const state = getState(map);
   if (!state.visible || !state.activeVisibleStations || state.activeVisibleStations.length === 0) return;
@@ -147,14 +176,43 @@ function handleStationHover(map, e) {
 
   const px = e.point.x;
   const py = e.point.y;
+  const scale = state.currentScale || 1.0;
+  const minDist = 22 * scale; // Hit radius scales with zoom
+  let closestDistSq = minDist * minDist;
   let hovered = null;
-  let minDist = 22; // Hit radius in screen pixels
 
-  for (const s of state.activeVisibleStations) {
-    const dist = Math.hypot(s.pt.x - px, s.pt.y - py);
-    if (dist < minDist) {
-      minDist = dist;
-      hovered = s;
+  // 1. Fast O(1) coarse bin lookup using 100x100px screen cells
+  if (state.activeBins && state.activeBins.size > 0) {
+    const minBx = Math.floor((px - minDist) / 100);
+    const maxBx = Math.floor((px + minDist) / 100);
+    const minBy = Math.floor((py - minDist) / 100);
+    const maxBy = Math.floor((py + minDist) / 100);
+
+    for (let bx = minBx; bx <= maxBx; bx++) {
+      for (let by = minBy; by <= maxBy; by++) {
+        const bin = state.activeBins.get(`${bx},${by}`);
+        if (!bin) continue;
+        for (let i = 0; i < bin.length; i++) {
+          const s = bin[i];
+          const dx = s.pt.x - px;
+          const dy = s.pt.y - py;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < closestDistSq) {
+            closestDistSq = d2;
+            hovered = s;
+          }
+        }
+      }
+    }
+  } else {
+    for (const s of state.activeVisibleStations) {
+      const dx = s.pt.x - px;
+      const dy = s.pt.y - py;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < closestDistSq) {
+        closestDistSq = d2;
+        hovered = s;
+      }
     }
   }
 
@@ -177,6 +235,13 @@ function handleStationHover(map, e) {
 }
 
 function handleStationMouseOut(map) {
+  const state = getState(map);
+  if (state.hoverAnimId && typeof cancelAnimationFrame === "function") {
+    cancelAnimationFrame(state.hoverAnimId);
+    state.hoverAnimId = null;
+  }
+  state.lastHoverEvent = null;
+
   if (map.getCanvas && map.getCanvas()) {
     map.getCanvas().style.cursor = "";
   }
@@ -545,7 +610,7 @@ export function drawSkyCoverCanvas(ctx, cx, cy, octas = 0, scale = 1.0) {
   ctx.lineWidth = 2.0 * scale;
   ctx.stroke();
 
-  const o = Math.min(8, Math.max(0, octas));
+  const o = isNaN(octas) ? 9 : Math.min(9, Math.max(0, Math.round(octas)));
   ctx.fillStyle = "#e6edf3";
 
   switch (o) {
@@ -586,6 +651,7 @@ export function drawSkyCoverCanvas(ctx, cx, cy, octas = 0, scale = 1.0) {
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.fill();
       break;
+    case 9:
     default: {
       // Obscured / missing: X cross
       const d = r * 0.707;
@@ -777,6 +843,7 @@ export function drawStationCanvas(map) {
 
   if (!state.visible || !state.geojson || !state.geojson.features || state.geojson.features.length === 0) {
     state.activeVisibleStations = [];
+    state.activeBins = new Map();
     state.renderedCount = 0;
     return true;
   }
@@ -784,6 +851,7 @@ export function drawStationCanvas(map) {
   const bounds = typeof map.getBounds === "function" ? map.getBounds() : null;
   const curZoom = typeof map.getZoom === "function" ? map.getZoom() : 5;
   const scale = curZoom < 4.5 ? 0.85 : (curZoom < 6.5 ? 1.0 : 1.15);
+  state.currentScale = scale;
 
   // 1. Group in-bounds stations matching filters into 100x100px screen pixel grid bins
   const screenBins = new Map();
@@ -821,221 +889,27 @@ export function drawStationCanvas(map) {
     }
   }
 
-  // 3. Render each station onto the 2D canvas context
+  // 3. Render each station onto the 2D canvas context and index into activeBins
+  const activeBins = new Map();
   for (const s of selectedStations) {
+    const bKey = `${Math.floor(s.pt.x / 100)},${Math.floor(s.pt.y / 100)}`;
+    let bList = activeBins.get(bKey);
+    if (!bList) {
+      bList = [];
+      activeBins.set(bKey, bList);
+    }
+    bList.push(s);
     renderStationPlotToCanvas(ctx, s.feature.properties || {}, s.pt.x, s.pt.y, state.config, scale);
   }
 
+  state.activeBins = activeBins;
   state.activeVisibleStations = selectedStations;
   state.renderedCount = selectedStations.length;
   return true;
 }
 
-// ----------------------------------------------------------------------------
-// Fallback DOM Marker Generator for Headless / Unit Testing Environments
-// ----------------------------------------------------------------------------
-
-function createStationMarkerDOM(f, config, scale) {
-  const p = f.properties || {};
-  const el = document.createElement("div");
-  el.className = "station-plot-marker";
-  el.style.fontFamily = "'SF Mono', -apple-system, monospace";
-  el.style.fontSize = "13px";
-  el.style.color = "#ffffff";
-  el.style.pointerEvents = "none";
-
-  const rawT = extractTemp(p, ["temperature", "temp", "TEM", "TT", "T", "TMP", "t", "temp_max", "tem"]);
-  const tt = rawT !== null ? Math.round(rawT).toString() : "";
-
-  const rawTd = extractTemp(p, ["dewpoint", "dew_point", "DPT", "TD", "Td", "td", "dew", "dpt"]);
-  const td = rawTd !== null ? Math.round(rawTd).toString() : "";
-
-  const ppp = extractPressureOrHeight(p);
-
-  const rawWs = extractRawNumber(p, ["wind_speed", "windSpeed", "ws", "WIN_S_Avg", "WIN_S", "FF", "ff", "speed"], 0, 150);
-  const ws = rawWs !== null ? (rawWs > 100 ? rawWs / 10.0 : rawWs) : null;
-  const wd = extractRawNumber(p, ["wind_dir", "windDir", "wd", "WIN_D_Avg", "WIN_D", "DD", "dd", "dir"], 0, 360);
-
-  const rawCloud = extractRawNumber(p, ["cloud_cover", "cloudCover", "cloud", "CLO_Cov", "N", "n"], 0, 9);
-  const cloudCover = rawCloud !== null ? Math.round(rawCloud) : 0;
-
-  const weatherCode = extractRawNumber(p, ["weather_code", "weatherCode", "weather", "Ww", "ww", "WEA"], 0, 99) || 0;
-
-  const pDiffRaw = extractRawNumber(p, ["press_diff_3h", "pDiff3h", "press_diff", "PRS_Change_3h", "p3"], -500, 500);
-  const pDiff = pDiffRaw !== null && Math.abs(pDiffRaw) > 0.05
-    ? `${pDiffRaw > 0 ? "+" : ""}${Math.abs(pDiffRaw) > 30 ? Math.round(pDiffRaw) : Math.round(pDiffRaw * 10)}`
-    : "";
-
-  const pTendCode = extractRawNumber(p, ["press_tend", "pTend", "PRS_Tendency", "a"], 0, 8);
-  const pTend = pTendCode !== null ? getPressureTendencyGlyph(pTendCode) : "";
-
-  const cfg = config || {};
-  const showTemp = cfg.showTemp !== undefined ? Boolean(cfg.showTemp) : true;
-  const showDewpoint = cfg.showDewpoint !== undefined ? Boolean(cfg.showDewpoint) : true;
-  const showWind = cfg.showWind !== undefined ? Boolean(cfg.showWind) : true;
-  const showDTD = Boolean(cfg.showDTD);
-  const showCloud = Boolean(cfg.showCloud);
-  const showWeather = Boolean(cfg.showWeather);
-  const showPressure = Boolean(cfg.showPressure);
-  const showTendency = Boolean(cfg.showTendency);
-  const showVisibility = Boolean(cfg.showVisibility);
-  const showRain6 = Boolean(cfg.showRain6);
-
-  let dtd = "";
-  if (rawT !== null && rawTd !== null && rawTd <= 50 && rawTd <= rawT + 0.5) {
-    const dVal = rawT - rawTd;
-    if (dVal >= 0 && dVal <= 45) {
-      dtd = Math.round(dVal).toString();
-    }
-  }
-
-  const rawVis = extractRawNumber(p, ["visibility", "VIS", "vis", "VV", "vv", "VIS_Avg", "VIS_Min"], 0, 150000);
-  const vis = rawVis !== null ? (rawVis >= 1000 ? (rawVis / 1000).toFixed(rawVis % 1000 === 0 ? 0 : 1) : (rawVis < 10 ? rawVis.toFixed(1) : Math.round(rawVis).toString())) : "";
-
-  const rawRain6 = extractRawNumber(p, ["rain_6h", "RAIN_6H", "rain6h", "PRE_6h", "RAIN_6h", "rain_3h", "rain_1h", "rain_12h", "rain_24h", "rain"], 0, 1000);
-  const rain6 = rawRain6 !== null && rawRain6 > 0 ? (rawRain6 < 10 ? rawRain6.toFixed(1) : Math.round(rawRain6).toString()) : "";
-
-  const ww = getWeatherSymbol(weatherCode);
-  const hasDTDPlot = Boolean(showDTD && dtd);
-  const hasVisPlot = Boolean(showVisibility && vis);
-  let wwHTML = "";
-  if (showWeather && ww) {
-    if (!hasDTDPlot) {
-      wwHTML = `
-      <div style="position: absolute; top: 20px; left: -2px; width: 20px; text-align: center; color: #e3b341; font-size: 15px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
-        ${ww}
-      </div>`;
-    } else if (!hasVisPlot) {
-      wwHTML = `
-      <div style="position: absolute; top: 20px; left: -26px; width: 24px; text-align: center; color: #e3b341; font-size: 15px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
-        ${ww}
-      </div>`;
-    }
-  }
-
-  const skySVG = getSkyCoverSVG(cloudCover, 16);
-  let barbSVG = "";
-  if (ws !== null && ws >= 0) {
-    if (ws < 1.5) {
-      barbSVG = getWindBarbSVG(0, 0, 100);
-    } else if (wd !== null && wd >= 0 && wd <= 360) {
-      barbSVG = getWindBarbSVG(ws, wd, 100);
-    }
-  }
-
-  el.innerHTML = `
-    <div style="position: relative; width: 56px; height: 56px; pointer-events: none; transform: scale(${scale}); transform-origin: center center;">
-      <!-- Wind Barb / Direction & Speed (Centered at 28, 28) -->
-      ${showWind ? `
-      <div style="position: absolute; top: -22px; left: -22px; width: 100px; height: 100px; pointer-events: none; z-index: 1;">
-        ${barbSVG}
-      </div>` : ""}
-      <!-- Center Sky Cover Circle (or small station dot if cloud is hidden) -->
-      ${showCloud ? `
-      <div style="position: absolute; top: 20px; left: 20px; width: 16px; height: 16px; pointer-events: none; z-index: 2;">
-        ${skySVG}
-      </div>` : `
-      <div style="position: absolute; top: 26px; left: 26px; width: 4px; height: 4px; border-radius: 50%; background: #e3b341; pointer-events: none; z-index: 2; box-shadow: 0 0 2px #000;"></div>`}
-      <!-- TT: Temperature (°C) Top-Left in Bold Red/Orange -->
-      ${showTemp && tt ? `
-      <div style="position: absolute; top: 4px; left: 0px; width: 22px; text-align: right; color: #f85149; font-weight: 700; font-size: 13px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
-        ${tt}
-      </div>` : ""}
-      <!-- DTD: Dew-Point Depression (°C) Middle-Left in Orange -->
-      ${hasDTDPlot ? `
-      <div style="position: absolute; top: 20px; left: 0px; width: 22px; text-align: right; color: #f0883e; font-weight: 700; font-size: 12px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
-        ${dtd}
-      </div>` : ""}
-      <!-- TdTd: Dew Point (°C) Bottom-Left in Emerald Green -->
-      ${showDewpoint && td ? `
-      <div style="position: absolute; bottom: 4px; left: 0px; width: 22px; text-align: right; color: #56d364; font-weight: 700; font-size: 13px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
-        ${td}
-      </div>` : ""}
-      <!-- ww: Present Weather Symbol (Middle Left or Displaced Far-Left) -->
-      ${wwHTML}
-      <!-- VV: Visibility (Far-Left in Golden Yellow) -->
-      ${hasVisPlot ? `
-      <div style="position: absolute; top: 20px; left: -26px; width: 24px; text-align: right; color: #ffd33d; font-weight: 700; font-size: 12px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
-        ${vis}
-      </div>` : ""}
-      <!-- PPP: Sea-Level Pressure (Top Right in Cyan/Blue) -->
-      ${showPressure && ppp ? `
-      <div style="position: absolute; top: 4px; left: 34px; width: 26px; text-align: left; color: #79c0ff; font-weight: 700; font-size: 13px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
-        ${ppp}
-      </div>` : ""}
-      <!-- R6: 6h Precipitation (Middle Right in Sky Blue) -->
-      ${showRain6 && rain6 ? `
-      <div style="position: absolute; top: 20px; left: 34px; width: 26px; text-align: left; color: #38bdf8; font-weight: 700; font-size: 12px; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
-        ${rain6}
-      </div>` : ""}
-      <!-- ppa: 3h Pressure Tendency & Diff (Bottom Right in Light Blue) -->
-      ${showTendency && (pDiff || pTend) ? `
-      <div style="position: absolute; bottom: 4px; left: 34px; width: 26px; text-align: left; font-size: 11px; font-weight: 600; color: #a5d6ff; text-shadow: 0 0 2px #000; line-height: 1; pointer-events: none;">
-        ${pDiff}${pTend}
-      </div>` : ""}
-    </div>
-  `;
-  return el;
-}
-
 export function updateVisibleMarkersForMap(map) {
-  const state = getState(map);
-
-  // 1. Primary Direct Canvas 2D Overlay Rendering (Zero DOM markers, 60 FPS locked)
-  const drawnOnCanvas = drawStationCanvas(map);
-  if (drawnOnCanvas) {
-    clearStationMarkersForMap(map);
-    return;
-  }
-
-  // 2. Fallback for headless unit testing environments without MapLibre container
-  clearStationMarkersForMap(map);
-  if (!state.visible || !state.geojson || !state.geojson.features) return;
-
-  const bounds = typeof map.getBounds === "function" ? map.getBounds() : null;
-  const curZoom = typeof map.getZoom === "function" ? map.getZoom() : 5;
-  const scale = curZoom < 4.5 ? 0.9 : (curZoom < 6.5 ? 1.0 : 1.15);
-
-  const screenBins = new Map();
-  for (const f of state.geojson.features) {
-    if (!f.geometry || !Array.isArray(f.geometry.coordinates) || f.geometry.coordinates.length < 2) continue;
-    const [lon, lat] = f.geometry.coordinates;
-    if (!isPointInBounds(bounds, lon, lat)) continue;
-    if (!matchesStationFilters(f.properties || {}, state.config)) continue;
-    if (typeof map.project !== "function") continue;
-
-    const pt = map.project([lon, lat]);
-    const binKey = `${Math.floor(pt.x / 100)},${Math.floor(pt.y / 100)}`;
-    let list = screenBins.get(binKey);
-    if (!list) {
-      list = [];
-      screenBins.set(binKey, list);
-    }
-    list.push(f);
-  }
-
-  const selectedFeatures = [];
-  for (const list of screenBins.values()) {
-    if (list.length <= 5) {
-      for (let i = 0; i < list.length; i++) selectedFeatures.push(list[i]);
-    } else {
-      list.sort((a, b) => {
-        const ha = hashStation(a.properties?.station_id, a.geometry.coordinates[0], a.geometry.coordinates[1]);
-        const hb = hashStation(b.properties?.station_id, b.geometry.coordinates[0], b.geometry.coordinates[1]);
-        return ha - hb;
-      });
-      for (let i = 0; i < 5; i++) selectedFeatures.push(list[i]);
-    }
-  }
-
-  for (const f of selectedFeatures) {
-    const [lon, lat] = f.geometry.coordinates;
-    const el = createStationMarkerDOM(f, state.config, scale);
-    const marker = new maplibregl.Marker({ element: el })
-      .setLngLat([lon, lat])
-      .addTo(map);
-    state.markers.push(marker);
-  }
+  drawStationCanvas(map);
 }
 
 // Legacy export alias for backward compatibility
@@ -1051,11 +925,16 @@ export function setStationVisibility(map, visible) {
     state.canvas.style.display = state.visible ? "block" : "none";
   }
   if (!state.visible) {
-    clearStationMarkersForMap(map);
+    if (state.hoverAnimId && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(state.hoverAnimId);
+      state.hoverAnimId = null;
+    }
+    state.lastHoverEvent = null;
     if (state.ctx && state.canvas) {
       state.ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
     }
     state.activeVisibleStations = [];
+    state.activeBins = new Map();
     state.renderedCount = 0;
     handleStationMouseOut(map);
   } else {
@@ -1063,12 +942,9 @@ export function setStationVisibility(map, visible) {
   }
 }
 
-export function clearStationMarkersForMap(map) {
-  const state = getState(map);
-  for (const m of state.markers) {
-    if (m && typeof m.remove === "function") m.remove();
-  }
-  state.markers = [];
+// Kept for backward compatibility; canvas path holds no DOM markers.
+export function clearStationMarkersForMap(_map) {
+  return;
 }
 
 export function getStationGeoJSON(map = null) {
@@ -1086,6 +962,12 @@ export function removeStationLayer(map) {
     cancelAnim(state.animId);
     state.animId = null;
   }
+  if (state.hoverAnimId && typeof cancelAnimationFrame === "function") {
+    cancelAnimationFrame(state.hoverAnimId);
+    state.hoverAnimId = null;
+  }
+  state.lastHoverEvent = null;
+
   if (state.moveListener && typeof map.off === "function") {
     map.off("move", state.moveListener);
     map.off("zoom", state.moveListener);
@@ -1112,37 +994,35 @@ export function removeStationLayer(map) {
     state.canvas = null;
     state.ctx = null;
   }
-  clearStationMarkersForMap(map);
   state.activeVisibleStations = [];
+  state.activeBins = new Map();
   state.renderedCount = 0;
+  if (lastStationGeoJSON === state.geojson || !map) {
+    lastStationGeoJSON = null;
+  }
   state.geojson = null;
   state.visible = false;
   handleStationMouseOut(map);
 }
 
 // Expose station layer controller for automated testing (uses active map fallback)
-if (typeof window !== "undefined") {
-  window.__STATION_LAYER__ = {
-    getVisibleCount: (map = null) => {
-      if (map && mapState.has(map)) {
-        const s = mapState.get(map);
-        return s.renderedCount || s.markers.length || 0;
-      }
-      if (window.__MAP__ && mapState.has(window.__MAP__)) {
-        const s = mapState.get(window.__MAP__);
-        return s.renderedCount || s.markers.length || 0;
-      }
-      let total = 0;
-      document.querySelectorAll(".station-plot-marker").forEach(() => total++);
-      return total;
-    },
-    getTotalCount: () => {
-      if (window.__MAP__) {
-        const s = mapState.get(window.__MAP__);
-        if (s && s.geojson && s.geojson.features) return s.geojson.features.length;
-      }
-      return lastStationGeoJSON && lastStationGeoJSON.features ? lastStationGeoJSON.features.length : 0;
-    },
-    setVisible: (map, visible) => setStationVisibility(map, visible),
-  };
-}
+const targetGlobal = typeof window !== "undefined" ? window : globalThis;
+targetGlobal.__STATION_LAYER__ = {
+  getVisibleCount: (map = null) => {
+    if (map && mapState.has(map)) {
+      return mapState.get(map).renderedCount || 0;
+    }
+    if (targetGlobal.__MAP__ && mapState.has(targetGlobal.__MAP__)) {
+      return mapState.get(targetGlobal.__MAP__).renderedCount || 0;
+    }
+    return 0;
+  },
+  getTotalCount: () => {
+    if (targetGlobal.__MAP__) {
+      const s = mapState.get(targetGlobal.__MAP__);
+      if (s && s.geojson && s.geojson.features) return s.geojson.features.length;
+    }
+    return lastStationGeoJSON && lastStationGeoJSON.features ? lastStationGeoJSON.features.length : 0;
+  },
+  setVisible: (map, visible) => setStationVisibility(map, visible),
+};

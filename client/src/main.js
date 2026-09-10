@@ -879,7 +879,6 @@ async function loadUpperAirComposite(map, level = 500, obsTime = "20260828170000
     ...(existingStn?.config || {}),
   };
   renderStationWeatherPlots(map, stations, isVisible, stnConfig);
-  setStationConfig(map, stnConfig);
   const stnLayer = addOrUpdateLayer({ id: layerId, name: `${curLevel} hPa Sounding Station Plots`, type: "station", color: "#e3b341", visible: isVisible, removable: true, stationsGeoJSON: stations, model: "UPPER_AIR", level: curLevel, config: stnConfig }, win);
   if (win && getActiveWindow() === win) syncLayerControlForWindow(win);
   if (stnLayer?.config?.showStreamlines && isVisible) triggerStationStreamlines(map, stnLayer, win);
@@ -916,7 +915,6 @@ async function loadObservationProduct(map, model, element, level, file, win = ge
       ...(existingStn?.config || {}),
     };
     renderStationWeatherPlots(map, stations, isVisible, stnConfig);
-    setStationConfig(map, stnConfig);
     const stnLayer = addOrUpdateLayer({ id: layerId, name, type: "station", color: "#e3b341", visible: isVisible, removable: true, stationsGeoJSON: stations, model, element, level, config: stnConfig }, win);
     if (win && getActiveWindow() === win) syncLayerControlForWindow(win);
     if (stnLayer?.config?.showStreamlines && isVisible) triggerStationStreamlines(map, stnLayer, win);

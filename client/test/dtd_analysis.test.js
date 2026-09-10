@@ -2,14 +2,43 @@
 import { test, expect, describe, beforeEach } from "bun:test";
 import { analyzeAndRenderSurfaceContours, SURFACE_CONTOUR_CONFIGS } from "../src/layers/surfaceAnalysis.js";
 import { analyzeAndRenderSoundingElementContour, SOUNDING_CONTOUR_CONFIGS } from "../src/layers/soundingAnalysis.js";
-import { getFieldValue, matchesStationFilters, renderStationWeatherPlots } from "../src/layers/stationLayer.js";
+import { getFieldValue, matchesStationFilters, renderStationPlotToCanvas } from "../src/layers/stationLayer.js";
 import { formatElementUnit } from "../src/utils/formatters.js";
 import { getColormap, getColor, getElementLevels } from "../src/utils/colormaps.js";
 import { getPaletteCategory } from "../src/utils/paletteLoader.js";
 import { initTooltip } from "../src/ui/tooltip.js";
 import { getLayersForWindow, clearWindowWeatherLayers, renderStationDrawerHTML, addOrUpdateLayer } from "../src/ui/layerControl.js";
 import fs from "fs";
-import maplibregl from "maplibre-gl";
+
+// Recording Canvas 2D context: captures fillText with active fillStyle for color assertions
+function createMockCtx() {
+  const texts = [];
+  return {
+    texts,
+    fillStyle: "#000",
+    strokeStyle: "#000",
+    lineWidth: 1,
+    font: "",
+    textAlign: "",
+    textBaseline: "",
+    save() {},
+    restore() {},
+    beginPath() {},
+    closePath() {},
+    moveTo() {},
+    lineTo() {},
+    arc() {},
+    stroke() {},
+    fill() {},
+    setLineDash() {},
+    setTransform() {},
+    clearRect() {},
+    strokeText() {},
+    fillText(text, x, y) {
+      texts.push({ text, x, y, fillStyle: this.fillStyle, font: this.font });
+    },
+  };
+}
 
 // Setup minimal DOM for test environment
 const mockElements = new Map();
@@ -46,24 +75,6 @@ if (typeof globalThis.document === "undefined") {
 globalThis.document.createElement = (tag) => createMockElement("", "", tag);
 globalThis.document.getElementById = (id) => mockElements.get(id) || null;
 globalThis.document.body = createMockElement("body");
-
-// Mock maplibregl.Marker to capture rendered HTML and elements
-let renderedMarkers = [];
-maplibregl.Marker = class MockMarker {
-  constructor({ element } = {}) {
-    this.element = element;
-    renderedMarkers.push(this);
-  }
-  setLngLat(coords) {
-    this.coords = coords;
-    return this;
-  }
-  addTo(map) {
-    this.map = map;
-    return this;
-  }
-  remove() {}
-};
 
 function createMockMap() {
   const sources = new Map();
@@ -562,103 +573,74 @@ describe("9. Station Plot DTD Number & Collision Mechanics (§5-I)", () => {
     expect(stnLayer.config.showDTD).toBe(false);
   });
 
-  test("renderStationWeatherPlots plots orange integer DTD when showDTD is true and blanks when missing", () => {
-    const map = createMockMap();
-    const stns = {
-      type: "FeatureCollection",
-      features: [
-        {
-          type: "Feature",
-          geometry: { type: "Point", coordinates: [116.4, 39.9] },
-          properties: {
-            temperature: 24.6,
-            dewpoint: 19.2, // DTD = 5.4 -> round 5
-          },
-        },
-        {
-          type: "Feature",
-          geometry: { type: "Point", coordinates: [121.4, 31.2] },
-          properties: {
-            temperature: 20.0,
-            dewpoint: null, // missing Td
-          },
-        },
-      ],
-    };
+  test("renderStationPlotToCanvas plots orange integer DTD when showDTD is true and blanks when missing", () => {
+    const p1 = { temperature: 24.6, dewpoint: 19.2 }; // DTD = 5.4 -> round 5
+    const p2 = { temperature: 20.0, dewpoint: null }; // missing Td
 
-    // When showDTD is false: no DTD in DOM
-    renderedMarkers = [];
-    renderStationWeatherPlots(map, stns, true, { showDTD: false });
-    expect(renderedMarkers.length).toBe(2);
-    expect(renderedMarkers[0].element.innerHTML).not.toContain("color: #f0883e");
+    // When showDTD is false: no orange DTD text on canvas
+    let ctx = createMockCtx();
+    renderStationPlotToCanvas(ctx, p1, 100, 100, { showDTD: false }, 1.0);
+    expect(ctx.texts.some((t) => t.text === "5" && t.fillStyle === "#f0883e")).toBe(false);
 
-    // When showDTD is true: station 1 has "5", station 2 has blank
-    renderedMarkers = [];
-    renderStationWeatherPlots(map, stns, true, { showDTD: true });
-    expect(renderedMarkers.length).toBe(2);
+    // When showDTD is true: station 1 draws "5" in orange at middle-left (cx-8, cy)
+    ctx = createMockCtx();
+    renderStationPlotToCanvas(ctx, p1, 100, 100, { showDTD: true }, 1.0);
+    const dtd = ctx.texts.find((t) => t.text === "5" && t.fillStyle === "#f0883e");
+    expect(dtd).toBeDefined();
+    expect(dtd.x).toBe(92);
+    expect(dtd.y).toBe(100);
 
-    // Verify DTD geometry: top: 20px; left: 0px; color: #f0883e
-    const html1 = renderedMarkers[0].element.innerHTML;
-    expect(html1).toContain("color: #f0883e");
-    expect(html1).toMatch(/color:\s*#f0883e[^>]*>\s*5\s*<\/div>/);
-
-    // Station 2 (missing dewpoint) should have blank DTD
-    const html2 = renderedMarkers[1].element.innerHTML;
-    expect(html2).not.toContain("color: #f0883e");
+    // Station 2 (missing dewpoint) draws no orange DTD
+    ctx = createMockCtx();
+    renderStationPlotToCanvas(ctx, p2, 100, 100, { showDTD: true }, 1.0);
+    expect(ctx.texts.some((t) => t.fillStyle === "#f0883e")).toBe(false);
   });
 
-  test("collision rule: DTD displaces ww to left: -26px when VIS is off; ww dropped when VIS is on", () => {
-    const map = createMockMap();
-    const stnFeature = {
-      type: "FeatureCollection",
-      features: [
-        {
-          type: "Feature",
-          geometry: { type: "Point", coordinates: [116.4, 39.9] },
-          properties: {
-            temperature: 25.0,
-            dewpoint: 20.0,
-            weather_code: 71, // snow symbol
-            visibility: 10.0,
-          },
-        },
-      ],
+  test("collision rule: DTD displaces ww to cx-22 when VIS is off; ww dropped when VIS is on", () => {
+    const props = {
+      temperature: 25.0,
+      dewpoint: 20.0, // DTD = 5
+      weather_code: 71, // snow symbol "✶"
+      visibility: 10.0, // canvas draws "10"
     };
 
-    // Case 1: showDTD off, showWeather on -> ww is at middle-left (left: -2px)
-    renderedMarkers = [];
-    renderStationWeatherPlots(map, stnFeature, true, {
+    // Case 1: showDTD off, showWeather on -> ww at middle (cx-8 = 92)
+    let ctx = createMockCtx();
+    renderStationPlotToCanvas(ctx, props, 100, 100, {
       showDTD: false,
       showWeather: true,
       showVisibility: false,
-    });
-    let html = renderedMarkers[0].element.innerHTML;
-    expect(html).toContain("left: -2px");
+    }, 1.0);
+    let ww = ctx.texts.find((t) => t.text === "✶");
+    expect(ww).toBeDefined();
+    expect(ww.x).toBe(92);
 
-    // Case 2: showDTD on, showWeather on, VIS off -> DTD at left: 0px, ww displaced to left: -26px
-    renderedMarkers = [];
-    renderStationWeatherPlots(map, stnFeature, true, {
+    // Case 2: showDTD on, showWeather on, VIS off -> DTD at 92, ww displaced to 78
+    ctx = createMockCtx();
+    renderStationPlotToCanvas(ctx, props, 100, 100, {
       showDTD: true,
       showWeather: true,
       showVisibility: false,
-    });
-    html = renderedMarkers[0].element.innerHTML;
-    expect(html).toContain("left: 0px"); // DTD
-    expect(html).toContain("color: #f0883e");
-    expect(html).toContain("left: -26px"); // displaced ww
+    }, 1.0);
+    const dtd = ctx.texts.find((t) => t.text === "5" && t.fillStyle === "#f0883e");
+    expect(dtd).toBeDefined();
+    expect(dtd.x).toBe(92);
+    ww = ctx.texts.find((t) => t.text === "✶");
+    expect(ww).toBeDefined();
+    expect(ww.x).toBe(78);
 
-    // Case 3: showDTD on, showWeather on, VIS on -> DTD at left: 0px, VIS at left: -26px, ww dropped
-    renderedMarkers = [];
-    renderStationWeatherPlots(map, stnFeature, true, {
+    // Case 3: showDTD on, showWeather on, VIS on -> DTD at 92, VIS at 78 in gold, ww dropped
+    ctx = createMockCtx();
+    renderStationPlotToCanvas(ctx, props, 100, 100, {
       showDTD: true,
       showWeather: true,
       showVisibility: true,
-    });
-    html = renderedMarkers[0].element.innerHTML;
-    expect(html).toContain("left: 0px"); // DTD
-    expect(html).toContain("color: #ffd33d"); // VIS golden yellow
-    expect(html).toContain("left: -26px"); // VIS geometry
-    expect(html).not.toContain("color: #e3b341; font-size: 15px"); // ww dropped
+    }, 1.0);
+    expect(ctx.texts.some((t) => t.text === "5" && t.fillStyle === "#f0883e" && t.x === 92)).toBe(true);
+    const vis = ctx.texts.find((t) => t.fillStyle === "#ffd33d");
+    expect(vis).toBeDefined();
+    expect(vis.x).toBe(78);
+    expect(ctx.texts.some((t) => t.text === "✶")).toBe(false);
   });
 });
 

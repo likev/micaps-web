@@ -11,7 +11,9 @@ import {
   setStationVisibility,
   setStationConfig,
   removeStationLayer,
+  getStationGeoJSON,
 } from "../src/layers/stationLayer.js";
+import { getSkyCoverSVG } from "../src/utils/weatherSymbols.js";
 
 function createMockContext2D() {
   const calls = {
@@ -214,7 +216,7 @@ describe("Direct HTML5 Canvas 2D Station Plotting (§8.9 & §8.8)", () => {
     expect(ctx.calls.stroke).toBeGreaterThanOrEqual(2);
   });
 
-  test("drawSkyCoverCanvas correctly renders 0..8 octas pie slices and overcast", () => {
+  test("drawSkyCoverCanvas correctly renders 0..8 octas pie slices, overcast, and 9 obscured", () => {
     // Octas 0: Clear (only outer circle, no slice fill)
     ctx.calls.arc = [];
     ctx.calls.fill = 0;
@@ -235,6 +237,24 @@ describe("Direct HTML5 Canvas 2D Station Plotting (§8.9 & §8.8)", () => {
     drawSkyCoverCanvas(ctx, 50, 50, 8, 1.0);
     expect(ctx.calls.arc.length).toBe(2);
     expect(ctx.calls.fill).toBe(2);
+
+    // Octas 9: Obscured / missing -> WMO X-cross (stroked lines, only 1 base fill)
+    ctx.calls.arc = [];
+    ctx.calls.fill = 0;
+    ctx.calls.moveTo = [];
+    ctx.calls.lineTo = [];
+    ctx.calls.stroke = 0;
+    drawSkyCoverCanvas(ctx, 50, 50, 9, 1.0);
+    expect(ctx.calls.arc.length).toBe(1); // only background circle
+    expect(ctx.calls.fill).toBe(1); // no solid overcast fill
+    expect(ctx.calls.moveTo.length).toBeGreaterThanOrEqual(2); // X-cross diagonal lines
+    expect(ctx.calls.lineTo.length).toBeGreaterThanOrEqual(2);
+    expect(ctx.calls.stroke).toBeGreaterThanOrEqual(2); // stroke border + stroke X
+
+    // Parity with getSkyCoverSVG: okta 9 produces line elements, not solid circle
+    const svg9 = getSkyCoverSVG(9);
+    expect(svg9).toContain("<line");
+    expect(svg9).not.toContain('<circle cx="9" cy="9" r="7.5" fill="#e6edf3"/>');
   });
 
   test("renderStationPlotToCanvas draws all 9 synoptic elements and respects DTD collision rules", () => {
@@ -385,7 +405,69 @@ describe("Direct HTML5 Canvas 2D Station Plotting (§8.9 & §8.8)", () => {
     }
   });
 
-  test("removeStationLayer cleans up canvas element, listeners, and resets state", () => {
+  test("LoD sampling caps at max 5 stations per 100x100px screen bin", () => {
+    const map = createMockMapWithContainer(ctx);
+    // Create 12 stations all situated in the exact same 100x100px screen bin:
+    // [116.0..116.06, 39.0..39.06] all project to roughly (460, 160), within the same (4, 1) cell
+    const features = [];
+    for (let i = 1; i <= 12; i++) {
+      features.push({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [116.0 + i * 0.005, 39.0 + i * 0.005] },
+        properties: { station_id: `STN_${i}`, temperature: 20 + i },
+      });
+    }
+    const geojson = { type: "FeatureCollection", features };
+    renderStationWeatherPlots(map, geojson, true);
+
+    expect(globalThis.__STATION_LAYER__.getVisibleCount(map)).toBe(5);
+  });
+
+  test("setStationVisibility(false) hides canvas, resets count, and disables hover inspection", () => {
+    const map = createMockMapWithContainer(ctx);
+    let tooltipShown = null;
+    const prevShow = globalThis.__SHOW_TOOLTIP__;
+    globalThis.__SHOW_TOOLTIP__ = (coords, props, pos) => { tooltipShown = { coords, props, pos }; };
+    if (typeof window !== "undefined") window.__SHOW_TOOLTIP__ = globalThis.__SHOW_TOOLTIP__;
+
+    try {
+      const geojson = {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: { type: "Point", coordinates: [116.4, 39.9] },
+            properties: { station_id: "54511", name: "Beijing", temperature: 22.0 },
+          },
+        ],
+      };
+
+      renderStationWeatherPlots(map, geojson, true);
+      const canvas = getStationCanvas(map);
+      expect(canvas.style.display).toBe("block");
+      expect(globalThis.__STATION_LAYER__.getVisibleCount(map)).toBe(1);
+
+      // Hide station layer
+      setStationVisibility(map, false);
+      expect(canvas.style.display).toBe("none");
+      expect(globalThis.__STATION_LAYER__.getVisibleCount(map)).toBe(0);
+
+      // Hover over Beijing while invisible -> no tooltip
+      tooltipShown = null;
+      map._emit("mousemove", { point: { x: 464, y: 151 } });
+      expect(tooltipShown).toBeNull();
+      expect(map.getCanvas().style.cursor).toBe("");
+    } finally {
+      if (prevShow !== undefined) globalThis.__SHOW_TOOLTIP__ = prevShow;
+      else delete globalThis.__SHOW_TOOLTIP__;
+      if (typeof window !== "undefined") {
+        if (prevShow !== undefined) window.__SHOW_TOOLTIP__ = prevShow;
+        else delete window.__SHOW_TOOLTIP__;
+      }
+    }
+  });
+
+  test("removeStationLayer cleans up canvas element, listeners, and resets state and stale global GeoJSON", () => {
     const map = createMockMapWithContainer(ctx);
     const geojson = {
       type: "FeatureCollection",
@@ -400,9 +482,12 @@ describe("Direct HTML5 Canvas 2D Station Plotting (§8.9 & §8.8)", () => {
 
     renderStationWeatherPlots(map, geojson, true);
     expect(map.container.children.length).toBe(1);
+    expect(getStationGeoJSON(null)).toBe(geojson);
 
     removeStationLayer(map);
     expect(map.container.children.length).toBe(0);
     expect(getStationCanvas(map)).toBeNull();
+    expect(getStationGeoJSON(null)).toBeNull();
+    expect(globalThis.__STATION_LAYER__.getTotalCount()).toBe(0);
   });
 });

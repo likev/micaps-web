@@ -6,7 +6,8 @@ export function getSkyCoverSVG(octas = 0, size = 18) {
   const cy = size / 2;
 
   let fillContent = "";
-  switch (Math.min(8, Math.max(0, octas))) {
+  const o = isNaN(octas) ? 9 : Math.min(9, Math.max(0, Math.round(octas)));
+  switch (o) {
     case 0: // Clear (open circle)
       fillContent = "";
       break;
@@ -26,8 +27,12 @@ export function getSkyCoverSVG(octas = 0, size = 18) {
     case 8: // Overcast (solid)
       fillContent = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#e6edf3"/>`;
       break;
-    default: // Obscured / missing
-      fillContent = `<line x1="${cx - r}" y1="${cy - r}" x2="${cx + r}" y2="${cy + r}" stroke="#e6edf3" stroke-width="2.0"/><line x1="${cx + r}" y1="${cy - r}" x2="${cx - r}" y2="${cy + r}" stroke="#e6edf3" stroke-width="2.0"/>`;
+    case 9:
+    default: { // Obscured / missing (WMO okta 9: X-cross)
+      const d = r * 0.707;
+      fillContent = `<line x1="${cx - d}" y1="${cy - d}" x2="${cx + d}" y2="${cy + d}" stroke="#e6edf3" stroke-width="2.0"/><line x1="${cx + d}" y1="${cy - d}" x2="${cx - d}" y2="${cy + d}" stroke="#e6edf3" stroke-width="2.0"/>`;
+      break;
+    }
   }
 
   return `
