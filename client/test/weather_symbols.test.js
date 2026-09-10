@@ -108,6 +108,26 @@ describe("WMO Meteorological Symbol & Wind Barb Verification", () => {
     expect(extractPressureOrHeight({ height: 16330 })).toBe("633");
   });
 
+  test("extractPressureOrHeight correctly decodes and formats surface SLP matching info window", async () => {
+    const { extractPressureOrHeight } = await import("../src/layers/stationLayer.js");
+
+    // Standard surface sea-level pressure values
+    expect(extractPressureOrHeight({ slp: 1021.4 })).toBe("1021.4");
+    expect(extractPressureOrHeight({ slp: 1021.0 })).toBe("1021");
+    expect(extractPressureOrHeight({ slp: 1020.3 })).toBe("1020.3");
+    expect(extractPressureOrHeight({ slp: 998.5 })).toBe("998.5");
+
+    // Decoded from slp_encoded fallback
+    expect(extractPressureOrHeight({ slp_encoded: "214" })).toBe("1021.4");
+    expect(extractPressureOrHeight({ slp_encoded: "984" })).toBe("998.4");
+
+    // Surface SLP takes precedence over station elevation if elevation is in height property
+    expect(extractPressureOrHeight({ slp: 1021.4, height: 335.5 })).toBe("1021.4");
+
+    // Upper-air station with missing slp sentinel correctly falls back to height
+    expect(extractPressureOrHeight({ height: 5880, slp: -9999 })).toBe("588");
+  });
+
   test("renderGridWindBarbs draws 20 m/s pennant flags at CMA metric thresholds", async () => {
     const { renderGridWindBarbs } = await import("../src/layers/windLayer.js");
 

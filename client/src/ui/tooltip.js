@@ -19,7 +19,29 @@ export function initTooltip(containerId = "tooltip") {
     const tt = hasTT ? `${props.temperature} °C` : "--";
     const td = hasTd ? `${props.dewpoint} °C` : "--";
     const dtd = (hasTT && hasTd) ? `${(props.temperature - props.dewpoint).toFixed(1)} °C` : "--";
-    const slp = props.slp > 0 ? `${props.slp} hPa` : "--";
+    let slpVal = null;
+    for (const k of ["slp", "SLP", "press_slp", "PRS_Sea", "press_stn", "stn_press", "PRS"]) {
+      if (typeof props[k] === "number" && !isNaN(props[k]) && props[k] > 0 && props[k] < 110000) {
+        let v = props[k];
+        if (v > 8000 && v < 110000) v = v / 100.0;
+        else if (v > 8000 && v < 11000) v = v / 10.0;
+        if (v >= 800 && v <= 1100) {
+          slpVal = Math.round(v * 10) / 10;
+          break;
+        }
+      }
+    }
+    if (slpVal === null && typeof props.slp_encoded === "string" && props.slp_encoded.length === 3 && !isNaN(parseInt(props.slp_encoded, 10))) {
+      const enc = parseInt(props.slp_encoded, 10);
+      slpVal = Math.round((enc <= 600 ? enc / 10.0 + 1000.0 : enc / 10.0 + 900.0) * 10) / 10;
+    }
+
+    const hasHeight = props.height !== undefined && props.height !== null && props.height !== -9999 && props.height !== "-9999";
+    const heightNum = hasHeight ? parseFloat(props.height) : null;
+    const isUpperAir = slpVal === null && heightNum !== null && !isNaN(heightNum) && heightNum > -500;
+
+    const pressureLabel = isUpperAir ? "Height (H):" : "SLP (PPP):";
+    const pressureDisplay = isUpperAir ? `${Math.round(heightNum)} gpm` : (slpVal !== null ? `${slpVal} hPa` : "--");
     const wind = props.wind_speed >= 0 ? `${props.wind_speed} m/s (${props.wind_dir}°)` : "--";
     const cloud = props.cloud_cover !== undefined ? `${props.cloud_cover}/8 octas` : "--";
     const rain = props.rain_1h >= 0 ? `${props.rain_1h} mm` : "--";
@@ -33,7 +55,7 @@ export function initTooltip(containerId = "tooltip") {
         <span>Temp (TT):</span> <strong style="color: #f85149;">${tt}</strong>
         <span>Dewpt (Td):</span> <strong style="color: #56d364;">${td}</strong>
         <span>DTD (T−Td):</span> <strong style="color: #f0883e;">${dtd}</strong>
-        <span>SLP (PPP):</span> <strong style="color: #79c0ff;">${slp}</strong>
+        <span>${pressureLabel}</span> <strong style="color: #79c0ff;">${pressureDisplay}</strong>
         <span>Wind (ff/dd):</span> <strong>${wind}</strong>
         <span>Cloud (N):</span> <strong>${cloud}</strong>
         <span>Rain 1h:</span> <strong>${rain}</strong>

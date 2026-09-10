@@ -290,7 +290,7 @@ describe("Direct HTML5 Canvas 2D Station Plotting (§8.9 & §8.8)", () => {
     expect(texts).toContain("25"); // TT rounded
     expect(texts).toContain("19"); // Td rounded
     expect(texts).toContain("5"); // DTD
-    expect(texts).toContain("123"); // PPP
+    expect(texts).toContain("1012.3"); // PPP (SLP)
     expect(texts).toContain("15"); // R6
     expect(texts).toContain("•"); // ww rain symbol
 

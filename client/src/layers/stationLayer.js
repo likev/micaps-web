@@ -309,7 +309,31 @@ function extractTemp(props, keys, minValid = -90, maxValid = 90) {
 
 export function extractPressureOrHeight(props) {
   if (!props) return "";
-  // 1. If upper-air sounding with geopotential height
+
+  // 1. Surface observation with SLP / station pressure (prioritized when valid sea-level pressure exists)
+  const keys = ["slp", "SLP", "press_slp", "PRS_Sea", "press_stn", "stn_press", "PRS", "slp_encoded"];
+  for (const k of keys) {
+    const v = props[k];
+    if (v !== undefined && v !== null && v !== "" && v !== "---" && v !== -9999 && v !== "-9999") {
+      if (typeof v === "string" && v.length === 3 && !isNaN(parseInt(v, 10))) {
+        const enc = parseInt(v, 10);
+        const dec = enc <= 600 ? enc / 10.0 + 1000.0 : enc / 10.0 + 900.0;
+        const rounded = Math.round(dec * 10) / 10;
+        return rounded.toString();
+      }
+      let num = typeof v === "number" ? v : parseFloat(v);
+      if (!isNaN(num) && num > 0 && num < 110000) {
+        if (num > 8000 && num < 110000) num = num / 100.0;
+        else if (num > 8000 && num < 11000) num = num / 10.0;
+        if (num >= 800 && num <= 1100) {
+          const rounded = Math.round(num * 10) / 10;
+          return rounded.toString();
+        }
+      }
+    }
+  }
+
+  // 2. Upper-air sounding with geopotential height (when no valid SLP is reported)
   if (props.height !== undefined && props.height !== null && props.height !== -9999 && props.height !== "-9999") {
     let num = typeof props.height === "number" ? props.height : parseFloat(props.height);
     if (!isNaN(num) && num > -500 && num < 45000) {
@@ -328,25 +352,6 @@ export function extractPressureOrHeight(props) {
     }
   }
 
-  // 2. Surface observation with SLP / station pressure
-  const keys = ["slp", "SLP", "press_slp", "PRS_Sea", "slp_encoded", "press_stn", "stn_press", "PRS"];
-  for (const k of keys) {
-    const v = props[k];
-    if (v !== undefined && v !== null && v !== "" && v !== "---" && v !== -9999 && v !== "-9999") {
-      if (typeof v === "string" && v.length === 3 && !isNaN(parseInt(v, 10))) {
-        return v;
-      }
-      let num = typeof v === "number" ? v : parseFloat(v);
-      if (!isNaN(num) && num > 0 && num < 110000) {
-        if (num > 8000 && num < 110000) num = num / 100.0;
-        else if (num > 8000 && num < 11000) num = num / 10.0;
-        if (num >= 800 && num <= 1100) {
-          const val = Math.round(num * 10);
-          return String(val % 1000).padStart(3, "0");
-        }
-      }
-    }
-  }
   return "";
 }
 
