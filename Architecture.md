@@ -234,6 +234,7 @@ Composite presets and named colormaps are loaded from `client/config.json` at st
 
 - `render.colormap` overrides the group setting, and `colormapByLevel` provides a level-specific override.
 - Colormaps use sorted numeric `val` stops and RGB/RGBA channel arrays from 0–255.
+- `performance.maxEffectiveCells` (default `50000`) caps the Marching Squares input budget (§8.8.4); never hardcoded — read via `getMaxEffectiveCells()` in `client/src/config/presets.js`.
 
 ---
 
@@ -784,14 +785,14 @@ flowchart TD
     end
 
     subgraph MemoryPathways ["Client Spatial Representation Pathways"]
-        RawGrid -->|Color Shading| RasterPath["WebGL Float32 Texture (rasterLayer.js)"]
+        RawGrid -->|Color Shading| RasterPath["Offscreen Canvas Image Source (rasterLayer.js)"]
         RawGrid -->|Vector Lines| IsolinePath["Marching Squares Isolines (contourLayer.js)"]
         RawGrid -->|Vector Fills (Heavy)| IsobandPath["Marching Squares Isobands (contourf)"]
         RawWind -->|Dynamic Simulation| CanvasWind["HTML5 Canvas 2D Overlay (windLayer.js)"]
     end
 
     subgraph MemoryFootprint ["Client Memory Impact"]
-        RasterPath -->|GPU VRAM: ~3 MB| LowMem["Zero GeoJSON Overhead (Ultra-Light)"]
+        RasterPath -->|Image Source Bitmap: ~2-4 MB| LowMem["Zero GeoJSON Overhead (Ultra-Light)"]
         IsolinePath -->|JS Heap: 2-5 MB| MedMem["LineString GeoJSON (Manageable)"]
         IsobandPath -->|JS Heap: 60-90 MB| HighMem["MultiPolygons + Earcut Mesh (Extremely Heavy)"]
         CanvasWind -->|Canvas Buffer: ~8 MB| LowMemWind["Zero GeoJSON Overhead (Locked 60 FPS)"]
@@ -823,13 +824,13 @@ Although meteorological intuition suggests that an isoband is simply the bounded
 
 ##### Memory Footprint Comparison (Typical 500 hPa Geopotential Height Field, 16 Levels):
 
-| Metric | Contour Lines (`griddata.contour`) | Contour Fills (`griddata.contourf`) | WebGL Float32 Raster (`rasterLayer.js`) |
+| Metric | Contour Lines (`griddata.contour`) | Contour Fills (`griddata.contourf`) | Offscreen Canvas Raster (`rasterLayer.js`) |
 | :--- | :--- | :--- | :--- |
-| **Geometry Representation** | GeoJSON `LineString` | GeoJSON `MultiPolygon` with Holes | Raw 2D Texture Array (GPU VRAM) |
-| **Coordinate Points** | $\approx 22,000$ points | $\approx 65,000$ points (duplicated + borders) | $0$ GeoJSON points ($1000 \times 800$ floats) |
-| **JavaScript Heap Memory** | $\approx 2\text{--}4\text{ MB}$ | $\approx 25\text{--}45\text{ MB}$ | $\approx 3.2\text{ MB}$ flat typed array |
-| **GPU Buffer / Triangulation** | Minimal (line extrusion quads) | $80,000\text{--}150,000$ WebGL triangles | $1$ quad (2 triangles) + texture sampler |
-| **Total Memory Footprint** | **$\approx 6\text{ MB}$** | **$\approx 60\text{--}90\text{ MB}$** ($10\times\text{--}15\times$) | **$\approx 3.2\text{ MB}$** ($95\%$ reduction) |
+| **Geometry Representation** | GeoJSON `LineString` | GeoJSON `MultiPolygon` with Holes | MapLibre Image Source (`type: "image"`) |
+| **Coordinate Points** | $\approx 22,000$ points | $\approx 65,000$ points (duplicated + borders) | $0$ GeoJSON points ($4$ corner coordinates) |
+| **JavaScript Heap Memory** | $\approx 2\text{--}4\text{ MB}$ | $\approx 25\text{--}45\text{ MB}$ | $\approx 2\text{--}4\text{ MB}$ ImageData buffer |
+| **GPU Buffer / Triangulation** | Minimal (line extrusion quads) | $80,000\text{--}150,000$ WebGL triangles | $1$ quad (2 triangles) + raster texture |
+| **Total Memory Footprint** | **$\approx 6\text{ MB}$** | **$\approx 60\text{--}90\text{ MB}$** ($10\times\text{--}15\times$) | **$\approx 3\text{--}5\text{ MB}$** ($95\%$ reduction) |
 
 #### 8.8.2. Zero-GeoJSON Direct Canvas Architecture for Vector Wind (`windLayer.js`)
 
@@ -846,18 +847,32 @@ Dynamic vector wind representations (animated streamlines and dense wind barbs) 
   - **Screen-Space Barb Culling**: Grid wind barbs evaluate screen coordinates at regular $48\text{-pixel}$ intervals (`step = 48`), rendering only visible barbs on map pan/zoom.
   - **Total GeoJSON Memory**: **$0\text{ bytes}$**.
 
-#### 8.8.3. WebGL Float32 Raster Overlay Strategy (`rasterLayer.js`)
+#### 8.8.3. Offscreen Canvas Image Source Pipeline (`rasterLayer.js`)
 
-To eliminate the $60\text{--}90\text{ MB}$ memory footprint of vector isobands (`contourf`), MICAPS-Web integrates a dedicated WebGL Float32 raster pipeline:
+To eliminate the $60\text{--}90\text{ MB}$ memory footprint of vector isobands (`contourf`), MICAPS-Web integrates an **Offscreen Canvas Image Source pipeline** that streams directly into MapLibre's raster renderer:
 
 1. **Binary Stream Ingestion (`/api/data/grid/binary`)**:
-   - Downloads the uncompressed Float32 scalar grid directly into an `ArrayBuffer`.
-2. **Direct GPU Texture Binding**:
-   - Uploads the grid to an `OES_texture_float` or `R32F` WebGL texture.
-3. **Fragment Shader Color Mapping**:
-   - The GPU fragment shader samples the scalar value and evaluates colormap stops in a single clock cycle, blending opacity seamlessly.
-4. **Mutual Exclusivity Enforcement**:
-   - As established in Section 8.5.4, contour fills (`showFill`) and binary raster overlays (`showRaster`) are mutually exclusive. Selecting raster shading disables `contourf` calculation entirely, dropping client memory load by up to $95\%$.
+   - Downloads the uncompressed Float32 scalar grid directly into an `ArrayBuffer` without JSON serialization overhead.
+2. **Web Mercator Reprojection (EPSG:4326 $\to$ EPSG:3857)**:
+   - Atmospheric grid data is natively indexed in equirectangular coordinates (Plate Carrée, EPSG:4326), but MapLibre GL operates in Web Mercator (EPSG:3857).
+   - An offscreen canvas (`rasterCanvas`) interpolates each row non-linearly using `latToMercatorY` and `mercatorYToLat`, ensuring that the resulting quad bitmap aligns with MapLibre's basemap tiles without high-latitude distortion.
+3. **Colormap Evaluation & Canvas Painting**:
+   - Evaluates colormap stops on CPU via `getColor(val, element, colormap, zMin, zMax)` and fills a single `ImageData` buffer (`imgData.data`), painting to canvas in a single `ctx.putImageData(imgData, 0, 0)` call.
+4. **MapLibre Image Source Binding**:
+   - Converts the canvas to a Data URL (`rasterCanvas.toDataURL()`) and binds it as a native MapLibre Image Source:
+     ```javascript
+     map.addSource(rasterSrcId, {
+       type: "image",
+       url: dataUrl,
+       coordinates: [[leftLon, topLat], [rightLon, topLat], [rightLon, bottomLat], [leftLon, bottomLat]],
+     });
+     ```
+   - Subsequent time steps call `map.getSource(rasterSrcId).updateImage({ url: dataUrl, coordinates })`. MapLibre uploads the bitmap to a standard GPU texture and renders it via its built-in raster shader (`raster-opacity`, `raster-fade-duration`).
+5. **Architectural Comparison: Canvas Image Source vs. Direct GPU Texture Binding**:
+   - **Canvas Image Source (Current)**: Universal across all browsers and devices; zero custom GLSL shader maintenance; integrates seamlessly into MapLibre's layer hierarchy, layer reordering (`beforeId`), and opacity controls. Completely eliminates GeoJSON overhead ($95\%$ memory reduction).
+   - **Direct GPU Texture Binding (Potential Future Optimization)**: Using MapLibre's `CustomLayerInterface` to bind raw Float32 data to an `OES_texture_float` or WebGL2 `R32F` texture would eliminate the CPU canvas loop, but requires maintaining a custom WebGL vertex/fragment shader that reprojects EPSG:4326 coordinates and samples a 1D colormap palette on the GPU.
+6. **Mutual Exclusivity Enforcement**:
+   - As established in Section 8.5.4, contour fills (`showFill`) and binary raster overlays (`showRaster`) are mutually exclusive. Selecting raster shading disables `contourf` calculation entirely.
 
 #### 8.8.4. Viewport Bounding Box Spatial Culling & Cell-Count-Driven LOD Pipeline
 
