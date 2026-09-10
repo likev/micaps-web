@@ -1,6 +1,7 @@
 package config
 
 import (
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -67,5 +68,31 @@ func TestFindRandomClusterIP(t *testing.T) {
 	ips := ParseClusterIPs(data)
 	if len(ips) != 2 {
 		t.Fatalf("expected 2 ips, got %d", len(ips))
+	}
+}
+
+func TestGetLocalIPs(t *testing.T) {
+	ips := GetLocalIPs()
+	t.Logf("GetLocalIPs() returned: %v", ips)
+
+	seen := make(map[string]bool)
+	for _, ipStr := range ips {
+		ip := net.ParseIP(ipStr)
+		if ip == nil {
+			t.Errorf("GetLocalIPs() returned invalid IP string: %s", ipStr)
+		}
+		if ip.To4() == nil {
+			t.Errorf("GetLocalIPs() returned non-IPv4 address: %s", ipStr)
+		}
+		if ip.IsLoopback() {
+			t.Errorf("GetLocalIPs() returned loopback address: %s", ipStr)
+		}
+		if ip.IsLinkLocalUnicast() {
+			t.Errorf("GetLocalIPs() returned link-local address: %s", ipStr)
+		}
+		if seen[ipStr] {
+			t.Errorf("GetLocalIPs() returned duplicate IP: %s", ipStr)
+		}
+		seen[ipStr] = true
 	}
 }

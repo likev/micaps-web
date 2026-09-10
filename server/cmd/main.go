@@ -93,6 +93,9 @@ func main() {
 	listenErrChan := make(chan error, 1)
 	go func() {
 		log.Printf("[MICAPS-Web] Server listening on http://localhost:%s", cfg.HTTPPort)
+		for _, ip := range config.GetLocalIPs() {
+			log.Printf("[MICAPS-Web] Server listening on http://%s:%s", ip, cfg.HTTPPort)
+		}
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			listenErrChan <- err
 		}

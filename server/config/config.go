@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -198,3 +200,76 @@ func getEnvBool(key string, defaultVal bool) bool {
 	}
 	return defaultVal
 }
+
+// GetLocalIPs returns non-loopback, active IPv4 addresses suitable for local network access.
+// Private network addresses (e.g. 192.168.x.x, 10.x.x.x) are prioritized first.
+func GetLocalIPs() []string {
+	var ips []string
+	seen := make(map[string]bool)
+
+	ifaces, err := net.Interfaces()
+	if err == nil {
+		for _, iface := range ifaces {
+			// Skip interfaces that are down or loopback devices
+			if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+				continue
+			}
+			addrs, err := iface.Addrs()
+			if err != nil {
+				continue
+			}
+			for _, addr := range addrs {
+				var ip net.IP
+				switch v := addr.(type) {
+				case *net.IPNet:
+					ip = v.IP
+				case *net.IPAddr:
+					ip = v.IP
+				}
+				if ip == nil || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
+					continue
+				}
+				ip4 := ip.To4()
+				if ip4 == nil {
+					continue
+				}
+				ipStr := ip4.String()
+				if !seen[ipStr] {
+					seen[ipStr] = true
+					ips = append(ips, ipStr)
+				}
+			}
+		}
+	}
+
+	// Fallback to net.InterfaceAddrs() if no interfaces were discovered
+	if len(ips) == 0 {
+		addrs, err := net.InterfaceAddrs()
+		if err == nil {
+			for _, addr := range addrs {
+				if ipNet, ok := addr.(*net.IPNet); ok && !ipNet.IP.IsLoopback() && !ipNet.IP.IsLinkLocalUnicast() {
+					if ip4 := ipNet.IP.To4(); ip4 != nil {
+						ipStr := ip4.String()
+						if !seen[ipStr] {
+							seen[ipStr] = true
+							ips = append(ips, ipStr)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Sort so private addresses (RFC 1918) appear first, followed by alphabetical order
+	sort.Slice(ips, func(i, j int) bool {
+		privI := net.ParseIP(ips[i]).IsPrivate()
+		privJ := net.ParseIP(ips[j]).IsPrivate()
+		if privI != privJ {
+			return privI // true before false
+		}
+		return ips[i] < ips[j]
+	})
+
+	return ips
+}
+
