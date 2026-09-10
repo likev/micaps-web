@@ -156,6 +156,14 @@ func LoadConfig() *Config {
 	}
 
 	cfg.CassandraPort = *cportFlag
+	if strings.Contains(cfg.CassandraHost, ":") {
+		if host, portStr, err := net.SplitHostPort(cfg.CassandraHost); err == nil {
+			cfg.CassandraHost = host
+			if p, err := strconv.Atoi(portStr); err == nil {
+				cfg.CassandraPort = p
+			}
+		}
+	}
 	cfg.HTTPPort = *httpPortFlag
 	cfg.EnableTunnel = *tunnelFlag
 	cfg.MockMode = *mockFlag

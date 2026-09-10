@@ -13,15 +13,63 @@ let currentPeriodIdx = 4; // default +024h
 let forecastCycles = generateDynamicForecastCycles(null, 10);
 let currentInitCycle = forecastCycles[0] || "26082820";
 
-let rawObsFiles = [...DEFAULT_MOCK_OBS_FILES];
-let obsFiles = [...rawObsFiles];
-let currentObsIdx = Math.max(0, obsFiles.length - 1);
+export const MAX_OBS_CHIPS = 10;
 
+export function findClosestFile(files, target) {
+  if (!Array.isArray(files) || files.length === 0) return "";
+  if (files.includes(target)) return target;
+  if (!target || typeof target !== "string" || target.length < 10) return files[files.length - 1];
+
+  const tYear = parseInt(target.slice(0, 4), 10);
+  const tMonth = parseInt(target.slice(4, 6), 10) - 1;
+  const tDay = parseInt(target.slice(6, 8), 10);
+  const tHour = parseInt(target.slice(8, 10), 10);
+  const tMin = parseInt(target.slice(10, 12) || "0", 10);
+  const targetMs = Date.UTC(tYear, tMonth, tDay, tHour, tMin);
+
+  let closest = files[files.length - 1];
+  let minDiff = Infinity;
+  for (const f of files) {
+    if (typeof f === "string" && f.length >= 10) {
+      const y = parseInt(f.slice(0, 4), 10);
+      const m = parseInt(f.slice(4, 6), 10) - 1;
+      const d = parseInt(f.slice(6, 8), 10);
+      const h = parseInt(f.slice(8, 10), 10);
+      const mn = parseInt(f.slice(10, 12) || "0", 10);
+      const diff = Math.abs(Date.UTC(y, m, d, h, mn) - targetMs);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closest = f;
+      }
+    }
+  }
+  return closest;
+}
+
+export function selectObsChipsWindow(files, targetFile = "") {
+  if (!Array.isArray(files) || files.length <= MAX_OBS_CHIPS) {
+    return Array.isArray(files) ? [...files] : [];
+  }
+  const idx = targetFile ? files.indexOf(targetFile) : -1;
+  if (idx === -1) {
+    return files.slice(-MAX_OBS_CHIPS);
+  }
+  let start = Math.max(0, idx - Math.floor(MAX_OBS_CHIPS / 2));
+  if (start + MAX_OBS_CHIPS > files.length) {
+    start = files.length - MAX_OBS_CHIPS;
+  }
+  return files.slice(start, start + MAX_OBS_CHIPS);
+}
+
+let isUpperAirMode = false;
 let onTimeChangeCallback = null;
 let currentWinTitle = "";
-let isUpperAirMode = false;
 let periodStepSeq = 0; // stale guard token for period steps
 const winLoadSeqMap = new Map(); // winId -> seq (optional per-win tracking)
+
+let rawObsFiles = [...DEFAULT_MOCK_OBS_FILES];
+let obsFiles = selectObsChipsWindow(filterObsFilesByStep(rawObsFiles, currentStepLength, isUpperAirMode));
+let currentObsIdx = Math.max(0, obsFiles.length - 1);
 
 export function getPeriodsForStep(step = 6) {
   const stepNum = parseInt(step, 10) || 6;
@@ -148,6 +196,7 @@ function updateStepLengthOptions(isUpper, currentStep) {
   const targetOptions = isUpper
     ? [
         { value: "12", label: "12h" },
+        { value: "24", label: "24h" },
         { value: "6", label: "6h" },
       ]
     : [
@@ -315,35 +364,13 @@ export function setStepLength(step, triggerCallback = false) {
     }
   } else {
     const curFile = obsFiles[currentObsIdx] || "";
-    obsFiles = filterObsFilesByStep(rawObsFiles, currentStepLength, isUpperAirMode);
-    let newIdx = obsFiles.indexOf(curFile);
-    if (newIdx === -1 && curFile && obsFiles.length > 0) {
-      const curYear = parseInt(curFile.slice(0, 4), 10);
-      const curMonth = parseInt(curFile.slice(4, 6), 10) - 1;
-      const curDay = parseInt(curFile.slice(6, 8), 10);
-      const curHour = parseInt(curFile.slice(8, 10), 10);
-      const curMin = parseInt(curFile.slice(10, 12) || "0", 10);
-      const curTimeMs = Date.UTC(curYear, curMonth, curDay, curHour, curMin);
-
-      let minDiff = Infinity;
-      let closestIdx = obsFiles.length - 1;
-      obsFiles.forEach((f, idx) => {
-        if (f.length >= 10) {
-          const y = parseInt(f.slice(0, 4), 10);
-          const m = parseInt(f.slice(4, 6), 10) - 1;
-          const d = parseInt(f.slice(6, 8), 10);
-          const h = parseInt(f.slice(8, 10), 10);
-          const mn = parseInt(f.slice(10, 12) || "0", 10);
-          const tMs = Date.UTC(y, m, d, h, mn);
-          const diff = Math.abs(tMs - curTimeMs);
-          if (diff < minDiff) {
-            minDiff = diff;
-            closestIdx = idx;
-          }
-        }
-      });
-      newIdx = closestIdx;
+    const allFiltered = filterObsFilesByStep(rawObsFiles, currentStepLength, isUpperAirMode);
+    let targetFile = curFile;
+    if (allFiltered.length > 0 && !allFiltered.includes(curFile) && curFile) {
+      targetFile = findClosestFile(allFiltered, curFile);
     }
+    obsFiles = selectObsChipsWindow(allFiltered, targetFile);
+    let newIdx = obsFiles.indexOf(targetFile);
     currentObsIdx = newIdx !== -1 ? newIdx : Math.max(0, obsFiles.length - 1);
     updateLabels();
     renderChips();
@@ -577,9 +604,14 @@ export function setTimelineMode(mode, customData = {}) {
     if (Array.isArray(customData.files) && customData.files.length > 0) {
       rawObsFiles = customData.files;
     }
-    obsFiles = filterObsFilesByStep(rawObsFiles, currentStepLength, isUpperAirMode);
-    if (customData.file) {
-      const idx = obsFiles.indexOf(customData.file);
+    const allFiltered = filterObsFilesByStep(rawObsFiles, currentStepLength, isUpperAirMode);
+    let targetFile = customData.file;
+    if (targetFile && !allFiltered.includes(targetFile)) {
+      targetFile = findClosestFile(allFiltered, targetFile);
+    }
+    obsFiles = selectObsChipsWindow(allFiltered, targetFile);
+    if (targetFile) {
+      const idx = obsFiles.indexOf(targetFile);
       currentObsIdx = idx !== -1 ? idx : Math.max(0, obsFiles.length - 1);
     } else {
       currentObsIdx = Math.max(0, obsFiles.length - 1);

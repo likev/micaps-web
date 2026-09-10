@@ -199,13 +199,14 @@ describe("Timeslider Step-Length & Discrete Periods", () => {
     expect(kept).toBe(validSounding);
   });
 
-  test("Observation timeline step length 12h yields >= 14 chips for both surface and upper-air", async () => {
-    const { setTimelineMode, setStepLength, getTimelineObsFiles, getRawObsFiles } = await import("../src/ui/timeSlider.js");
+  test("Observation timeline chips are capped at 10 (MAX_OBS_CHIPS = 10) for any step length, retaining full history", async () => {
+    const { setTimelineMode, setStepLength, getTimelineObsFiles, getRawObsFiles, selectObsChipsWindow, MAX_OBS_CHIPS } = await import("../src/ui/timeSlider.js");
     const { DEFAULT_MOCK_OBS_FILES } = await import("../src/config/presets.js");
 
+    expect(MAX_OBS_CHIPS).toBe(10);
     expect(DEFAULT_MOCK_OBS_FILES.length).toBeGreaterThanOrEqual(50);
 
-    // 1. Surface mode with default 3h step length
+    // 1. Surface mode with default 3h step length: raw files >= 50, but timeline chips strictly capped at 10
     setTimelineMode("obs", {
       files: DEFAULT_MOCK_OBS_FILES,
       stepLength: 3,
@@ -215,32 +216,42 @@ describe("Timeslider Step-Length & Discrete Periods", () => {
 
     const rawFiles = getRawObsFiles();
     expect(rawFiles.length).toBeGreaterThanOrEqual(50);
-    expect(getTimelineObsFiles().length).toBeGreaterThanOrEqual(50);
+    expect(getTimelineObsFiles().length).toBe(10);
 
-    // 2. Switch Surface step length to 12h: must produce >= 14 chips (not just 3!)
+    // 2. Switch Surface step length to 12h: must produce exactly 10 chips (aligned with 08:00 and 20:00)
     setStepLength(12);
     const surface12hFiles = getTimelineObsFiles();
-    expect(surface12hFiles.length).toBeGreaterThanOrEqual(14);
-    // All files in 12h surface mode must align with synoptic 08:00 and 20:00 UTC+8
+    expect(surface12hFiles.length).toBe(10);
     surface12hFiles.forEach((f) => {
       const hour = parseInt(f.slice(8, 10), 10);
       expect([8, 20]).toContain(hour);
     });
 
-    // 3. Switch Surface step length to 6h: must produce >= 28 chips (02, 08, 14, 20)
+    // 3. Switch Surface step length to 6h: capped at 10 chips (02, 08, 14, 20)
     setStepLength(6);
     const surface6hFiles = getTimelineObsFiles();
-    expect(surface6hFiles.length).toBeGreaterThanOrEqual(28);
+    expect(surface6hFiles.length).toBe(10);
     surface6hFiles.forEach((f) => {
       const hour = parseInt(f.slice(8, 10), 10);
       expect([2, 8, 14, 20]).toContain(hour);
     });
 
-    // 4. Switch back to 3h: must restore all files without data loss
-    setStepLength(3);
-    expect(getTimelineObsFiles().length).toBe(rawFiles.length);
+    // 4. Switch Surface step length to 24h: capped at <= 10 chips (all 08:00 daily)
+    setStepLength(24);
+    const surface24hFiles = getTimelineObsFiles();
+    expect(surface24hFiles.length).toBeLessThanOrEqual(10);
+    expect(surface24hFiles.length).toBeGreaterThan(0);
+    surface24hFiles.forEach((f) => {
+      const hour = parseInt(f.slice(8, 10), 10);
+      expect(hour).toBe(8);
+    });
 
-    // 5. Upper-air mode with default 12h step length: must produce >= 14 chips (not just 5!)
+    // 5. Switch back to 3h: chips capped at 10 without losing raw history
+    setStepLength(3);
+    expect(getTimelineObsFiles().length).toBe(10);
+    expect(getRawObsFiles().length).toBe(rawFiles.length);
+
+    // 6. Upper-air mode with default 12h step length: capped at 10 chips (08:00 and 20:00)
     setTimelineMode("obs", {
       files: DEFAULT_MOCK_OBS_FILES,
       stepLength: 12,
@@ -249,15 +260,95 @@ describe("Timeslider Step-Length & Discrete Periods", () => {
       isUpper: true,
     });
     const upper12hFiles = getTimelineObsFiles();
-    expect(upper12hFiles.length).toBeGreaterThanOrEqual(14);
+    expect(upper12hFiles.length).toBe(10);
     upper12hFiles.forEach((f) => {
       const hour = parseInt(f.slice(8, 10), 10);
       expect([8, 20]).toContain(hour);
     });
 
-    // 6. Upper-air switched to 6h: must produce >= 28 chips
+    // 7. Upper-air switched to 6h: capped at 10 chips
     setStepLength(6);
     const upper6hFiles = getTimelineObsFiles();
-    expect(upper6hFiles.length).toBeGreaterThanOrEqual(28);
+    expect(upper6hFiles.length).toBe(10);
+
+    // 8. Upper-air switched to 24h: capped at <= 10 chips, all 08:00 daily soundings
+    setStepLength(24);
+    const upper24hFiles = getTimelineObsFiles();
+    expect(upper24hFiles.length).toBeLessThanOrEqual(10);
+    expect(upper24hFiles.length).toBeGreaterThan(0);
+    upper24hFiles.forEach((f) => {
+      const hour = parseInt(f.slice(8, 10), 10);
+      expect(hour).toBe(8);
+    });
+
+    // 9. selectObsChipsWindow helper unit verification
+    const mock20 = Array.from({ length: 20 }, (_, i) => `file_${String(i).padStart(2, "0")}`);
+    expect(selectObsChipsWindow(mock20).length).toBe(10);
+    expect(selectObsChipsWindow(mock20)[9]).toBe("file_19"); // defaults to latest 10
+    // Target file centered/contained in window
+    const winTarget = selectObsChipsWindow(mock20, "file_05");
+    expect(winTarget.length).toBe(10);
+    expect(winTarget).toContain("file_05");
+  });
+
+  test("Upper-Air mode populates select-step-length with 12h, 24h, 6h options in DOM", async () => {
+    const { setTimelineMode } = await import("../src/ui/timeSlider.js");
+    const { DEFAULT_MOCK_OBS_FILES } = await import("../src/config/presets.js");
+
+    const selStep = {
+      id: "select-step-length",
+      options: [],
+      value: "6",
+      _html: "",
+      get innerHTML() { return this._html; },
+      set innerHTML(val) {
+        this._html = val;
+        if (!val) this.options = [];
+      },
+      appendChild(child) {
+        this.options.push(child);
+      },
+    };
+
+    const prevDoc = globalThis.document;
+    globalThis.document = {
+      getElementById(id) {
+        if (id === "select-step-length") return selStep;
+        return null;
+      },
+      createElement(tag) {
+        return { value: "", textContent: "" };
+      },
+    };
+
+    try {
+      // Set to Upper-Air observation mode
+      setTimelineMode("obs", {
+        files: DEFAULT_MOCK_OBS_FILES,
+        stepLength: 12,
+        path: "UPPER_AIR/PLOT/500",
+        winTitle: "500 hPa Geopotential Height",
+        isUpper: true,
+      });
+
+      const upperOpts = selStep.options.map((o) => o.value);
+      expect(upperOpts).toEqual(["12", "24", "6"]);
+      expect(selStep.value).toBe("12");
+
+      // Switch to Surface observation mode
+      setTimelineMode("obs", {
+        files: DEFAULT_MOCK_OBS_FILES,
+        stepLength: 3,
+        path: "SURFACE/PLOT_GLOBAL_3H",
+        winTitle: "Surface Synoptic Plot",
+        isUpper: false,
+      });
+
+      const surfaceOpts = selStep.options.map((o) => o.value);
+      expect(surfaceOpts).toEqual(["1", "3", "6", "12", "24"]);
+      expect(selStep.value).toBe("3");
+    } finally {
+      globalThis.document = prevDoc;
+    }
   });
 });
