@@ -7,6 +7,7 @@ import {
   setLayerIsolineStyle,
   renderContourLayers,
   removeContourLayer,
+  getLayerDOMIds,
 } from "../layers/contourLayer.js";
 import { setStationVisibility, setStationConfig, getStationGeoJSON } from "../layers/stationLayer.js";
 import { renderBinaryRaster, renderGridRaster, setRasterVisibility, removeRasterLayer, getRasterDOMIds } from "../layers/rasterLayer.js";
@@ -33,7 +34,22 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
   if (action === "visibility") {
     if (!layer) return;
     if (layer.type === "contour" || layer.type === "wind") {
-      setLayerIsobandVisibility(map, layerId, value && layer.config?.showFill);
+      if (layer.config?.showFill) {
+        if (value) {
+          const { isobandSrcId } = getLayerDOMIds(layerId);
+          const isobandSrc = map.getSource(isobandSrcId);
+          const features = getSourceFeatures(isobandSrc);
+          if (features.length > 0) {
+            setLayerIsobandVisibility(map, layerId, true);
+          } else {
+            triggerIsobandOverlay(map, layer, winObj);
+          }
+        } else {
+          setLayerIsobandVisibility(map, layerId, false);
+        }
+      } else {
+        setLayerIsobandVisibility(map, layerId, false);
+      }
       setLayerIsolineVisibility(map, layerId, value && layer.config?.showLine);
       if (layer.config?.showRaster) {
         if (value) {
@@ -128,10 +144,12 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
       if (!layer.config) layer.config = {};
       if (value.showFill !== undefined) {
         layer.config.showFill = value.showFill;
-        setLayerIsobandVisibility(map, layerId, layer.visible && value.showFill);
         if (value.showFill) {
           layer.config.showRaster = false;
           setRasterVisibility(map, false, layerId);
+          triggerIsobandOverlay(map, layer, winObj);
+        } else {
+          setLayerIsobandVisibility(map, layerId, false);
         }
       }
       if (value.showLine !== undefined) {
@@ -507,6 +525,107 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
       }
     }
   }
+}
+
+function getSourceFeatures(src) {
+  if (!src) return [];
+  const d = src._data?.geojson || src._data || src.data;
+  return Array.isArray(d?.features) ? d.features : [];
+}
+
+export async function triggerIsobandOverlay(map, layer = null, win = null) {
+  if (!map || !layer) return;
+  const layerId = layer.id || (layer.element ? `contour-${layer.element}` : "default");
+  const { isobandSrcId } = getLayerDOMIds(layerId);
+  const isobandSrc = map.getSource(isobandSrcId);
+  const features = getSourceFeatures(isobandSrc);
+
+  if (features.length > 0) {
+    setLayerIsobandVisibility(map, layerId, layer.visible !== false);
+    if (layer.visible !== false && layer.element) {
+      const colormap = layer.colormap || layer.config?.palettePath || layer.element;
+      updateLegend(layer.element, colormap, layer.gridData?.stats?.min, layer.gridData?.stats?.max, win);
+    }
+    return;
+  }
+
+  // 1. Direct in-memory gridData from layer
+  if (layer.gridData && layer.gridData.header) {
+    const isVisible = layer.visible !== false;
+    renderContourLayers(map, layer.gridData, layer.element || "TMP", {
+      ...layer.config,
+      layerId,
+      showFill: isVisible,
+      showRaster: false,
+      showLine: isVisible && layer.config?.showLine !== false,
+      opacity: layer.config?.opacity ?? 0.75,
+      lineColor: layer.config?.lineColor,
+      lineWidth: layer.config?.lineWidth,
+      boldValues: layer.config?.boldValues,
+      boldLineWidth: layer.config?.boldLineWidth,
+      colormap: layer.colormap || layer.element,
+      smooth: layer.config?.smooth,
+      smoothIterations: layer.config?.smoothIterations,
+      labelSize: layer.config?.labelSize,
+      viewportBounds: (map && typeof map.getBounds === "function") ? map.getBounds().toArray() : null,
+    });
+    armContourReRender(map, layer, win);
+    if (isVisible && layer.element) {
+      const colormap = layer.colormap || layer.config?.palettePath || layer.element;
+      updateLegend(layer.element, colormap, layer.gridData?.stats?.min, layer.gridData?.stats?.max, win);
+    }
+    return;
+  }
+
+  // 2. Fetch gridData if missing (for catalog-loaded NWP layers)
+  const model = layer.model || win?.model || "ECMWF_HR";
+  const level = layer.level !== undefined && layer.level !== null ? layer.level : (win?.level !== undefined ? win.level : null);
+  let path = layer.path;
+  if (!path) {
+    const isUpper = model === "UPPER_AIR" || (layer.element && layer.element.includes("UPPER"));
+    path = isUpper ? `UPPER_AIR/${layer.element}/${level || 500}` : `${model}/${layer.element}/${level !== null ? level : "0"}`;
+  }
+  let file = layer.file || win?.obsTime;
+  if (!file && win?.forecastCycle) {
+    file = `${win.forecastCycle}.${String(win.period ?? 24).padStart(3, "0")}`;
+  }
+  if (path && file) {
+    try {
+      const gridData = await fetchGridData(path, file);
+      if (gridData && gridData.header) {
+        layer.gridData = gridData;
+        const isVisible = layer.visible !== false;
+        renderContourLayers(map, gridData, layer.element || "TMP", {
+          ...layer.config,
+          layerId,
+          showFill: isVisible,
+          showRaster: false,
+          showLine: isVisible && layer.config?.showLine !== false,
+          opacity: layer.config?.opacity ?? 0.75,
+          lineColor: layer.config?.lineColor,
+          lineWidth: layer.config?.lineWidth,
+          boldValues: layer.config?.boldValues,
+          boldLineWidth: layer.config?.boldLineWidth,
+          colormap: layer.colormap || layer.element,
+          smooth: layer.config?.smooth,
+          smoothIterations: layer.config?.smoothIterations,
+          labelSize: layer.config?.labelSize,
+          viewportBounds: (map && typeof map.getBounds === "function") ? map.getBounds().toArray() : null,
+        });
+        armContourReRender(map, layer, win);
+        if (isVisible && layer.element) {
+          const colormap = layer.colormap || layer.config?.palettePath || layer.element;
+          updateLegend(layer.element, colormap, gridData.stats?.min, gridData.stats?.max, win);
+        }
+        return;
+      }
+    } catch (err) {
+      console.warn("[LayerActions] Failed to fetch gridData for isoband overlay:", err);
+    }
+  }
+
+  // Fallback: sync visibility on existing layer
+  setLayerIsobandVisibility(map, layerId, layer.visible !== false);
 }
 
 export async function triggerRasterOverlay(map, layer = null, win = null) {

@@ -140,6 +140,8 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
           renderContourLayers(map, layer.gridData, layer.element || "TMP", {
             ...layer.config,
             layerId: layer.id,
+            preserveIsobands: true, // Preserve existing contour fill polygons (§8.8.4)
+            visibleIsoband: layer.visible !== false && Boolean(layer.config?.showFill),
             showFill: false, // NEVER contourf on move (spec §8.8.4: isolines + raster only)
             showLine: layer.visible !== false && layer.config?.showLine !== false,
             viewportBounds: map.getBounds().toArray(),

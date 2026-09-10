@@ -3,6 +3,7 @@ import { test, expect, describe, beforeAll, beforeEach } from "bun:test";
 import { addOrUpdateLayer, getLayersForWindow, clearWindowWeatherLayers } from "../src/ui/layerControl.js";
 import { handleLayerAction } from "../src/ui/layerActions.js";
 import { updateLegend, removeLegend, clearLegends } from "../src/ui/legend.js";
+import { renderContourLayers } from "../src/layers/contourLayer.js";
 
 beforeAll(() => {
   if (typeof globalThis.document === "undefined") {
@@ -47,7 +48,8 @@ function createMockMap() {
   return {
     getSource: (id) => sources.get(id) || null,
     addSource: (id, def) => {
-      sources.set(id, { ...def });
+      const src = { ...def, _data: def.data, setData: (d) => { src.data = d; src._data = d; } };
+      sources.set(id, src);
     },
     removeSource: (id) => {
       sources.delete(id);
@@ -73,6 +75,7 @@ function createMockMap() {
         lyr.paint[prop] = val;
       }
     },
+    getBounds: () => ({ toArray: () => [[60, 20], [80, 40]] }),
     getStyle: () => ({
       layers: Array.from(layers.values()),
       sources: Object.fromEntries(sources.entries()),
@@ -335,3 +338,123 @@ describe("Legend Lifecycle: Show for Shading (Fill or Raster), Hide for Lines-On
     expect(panel.innerHTML).toBe("");
   });
 });
+
+describe("Contour Fills (isoband) Dynamic Computation & Viewport Move Preservation", () => {
+  const win = { id: "win-test-fills", winIdx: 0 };
+
+  const sampleGridData = {
+    header: {
+      n_lon: 20,
+      n_lat: 20,
+      start_lon: 60,
+      end_lon: 80,
+      start_lat: 40,
+      end_lat: 20,
+      d_lon: 1,
+      d_lat: -1,
+    },
+    x: Array.from({ length: 20 }, (_, i) => 60 + i),
+    y: Array.from({ length: 20 }, (_, i) => 40 - i),
+    values: Array.from({ length: 400 }, (_, i) => 10 + (i % 20)),
+    stats: { min: 10, max: 30 },
+  };
+
+  test("1. Viewport pan/zoom re-render with preserveIsobands: true does not wipe out existing isobands", () => {
+    const map = createMockMap();
+    renderContourLayers(map, sampleGridData, "TMP", {
+      layerId: "preserve-test",
+      showFill: true,
+      showRaster: false,
+      showLine: true,
+    });
+
+    const isobandSrc = map.getSource("preserve-test-isoband-source");
+    expect(isobandSrc).toBeTruthy();
+    expect(isobandSrc.data.features.length).toBeGreaterThan(0);
+    const initialCount = isobandSrc.data.features.length;
+
+    // Simulate pan/zoom moveend re-render in contourReRender.js
+    renderContourLayers(map, sampleGridData, "TMP", {
+      layerId: "preserve-test",
+      preserveIsobands: true,
+      visibleIsoband: true,
+      showFill: false,
+      showLine: true,
+    });
+
+    // Isobands must remain intact, not wiped out to 0
+    expect(map.getSource("preserve-test-isoband-source").data.features.length).toBe(initialCount);
+    expect(map.getLayer("preserve-test-isoband-layer").layout.visibility).toBe("visible");
+  });
+
+  test("2. Toggling showFill: true on an HGT layer dynamically computes and populates isobands", () => {
+    const map = createMockMap();
+    // Initially load layer with showFill: false (default for HGT)
+    renderContourLayers(map, sampleGridData, "HGT", {
+      layerId: "contour-hgt-fill-test",
+      showFill: false,
+      showLine: true,
+    });
+
+    const isobandSrc = map.getSource("contour-hgt-fill-test-isoband-source");
+    expect(isobandSrc.data.features.length).toBe(0);
+
+    const layer = addOrUpdateLayer({
+      id: "contour-hgt-fill-test",
+      element: "HGT",
+      type: "contour",
+      visible: true,
+      gridData: sampleGridData,
+      config: {
+        showFill: false,
+        showRaster: false,
+        showLine: true,
+      },
+    }, win);
+
+    // User checks Contour Fills (isoband) in Layer Control
+    handleLayerAction(map, "config", layer.id, { showFill: true, showRaster: false }, layer, win);
+
+    expect(layer.config.showFill).toBe(true);
+    expect(layer.config.showRaster).toBe(false);
+    expect(map.getSource("contour-hgt-fill-test-isoband-source").data.features.length).toBeGreaterThan(0);
+    expect(map.getLayer("contour-hgt-fill-test-isoband-layer").layout.visibility).toBe("visible");
+  });
+
+  test("3. Toggling showFill: false hides isobands; subsequent showFill: true reuses existing features without wiping", () => {
+    const map = createMockMap();
+    const layer = addOrUpdateLayer({
+      id: "contour-tmp-toggle-test",
+      element: "TMP",
+      type: "contour",
+      visible: true,
+      gridData: sampleGridData,
+      config: {
+        showFill: true,
+        showRaster: false,
+        showLine: true,
+      },
+    }, win);
+
+    // Initial render with fill
+    renderContourLayers(map, sampleGridData, "TMP", {
+      layerId: layer.id,
+      showFill: true,
+      showRaster: false,
+    });
+
+    const count = map.getSource("contour-tmp-toggle-test-isoband-source").data.features.length;
+    expect(count).toBeGreaterThan(0);
+
+    // User unchecks Fill -> hide isoband
+    handleLayerAction(map, "config", layer.id, { showFill: false }, layer, win);
+    expect(map.getLayer("contour-tmp-toggle-test-isoband-layer").layout.visibility).toBe("none");
+    expect(map.getSource("contour-tmp-toggle-test-isoband-source").data.features.length).toBe(count);
+
+    // User re-checks Fill -> reuse isoband features and show
+    handleLayerAction(map, "config", layer.id, { showFill: true, showRaster: false }, layer, win);
+    expect(map.getLayer("contour-tmp-toggle-test-isoband-layer").layout.visibility).toBe("visible");
+    expect(map.getSource("contour-tmp-toggle-test-isoband-source").data.features.length).toBe(count);
+  });
+});
+

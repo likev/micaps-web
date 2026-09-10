@@ -509,6 +509,7 @@ async function loadWeatherField(map, model, element, level, period, customOption
       renderContourLayers(map, gridData, element, {
         layerId,
         showFill: isVisible && showFill,
+        showRaster: isVisible && showRaster,
         showLine: isVisible && showLine,
         lineColor,
         lineWidth,

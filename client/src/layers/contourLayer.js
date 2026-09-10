@@ -131,13 +131,17 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
   const levels = options.levels || getElementLevels(element, zMin, zMax, options.colormap);
 
   const isVisible = options.visible !== false;
-  const showFill = options.showFill === true;
   const showRaster = options.showRaster === true;
+  const showFill = options.preserveIsobands
+    ? false
+    : (options.showFill !== undefined
+        ? Boolean(options.showFill)
+        : (!showRaster && element !== "HGT" && element !== "WIND" && element !== "DTD"));
 
-  // Phase 3 (§8.8.3 & §8.5.4): Skip contourf entirely if showFill is false or if showRaster is active
-  // This eliminates 60-90 MB of heavy polygon allocation
-  let isobandFC = { type: "FeatureCollection", features: [] };
-  if (isVisible && showFill && !showRaster) {
+  // Phase 3 (§8.8.3 & §8.5.4): Skip contourf entirely if showFill is false or if showRaster is active.
+  // When preserveIsobands is true (e.g. pan/zoom re-render), isobandFC is null to protect existing isobands.
+  let isobandFC = options.preserveIsobands ? null : { type: "FeatureCollection", features: [] };
+  if (!options.preserveIsobands && isVisible && showFill && !showRaster) {
     try {
       const features = griddata.contourf(Z, { x, y, levels });
       if (Array.isArray(features)) {
@@ -219,7 +223,7 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
   isolineFC = null;
 }
 
-function getLayerDOMIds(layerId = "default") {
+export function getLayerDOMIds(layerId = "default") {
   const isDefault = layerId === "default" || layerId === "contour-TMP-850" || layerId === "contour-ECMWF_HR-TMP-850";
   return {
     isobandSrcId: isDefault ? "isoband-source" : `${layerId}-isoband-source`,
@@ -284,6 +288,13 @@ function updateMapLibreContour(map, isobands, isolines, options = {}) {
         },
         map.getLayer("citys-boundary") ? "citys-boundary" : (map.getLayer("provinces-boundary") ? "provinces-boundary" : undefined)
       );
+    }
+  } else if (options.preserveIsobands && map.getLayer(isobandLayerId)) {
+    if (visibleIsoband !== undefined) {
+      map.setLayoutProperty(isobandLayerId, "visibility", visibleIsoband ? "visible" : "none");
+    }
+    if (opacity !== undefined) {
+      map.setPaintProperty(isobandLayerId, "fill-opacity", opacity);
     }
   }
 
