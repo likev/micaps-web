@@ -859,7 +859,56 @@ To eliminate the $60\text{--}90\text{ MB}$ memory footprint of vector isobands (
 4. **Mutual Exclusivity Enforcement**:
    - As established in Section 8.5.4, contour fills (`showFill`) and binary raster overlays (`showRaster`) are mutually exclusive. Selecting raster shading disables `contourf` calculation entirely, dropping client memory load by up to $95\%$.
 
-#### 8.8.4. Lifecycle Memory Management & Cache Flushing
+#### 8.8.4. Viewport Bounding Box Spatial Culling & Level of Detail (LOD)
+
+When handling massive ultra-high-resolution global grids (such as ECMWF_HR $0.1^\circ$ with $3600 \times 1801 \approx 6.48 \times 10^6$ cells), calculating isolines for the entire planet generates hundreds of thousands of lines across oceans and continents that the forecaster never sees on screen. To maximize memory efficiency, the pipeline employs two complementary spatial reduction mechanisms:
+
+```mermaid
+flowchart LR
+    MapZoom["Map Viewport: Zoom Level & Bounds"] --> Decision{"Is Grid Global / Massive (> 500k pts)?"}
+    
+    Decision -->|No: Regional Mesh (China, 45k pts)| FullDomain["Full Domain Step = 1 (Zero Re-computation on Pan/Zoom)"]
+    
+    Decision -->|Yes: Global Mesh (6.48M pts)| LODBranch["Zoom-Dependent Level of Detail (LOD)"]
+    
+    LODBranch --> ZoomLow["Zoom <= 3 (Global View): Step = 4 (Decimated Macro-Fronts)"]
+    LODBranch --> ZoomMid["3 < Zoom <= 6 (Synoptic View): Step = 2 (Country-Scale Fronts)"]
+    LODBranch --> ZoomHigh["Zoom > 6 (Mesoscale View): Bounding Box Crop + Step = 1"]
+    
+    ZoomHigh --> BBoxCrop["Crop Sub-Grid: [West-buf, South-buf, East+buf, North+buf]"]
+    BBoxCrop --> FastContour["Micro-Grid Marching Squares (2,500 - 10,000 pts)"]
+    
+    FullDomain --> RenderPipe["Upload to MapLibre WebGL Buffer"]
+    ZoomLow --> RenderPipe
+    ZoomMid --> RenderPipe
+    FastContour --> RenderPipe
+```
+
+1. **Bounding Box Spatial Culling (BBox Crop)**:
+   - **Trade-Off Contract**:
+     - *Regional domains* (e.g. China $70^\circ\text{E} \to 140^\circ\text{E}, 15^\circ\text{N} \to 55^\circ\text{N}$, $\approx 45,000$ points): Computed once across the full domain (Section 8.6.1) so forecasters can pan and zoom at a locked 60 FPS without triggering Marching Squares re-calculations.
+     - *Massive global grids* ($> 500,000$ points) at high zoom levels ($z > 6$): The full domain is cropped to the visible map bounding box plus a safety margin before vectorization.
+   - **Index Clamping Formulation**:
+     Given visible geographic bounds $[W, S, E, N] = \text{map.getBounds()}$ and a boundary buffer margin $\delta = 1.5^\circ\text{--}2.0^\circ$:
+     $$\begin{aligned}
+     i_{\min} &= \max\left(0, \left\lfloor \frac{W - \delta - \text{startLon}}{d\text{lon}} \right\rfloor\right), \quad &i_{\max} &= \min\left(N_{\text{lon}}-1, \left\lceil \frac{E + \delta - \text{startLon}}{d\text{lon}} \right\rceil\right) \\
+     j_{\min} &= \max\left(0, \left\lfloor \frac{S - \delta - \text{startLat}}{d\text{lat}} \right\rfloor\right), \quad &j_{\max} &= \min\left(N_{\text{lat}}-1, \left\lceil \frac{N + \delta - \text{startLat}}{d\text{lat}} \right\rceil\right)
+     \end{aligned}$$
+   - **Memory Impact**:
+     Cropping a $3600 \times 1801$ global grid to a regional synoptic view ($30^\circ \times 20^\circ$) reduces the active 2D matrix $Z_{\text{crop}}$ from $6.48 \times 10^6$ points down to $300 \times 200 = 60,000$ points—an immediate **$99\%$ reduction in Marching Squares vertex memory**.
+
+2. **Level of Detail (LOD) & Zoom-Dependent Decimation**:
+   Rather than treating all zoom levels identically, grid decimation adapts to the physical pixel density of the display:
+   - **Low Zoom ($z \le 3$, Planetary / Hemispheric Scale)**:
+     - At this scale, 1 screen pixel covers multiple grid cells; fine mesoscale details would create an illegible dense knot of black lines.
+     - Decimation uses `step = 4` (sampling every $0.4^\circ\text{--}0.5^\circ$), producing clean, broad synoptic ridges and troughs with $< 1\text{ MB}$ GeoJSON overhead.
+   - **Medium Zoom ($3 < z \le 6$, Continental / Synoptic Scale, e.g. East Asia)**:
+     - Decimation uses `step = 2` (sampling every $0.2^\circ\text{--}0.25^\circ$), balancing sub-second contour execution with high-fidelity frontal boundaries.
+   - **High Zoom ($z > 6$, Provincial / Mesoscale Analysis)**:
+     - Evaluated at native full resolution (`step = 1`, $0.1^\circ$), combined with Viewport BBox Cropping.
+     - Because the cropped bounding box contains only $5,000\text{--}20,000$ cells, Marching Squares executes in $< 15\text{ ms}$, delivering millimeter-accurate local terrain and frontal isolines while consuming less than $2\text{ MB}$ of JS heap.
+
+#### 8.8.5. Lifecycle Memory Management & Cache Flushing
 
 1. **Chaikin Smoothing Vertex Control**:
    - Because each iteration of Chaikin smoothing doubles polyline vertices ($2^N$ growth), smoothing is capped at $2$ iterations (`smoothIterations = 2`).
