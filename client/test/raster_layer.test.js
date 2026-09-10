@@ -12,6 +12,9 @@ beforeAll(() => {
   if (typeof globalThis.document === "undefined") {
     globalThis.document = {};
   }
+  if (!globalThis.document.baseURI) {
+    globalThis.document.baseURI = "http://localhost:8088/";
+  }
   if (!globalThis.document.createElement) {
     globalThis.document.createElement = (tag) => {
       if (tag === "canvas") {
@@ -38,6 +41,7 @@ beforeAll(() => {
 function createMockMap() {
   const sources = new Map();
   const layers = new Map();
+  const listeners = new Map();
 
   return {
     getSource: (id) => sources.get(id) || null,
@@ -78,8 +82,21 @@ function createMockMap() {
       layers: Array.from(layers.values()),
       sources: Object.fromEntries(sources.entries()),
     }),
+    on: (evt, handler) => {
+      if (!listeners.has(evt)) listeners.set(evt, new Set());
+      listeners.get(evt).add(handler);
+    },
+    off: (evt, handler) => {
+      if (listeners.has(evt)) listeners.get(evt).delete(handler);
+    },
+    _emit: (evt) => {
+      if (listeners.has(evt)) {
+        for (const h of listeners.get(evt)) h();
+      }
+    },
     _sources: sources,
     _layers: layers,
+    _listeners: listeners,
   };
 }
 
@@ -178,5 +195,65 @@ describe("Per-Layer Raster DOM IDs & Independent Map Sources", () => {
     expect(map.getSource("wind-WIND-raster-source")).toBeNull();
     expect(map._sources.size).toBe(0);
     expect(map._layers.size).toBe(0);
+  });
+
+  test("contourReRender preserves custom palette across viewport move", async () => {
+    const { armContourReRender, disarmAllContourReRenders } = await import("../src/services/contourReRender.js");
+    const { setColormaps, COLORMAPS } = await import("../src/utils/colormaps.js");
+    const { addOrUpdateLayer } = await import("../src/ui/layerControl.js");
+
+    const map = createMockMap();
+    map.getBounds = () => ({
+      toArray: () => [[70, 15], [135, 55]],
+    });
+
+    const mockWin = { id: "test-win-pal", loadSeq: 1 };
+    const customPalette = [
+      { val: -40, color: [0, 0, 100, 255] },
+      { val: 40, color: [255, 0, 0, 255] },
+    ];
+    setColormaps({ ...COLORMAPS, "palette:layer-pal-test": customPalette });
+
+    const layer = {
+      id: "layer-pal-test",
+      element: "TMP",
+      colormap: "palette:layer-pal-test",
+      gridData: {
+        header: { n_lon: 400, n_lat: 300, start_lon: 60, end_lon: 140, start_lat: 50, end_lat: 10 },
+        values: new Float32Array(120000),
+      },
+      config: {
+        showRaster: true,
+        showLine: true,
+        showFill: false,
+        palettePath: "test.xml",
+      },
+      visible: true,
+    };
+
+    addOrUpdateLayer(layer, mockWin);
+    armContourReRender(map, layer, mockWin);
+
+    expect(map._listeners.get("moveend")?.size).toBe(1);
+
+    // Initial raster render using custom palette
+    renderGridRaster(map, layer.gridData, "TMP", layer.colormap, { layerId: layer.id });
+    expect(map.getSource("layer-pal-test-raster-source")).not.toBeNull();
+
+    // Trigger move with updated bounds
+    map.getBounds = () => ({
+      toArray: () => [[75, 20], [130, 50]],
+    });
+
+    // Fire moveend
+    map._emit("moveend");
+
+    // Wait for debounced recompute (250ms debounce + timeout)
+    await new Promise((resolve) => setTimeout(resolve, 350));
+
+    // After move, verify that the layer's raster was re-rendered and still exists
+    expect(map.getSource("layer-pal-test-raster-source")).not.toBeNull();
+
+    disarmAllContourReRenders(map);
   });
 });

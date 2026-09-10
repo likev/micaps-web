@@ -3,6 +3,9 @@ import { getMaxEffectiveCells } from "../config/presets.js";
 import { shouldBypassCrop } from "../utils/viewportCrop.js";
 import { renderContourLayers } from "../layers/contourLayer.js";
 import { renderGridRaster } from "../layers/rasterLayer.js";
+import { getLayerById } from "../ui/layerControl.js";
+import { COLORMAPS, setColormaps } from "../utils/colormaps.js";
+import { loadXMLPalette } from "../utils/paletteLoader.js";
 
 const reRenderTimers = new Map();   // key: `${winKey}::${layerId}` -> timeout ID
 const reRenderHandlers = new Map(); // key -> handler function
@@ -59,9 +62,9 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
 
   const gridData = layer.gridData;
   const h = gridData.header;
-  const nLon = h?.n_lon || h?.LongitudeGridNumber || (gridData.values ? gridData.values[0]?.length : 0);
-  const nLat = h?.n_lat || h?.LatitudeGridNumber || (gridData.values ? gridData.values.length : 0);
-  const totalCells = (nLon && nLat) ? nLon * nLat : (Array.isArray(gridData.values) ? gridData.values.length : 0);
+  const nLon = h?.n_lon || h?.LongitudeGridNumber || (gridData.values ? gridData.values[0]?.length : (gridData.u ? gridData.u[0]?.length : 0));
+  const nLat = h?.n_lat || h?.LatitudeGridNumber || (gridData.values ? gridData.values.length : (gridData.u ? gridData.u.length : 0));
+  const totalCells = (nLon && nLat) ? nLon * nLat : (Array.isArray(gridData.values) ? gridData.values.length : (Array.isArray(gridData.u) ? gridData.u.length : 0));
 
   const budget = Number.isFinite(opts.maxEffectiveCells) && opts.maxEffectiveCells > 0
     ? getMaxEffectiveCells(opts.maxEffectiveCells)
@@ -126,8 +129,10 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
         return; // Bounds unchanged
       }
 
-      const runCompute = () => {
-        if (!map || !layer || !layer.gridData) return;
+      const runCompute = async () => {
+        if (!map || !layer) return;
+        const liveLayer = (win && typeof getLayerById === "function" ? getLayerById(layer.id, win) : null) || layer;
+        if (!liveLayer.gridData) return;
         if (reRenderBusy.has(key)) {
           pendingReRenders.set(key, true);
           return;
@@ -137,25 +142,42 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
         lastBoundsKey.set(key, bKey);
 
         try {
-          renderContourLayers(map, layer.gridData, layer.element || "TMP", {
-            ...layer.config,
-            layerId: layer.id,
-            preserveIsobands: true, // Preserve existing contour fill polygons (§8.8.4)
-            visibleIsoband: layer.visible !== false && Boolean(layer.config?.showFill),
-            showFill: false, // NEVER contourf on move (spec §8.8.4: isolines + raster only)
-            showLine: layer.visible !== false && layer.config?.showLine !== false,
-            viewportBounds: map.getBounds().toArray(),
-            maxEffectiveCells: budget,
-            onStats: (s) => {
-              layer._lastContourStats = s;
-              if (typeof opts.onStats === "function") opts.onStats(s);
-            },
-          });
+          const palettePath = liveLayer.config?.palettePath || liveLayer.render?.palettePath;
+          let targetColormap = liveLayer.colormap || (palettePath ? `palette:${liveLayer.id}` : null) || liveLayer.element || "TMP";
 
-          if (layer.visible !== false && layer.config?.showRaster && layer.gridData) {
-            renderGridRaster(map, layer.gridData, layer.element || "TMP", layer.colormap, {
-              layerId: layer.id,
-              opacity: layer.config?.opacity ?? 0.85,
+          if (palettePath && (!COLORMAPS || !COLORMAPS[targetColormap])) {
+            try {
+              const stops = await loadXMLPalette(palettePath);
+              if (stops) {
+                targetColormap = `palette:${liveLayer.id}`;
+                setColormaps({ ...COLORMAPS, [targetColormap]: stops });
+                liveLayer.colormap = targetColormap;
+              }
+            } catch {}
+          }
+
+          if (liveLayer.gridData?.values) {
+            renderContourLayers(map, liveLayer.gridData, liveLayer.element || "TMP", {
+              ...liveLayer.config,
+              layerId: liveLayer.id,
+              colormap: targetColormap,
+              preserveIsobands: true, // Preserve existing contour fill polygons (§8.8.4)
+              visibleIsoband: liveLayer.visible !== false && Boolean(liveLayer.config?.showFill),
+              showFill: false, // NEVER contourf on move (spec §8.8.4: isolines + raster only)
+              showLine: liveLayer.visible !== false && liveLayer.config?.showLine !== false,
+              viewportBounds: map.getBounds().toArray(),
+              maxEffectiveCells: budget,
+              onStats: (s) => {
+                liveLayer._lastContourStats = s;
+                if (typeof opts.onStats === "function") opts.onStats(s);
+              },
+            });
+          }
+
+          if (liveLayer.visible !== false && liveLayer.config?.showRaster && liveLayer.gridData) {
+            renderGridRaster(map, liveLayer.gridData, liveLayer.element || "TMP", targetColormap, {
+              layerId: liveLayer.id,
+              opacity: liveLayer.config?.opacity ?? 0.85,
             });
           }
         } catch (err) {

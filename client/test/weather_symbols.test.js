@@ -107,4 +107,69 @@ describe("WMO Meteorological Symbol & Wind Barb Verification", () => {
     expect(extractPressureOrHeight({ height: 12020 })).toBe("202");
     expect(extractPressureOrHeight({ height: 16330 })).toBe("633");
   });
+
+  test("renderGridWindBarbs draws 20 m/s pennant flags at CMA metric thresholds", async () => {
+    const { renderGridWindBarbs } = await import("../src/layers/windLayer.js");
+
+    const fills = [];
+    const strokes = [];
+    const mockCtx = {
+      clearRect: () => {},
+      setTransform: () => {},
+      beginPath: () => {},
+      moveTo: () => {},
+      lineTo: () => {},
+      arc: () => {},
+      closePath: () => {},
+      fill: () => fills.push(true),
+      stroke: () => strokes.push(true),
+    };
+
+    const mockCanvas = {
+      width: 100,
+      height: 100,
+      style: {},
+      getContext: () => mockCtx,
+      remove: () => {},
+    };
+
+    const mockContainer = {
+      clientWidth: 96,
+      clientHeight: 96,
+      getBoundingClientRect: () => ({ width: 96, height: 96 }),
+      querySelector: () => mockCanvas,
+      appendChild: () => {},
+    };
+
+    const mockMap = {
+      getContainer: () => mockContainer,
+      unproject: () => ({ lng: 100, lat: 30 }),
+      on: () => {},
+      off: () => {},
+    };
+
+    // 24 m/s wind: 1 pennant flag (20 m/s) + 1 full barb (4 m/s)
+    const gridData = {
+      header: {
+        n_lon: 2,
+        n_lat: 2,
+        start_lon: 90,
+        end_lon: 110,
+        start_lat: 40,
+        end_lat: 20,
+        d_lon: 20,
+        d_lat: -20,
+      },
+      u: new Float32Array([24, 24, 24, 24]),
+      v: new Float32Array([0, 0, 0, 0]),
+    };
+
+    renderGridWindBarbs(mockMap, gridData);
+
+    // In a 96x96 canvas with step=48, 4 sample positions (sx=24,72, sy=24,72).
+    // With 20 m/s pennant standard: 1 circle fill + 1 triangle pennant fill = 2 fills * 4 = 8 fills.
+    expect(fills.length).toBe(8);
+    // 1 staff stroke + 1 full barb (4 m/s) stroke = 2 strokes * 4 = 8 strokes.
+    expect(strokes.length).toBe(8);
+  });
 });

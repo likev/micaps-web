@@ -340,6 +340,7 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
                   if (layer.config?.showRaster && layer.visible) {
                     triggerRasterOverlay(map, layer, winObj);
                   }
+                  armContourReRender(map, layer, winObj);
                 } catch { /* ignore colormap registration errors */ }
               });
             });
@@ -669,6 +670,7 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
     if (layer.visible !== false) {
       updateLegend(element, colormap, layer.gridData.stats?.min, layer.gridData.stats?.max, win);
     }
+    armContourReRender(map, layer, win);
     return;
   }
 
@@ -730,6 +732,7 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
             if (layer?.visible !== false) {
               updateLegend(element, colormap, grid.stats?.min, grid.stats?.max, win);
             }
+            if (layer) armContourReRender(map, layer, win);
           } else {
             notifyError(`Failed to load raster overlay data for ${element}.`);
           }

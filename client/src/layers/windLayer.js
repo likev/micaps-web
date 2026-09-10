@@ -423,8 +423,8 @@ export function renderGridWindBarbs(map, gridData) {
         const featherLen = 8;
         const barbSpacing = 3.5;
 
-        // 50 m/s pennants (triangles)
-        while (spd >= 48) {
+        // 20 m/s pennants (triangles) - CMA / MICAPS standard
+        while (spd >= 18) {
           const px = x1 - dx * pos * barbSpacing;
           const py = y1 - dy * pos * barbSpacing;
           const px2 = x1 - dx * (pos + 1.5) * barbSpacing;
@@ -436,7 +436,7 @@ export function renderGridWindBarbs(map, gridData) {
           ctx.closePath();
           ctx.fill();
           pos += 1.8;
-          spd -= 50;
+          spd -= 20;
         }
 
         // 4 m/s full barbs

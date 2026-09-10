@@ -1,7 +1,7 @@
 // presets.js - Runtime-loaded composite preset & layer configuration (config.json)
 import { setColormaps } from "../utils/colormaps.js";
 
-const CONFIG_URL = new URL("./config.json", typeof document !== "undefined" ? document.baseURI : "http://localhost:8088/");
+const CONFIG_URL = new URL("./config.json", (typeof document !== "undefined" && document.baseURI) ? document.baseURI : "http://localhost:8088/");
 
 // Keep this as a live export so existing consumers see a successfully reloaded
 // configuration without needing to be re-imported.

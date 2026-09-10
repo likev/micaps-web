@@ -560,8 +560,8 @@ async function loadWeatherField(map, model, element, level, period, customOption
       },
     }, win);
 
-    if (!isWind) {
-      const layerObj = (win?.layers && win.layers.find((l) => l.id === layerId)) || {
+    if (!isWind || showRaster) {
+      const layerObj = getLayerById(layerId, win) || {
         id: layerId,
         element,
         level,
