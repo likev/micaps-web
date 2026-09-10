@@ -39,7 +39,7 @@ graph TD
         
         RasterL["Offscreen Canvas Float32Array Raster Layer"]
         ContourL["Isoband (Polygon) & Isoline (Line) Vector Overlays"]
-        WindL["Animated Particle Streamlines Simulator"]
+        WindL["Vector Wind & Wind Barb Engine (Canvas Streamlines & 110° Metric Barbs)"]
         StationL["WMO / NOAA 9-Point Station Plot Model (LoD Culling)"]
         UI["Workstation UI (Catalog Drawer, Layer Controls, Time Slider)"]
 
@@ -57,7 +57,7 @@ graph TD
 
     subgraph Testing ["Automated Verification Test Suites"]
         GoTest["Go Test Suite (Parser QC, MDFS Headers, Config)"]
-        BunTest["Bun Test Runner (174 Tests: QC, Contours, Palettes, Prefetch, Shortcuts)"]
+        BunTest["Bun Test Runner (201 Tests: QC, Contours, Palettes, Prefetch, Barbs, Memory)"]
         GoTest -->|Validate Parser & Normalization| Backend
         BunTest -->|Test QC, Interpolation, Contours, Prefetch, Shortcuts| Frontend
     end
@@ -124,9 +124,9 @@ micaps-web/
 │   │   ├── store/                    # Reactive workstation state manager
 │   │   ├── ui/                       # Navbar, catalog drawer, layer control, time slider, tooltip
 │   │   └── utils/                    # CMA palettes, weather symbols, griddata-js adapter
-│   └── test/                         # Meteorological Unit Test Suite (174 bun tests across 18 files)
+│   └── test/                         # Meteorological Unit Test Suite (201 bun tests across 20 files)
 │       ├── colormaps.test.js         # Dynamic colormaps & level scaling tests
-│       ├── weather_symbols.test.js   # WMO symbols & 110° wind barbs tests
+│       ├── weather_symbols.test.js   # WMO symbols & CMA/MICAPS 110° wind barbs tests
 │       ├── contour_logic.test.js     # Characteristic bold contour tests
 │       ├── contour_raster_exclusivity_legend.test.js # Colormap exclusivity & dynamic legend switching tests
 │       ├── config.test.js            # config.json validation & compact formatting tests
@@ -142,7 +142,9 @@ micaps-web/
 │       ├── window_title.test.js      # Multi-window viewport title generation tests
 │       ├── palette_persistence.test.js # Custom palettePath & colormap preservation across re-registration tests
 │       ├── keyboard_shortcuts.test.js # ArrowLeft/Right time stepping & ArrowUp/Down isobaric level shortcuts tests
-│       └── prefetch.test.js          # 3-min TTL cache, adjacent step resolution, prefetch targets & debouncing tests
+│       ├── prefetch.test.js          # 3-min TTL cache, adjacent step resolution, prefetch targets & debouncing tests
+│       ├── viewport_crop.test.js     # Performance maxEffectiveCells budget & cell-count LOD step decimation tests
+│       └── memory_optimization.test.js # Viewport BBox culling, zero-GeoJSON vector wind, & tile cache flush tests
 ```
 
 ---
@@ -256,13 +258,13 @@ Individual test suites:
 - **`station_contour_analysis.test.js`**: Delaunay triangulation, natural neighbor / IDW objective analysis interpolation, surface sea-level pressure (SLP) contouring, and multi-element extractor verification.
 - **`smooth_contour.test.js`**: Chaikin B-spline corner smoothing and Douglas-Peucker simplification for smooth meteorological isolines.
 - **`colormaps.test.js`**: Dynamic colormap interpolation, discrete/continuous stops, and pressure level scaling.
-- **`weather_symbols.test.js`**: WMO standard present weather symbols and 110-degree wind barbs.
+- **`weather_symbols.test.js`**: WMO standard present weather symbols, CMA / MICAPS standard 20 m/s pennant flags, 4 m/s full barbs, 2 m/s half barbs, 110-degree barb orientation, and canvas wind barb rendering.
 - **`contour_logic.test.js`**: Characteristic bold contour line matching (e.g. 588 dam subtropical high, 0°C isotherm).
 - **`contour_raster_exclusivity_legend.test.js`**: Colormap exclusivity, dual rendering states, dynamic legend switching between contour and raster palettes, and visibility coordination.
 - **`config.test.js`**: `config.json` schema validation, preset loading, and compact JSON serialization.
 - **`timeslider.test.js`**: Timeline stepper intervals, upper-air synoptic sounding 08:00 / 20:00 UTC+8 filtering, and NWP forecast init-cycles.
 - **`formatters.test.js`**: Meteorological unit formatting, coordinate rounding, and date/time conversions.
-- **`raster_layer.test.js`**: Offscreen canvas Float32Array raster rendering, range clamping, and opacity blending.
+- **`raster_layer.test.js`**: Offscreen canvas Float32Array raster rendering, range clamping, opacity blending, and custom XML palette preservation across viewport moves.
 - **`ui_review2_fixes.test.js`**: UI layer control state synchronization and multi-window manager callbacks.
 - **`ui_review3_fixes.test.js`**: UI layout contracts, CSS ellipsis, panel a11y, multi-window config recovery, step-length fallback, and layer label sizing.
 - **`dtd_analysis.test.js`**: Dew-point depression ($DTD = T - T_d$) multi-element extraction, physical supersaturation clamping & QC rejection, isobaric envelope validation, Delaunay triangulation & filled isoband contours, level-step layer renaming, station filter thresholding, station weather plot middle-left integer rendering with slot collision displacement/drop, and custom inverted moisture colormaps.
@@ -270,6 +272,8 @@ Individual test suites:
 - **`palette_persistence.test.js`**: Custom raster palette path and colormap preservation across layer re-registration, wind layer updates, preset config auto-save, and collapsible panel state persistence.
 - **`keyboard_shortcuts.test.js`**: Keyboard arrow key handling for operational forecasting, active window targeting, ArrowLeft / ArrowRight timeline stepping across NWP forecast lead hours and observation timestamps, and ArrowUp / ArrowDown isobaric level transitions.
 - **`prefetch.test.js`**: 3-minute TTL in-memory data cache, network in-flight request deduplication, JSON deep clone isolation, clock-skew prevention, tab visibility GC pause/resume, adjacent time step resolution (NWP periods & observation timestamps), 4-directional target calculation (Left/Right/Up/Down), surface vs upper-air level suppression, directional stepper prefetching (`btn-prev` only prev, `btn-next` and `btn-play` only next), and non-blocking debounced multi-window background prefetching.
+- **`viewport_crop.test.js`**: Config-driven performance `maxEffectiveCells` budget (50,000 ceiling), cell-count-driven step decimation, and Marching Squares small-grid bypass.
+- **`memory_optimization.test.js`**: Viewport bounding box spatial culling, cell-count-driven LOD, Douglas-Peucker collinear vertex simplification, main-thread FeatureCollection dereferencing, timeline stepper tile flushing, debounced viewport re-rendering in `contourReRender.js`, and zero-GeoJSON vector wind streamline/barb lifecycle cleanup.
 
 ### 5.2. Server Binary Parser Test Suite (Go Test)
 
@@ -428,7 +432,7 @@ Upper-air wind observations are subject to multi-stage QC in both backend parsin
 4. **Synoptic Station Plotting Symbology ([`client/src/layers/stationLayer.js`](file:///root/downloads/micaps-web/client/src/layers/stationLayer.js))**:
    - Missing wind ($ws = \text{null}$ or $-9999$): No wind barb or calm circle is rendered.
    - Calm wind ($ws < 1.5\text{ m/s}$): A calm wind circle ($\odot$) is rendered centered on the station coordinates; barb shafts and feathers are omitted.
-   - Active wind ($ws \ge 1.5\text{ m/s}$ and $wd \in [0, 360]$): A directional WMO standard wind barb with 110-degree flags is rendered, oriented along the incoming wind azimuth.
+   - Active wind ($ws \ge 1.5\text{ m/s}$ and $wd \in [0, 360]$): A directional WMO / CMA standard wind barb with 110-degree flags is rendered, oriented along the incoming wind azimuth using metric increments ($20\text{ m/s}$ triangle pennant flag, $4\text{ m/s}$ full barb, $2\text{ m/s}$ half barb; see [Section 8.9](#89-wind-barb-symbology--dual-engine-rendering-architecture)).
 
 #### 8.5.3. Isobaric Level-Specific Climatological QC Bounds Table
 
@@ -840,11 +844,12 @@ Dynamic vector wind representations (animated streamlines and dense wind barbs) 
   - Simulating $1,200$ moving particles across $60\text{ FPS}$ would require regenerating GeoJSON `LineString` features sixty times per second.
   - Slicing and uploading $60$ GeoJSON datasets per second would saturate MapLibre's Web Worker pipeline and cause immediate out-of-memory browser tab termination.
 - **MICAPS-Web Direct Canvas Implementation**:
-  - Both animated streamlines ([`renderWindStreamlines`](file:///root/downloads/micaps-web/client/src/layers/windLayer.js#L4)) and grid wind barbs ([`renderGridWindBarbs`](file:///root/downloads/micaps-web/client/src/layers/windLayer.js#L224)) bypass GeoJSON completely.
+  - Both animated streamlines ([`renderWindStreamlines`](file:///root/downloads/micaps-web/client/src/layers/windLayer.js#L16)) and grid wind barbs ([`renderGridWindBarbs`](file:///root/downloads/micaps-web/client/src/layers/windLayer.js#L301)) bypass GeoJSON completely.
   - They render into full-screen HTML5 `<canvas>` overlays (`.streamline-canvas` at `zIndex: 400` and `.wind-barb-canvas` at `zIndex: 405`) inserted directly into the MapLibre map container.
   - **Data Efficiency**: The renderer reads directly from the raw 1D typed arrays (`gridData.u` and `gridData.v`).
   - **Particle Advection**: Streamlines sample velocity via bilinear interpolation (`sampleWind(lng, lat)`), compute screen projections on the fly, and draw fading particle trails.
   - **Screen-Space Barb Culling**: Grid wind barbs evaluate screen coordinates at regular $48\text{-pixel}$ intervals (`step = 48`), rendering only visible barbs on map pan/zoom.
+  - **Metric Pennant Standard**: Strictly follows CMA/MICAPS metric conventions ($20\text{ m/s}$ filled triangle flag, $4\text{ m/s}$ full barb, $2\text{ m/s}$ half barb; see [Section 8.9](#89-wind-barb-symbology--dual-engine-rendering-architecture) for full specification).
   - **Total GeoJSON Memory**: **$0\text{ bytes}$**.
 
 #### 8.8.3. Offscreen Canvas Image Source Pipeline (`rasterLayer.js`)
@@ -941,6 +946,99 @@ flowchart TD
    - Once MapLibre has ingested the GeoJSON via `map.getSource(srcId).setData(isolineFC)`, the main-thread reference is dereferenced (`isolineFC = null`), allowing the V8 garbage collector to reclaim young-generation heap objects immediately.
 3. **Timeline Stepper Tile Flushing**:
    - When advancing along the timeline (`btn-next`, `btn-prev`, or `btn-play`), inactive layer sources are updated with an empty FeatureCollection (`{ type: "FeatureCollection", features: [] }`) before disposal, forcing MapLibre's Web Worker to clear tile pyramid caches.
+
+---
+
+### 8.9. Wind Barb Symbology & Dual-Engine Rendering Architecture
+
+Wind barbs (风向风速杆) provide simultaneous spatial representation of wind direction (azimuth $\theta \in [0^\circ, 360^\circ]$) and scalar wind speed ($ws$) for both discrete ground/radiosonde observation stations and continuous numerical weather prediction (NWP) vector meshes. MICAPS-Web implements an authoritative meteorological wind barb pipeline strictly adhering to **China Meteorological Administration (CMA / MICAPS)** operational forecasting rules and **Chinese National Standard (GB/T 35663)** weather charting conventions.
+
+```mermaid
+graph TD
+    subgraph Input ["Wind Data Ingestion"]
+        StationObs["Station Observations (TEMP / PILOT / SYNOP)"]
+        NWPGrid["NWP 2D Vector Mesh (ECMWF / GFS u, v)"]
+    end
+
+    subgraph StationEngine ["1. Synoptic Station Vector Engine (weatherSymbols.js & stationLayer.js)"]
+        SVGGen["getWindBarbSVG(speed, direction, baseSize)"]
+        MarkerOverlay["MapLibre HTML Marker Cluster Overlay"]
+        LoDCull["Spatial Clutter Avoidance & Level-of-Detail Culling"]
+        SVGGen --> MarkerOverlay --> LoDCull
+    end
+
+    subgraph GridEngine ["2. Direct Canvas 2D Grid Engine (windLayer.js)"]
+        ScreenDecimate["Screen-Space Decimation (step = 48 px)"]
+        BilinearVel["Velocity Interpolation sampleWind(lng, lat)"]
+        ColorCoding["Speed-Bracketed Color Coding (Cyan / Green / Yellow / Orange)"]
+        CanvasPaint["HTML5 Canvas Overlay (.wind-barb-canvas, zIndex: 405)"]
+        ScreenDecimate --> BilinearVel --> ColorCoding --> CanvasPaint
+    end
+
+    StationObs --> StationEngine
+    NWPGrid --> GridEngine
+```
+
+#### 8.9.1. CMA / MICAPS Metric Wind Barb Symbology Standards
+
+Unlike United States / NOAA conventions that reckon wind speed in knots ($1\text{ pennant} = 50\text{ kt} \approx 25.7\text{ m/s}$), operational weather analysis in China measures wind speed in **meters per second ($m/s$)**.
+
+The speed is decomposed into a hierarchical sequence of geometric pennants (flags) and feathers:
+- **三角旗 (Pennant Flag)**: **$20\text{ m/s}$** each ($\approx 72\text{ km/h}$ or $38.9\text{ kt}$). Drawn as a solid filled triangle (`<polygon>` in SVG, `ctx.fill()` in Canvas2D).
+- **长划 (Full Barb / Long Feather)**: **$4\text{ m/s}$** each ($\approx 14.4\text{ km/h}$ or $7.8\text{ kt}$). Drawn as a full-length line segment ($15\text{--}17\text{ px}$).
+- **短划 (Half Barb / Short Feather)**: **$2\text{ m/s}$** ($\approx 7.2\text{ km/h}$ or $3.9\text{ kt}$). Drawn at approximately half the length of a full feather ($8\text{ px}$).
+- **静风 (Calm Wind, $ws < 1.5\text{ m/s}$)**: Represented as a calm wind circle ($\odot$ on station plots; omitted or culled on continuous gridded meshes). No shaft or feathers are drawn.
+
+##### Metric Decomposition & Rounding Rules
+
+Wind speed is rounded to the nearest $2\text{ m/s}$ increment following operational meteorological thresholds:
+
+| Wind Speed ($m/s$) | Pennants ($20\text{ m/s}$) | Full Feathers ($4\text{ m/s}$) | Half Feathers ($2\text{ m/s}$) | Graphical Representation |
+| :---: | :---: | :---: | :---: | :--- |
+| **$< 1.5$** | $0$ | $0$ | $0$ | Calm circle ($\odot$, radius $4.5\text{ px}$) |
+| **$[1.5, 3.5)$** | $0$ | $0$ | $1$ | 1 short feather (indented from staff tip) |
+| **$[3.5, 5.5)$** | $0$ | $1$ | $0$ | 1 long feather |
+| **$[5.5, 7.5)$** | $0$ | $1$ | $1$ | 1 long feather + 1 short feather |
+| **$[7.5, 9.5)$** | $0$ | $2$ | $0$ | 2 long feathers |
+| **$[9.5, 11.5)$** | $0$ | $2$ | $1$ | 2 long feathers + 1 short feather |
+| **$[11.5, 13.5)$** | $0$ | $3$ | $0$ | 3 long feathers |
+| **$[13.5, 15.5)$** | $0$ | $3$ | $1$ | 3 long feathers + 1 short feather |
+| **$[15.5, 17.5)$** | $0$ | $4$ | $0$ | 4 long feathers |
+| **$[18.0, 21.5)$** | **$1$** | $0$ | $0$ | **1 Pennant triangle flag** |
+| **$[21.5, 23.5)$** | **$1$** | $0$ | $1$ | 1 Pennant flag + 1 short feather |
+| **$[23.5, 25.5)$** | **$1$** | $1$ | $0$ | 1 Pennant flag + 1 long feather |
+| **$[27.5, 29.5)$** | **$1$** | $2$ | $0$ | 1 Pennant flag + 2 long feathers |
+| **$[38.0, 41.5)$** | **$2$** | $0$ | $0$ | **2 Pennant triangle flags** |
+| **$[58.0, 61.5)$** | **$3$** | $0$ | $0$ | **3 Pennant triangle flags** (Typhoon / Jet core) |
+
+##### Spatial Geometry & Orientation Convention
+
+- **Staff Direction (Azimuth)**: The barb shaft points towards the direction from which the wind originates (upwind vector). For example, a Northerly wind ($0^\circ$) has its shaft pointing straight North; a Westerly wind ($270^\circ$) has its shaft pointing West.
+- **Feather Slant Angle**: Per standard WMO / NOAA / CMA conventions, feathers and pennants are angled backward towards the tail at $110^\circ$ relative to the inward shaft vector (slanted $70^\circ$ relative to staff axis), facing cyclonically (to the left in Northern Hemisphere synoptic charts).
+- **Indentation Rule**: When a wind barb contains only a single half-feather ($2\text{ m/s}$), the feather is placed indented from the end of the shaft to prevent visual confusion with a full feather positioned at the tip.
+
+#### 8.9.2. Dual-Engine Rendering Implementation
+
+MICAPS-Web provides two specialized, high-performance rendering engines tailored to the differing topological requirements of discrete observational stations vs. dense gridded NWP fields:
+
+##### 1. Synoptic Station Plot Engine ([`weatherSymbols.js`](file:///root/downloads/micaps-web/client/src/utils/weatherSymbols.js) & [`stationLayer.js`](file:///root/downloads/micaps-web/client/src/layers/stationLayer.js))
+- **Vector SVG Generation**: Produces crisp, resolution-independent vector markup via `getWindBarbSVG(speed, direction, baseSize)`.
+- **Integrated WMO 9-Point Model**: Positioned at the station coordinate centroid, acting as the directional anchor for upper-air height, temperature, dewpoint, and surface weather parameter plots.
+- **Calm & Outlier Handling**: Observations $< 1.5\text{ m/s}$ render an inner calm circle (`<circle r="4.5">`); speeds $> 150\text{ m/s}$ or $-9999$ nulls are omitted.
+- **Level-of-Detail (LoD) Culling**: Dense station clusters are dynamically culled based on map zoom and screen-space collision radius, preventing overlap while maintaining primary sounding and surface station visibility.
+
+##### 2. NWP Gridded Vector Canvas Engine ([`windLayer.js`](file:///root/downloads/micaps-web/client/src/layers/windLayer.js))
+- **Direct Canvas 2D Pipeline**: Operates on a full-screen `<canvas class="wind-barb-canvas">` at `zIndex: 405`, completely bypassing GeoJSON allocations and worker tile serialization ($0\text{ MB}$ GeoJSON footprint).
+- **Screen-Space Decimation (`step = 48 px`)**: Unlike station markers which are anchored to geographic coordinates, gridded vector wind is evaluated uniformly across viewport screen pixels. At every $48\text{-pixel}$ screen node, the map coordinate is unprojected (`map.unproject([sx, sy])`) and sampled from raw Float32 arrays (`gridData.u`, `gridData.v`) via bilinear interpolation. This prevents dense clutter at low zoom levels while maintaining uniform visual density when zooming in.
+- **High-DPI Retina Support**: Automatically scales by `window.devicePixelRatio`, applying `ctx.setTransform(dpr, 0, 0, dpr, 0, 0)` so that staff lines ($1.3\text{ px}$) and pennant polygons remain razor-sharp on $4\text{K}$ and Retina displays.
+- **Speed-Bracketed Dynamic Color Coding**:
+  To enhance synoptic situational awareness, grid barbs are dynamically color-coded according to physical wind speed tiers:
+  - **$ws > 25\text{ m/s}$**: Orange/Red (`rgba(240, 100, 30, 0.9)`) — Jet streams, severe gales, typhoon circulation.
+  - **$ws > 15\text{ m/s}$**: Yellow (`rgba(230, 200, 40, 0.9)`) — Gale force, strong breeze.
+  - **$ws > 8\text{ m/s}$**: Green (`rgba(80, 220, 120, 0.85)`) — Moderate breeze.
+  - **$ws \le 8\text{ m/s}$**: Light Blue (`rgba(100, 190, 255, 0.8)`) — Light breeze.
+- **Unified Lifecycle & Cleanup**:
+  Integrated with streamline particle animations into `cleanupWindLayer(map)`, ensuring that map pan, zoom, tab switching, and layer deletion safely clear canvas buffers and cancel pending animation frames without memory leaks.
 
 
 
