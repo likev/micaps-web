@@ -947,6 +947,37 @@ flowchart TD
 3. **Timeline Stepper Tile Flushing**:
    - When advancing along the timeline (`btn-next`, `btn-prev`, or `btn-play`), inactive layer sources are updated with an empty FeatureCollection (`{ type: "FeatureCollection", features: [] }`) before disposal, forcing MapLibre's Web Worker to clear tile pyramid caches.
 
+#### 8.8.6. Domain-Specific Memory Strategies: NWP Grids vs. Observational Stations vs. Derived Analyses
+
+Memory and performance optimization in MICAPS-Web is **not** confined to NWP grids; it spans all three meteorological data domains, applying specialized, mathematically appropriate strategies tailored to the topological nature of each data type:
+
+```mermaid
+flowchart TD
+    subgraph ThreeDomains ["Three Meteorological Data Domains"]
+        D1["1. Massive NWP Grids (ECMWF_HR, GFS)\n• Continuous 2D Float32Array\n• 1,000,000 to 6,500,000 cells"]
+        D2["2. Observational Station Plots (SURFACE, UPPER_AIR)\n• Discrete geographic points\n• 150 to 10,000 stations"]
+        D3["3. In-Browser Objective Analyses (Delaunay + IDW)\n• Synthesized regional 2D meshes\n• 5,000 to 20,000 cells"]
+    end
+
+    subgraph OptimizationPipelines ["Domain-Specific Optimization Architectures"]
+        D1 --> P1["Grid Optimization Pipeline\n• 3-Stage BBox Crop + Cell-Count LOD (§8.8.4)\n• Offscreen Canvas Image Source (95% memory drop)\n• Zero-GeoJSON Canvas Wind Streamlines & Barbs\n• Debounced Viewport Re-render Engine"]
+        D2 --> P2["Station Point Optimization Pipeline\n• Viewport Geographic Bounds Culling (isPointInBounds)\n• Screen-Space 100x100px Spatial Binning\n• Level-of-Detail (LoD) Density Culling (<= 5 per cell)\n• WeakMap Marker Lifecycle & Isobaric QC Clamping"]
+        D3 --> P3["Analysis Grid Optimization Pipeline\n• §8.8.4 Stage 1 Bypass Gate (N_cells < 50,000)\n• Zero Pan/Zoom Re-render (Locked 60 FPS)\n• Native step = 1 Mesoscale Fidelity Locked\n• Shared DP Simplification + Chaikin Vertex Control"]
+    end
+```
+
+##### Architectural Comparison Across All Three Domains:
+
+| Dimension | Massive NWP Grids (ECMWF_HR, GFS) | Observational Stations (`SURFACE` & `UPPER_AIR`) | In-Browser Objective Analyses (Surface / Sounding) |
+| :--- | :--- | :--- | :--- |
+| **Data Nature** | Continuous uniform 2D scalar/vector matrix | Discrete, irregular geographic observation points | Synthesized continuous 2D scalar mesh (Delaunay + IDW) |
+| **Data Scale ($N$)** | $1.0\text{M}\text{--}6.5\text{M}$ grid cells ($0.1^\circ\text{--}0.25^\circ$ global) | Surface: $2,000\text{--}10,000$ points; Upper-air: $120\text{--}800$ points | Regional East Asia: $171 \times 101 \approx 17,271$ cells ($0.5^\circ$ grid) |
+| **Primary Memory Bottleneck** | V8 heap exhaustion from GeoJSON `MultiPolygon` isobands ($60\text{--}90\text{ MB}$) & CPU Marching Squares latency ($> 500\text{ ms}$) | DOM element / SVG marker bloat, layout thrashing, and visual clutter from overlapping station plots | Unnecessary CPU Marching Squares re-computations during smooth map navigation |
+| **Active Spatial Optimization** | **3-Stage Pipeline (§8.8.4)**:<br>1. Stage 2 BBox crop to visible extent $[W, S, E, N]$<br>2. Stage 3 cell-count LOD: $\text{step} = \lceil\sqrt{N_{\text{crop}} / 50,000}\rceil$<br>3. Debounced re-render (`contourReRender.js`) | **Screen-Space Culling & Density Binning**:<br>1. Viewport coordinate culling (`isPointInBounds`)<br>2. $100\times100\text{ px}$ screen-space spatial binning<br>3. LoD density capping (max 5 stations/cell via stable hash) | **Stage 1 Complete Bypass Gate**:<br>1. Evaluates $N_{\text{cells}} \approx 17,271 < 50,000$<br>2. BBox crop completely bypassed (`shouldBypassCrop` = `true`)<br>3. Step locked at `step = 1` (full native mesoscale fidelity)<br>4. Viewport re-render listeners bypassed (0 ms pan overhead) |
+| **Rendering Pathway** | Offscreen Canvas Image Source (`rasterLayer.js`) + LineString isolines (`contourLayer.js`) + HTML5 Canvas wind overlay (`windLayer.js`) | Direct DOM / SVG marker clusters managed via per-map `WeakMap` lifecycle | Shared `contourLayer.js` LineString pipeline with Douglas-Peucker simplification + optional Canvas raster |
+| **GeoJSON Heap Footprint** | $0\text{ MB}$ (Raster / Wind) or $2\text{--}4\text{ MB}$ (Cropped Isolines) | $\approx 200\text{ KB}\text{--}1.2\text{ MB}$ (raw GeoJSON in V8 heap) | $\approx 800\text{ KB}\text{--}1.8\text{ MB}$ (regional isoline GeoJSON) |
+| **Navigation FPS** | Locked $60\text{ FPS}$ (debounced dynamic re-sampling) | Locked $60\text{ FPS}$ (markers culled to visible viewport) | Locked $60\text{ FPS}$ (computed once, zero re-computations) |
+
 ---
 
 ### 8.9. Wind Barb Symbology & Dual-Engine Rendering Architecture
