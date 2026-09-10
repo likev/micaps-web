@@ -200,17 +200,17 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
 
   selectModel.addEventListener("change", updateFormVisibility);
 
-  // Attempt to dynamically populate obs times via catalog API
-  (async () => {
+  // Dynamically populate observation times filtered by model type
+  async function refreshObsTimeOptions(model) {
+    const isUpper = model === "UPPER_AIR";
+    const candidatePaths = isUpper ? ["UPPER_AIR/PLOT/500", "UPPER_AIR/PLOT"] : ["SURFACE/PLOT_GLOBAL_3H", "SURFACE/PLOT_10MIN", "SURFACE/PLOT"];
     try {
       const { fetchTree } = await import("../api/catalogApi.js");
-      // Try known observation paths
-      const candidatePaths = ["SURFACE/PLOT_10MIN", "SURFACE/PLOT", "UPPER_AIR/PLOT"];
+      const { filterObsFilesByStep } = await import("./timeSlider.js");
       let files = null;
       for (const p of candidatePaths) {
         try {
           const res = await fetchTree(p);
-          // fetchTree may return array of strings or object with files
           const arr = Array.isArray(res) ? res : res?.files || res?.data || null;
           if (Array.isArray(arr) && arr.length) {
             files = arr;
@@ -220,34 +220,59 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
           continue;
         }
       }
+      let toUse = [];
       if (files && files.length) {
-        // Filter to .000 files and sort descending (newest first)
-        const obsFiles = files.filter((f) => typeof f === "string" && f.endsWith(".000")).sort().reverse();
-        const toUse = obsFiles.length ? obsFiles.slice(0, 10) : files.slice(0, 10);
-        if (toUse.length) {
-          selectObsTime.innerHTML = toUse
-            .map((f, idx) => {
-              let label = f;
-              try {
-                label = formatObsTimestamp(f);
-              } catch {
-                label = f;
-              }
-              return `<option value="${f}" ${idx === 0 ? "selected" : ""}>${label}</option>`;
-            })
-            .join("");
-          const st = document.getElementById("catalog-obs-status");
-          if (st) { st.textContent = "(live)"; st.style.color = "#56d364"; }
+        let obsFiles = files.filter((f) => typeof f === "string" && f.endsWith(".000")).sort().reverse();
+        if (isUpper) {
+          obsFiles = filterObsFilesByStep(obsFiles, 12, true);
         }
-      } else {
+        toUse = obsFiles.slice(0, 10);
+      }
+      if (!toUse.length) {
+        const { DEFAULT_MOCK_OBS_FILES } = await import("../config/presets.js");
+        const { filterObsFilesByStep } = await import("./timeSlider.js");
+        let fallback = [...DEFAULT_MOCK_OBS_FILES].sort().reverse();
+        if (isUpper) {
+          fallback = filterObsFilesByStep(fallback, 12, true);
+        }
+        toUse = fallback.slice(0, 10);
+      }
+      if (toUse.length) {
+        selectObsTime.innerHTML = toUse
+          .map((f, idx) => {
+            let label = f;
+            try {
+              label = formatObsTimestamp(f);
+            } catch {
+              label = f;
+            }
+            return `<option value="${f}" ${idx === 0 ? "selected" : ""}>${label}</option>`;
+          })
+          .join("");
         const st = document.getElementById("catalog-obs-status");
-        if (st) { st.textContent = "(fallback defaults)"; st.style.color = "#8b949e"; }
+        if (st) {
+          st.textContent = files && files.length ? "(live)" : "(fallback defaults)";
+          st.style.color = files && files.length ? "#56d364" : "#8b949e";
+        }
       }
     } catch (_) {
       const st = document.getElementById("catalog-obs-status");
       if (st) { st.textContent = "(fallback defaults)"; st.style.color = "#8b949e"; }
     }
-  })();
+  }
+
+  // Refresh observation times whenever model changes to observation
+  const origUpdateFormVisibility = updateFormVisibility;
+  updateFormVisibility = function() {
+    origUpdateFormVisibility();
+    const m = selectModel.value;
+    if (m === "SURFACE" || m === "UPPER_AIR") {
+      refreshObsTimeOptions(m);
+    }
+  };
+
+  // Initial populate
+  refreshObsTimeOptions(selectModel.value);
 
   btnLoad.addEventListener("click", async () => {
     btnLoad.disabled = true;

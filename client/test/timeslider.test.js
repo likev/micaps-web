@@ -178,4 +178,24 @@ describe("Timeslider Step-Length & Discrete Periods", () => {
     expect(extractPeriod(null, 24)).toBe(24);
     expect(extractPeriod(undefined, 24)).toBe(24);
   });
+
+  test("syncObservationTimeline for UPPER_AIR locks targetFile to 08:00 or 20:00 BJT", async () => {
+    const { syncObservationTimeline } = await import("../src/utils/timelineSync.js");
+
+    // 1. When no currentFile is given, targetFile must be 08:00 or 20:00
+    const latestUpper = await syncObservationTimeline("UPPER_AIR/PLOT/500", null, "500 hPa Sounding");
+    expect(typeof latestUpper).toBe("string");
+    const latestHour = parseInt(latestUpper.slice(8, 10), 10);
+    expect([8, 20]).toContain(latestHour);
+
+    // 2. When an invalid intermediate hour (e.g. 14:00) is requested, it snaps to valid sounding
+    const snapped = await syncObservationTimeline("UPPER_AIR/PLOT/500", "20260828140000.000", "500 hPa Sounding");
+    const snappedHour = parseInt(snapped.slice(8, 10), 10);
+    expect([8, 20]).toContain(snappedHour);
+
+    // 3. When a valid 20:00 file is requested, it is preserved
+    const validSounding = "20260828200000.000";
+    const kept = await syncObservationTimeline("UPPER_AIR/PLOT/500", validSounding, "500 hPa Sounding");
+    expect(kept).toBe(validSounding);
+  });
 });

@@ -1,5 +1,5 @@
 import { fetchTree, fetchLatest } from "../api/catalogApi.js";
-import { setTimelineMode } from "../ui/timeSlider.js";
+import { setTimelineMode, filterObsFilesByStep } from "../ui/timeSlider.js";
 import { getActiveWindow } from "../ui/tabWindowManager.js";
 import { DEFAULT_MOCK_OBS_FILES } from "../config/presets.js";
 
@@ -181,11 +181,20 @@ export async function syncObservationTimeline(path, currentFile = null, winTitle
       const isMockFallback = !hasObsFormat;
       validFiles = hasObsFormat ? validFiles.filter((f) => f.length >= 14 && f.endsWith(".000")) : DEFAULT_MOCK_OBS_FILES;
       if (validFiles.length > 0) {
-        // FIX: after filter validFiles is always a new array, so `validFiles !== DEFAULT_MOCK_OBS_FILES` is always true — use isMockFallback flag instead
         const recentFiles = !isMockFallback && validFiles.length >= 2 ? validFiles.slice(0, 10).reverse() : (validFiles.length >= 2 ? validFiles.slice(-10) : DEFAULT_MOCK_OBS_FILES);
         // when falling back to mock, recentFiles should be mock files
-        const effectiveFiles = isMockFallback ? DEFAULT_MOCK_OBS_FILES : recentFiles;
-        const targetFile = currentFile && effectiveFiles.includes(currentFile) ? currentFile : effectiveFiles[effectiveFiles.length - 1];
+        let effectiveFiles = isMockFallback ? DEFAULT_MOCK_OBS_FILES : recentFiles;
+        if (isUpper) {
+          const upperFiltered = filterObsFilesByStep(effectiveFiles, stepLength, true);
+          if (upperFiltered.length > 0) {
+            effectiveFiles = upperFiltered;
+          }
+        }
+        let targetFile = currentFile && effectiveFiles.includes(currentFile) ? currentFile : effectiveFiles[effectiveFiles.length - 1];
+        if (isUpper && currentFile && !effectiveFiles.includes(currentFile)) {
+          // If a requested file was outside standard 08:00/20:00 soundings, lock to latest valid sounding
+          targetFile = effectiveFiles[effectiveFiles.length - 1];
+        }
         applyTimeline(targetFile, effectiveFiles);
         return targetFile;
       }
@@ -193,7 +202,15 @@ export async function syncObservationTimeline(path, currentFile = null, winTitle
   } catch (err) {
     console.warn("[Main] Failed to query observation file tree for timeline:", err);
   }
-  const fallbackFile = currentFile || DEFAULT_MOCK_OBS_FILES[DEFAULT_MOCK_OBS_FILES.length - 1];
-  applyTimeline(fallbackFile, DEFAULT_MOCK_OBS_FILES);
+  let fallbackFiles = DEFAULT_MOCK_OBS_FILES;
+  if (isUpper) {
+    const upperFallback = filterObsFilesByStep(DEFAULT_MOCK_OBS_FILES, stepLength, true);
+    if (upperFallback.length > 0) fallbackFiles = upperFallback;
+  }
+  let fallbackFile = currentFile && fallbackFiles.includes(currentFile) ? currentFile : fallbackFiles[fallbackFiles.length - 1];
+  if (isUpper && currentFile && !fallbackFiles.includes(currentFile)) {
+    fallbackFile = fallbackFiles[fallbackFiles.length - 1];
+  }
+  applyTimeline(fallbackFile, fallbackFiles);
   return fallbackFile;
 }

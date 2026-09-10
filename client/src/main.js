@@ -851,12 +851,20 @@ async function renderSurfaceDerivedContoursForStation(map, stations, activeGroup
   if (win?.derivedContourSnapshots) win.derivedContourSnapshots = null;
 }
 
-async function loadUpperAirComposite(map, level = 500, obsTime = "20260828170000.000", win = getActiveWindow(), expectedSeq = null) {
+async function loadUpperAirComposite(map, level = 500, obsTime = "20260828200000.000", win = getActiveWindow(), expectedSeq = null) {
   const curLevel = level || 500;
+  // Guard upper-air sounding: validate that obsTime conforms to standard synoptic soundings (08:00 or 20:00 BJT)
+  let effectiveObsTime = obsTime || "20260828200000.000";
+  if (typeof effectiveObsTime === "string" && effectiveObsTime.length >= 10) {
+    const hour = parseInt(effectiveObsTime.slice(8, 10), 10);
+    if (hour !== 8 && hour !== 20) {
+      console.warn(`[UpperAir] Warning: requested time ${effectiveObsTime} (hour ${hour}) is outside standard 08:00/20:00 synoptic soundings.`);
+    }
+  }
   const path = `UPPER_AIR/PLOT/${curLevel}`;
   let stations;
   try {
-    stations = await fetchStationObservations(path, obsTime);
+    stations = await fetchStationObservations(path, effectiveObsTime);
   } catch (err) {
     console.error("[Main] Upper-air composite load error:", err);
     showErrorToast(`Upper-air load failed (${curLevel}hPa): ${err.message || err}`);
