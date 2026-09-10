@@ -197,21 +197,11 @@ async function bootstrap() {
   initNavBar("navbar", {
     onOpenConfig: () => openConfigTab(),
     onConfigReload: reloadConfiguration,
-    onPresetSelect: (group) => {
-      const win = getActiveWindow();
-      if (!win) return;
-      win.activeGroup = group;
-      win.level = null;
-      win.isObservation = Boolean(group?.isObservation);
-      updateWindowTitle(win, group ? group.name : "");
-      setWindowHeaderPreset(win, group?.id || "");
-      setWindowHeaderLevel(win, null);
+    onPresetSelect: () => {
+      // Intentionally do not modify active window title or state before data is actually loaded via onLoadData
     },
-    onLevelSelect: (lvl) => {
-      const win = getActiveWindow();
-      if (!win) return;
-      win.level = lvl;
-      setWindowHeaderLevel(win, lvl);
+    onLevelSelect: () => {
+      // Intentionally do not modify active window state before data is actually loaded via onLoadData
     },
     onLoadData: async (group, overrideLevel = null) => {
       const win = getActiveWindow();

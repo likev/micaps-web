@@ -141,4 +141,45 @@ describe("Window Title with Observation Time and Valid Time", () => {
     expect(tabEl?.textContent).toBe("W1: 500hPa Upper-Air Sounding [Obs: 2026-09-04 08:00 (UTC+8)]");
     expect(tabEl?.title).toBe("W1: 500hPa Upper-Air Sounding [Obs: 2026-09-04 08:00 (UTC+8)]");
   });
+
+  test("Selecting preset in navbar before real load data preserves window title and active group", () => {
+    const win = {
+      titleId: "win-title-1-0",
+      winIdx: 0,
+      activeGroup: { id: "ecmwf-500", name: "ECMWF 500hPa HGT+WIND+TMP", isObservation: false },
+      isObservation: false,
+      forecastCycle: "2026090408",
+      period: 24,
+      baseTitle: "ECMWF 500hPa HGT+WIND+TMP",
+    };
+
+    updateWindowTitle(win, win.baseTitle);
+    const initialTitle = document.getElementById("win-title-1-0")?.textContent;
+    expect(initialTitle).toBe("ECMWF 500hPa HGT+WIND+TMP [Valid: 2026-09-05 08:00 (UTC+8) (+024h)]");
+
+    // Simulating navbar onPresetSelect callback (user changed select-preset dropdown)
+    // onPresetSelect must NOT modify active window or window title
+    const candidateGroup = { id: "surface-obs", name: "Surface Observations", isObservation: true };
+    const onPresetSelect = () => {};
+    onPresetSelect(candidateGroup);
+
+    // Verify window title and state are strictly unchanged
+    const preservedTitle = document.getElementById("win-title-1-0")?.textContent;
+    expect(preservedTitle).toBe(initialTitle);
+    expect(win.activeGroup.id).toBe("ecmwf-500");
+    expect(win.isObservation).toBe(false);
+
+    // Only on real load data (onLoadData callback), window title and state update
+    const onLoadData = (group) => {
+      win.activeGroup = group;
+      win.isObservation = Boolean(group.isObservation);
+      updateWindowTitle(win, group.name);
+    };
+    onLoadData(candidateGroup);
+
+    const updatedTitle = document.getElementById("win-title-1-0")?.textContent;
+    expect(updatedTitle).toBe("Surface Observations");
+    expect(win.activeGroup.id).toBe("surface-obs");
+    expect(win.isObservation).toBe(true);
+  });
 });

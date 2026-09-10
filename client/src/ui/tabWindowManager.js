@@ -601,8 +601,12 @@ function setupWindowControlsForWin(tab, win) {
     presetSelect.addEventListener("change", (e) => {
       const gid = e.target.value;
       const g = PRESET_GROUPS.find((grp) => grp.id === gid) || null;
-      win.activeGroup = g;
-      updateWindowTitle(win, g ? g.name : "");
+      if (callbacks.onWindowGroupChange && g) {
+        callbacks.onWindowGroupChange(win, g);
+      } else {
+        win.activeGroup = g;
+        updateWindowTitle(win, g ? g.name : "");
+      }
       focusWindow(win.tabId, win.winIdx);
     });
   }
@@ -612,6 +616,9 @@ function setupWindowControlsForWin(tab, win) {
       const lvl = parseInt(e.target.value, 10);
       if (!isNaN(lvl)) {
         win.level = lvl;
+        if (callbacks.onWindowLevelChange) {
+          callbacks.onWindowLevelChange(win, lvl);
+        }
         focusWindow(win.tabId, win.winIdx);
       }
     });
