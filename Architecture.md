@@ -859,64 +859,63 @@ To eliminate the $60\text{--}90\text{ MB}$ memory footprint of vector isobands (
 4. **Mutual Exclusivity Enforcement**:
    - As established in Section 8.5.4, contour fills (`showFill`) and binary raster overlays (`showRaster`) are mutually exclusive. Selecting raster shading disables `contourf` calculation entirely, dropping client memory load by up to $95\%$.
 
-#### 8.8.4. Viewport Bounding Box Spatial Culling & Cell-Count-Driven LOD
+#### 8.8.4. Viewport Bounding Box Spatial Culling & Cell-Count-Driven LOD Pipeline
 
-When handling massive ultra-high-resolution global grids (such as ECMWF_HR $0.1^\circ$ with $3600 \times 1801 \approx 6.48 \times 10^6$ cells), calculating isolines across the entire planet produces hundreds of thousands of lines that are never displayed on screen. Rather than coupling decimation to arbitrary map zoom levels, the pipeline strictly evaluates the **active cell count ($N_{\text{cells}}$)** against a calibrated computational budget of **$50,000\text{ cells}$**:
+When handling massive ultra-high-resolution global grids (such as ECMWF_HR $0.1^\circ$ with $3600 \times 1801 \approx 6.48 \times 10^6$ cells), calculating isolines across the entire planet produces hundreds of thousands of lines that are never displayed on screen. To maximize memory efficiency and preserve locked 60 FPS map performance, the client executes a sequential 3-stage spatial evaluation pipeline:
 
 ```mermaid
 flowchart TD
-    GridIn["NWP Grid Ingestion: N_cells = N_lon * N_lat"] --> CellCheck{"Is N_cells < 50,000?"}
+    GridIn["NWP Grid Ingestion: Total N_cells = N_lon * N_lat"] --> Stage1{"1. Is Total N_cells < 50,000?"}
     
-    CellCheck -->|Yes: Small/Regional Mesh (e.g. China 45k)| FullDomain["Bypass BBox Crop & Decimation: step = 1\n(Full Domain Once, Zero Re-computation on Pan/Zoom)"]
+    Stage1 -->|Yes (< 50k cells)| Bypass["Stage 1: Complete BBox Crop Bypass\n• Lock step = 1 (100% Full Native Resolution)\n• Full domain computed once, locked 60 FPS on pan/zoom"]
     
-    CellCheck -->|No: Large/Global Mesh (>= 50,000 pts)| BBoxCheck{"Is Domain Larger than Viewport?"}
+    Stage1 -->|No (>= 50k cells)| Stage2["Stage 2: Execute Viewport BBox Crop\n• Crop sub-grid to viewport [W, S, E, N] + buffer delta\n• Compute cropped count: N_crop = N_lon_crop * N_lat_crop"]
     
-    BBoxCheck -->|No (Fully Contained)| ActiveCalcFull["N_active = N_cells"]
-    BBoxCheck -->|Yes (Exceeds Viewport)| CropGrid["BBox Crop Sub-Grid:\n[West-buf, South-buf, East+buf, North+buf]"]
-    CropGrid --> ActiveCalcCrop["N_active = N_crop = N_lon_crop * N_lat_crop"]
+    Stage2 --> Stage3{"3. Evaluate step by Cropped Count N_crop"}
     
-    ActiveCalcFull --> StepCalc{"Evaluate step based on N_active"}
-    ActiveCalcCrop --> StepCalc
+    Stage3 -->|N_crop < 50,000| Step1["step = 1 (Full Native Resolution on Cropped Viewport)"]
+    Stage3 -->|50,000 <= N_crop < 200,000| Step2["step = 2 (4x Cell Reduction -> <= 50k effective)"]
+    Stage3 -->|200,000 <= N_crop < 450,000| Step3["step = 3 (9x Cell Reduction -> <= 50k effective)"]
+    Stage3 -->|N_crop >= 450,000| StepN["step = ceil(sqrt(N_crop / 50,000))"]
     
-    StepCalc -->|N_active < 50k| Step1["step = 1 (100% Full Native Resolution)"]
-    StepCalc -->|50k <= N_active < 200k| Step2["step = 2 (4x Cell Reduction -> <= 50k effective)"]
-    StepCalc -->|200k <= N_active < 450k| Step3["step = 3 (9x Cell Reduction -> <= 50k effective)"]
-    StepCalc -->|N_active >= 450k| StepN["step = ceil(sqrt(N_active / 50,000))"]
-    
-    FullDomain --> MarchingSquares["Marching Squares & Isoline Generation"]
+    Bypass --> MarchingSquares["Marching Squares & Isoline Generation"]
     Step1 --> MarchingSquares
     Step2 --> MarchingSquares
     Step3 --> MarchingSquares
     StepN --> MarchingSquares
 ```
 
-1. **The $50,000$ Cell Guard Limit (`$N_{\text{cells}} < 50,000$`)**:
-   - **Contract**: When total mesh cells $N_{\text{cells}} = N_{\text{lon}} \times N_{\text{lat}} < 50,000$, both **Bounding Box Cropping and decimation are strictly bypassed**.
-   - Standard regional operational products (such as China synoptic mesh $281 \times 161 = 45,241$ cells) fit comfortably within browser heap budgets ($\approx 2\text{--}4\text{ MB}$ GeoJSON).
-   - By calculating the entire domain once at native resolution (`step = 1`), forecasters can freely pan and zoom across the continent at a locked 60 FPS without triggering CPU Marching Squares re-calculations.
+##### 1. When Total Grid Cells $N_{\text{cells}} = N_{\text{lon}} \times N_{\text{lat}} < 50,000$:
+- **Complete BBox Crop Bypass**: When the ingested dataset contains fewer than $50,000$ total points, Bounding Box Cropping is **strictly bypassed**.
+- **Native Resolution Locked (`step = 1`)**: No downsampling is applied; the grid is evaluated at $100\%$ full native resolution.
+- **Zero Re-computation on Pan / Zoom**: Standard regional operational meshes (such as the China synoptic mesh $281 \times 161 = 45,241$ cells) generate a lightweight GeoJSON footprint ($\approx 2\text{--}4\text{ MB}$). Computing the full domain once allows forecasters to freely pan, zoom, and tilt the map at a locked 60 FPS with zero CPU Marching Squares recalculations.
 
-2. **Deciding `step` by Cell Count (Decoupled from Zoom Level)**:
-   - **Why Zoom-Based Decimation Fails**: A coarse regional grid (e.g. $60 \times 40 = 2,400$ cells) viewed at a low zoom level would be ruined if decimated by a zoom-based rule (`step = 4` $\implies 15 \times 10$ points). Conversely, an ultra-fine global grid viewed at mid zoom could still contain millions of cells, causing tab crashes if judged solely by zoom.
-   - **Budget-Balancing Decimation Formula**:
-     To guarantee that the input matrix to Marching Squares never exceeds the safe computational ceiling of $50,000$ effective cells, the decimation step factor is derived directly from the active cell count:
-     $$\text{step} = \max\left(1, \left\lceil \sqrt{\frac{N_{\text{active}}}{50,000}} \right\rceil\right)$$
-   - **Operational Decimation Brackets**:
-     - **$N_{\text{active}} < 50,000$ cells**: $\text{step} = 1$ ($100\%$ full native resolution, zero loss of mesoscale fidelity).
-     - **$50,000 \le N_{\text{active}} < 200,000$ cells**: $\text{step} = 2$ ($4\times$ decimation $\implies 12,500\text{--}50,000$ effective cells).
-     - **$200,000 \le N_{\text{active}} < 450,000$ cells**: $\text{step} = 3$ ($9\times$ decimation $\implies 22,200\text{--}50,000$ effective cells).
-     - **$450,000 \le N_{\text{active}} < 800,000$ cells**: $\text{step} = 4$ ($16\times$ decimation $\implies 28,100\text{--}50,000$ effective cells).
-     - **$N_{\text{active}} \ge 800,000$ cells**: BBox Cropping extracts the visible sub-grid. If the cropped sub-grid contains $< 50,000$ cells, it immediately renders at full native resolution (`step = 1`).
+##### 2. Bounding Box Spatial Culling (BBox Crop when $N_{\text{cells}} \ge 50,000$):
+- **Viewport Spatial Isolation**: When the total grid exceeds $50,000$ cells and extends beyond the current display, the client crops the 2D scalar matrix $Z$ to the visible map bounding box plus a safety buffer margin $\delta = 1.5^\circ\text{--}2.0^\circ$.
+- **Index Clamping Formulation**:
+  Given visible geographic bounds $[W, S, E, N] = \text{map.getBounds()}$:
+  $$\begin{aligned}
+  i_{\min} &= \max\left(0, \left\lfloor \frac{W - \delta - \text{startLon}}{d\text{lon}} \right\rfloor\right), \quad &i_{\max} &= \min\left(N_{\text{lon}}-1, \left\lceil \frac{E + \delta - \text{startLon}}{d\text{lon}} \right\rceil\right) \\
+  j_{\min} &= \max\left(0, \left\lfloor \frac{S - \delta - \text{startLat}}{d\text{lat}} \right\rfloor\right), \quad &j_{\max} &= \min\left(N_{\text{lat}}-1, \left\lceil \frac{N + \delta - \text{startLat}}{d\text{lat}} \right\rceil\right)
+  \end{aligned}$$
+- **Cropped Dimensions & Cell Count**:
+  $$\begin{aligned}
+  N_{\text{lon\_crop}} &= i_{\max} - i_{\min} + 1, \quad &N_{\text{lat\_crop}} &= j_{\max} - j_{\min} + 1 \\
+  N_{\text{crop}} &= N_{\text{lon\_crop}} \times N_{\text{lat\_crop}}
+  \end{aligned}$$
+- **Immediate Spatial Pruning**: For a $3600 \times 1801$ global grid ($6.48\text{M}$ cells), cropping to a regional synoptic view ($30^\circ \times 20^\circ$) drops the active cell count from $6,483,600$ down to $N_{\text{crop}} = 300 \times 200 = 60,000$ cells—an immediate **$99\%$ reduction** in active data points.
 
-3. **Bounding Box Spatial Culling (BBox Crop)**:
-   - **Activation Condition**: Only invoked when $N_{\text{cells}} \ge 50,000$ AND the model domain substantially exceeds the current viewport.
-   - **Index Clamping Formulation**:
-     Given visible geographic bounds $[W, S, E, N] = \text{map.getBounds()}$ and buffer margin $\delta = 1.5^\circ\text{--}2.0^\circ$:
-     $$\begin{aligned}
-     i_{\min} &= \max\left(0, \left\lfloor \frac{W - \delta - \text{startLon}}{d\text{lon}} \right\rfloor\right), \quad &i_{\max} &= \min\left(N_{\text{lon}}-1, \left\lceil \frac{E + \delta - \text{startLon}}{d\text{lon}} \right\rceil\right) \\
-     j_{\min} &= \max\left(0, \left\lfloor \frac{S - \delta - \text{startLat}}{d\text{lat}} \right\rfloor\right), \quad &j_{\max} &= \min\left(N_{\text{lat}}-1, \left\lceil \frac{N + \delta - \text{startLat}}{d\text{lat}} \right\rceil\right)
-     \end{aligned}$$
-   - **Memory Impact**:
-     Cropping a $3600 \times 1801$ global grid to a synoptic view ($30^\circ \times 20^\circ$) reduces active cells from $6.48 \times 10^6$ down to $300 \times 200 = 60,000$ cells. Applying the decimation formula ($\text{step} = 2$) results in only $15,000$ points fed into Marching Squares—a **$99.7\%$ reduction** in vertex generation and heap allocation.
+##### 3. Deciding `step` Strictly by Cell Count After BBox Crop:
+- **Decoupled from Zoom Level**: The decimation factor `step` is **never determined by arbitrary map zoom levels**. Instead, it is evaluated strictly on the **cropped cell count ($N_{\text{crop}}$)** resulting from Stage 2.
+- **Budget-Balancing Decimation Formula**:
+  To guarantee that the input matrix fed into Marching Squares never exceeds the calibrated computational ceiling of $50,000$ effective cells, `step` is derived directly from $N_{\text{crop}}$:
+  $$\text{step} = \max\left(1, \left\lceil \sqrt{\frac{N_{\text{crop}}}{50,000}} \right\rceil\right)$$
+- **Post-Crop Decimation Brackets**:
+  - **$N_{\text{crop}} < 50,000$ cells**: $\text{step} = 1$ ($100\%$ full native resolution on the cropped viewport area, zero loss of mesoscale accuracy).
+  - **$50,000 \le N_{\text{crop}} < 200,000$ cells**: $\text{step} = 2$ ($4\times$ cell reduction $\implies 12,500\text{--}50,000$ effective cells).
+  - **$200,000 \le N_{\text{crop}} < 450,000$ cells**: $\text{step} = 3$ ($9\times$ cell reduction $\implies 22,200\text{--}50,000$ effective cells).
+  - **$450,000 \le N_{\text{crop}} < 800,000$ cells**: $\text{step} = 4$ ($16\times$ cell reduction $\implies 28,100\text{--}50,000$ effective cells).
+  - **$N_{\text{crop}} \ge 800,000$ cells**: Scaled dynamically via $\lceil\sqrt{N_{\text{crop}} / 50,000}\rceil$, ensuring the active Marching Squares calculation strictly finishes in $< 30\text{ ms}$.
 
 #### 8.8.5. Lifecycle Memory Management & Cache Flushing
 
