@@ -18,11 +18,16 @@ beforeAll(() => {
         return {
           width: 0,
           height: 0,
+          style: {},
           getContext: () => ({
             createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }),
             putImageData: () => {},
           }),
           toDataURL: () => "data:image/png;base64,mock",
+          toBlob: (cb) => {
+            if (typeof cb === "function") cb(new Blob(["mock"]));
+          },
+          remove: () => {},
         };
       }
       return {};

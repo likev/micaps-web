@@ -17,6 +17,7 @@ import { getActiveWindow, getWindowById } from "./tabWindowManager.js";
 import { getLayersForWindow } from "./layerControl.js";
 import { updateLegend, removeLegend } from "./legend.js";
 import { upsertDerivedLayerToPreset, removeDerivedLayerFromPreset } from "../config/presets.js";
+import { armContourReRender, disarmContourReRender } from "../services/contourReRender.js";
 
 function notifyError(msg) {
   import("../main.js").then(({ showErrorToast }) => {
@@ -220,7 +221,9 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
             boldValues: layer.config?.boldValues,
             boldLineWidth: layer.config?.boldLineWidth,
             colormap: layer.colormap,
+            viewportBounds: (map && typeof map.getBounds === "function") ? map.getBounds().toArray() : null,
           });
+          armContourReRender(map, layer, winObj);
         }
       }
 
@@ -261,7 +264,9 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
               smooth: layer.config?.smooth,
               smoothIterations: layer.config?.smoothIterations,
               labelSize: layer.config?.labelSize,
+              viewportBounds: (map && typeof map.getBounds === "function") ? map.getBounds().toArray() : null,
             });
+            armContourReRender(map, layer, winObj);
             const hasShading = (layer.visible !== false) && (Boolean(layer.config?.showFill) || Boolean(layer.config?.showRaster));
             if (hasShading) {
               updateLegend(elem, elem, layer.gridData?.stats?.min, layer.gridData?.stats?.max, winObj);
@@ -304,7 +309,9 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
                       smooth: layer.config?.smooth,
                       smoothIterations: layer.config?.smoothIterations,
                       labelSize: layer.config?.labelSize,
+                      viewportBounds: (map && typeof map.getBounds === "function") ? map.getBounds().toArray() : null,
                     });
+                    armContourReRender(map, layer, winObj);
                     const hasShading = (layer.visible !== false) && (Boolean(layer.config?.showFill) || Boolean(layer.config?.showRaster));
                     if (hasShading) {
                       updateLegend(elem, key, layer.gridData?.stats?.min, layer.gridData?.stats?.max, winObj);

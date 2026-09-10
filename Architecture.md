@@ -858,21 +858,21 @@ To eliminate the $60\text{--}90\text{ MB}$ memory footprint of vector isobands (
    - An offscreen canvas (`rasterCanvas`) interpolates each row non-linearly using `latToMercatorY` and `mercatorYToLat`, ensuring that the resulting quad bitmap aligns with MapLibre's basemap tiles without high-latitude distortion.
 3. **Colormap Evaluation & Canvas Painting**:
    - Evaluates colormap stops on CPU via `getColor(val, element, colormap, zMin, zMax)` and fills a single `ImageData` buffer (`imgData.data`), painting to canvas in a single `ctx.putImageData(imgData, 0, 0)` call.
-4. **MapLibre Image Source Binding**:
-   - Converts the canvas to a Data URL (`rasterCanvas.toDataURL()`) and binds it as a native MapLibre Image Source:
+4. **MapLibre Image Source Binding & Blob URL Lifecycle**:
+   - Converts the per-render canvas into a Blob URL (`URL.createObjectURL(blob)`) and binds it as a native MapLibre Image Source (`type: "image"`), capping raster dimensions to a maximum of 2048 on the longest side to bound texture memory:
      ```javascript
      map.addSource(rasterSrcId, {
        type: "image",
-       url: dataUrl,
+       url: blobUrl,
        coordinates: [[leftLon, topLat], [rightLon, topLat], [rightLon, bottomLat], [leftLon, bottomLat]],
      });
      ```
-   - Subsequent time steps call `map.getSource(rasterSrcId).updateImage({ url: dataUrl, coordinates })`. MapLibre uploads the bitmap to a standard GPU texture and renders it via its built-in raster shader (`raster-opacity`, `raster-fade-duration`).
+   - Subsequent time steps and re-renders call `map.getSource(rasterSrcId).updateImage({ url: newBlobUrl, coordinates })` and revoke prior URLs via `URL.revokeObjectURL(prevUrl)`, completely preventing heap retention and base64 bloat. MapLibre uploads the bitmap to a standard GPU texture and renders it via its built-in raster shader (`raster-opacity`, `raster-fade-duration`).
 5. **Architectural Comparison: Canvas Image Source vs. Direct GPU Texture Binding**:
-   - **Canvas Image Source (Current)**: Universal across all browsers and devices; zero custom GLSL shader maintenance; integrates seamlessly into MapLibre's layer hierarchy, layer reordering (`beforeId`), and opacity controls. Completely eliminates GeoJSON overhead ($95\%$ memory reduction).
+   - **Canvas Image Source (Current Realization)**: Universal across all browsers and devices; zero custom GLSL shader maintenance; integrates seamlessly into MapLibre's layer hierarchy, layer reordering (`beforeId`), and opacity controls. Completely eliminates GeoJSON overhead ($95\%$ memory reduction, ~3–5 MB vs 60–90 MB). See [memory-optimization-plan1.md](file:///root/downloads/micaps-web/memory-optimization-plan1.md) for full implementation details.
    - **Direct GPU Texture Binding (Potential Future Optimization)**: Using MapLibre's `CustomLayerInterface` to bind raw Float32 data to an `OES_texture_float` or WebGL2 `R32F` texture would eliminate the CPU canvas loop, but requires maintaining a custom WebGL vertex/fragment shader that reprojects EPSG:4326 coordinates and samples a 1D colormap palette on the GPU.
 6. **Mutual Exclusivity Enforcement**:
-   - As established in Section 8.5.4, contour fills (`showFill`) and binary raster overlays (`showRaster`) are mutually exclusive. Selecting raster shading disables `contourf` calculation entirely.
+   - As established in Section 8.5.4, contour fills (`showFill`) and binary raster overlays (`showRaster`) are mutually exclusive. Selecting raster shading disables `contourf` calculation entirely at the compute site.
 
 #### 8.8.4. Viewport Bounding Box Spatial Culling & Cell-Count-Driven LOD Pipeline
 

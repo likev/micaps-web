@@ -21,6 +21,7 @@ import { loadPresetGroups } from "./config/presets.js";
 import { resolveColormap } from "./utils/colormaps.js";
 import { resolveForecastCycles, resolveLatestForecastCycle, syncObservationTimeline, invalidateForecastCyclesCache } from "./utils/timelineSync.js";
 import { schedulePrefetch } from "./services/prefetchService.js";
+import { armContourReRender } from "./services/contourReRender.js";
 import {
   initTabWindowManager,
   getActiveWindow,
@@ -518,6 +519,7 @@ async function loadWeatherField(map, model, element, level, period, customOption
         smooth,
         smoothIterations,
         labelSize,
+        viewportBounds: (map && typeof map.getBounds === "function") ? map.getBounds().toArray() : null,
       });
     }
 
@@ -556,6 +558,35 @@ async function loadWeatherField(map, model, element, level, period, customOption
         smoothIterations,
       },
     }, win);
+
+    if (!isWind) {
+      const layerObj = (win?.layers && win.layers.find((l) => l.id === layerId)) || {
+        id: layerId,
+        element,
+        level,
+        model,
+        path,
+        file,
+        gridData,
+        colormap,
+        visible: isVisible,
+        config: {
+          showFill,
+          showLine,
+          lineColor,
+          opacity,
+          lineWidth,
+          boldValues: exCfg.boldValues ?? customOptions?.boldValues,
+          boldLineWidth: exCfg.boldLineWidth ?? customOptions?.boldLineWidth,
+          labelSize,
+          palettePath: savedPalettePath,
+          showRaster,
+          smooth,
+          smoothIterations,
+        },
+      };
+      armContourReRender(map, layerObj, win);
+    }
 
     // Bug fix: addOrUpdateLayer only re-renders the panel when winId === currentActiveWinId.
     // If the user switched tabs while data was loading, currentActiveWinId may differ even though

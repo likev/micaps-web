@@ -3,6 +3,8 @@ import { createMapInstance, setActiveMap } from "../map/mapInstance.js";
 import { PRESET_GROUPS } from "../config/presets.js";
 import { appState } from "../store/appState.js";
 import { formatObsTimestamp, formatForecastValidTime } from "../utils/formatters.js";
+import { disarmAllContourReRenders } from "../services/contourReRender.js";
+import { cleanupWindLayer } from "../layers/windLayer.js";
 
 const DEFAULT_LEVELS = [500, 850, 1000, 200, 700, 400, 300, 100];
 
@@ -246,8 +248,12 @@ function closeWindowTab(tab, winIdx) {
   const win = tab.windows[winIdx];
   if (!win) return;
 
-  win.map?.remove();
-  win.map = null;
+  if (win.map) {
+    disarmAllContourReRenders(win.map, win);
+    cleanupWindLayer(win.map);
+    win.map.remove();
+    win.map = null;
+  }
 
   document.getElementById(win.panelId)?.remove();
   document.getElementById(`tab-item-win-${win.winIdx}`)?.remove();

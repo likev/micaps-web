@@ -5,6 +5,9 @@
     "showGraticule": false,
     "showProvinces": false
   },
+  "performance": {
+    "maxEffectiveCells": 50000
+  },
   "colormaps": {
     "DTD": [
       {

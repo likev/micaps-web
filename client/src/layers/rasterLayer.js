@@ -1,7 +1,26 @@
-// rasterLayer.js - Zero-copy Float32Array streaming to Canvas & MapLibre raster image
+// rasterLayer.js - Zero-copy Float32Array streaming to Canvas & MapLibre raster image (§8.8.3)
 import { getColor } from "../utils/colormaps.js";
 
-let rasterCanvas = null;
+// Active Blob URL tracking per raster source for memory leak prevention (§8.8.3)
+const activeObjectUrls = new Map(); // rasterSrcId -> objectUrl string
+const rasterRenderSeq = new Map();  // rasterSrcId -> sequence number
+
+/**
+ * Revokes any allocated Blob URL for the specified raster source ID (§8.8.3).
+ *
+ * @param {string} rasterSrcId - Raster source DOM identifier
+ */
+export function revokeRasterUrl(rasterSrcId) {
+  const prevUrl = activeObjectUrls.get(rasterSrcId);
+  if (prevUrl && typeof prevUrl === "string" && prevUrl.startsWith("blob:")) {
+    if (typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") {
+      try {
+        URL.revokeObjectURL(prevUrl);
+      } catch {}
+    }
+  }
+  activeObjectUrls.delete(rasterSrcId);
+}
 
 export function getRasterDOMIds(layerId = "default") {
   const isDefault = !layerId || layerId === "default";
@@ -121,15 +140,26 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
   const yBottom = latToMercatorY(bottomLat);
   const ySpan = yTop - yBottom;
 
-  const outWidth = nlon;
-  const outHeight = Math.max(nlat, 256);
-
-  if (!rasterCanvas) {
-    rasterCanvas = document.createElement("canvas");
+  // Capped raster dimensions (max 2048 on longest side preserving aspect ratio) (§8.8.3 P3-3)
+  let outWidth = nlon;
+  let outHeight = Math.max(nlat, 256);
+  const maxRasterDim = 2048;
+  if (outWidth > maxRasterDim || outHeight > maxRasterDim) {
+    const scale = maxRasterDim / Math.max(outWidth, outHeight);
+    outWidth = Math.max(1, Math.round(outWidth * scale));
+    outHeight = Math.max(1, Math.round(outHeight * scale));
   }
-  rasterCanvas.width = outWidth;
-  rasterCanvas.height = outHeight;
-  const ctx = rasterCanvas.getContext("2d");
+
+  // Allocate fresh per-render canvas (no shared singleton state, no cross-layer collision) (§8.8.3 P3-2)
+  const canvas = (typeof document !== "undefined" && typeof document.createElement === "function")
+    ? document.createElement("canvas")
+    : (typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(outWidth, outHeight) : null);
+
+  if (!canvas) return;
+  canvas.width = outWidth;
+  canvas.height = outHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
   const imgData = ctx.createImageData(outWidth, outHeight);
   const data = imgData.data;
 
@@ -184,7 +214,6 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
   }
 
   ctx.putImageData(imgData, 0, 0);
-  const dataUrl = rasterCanvas.toDataURL();
 
   const coordinates = [
     [leftLon, topLat],     // Top-left
@@ -194,39 +223,99 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
   ];
 
   const { rasterSrcId, rasterLayerId } = getRasterDOMIds(layerId);
+  const curSeq = (rasterRenderSeq.get(rasterSrcId) || 0) + 1;
+  rasterRenderSeq.set(rasterSrcId, curSeq);
 
-  if (map.getSource(rasterSrcId)) {
-    map.getSource(rasterSrcId).updateImage({
-      url: dataUrl,
-      coordinates,
-    });
-    if (map.getLayer(rasterLayerId)) {
-      map.setLayoutProperty(rasterLayerId, "visibility", visible ? "visible" : "none");
-      map.setPaintProperty(rasterLayerId, "raster-opacity", opacity);
+  const applyRasterImage = (imageUrl) => {
+    // Drop stale async renders
+    if (rasterRenderSeq.get(rasterSrcId) !== curSeq) {
+      if (imageUrl && typeof imageUrl === "string" && imageUrl.startsWith("blob:")) {
+        if (typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") {
+          try { URL.revokeObjectURL(imageUrl); } catch {}
+        }
+      }
+      return;
     }
-  } else {
-    map.addSource(rasterSrcId, {
-      type: "image",
-      url: dataUrl,
-      coordinates,
-    });
 
-    const beforeId = map.getLayer("citys-boundary") ? "citys-boundary" : (map.getLayer("provinces-boundary") ? "provinces-boundary" : undefined);
-    map.addLayer(
-      {
-        id: rasterLayerId,
-        type: "raster",
-        source: rasterSrcId,
-        layout: {
-          visibility: visible ? "visible" : "none",
+    // Revoke previous URL to release memory (§8.8.3 P3-2)
+    const prevUrl = activeObjectUrls.get(rasterSrcId);
+    if (prevUrl && prevUrl !== imageUrl && prevUrl.startsWith("blob:")) {
+      if (typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") {
+        try { URL.revokeObjectURL(prevUrl); } catch {}
+      }
+    }
+    activeObjectUrls.set(rasterSrcId, imageUrl);
+
+    if (map.getSource(rasterSrcId)) {
+      map.getSource(rasterSrcId).updateImage({
+        url: imageUrl,
+        coordinates,
+      });
+      if (map.getLayer(rasterLayerId)) {
+        map.setLayoutProperty(rasterLayerId, "visibility", visible ? "visible" : "none");
+        map.setPaintProperty(rasterLayerId, "raster-opacity", opacity);
+      }
+    } else {
+      map.addSource(rasterSrcId, {
+        type: "image",
+        url: imageUrl,
+        coordinates,
+      });
+
+      const beforeId = map.getLayer("citys-boundary") ? "citys-boundary" : (map.getLayer("provinces-boundary") ? "provinces-boundary" : undefined);
+      map.addLayer(
+        {
+          id: rasterLayerId,
+          type: "raster",
+          source: rasterSrcId,
+          layout: {
+            visibility: visible ? "visible" : "none",
+          },
+          paint: {
+            "raster-opacity": opacity,
+            "raster-fade-duration": 0,
+          },
         },
-        paint: {
-          "raster-opacity": opacity,
-          "raster-fade-duration": 0,
-        },
-      },
-      beforeId
-    );
+        beforeId
+      );
+    }
+  };
+
+  // Prefer canvas.toBlob() to avoid base64 memory overhead; fallback to toDataURL()
+  if (typeof canvas.toBlob === "function") {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        if (typeof canvas.toDataURL === "function") {
+          applyRasterImage(canvas.toDataURL());
+        }
+        return;
+      }
+      const blobUrl = (typeof URL !== "undefined" && typeof URL.createObjectURL === "function")
+        ? URL.createObjectURL(blob)
+        : null;
+      if (blobUrl) {
+        applyRasterImage(blobUrl);
+      } else if (typeof canvas.toDataURL === "function") {
+        applyRasterImage(canvas.toDataURL());
+      }
+    }, "image/png");
+  } else if (typeof canvas.convertToBlob === "function") {
+    canvas.convertToBlob({ type: "image/png" }).then((blob) => {
+      const blobUrl = (typeof URL !== "undefined" && typeof URL.createObjectURL === "function")
+        ? URL.createObjectURL(blob)
+        : null;
+      if (blobUrl) {
+        applyRasterImage(blobUrl);
+      } else if (typeof canvas.toDataURL === "function") {
+        applyRasterImage(canvas.toDataURL());
+      }
+    }).catch(() => {
+      if (typeof canvas.toDataURL === "function") {
+        applyRasterImage(canvas.toDataURL());
+      }
+    });
+  } else if (typeof canvas.toDataURL === "function") {
+    applyRasterImage(canvas.toDataURL());
   }
 }
 
@@ -259,6 +348,7 @@ export function removeRasterLayer(map, layerId = null) {
   if (!map || !map.getStyle) return;
   if (layerId) {
     const { rasterSrcId, rasterLayerId } = getRasterDOMIds(layerId);
+    revokeRasterUrl(rasterSrcId);
     if (map.getLayer(rasterLayerId)) map.removeLayer(rasterLayerId);
     if (map.getSource(rasterSrcId)) map.removeSource(rasterSrcId);
   } else {
@@ -284,6 +374,7 @@ export function removeAllRasterLayers(map) {
   if (style.sources) {
     for (const srcId of Object.keys(style.sources)) {
       if (srcId.includes("raster-source") || srcId.endsWith("-raster-source")) {
+        revokeRasterUrl(srcId);
         if (map.getSource(srcId)) {
           map.removeSource(srcId);
         }

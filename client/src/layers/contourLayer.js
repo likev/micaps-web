@@ -2,8 +2,18 @@
 import * as griddata from "griddata";
 import { getElementLevels, getHexColor } from "../utils/colormaps.js";
 import { removeRasterLayer } from "./rasterLayer.js";
-import { smoothFeatureCollection, smoothGrid2D } from "../utils/smoothContour.js";
+import { smoothFeatureCollection, smoothGrid2D, simplifyFeatureCollection } from "../utils/smoothContour.js";
 import { formatContourLabel } from "../utils/formatters.js";
+import { getMaxEffectiveCells } from "../config/presets.js";
+import {
+  getFullGridStep,
+  computeCropIndices,
+  cropGridValues,
+  resolveContourStep,
+  shouldBypassCrop,
+} from "../utils/viewportCrop.js";
+import { isDebugMemEnabled, countGeoJSONPoints, estimateHeapMB } from "../utils/memStats.js";
+import { disarmContourReRender, disarmAllContourReRenders } from "../services/contourReRender.js";
 
 export function parseBoldValues(boldInput, element = null) {
   if (!boldInput) {
@@ -44,54 +54,50 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
     return;
   }
 
+  const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+
   const nLon = gridData.header.n_lon;
   const nLat = gridData.header.n_lat;
-  // Full grid resolution for high-fidelity smooth isolines (downsample only for massive grids > 500,000 pts)
-  const step = nLon * nLat > 500000 ? 2 : 1;
+  const totalCells = nLon * nLat;
 
-  let x = [];
-  if (gridData.x && gridData.x.length === nLon) {
-    for (let i = 0; i < nLon; i += step) {
-      x.push(gridData.x[i]);
-    }
+  // Budget resolved from config.json -> performance.maxEffectiveCells (default 50000)
+  const budget = Number.isFinite(options.maxEffectiveCells) && options.maxEffectiveCells > 0
+    ? getMaxEffectiveCells(options.maxEffectiveCells)
+    : getMaxEffectiveCells();
+
+  // §8.8.4 3-Stage Spatial Evaluation Pipeline:
+  // 1. When total grid cells < 50,000: BBox crop is completely bypassed, step = 1
+  // 2. When total grid cells >= 50,000: BBox Crop to viewport + buffer margin
+  // 3. Deciding step strictly by cell count after bbox crop (N_crop)
+  let step = 1;
+  let cropIdx = null;
+  let croppedData = null;
+
+  const isSmallGrid = shouldBypassCrop(totalCells, budget);
+  const enableBBoxCrop = options.enableBBoxCrop !== false;
+
+  if (isSmallGrid) {
+    // Stage 1: Complete BBox crop bypass & locked step = 1 (Zero pan/zoom re-computation)
+    step = 1;
+    cropIdx = { iMin: 0, iMax: nLon - 1, jMin: 0, jMax: nLat - 1, nLonCrop: nLon, nLatCrop: nLat, nCrop: totalCells };
+    croppedData = cropGridValues(gridData, cropIdx, step);
   } else {
-    for (let i = 0; i < nLon; i += step) {
-      x.push(gridData.header.start_lon + i * gridData.header.d_lon);
+    // Stage 2 & 3: Large grid (>= 50,000 cells)
+    if (enableBBoxCrop && options.viewportBounds) {
+      // Stage 2: Viewport BBox Crop
+      cropIdx = computeCropIndices(gridData.header, gridData.x, gridData.y, options.viewportBounds, options.bufferDelta ?? 1.75);
+      // Stage 3: Deciding step strictly by cell count after bbox crop
+      step = resolveContourStep(cropIdx.nCrop, budget);
+      croppedData = cropGridValues(gridData, cropIdx, step);
+    } else {
+      // Headless / fallback without viewport bounds
+      step = getFullGridStep(nLon, nLat, budget);
+      cropIdx = { iMin: 0, iMax: nLon - 1, jMin: 0, jMax: nLat - 1, nLonCrop: nLon, nLatCrop: nLat, nCrop: totalCells };
+      croppedData = cropGridValues(gridData, cropIdx, step);
     }
   }
 
-  let y = [];
-  if (gridData.y && gridData.y.length === nLat) {
-    for (let j = 0; j < nLat; j += step) {
-      y.push(gridData.y[j]);
-    }
-  } else {
-    let dLat = gridData.header.d_lat ?? gridData.header.LatitudeGridSpace;
-    if (dLat === undefined || dLat === null || dLat === 0) {
-      dLat = (gridData.header.end_lat !== undefined && nLat > 1) ? (gridData.header.end_lat - gridData.header.start_lat) / (nLat - 1) : -0.25;
-    } else if (gridData.header.end_lat !== undefined && gridData.header.start_lat > gridData.header.end_lat && dLat > 0) {
-      dLat = -dLat;
-    }
-    for (let j = 0; j < nLat; j += step) {
-      y.push(gridData.header.start_lat + j * dLat);
-    }
-  }
-
-  // Convert 1D values to 2D array Z[latIndex][lonIndex]
-  let Z = [];
-  for (let j = 0; j < nLat; j += step) {
-    const row = [];
-    for (let i = 0; i < nLon; i += step) {
-      row.push(gridData.values[j * nLon + i]);
-    }
-    Z.push(row);
-  }
-
-  // If latitude is descending (e.g. 60 down to -10), reverse to ensure ascending order for Marching Squares
-  if (y.length > 1 && y[0] > y[y.length - 1]) {
-    y.reverse();
-    Z.reverse();
-  }
+  let { x, y, Z } = croppedData;
 
   const shouldSmooth = options.smooth !== false;
   const smoothIterations = typeof options.smoothIterations === "number" ? options.smoothIterations : 2;
@@ -124,50 +130,93 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
   // Determine isoline levels
   const levels = options.levels || getElementLevels(element, zMin, zMax, options.colormap);
 
-  // 1. Generate Isobands via griddata.contourf
+  const isVisible = options.visible !== false;
+  const showFill = options.showFill === true;
+  const showRaster = options.showRaster === true;
+
+  // Phase 3 (§8.8.3 & §8.5.4): Skip contourf entirely if showFill is false or if showRaster is active
+  // This eliminates 60-90 MB of heavy polygon allocation
   let isobandFC = { type: "FeatureCollection", features: [] };
-  try {
-    const features = griddata.contourf(Z, { x, y, levels });
-    if (Array.isArray(features)) {
-      for (const feature of features) {
-        if (feature.properties && feature.properties.level) {
-          const midVal = (feature.properties.level[0] + feature.properties.level[1]) / 2;
-          feature.properties.fillColor = getHexColor(midVal, element, options.colormap, gridData.stats?.min, gridData.stats?.max);
+  if (isVisible && showFill && !showRaster) {
+    try {
+      const features = griddata.contourf(Z, { x, y, levels });
+      if (Array.isArray(features)) {
+        for (const feature of features) {
+          if (feature.properties && feature.properties.level) {
+            const midVal = (feature.properties.level[0] + feature.properties.level[1]) / 2;
+            feature.properties.fillColor = getHexColor(midVal, element, options.colormap, gridData.stats?.min, gridData.stats?.max);
+          }
         }
+        isobandFC.features = features;
       }
-      isobandFC.features = features;
+    } catch (err) {
+      console.error("[Contour] contourf failed:", err);
     }
-  } catch (err) {
-    console.error("[Contour] contourf failed:", err);
   }
 
   // 2. Generate Isolines via griddata.contour with characteristic bold tagging
   const boldValues = parseBoldValues(options.boldValues, element);
   let isolineFC = { type: "FeatureCollection", features: [] };
-  try {
-    const lines = griddata.contour(Z, { x, y, levels });
-    if (Array.isArray(lines)) {
-      const isDam = (gridData.stats?.max !== undefined) ? gridData.stats.max < 2500 : false;
-      for (const f of lines) {
-        if (!f.properties) f.properties = {};
-        const val = f.value ?? f.properties.value ?? f.properties.level ?? 0;
-        f.properties.value = val;
-        f.properties.label = formatContourLabel(val, element, isDam);
-        f.properties.isBold = isFeatureBold(val, boldValues);
+  const showLine = options.showLine !== false;
+  if (isVisible && showLine) {
+    try {
+      const lines = griddata.contour(Z, { x, y, levels });
+      if (Array.isArray(lines)) {
+        const isDam = (gridData.stats?.max !== undefined) ? gridData.stats.max < 2500 : false;
+        for (const f of lines) {
+          if (!f.properties) f.properties = {};
+          const val = f.value ?? f.properties.value ?? f.properties.level ?? 0;
+          f.properties.value = val;
+          f.properties.label = formatContourLabel(val, element, isDam);
+          f.properties.isBold = isFeatureBold(val, boldValues);
+        }
+        isolineFC.features = lines;
       }
-      isolineFC.features = lines;
+    } catch (err) {
+      console.error("[Contour] contour failed:", err);
     }
-  } catch (err) {
-    console.error("[Contour] contour failed:", err);
   }
 
-  // 3. Smooth Isolines vector curves using Chaikin's algorithm
+  // 3. Douglas-Peucker pre-pass & Chaikin vector curve smoothing (§8.8.5)
   if (shouldSmooth && isolineFC.features.length > 0) {
+    const dpTolerance = Math.max(0.01, 0.02 * (step || 1));
+    isolineFC = simplifyFeatureCollection(isolineFC, dpTolerance);
     isolineFC = smoothFeatureCollection(isolineFC, smoothIterations);
+  }
+
+  const elapsedMs = typeof performance !== "undefined" ? Math.round((performance.now() - t0) * 10) / 10 : 0;
+  const isobandPts = countGeoJSONPoints(isobandFC);
+  const isolinePts = countGeoJSONPoints(isolineFC);
+  const totalPts = isobandPts + isolinePts;
+  const estimatedHeap = estimateHeapMB(isolineFC) + estimateHeapMB(isobandFC);
+
+  const stats = {
+    nLon,
+    nLat,
+    totalCells,
+    nCrop: cropIdx?.nCrop ?? totalCells,
+    effectiveCells: croppedData.nCells,
+    step,
+    elapsedMs,
+    isobandPoints: isobandPts,
+    isolinePoints: isolinePts,
+    totalPoints: totalPts,
+    estimatedHeapMB: estimatedHeap,
+  };
+
+  if (typeof options.onStats === "function") {
+    try { options.onStats(stats); } catch {}
+  }
+  if (isDebugMemEnabled()) {
+    console.debug(`[Contour] ${totalCells} cells -> cropped ${stats.nCrop}, step=${step}, ${elapsedMs}ms, ${totalPts} pts, ~${estimatedHeap}MB`);
   }
 
   // Update MapLibre sources
   updateMapLibreContour(map, isobandFC, isolineFC, { ...options, element, boldValues, smooth: shouldSmooth, smoothIterations });
+
+  // Phase 2 (§8.8.5): Dereference GeoJSON FeatureCollections after upload
+  isobandFC = null;
+  isolineFC = null;
 }
 
 function getLayerDOMIds(layerId = "default") {
@@ -384,7 +433,36 @@ export function setLayerIsobandOpacity(map, layerId, opacity) {
   if (map.getLayer(isobandLayerId)) map.setPaintProperty(isobandLayerId, "fill-opacity", opacity);
 }
 
+/**
+ * Flushes WebGL vector tile pyramids from MapLibre's Web Worker (§8.8.5).
+ * Updates isoband and isoline sources with an empty FeatureCollection before removal or layer reuse.
+ *
+ * @param {Object} map - MapLibre map instance
+ * @param {string} [layerId="default"] - Layer identifier
+ */
+export function flushContourSource(map, layerId = "default") {
+  if (!map) return;
+  const { isobandSrcId, isolineSrcId } = getLayerDOMIds(layerId);
+  const emptyFC = { type: "FeatureCollection", features: [] };
+  try {
+    const isobandSrc = map.getSource(isobandSrcId);
+    if (isobandSrc && typeof isobandSrc.setData === "function") {
+      isobandSrc.setData(emptyFC);
+    }
+  } catch {}
+  try {
+    const isolineSrc = map.getSource(isolineSrcId);
+    if (isolineSrc && typeof isolineSrc.setData === "function") {
+      isolineSrc.setData(emptyFC);
+    }
+  } catch {}
+}
+
 export function removeContourLayer(map, layerId) {
+  // Phase 2 (§8.8.5): Flush worker vector tiles before removal
+  flushContourSource(map, layerId);
+  disarmContourReRender(map, layerId);
+
   const { isobandSrcId, isobandLayerId, isolineSrcId, isolineLayerId, isolineLabelLayerId } = getLayerDOMIds(layerId);
 
   if (map.getLayer(isolineLabelLayerId)) map.removeLayer(isolineLabelLayerId);
@@ -397,6 +475,7 @@ export function removeContourLayer(map, layerId) {
 
 
 export function removeAllContourLayers(map) {
+  disarmAllContourReRenders(map);
   if (!map || !map.getStyle) return;
   const style = map.getStyle();
   if (!style) return;
@@ -416,6 +495,7 @@ export function removeAllContourLayers(map) {
     for (const srcId of Object.keys(style.sources)) {
       if (srcId.includes("isoband") || srcId.includes("isoline") || srcId.startsWith("contour-") || srcId.startsWith("sounding-") || srcId.startsWith("surface-")) {
         if (map.getSource(srcId)) {
+          try { map.getSource(srcId).setData({ type: "FeatureCollection", features: [] }); } catch {}
           map.removeSource(srcId);
         }
       }
@@ -427,9 +507,13 @@ export function renderCustomContourGeoJSON(map, isobands, isolines, options = {}
   let smoothLines = isolines;
   if (options.smooth !== false && isolines && Array.isArray(isolines.features) && isolines.features.length > 0) {
     const it = typeof options.smoothIterations === "number" ? options.smoothIterations : 2;
-    smoothLines = smoothFeatureCollection(isolines, it);
+    // Douglas-Peucker pre-pass (§8.8.5)
+    const dpTolerance = Math.max(0.01, 0.02 * (options.step || 1));
+    const simplified = simplifyFeatureCollection(isolines, dpTolerance);
+    smoothLines = smoothFeatureCollection(simplified, it);
   }
   updateMapLibreContour(map, isobands, smoothLines, options);
+  smoothLines = null;
 }
 
 export function setIsobandVisibility(map, visible) {

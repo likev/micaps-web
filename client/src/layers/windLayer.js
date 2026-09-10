@@ -1,8 +1,23 @@
-// windLayer.js - Animated physical particle streamlines with bilinear velocity interpolation
+// windLayer.js - Animated physical particle streamlines with bilinear velocity interpolation (§8.8.2)
 import { WIND_QC_BOUNDS } from "./soundingAnalysis.js";
 
-export function renderWindStreamlines(map, gridData) {
+/**
+ * Unified wind layer cleanup for both streamlines and wind barbs (§8.8.2 P4-1).
+ * Cancels active animation frames, removes map move/resize listeners, unbinds
+ * visibility change handlers, and clears/removes overlay canvases.
+ *
+ * @param {Object} [map=null] - MapLibre map instance
+ */
+export function cleanupWindLayer(map = null) {
+  stopWindAnimation(map);
+  removeGridWindBarbs(map);
+}
+
+export function renderWindStreamlines(map, gridData, options = {}) {
   if (!map || !gridData || !gridData.u || !gridData.v || !gridData.header) return;
+
+  // Clean up any existing streamline animation or listeners on this map
+  stopWindAnimation(map);
 
   const header = gridData.header;
   const nLon = header.n_lon || header.LongitudeGridNumber || 100;
@@ -18,29 +33,40 @@ export function renderWindStreamlines(map, gridData) {
   const isLatNorthToSouth = startLat > endLat;
 
   const container = map.getContainer();
-  let streamCanvas = container.querySelector(".streamline-canvas");
-  if (!streamCanvas) {
+  let streamCanvas = container?.querySelector(".streamline-canvas");
+  if (!streamCanvas && container) {
     streamCanvas = document.createElement("canvas");
     streamCanvas.className = "streamline-canvas";
-    streamCanvas.style.position = "absolute";
-    streamCanvas.style.top = "0";
-    streamCanvas.style.left = "0";
-    streamCanvas.style.width = "100%";
-    streamCanvas.style.height = "100%";
-    streamCanvas.style.pointerEvents = "none";
-    streamCanvas.style.zIndex = "400";
+    if (streamCanvas.style) {
+      streamCanvas.style.position = "absolute";
+      streamCanvas.style.top = "0";
+      streamCanvas.style.left = "0";
+      streamCanvas.style.width = "100%";
+      streamCanvas.style.height = "100%";
+      streamCanvas.style.pointerEvents = "none";
+      streamCanvas.style.zIndex = "400";
+    }
     container.appendChild(streamCanvas);
   }
 
+  if (!streamCanvas) return;
+
   const ctx = streamCanvas.getContext("2d");
+  const dpr = typeof window !== "undefined" ? Math.min(2, window.devicePixelRatio || 1) : 1;
+
+  let cssWidth = 800;
+  let cssHeight = 600;
 
   function resize() {
-    const rect = container.getBoundingClientRect();
-    if (rect.width && rect.height) {
-      if (streamCanvas.width !== Math.round(rect.width) || streamCanvas.height !== Math.round(rect.height)) {
-        streamCanvas.width = Math.round(rect.width);
-        streamCanvas.height = Math.round(rect.height);
-      }
+    if (!container) return;
+    const rect = container.getBoundingClientRect ? container.getBoundingClientRect() : { width: 800, height: 600 };
+    cssWidth = Math.round(rect.width) || 800;
+    cssHeight = Math.round(rect.height) || 600;
+    const targetW = Math.round(cssWidth * dpr);
+    const targetH = Math.round(cssHeight * dpr);
+    if (streamCanvas.width !== targetW || streamCanvas.height !== targetH) {
+      streamCanvas.width = targetW;
+      streamCanvas.height = targetH;
     }
   }
   resize();
@@ -78,21 +104,23 @@ export function renderWindStreamlines(map, gridData) {
     return [uVal, vVal];
   }
 
-  const numParticles = 1200;
+  // Adaptive particle count based on canvas area (§8.8.2 P4-2: clamp(area/1500, 400, 1600))
+  const canvasArea = cssWidth * cssHeight;
+  const numParticles = options.numParticles || Math.max(400, Math.min(1600, Math.round(canvasArea / 1500)));
   const particles = [];
 
   function resetParticle(p) {
-    const bounds = map.getBounds();
-    const west = bounds.getWest();
-    const east = bounds.getEast();
-    const south = bounds.getSouth();
-    const north = bounds.getNorth();
+    const bounds = typeof map.getBounds === "function" ? map.getBounds() : null;
+    const west = bounds ? bounds.getWest() : startLon;
+    const east = bounds ? bounds.getEast() : endLon;
+    const south = bounds ? bounds.getSouth() : Math.min(startLat, endLat);
+    const north = bounds ? bounds.getNorth() : Math.max(startLat, endLat);
 
     p.lng = west + Math.random() * (east - west);
     p.lat = south + Math.random() * (north - south);
     p.age = Math.random() * 40;
     p.maxAge = 40 + Math.random() * 50;
-    const pt = map.project([p.lng, p.lat]);
+    const pt = typeof map.project === "function" ? map.project([p.lng, p.lat]) : { x: 0, y: 0 };
     p.x = pt.x;
     p.y = pt.y;
   }
@@ -103,20 +131,31 @@ export function renderWindStreamlines(map, gridData) {
     particles.push(p);
   }
 
-  if (map._windAnimId) {
-    cancelAnimationFrame(map._windAnimId);
-    map._windAnimId = null;
-  }
+  let animRunning = true;
 
   function animate() {
-    if (!container.isConnected) return;
+    if (!animRunning) return;
+    if (container && !container.isConnected) return;
 
-    // Gradual fade trail
+    if (typeof requestAnimationFrame === "function") {
+      map._windAnimId = requestAnimationFrame(animate);
+    }
+
+    if (!ctx || typeof ctx.fillRect !== "function") return;
+
+    // Gradual fade trail in buffer coordinates
+    if (typeof ctx.setTransform === "function") {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
     ctx.fillStyle = "rgba(10, 13, 20, 0.92)";
     ctx.globalCompositeOperation = "destination-in";
     ctx.fillRect(0, 0, streamCanvas.width, streamCanvas.height);
     ctx.globalCompositeOperation = "source-over";
 
+    // Set DPR scale for particle drawing in CSS coordinates
+    if (typeof ctx.setTransform === "function") {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
     ctx.lineWidth = 1.4;
     ctx.lineCap = "round";
 
@@ -148,8 +187,8 @@ export function renderWindStreamlines(map, gridData) {
       const nextLng = p.lng + dLng;
       const nextLat = p.lat + dLat;
 
-      const currPt = map.project([p.lng, p.lat]);
-      const nextPt = map.project([nextLng, nextLat]);
+      const currPt = typeof map.project === "function" ? map.project([p.lng, p.lat]) : { x: p.x, y: p.y };
+      const nextPt = typeof map.project === "function" ? map.project([nextLng, nextLat]) : { x: p.x, y: p.y };
 
       // Color coding based on wind speed
       if (speed > 25) {
@@ -175,14 +214,35 @@ export function renderWindStreamlines(map, gridData) {
 
       if (
         p.age > p.maxAge ||
-        p.x < 0 || p.x > streamCanvas.width ||
-        p.y < 0 || p.y > streamCanvas.height
+        p.x < 0 || p.x > cssWidth ||
+        p.y < 0 || p.y > cssHeight
       ) {
         resetParticle(p);
       }
     }
+  }
 
-    map._windAnimId = requestAnimationFrame(animate);
+  // Pause requestAnimationFrame loop on document.hidden (§8.8.2 P4-2)
+  const handleVisibility = () => {
+    if (typeof document !== "undefined" && document.hidden) {
+      animRunning = false;
+      if (map._windAnimId) {
+        cancelAnimationFrame(map._windAnimId);
+        map._windAnimId = null;
+      }
+    } else {
+      if (!animRunning && (!container || container.isConnected)) {
+        animRunning = true;
+        if (typeof requestAnimationFrame === "function") {
+          map._windAnimId = requestAnimationFrame(animate);
+        }
+      }
+    }
+  };
+
+  if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+    document.addEventListener("visibilitychange", handleVisibility);
+    map._windStreamlineVisibilityListener = handleVisibility;
   }
 
   animate();
@@ -190,7 +250,7 @@ export function renderWindStreamlines(map, gridData) {
   const onMove = () => {
     resize();
     for (const p of particles) {
-      if (p.lng !== undefined && p.lat !== undefined) {
+      if (p.lng !== undefined && p.lat !== undefined && typeof map.project === "function") {
         const pt = map.project([p.lng, p.lat]);
         p.x = pt.x;
         p.y = pt.y;
@@ -198,22 +258,39 @@ export function renderWindStreamlines(map, gridData) {
     }
   };
 
-  map.on("resize", resize);
-  map.on("move", onMove);
+  map._windStreamlineMoveListener = onMove;
+  map._windStreamlineResizeListener = resize;
+
+  if (typeof map.on === "function") {
+    map.on("resize", resize);
+    map.on("move", onMove);
+  }
 }
 
 export function stopWindAnimation(map = null) {
   if (map) {
     if (map._windAnimId) {
-      cancelAnimationFrame(map._windAnimId);
+      if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(map._windAnimId);
       map._windAnimId = null;
     }
-    const canvas = map.getContainer()?.querySelector(".streamline-canvas");
+    if (map._windStreamlineMoveListener && typeof map.off === "function") {
+      map.off("move", map._windStreamlineMoveListener);
+      map._windStreamlineMoveListener = null;
+    }
+    if (map._windStreamlineResizeListener && typeof map.off === "function") {
+      map.off("resize", map._windStreamlineResizeListener);
+      map._windStreamlineResizeListener = null;
+    }
+    if (map._windStreamlineVisibilityListener && typeof document !== "undefined" && typeof document.removeEventListener === "function") {
+      document.removeEventListener("visibilitychange", map._windStreamlineVisibilityListener);
+      map._windStreamlineVisibilityListener = null;
+    }
+    const canvas = map.getContainer ? map.getContainer()?.querySelector(".streamline-canvas") : null;
     if (canvas) {
       canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
       canvas.remove();
     }
-  } else {
+  } else if (typeof document !== "undefined" && typeof document.querySelectorAll === "function") {
     document.querySelectorAll(".streamline-canvas").forEach((canvas) => {
       canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
       canvas.remove();
@@ -223,6 +300,9 @@ export function stopWindAnimation(map = null) {
 
 export function renderGridWindBarbs(map, gridData) {
   if (!map || !gridData || !gridData.u || !gridData.v || !gridData.header) return;
+
+  // Clean up any existing barb listeners
+  removeGridWindBarbs(map);
 
   const header = gridData.header;
   const nLon = header.n_lon || header.LongitudeGridNumber || 100;
@@ -237,22 +317,26 @@ export function renderGridWindBarbs(map, gridData) {
   const dLat = Math.abs(header.d_lat ?? header.LatitudeGridSpace ?? (nLat > 1 ? Math.abs(endLat - startLat) / (nLat - 1) : 0.25));
   const isLatNorthToSouth = startLat > endLat;
 
-  const container = map.getContainer();
-  let barbCanvas = container.querySelector(".wind-barb-canvas");
-  if (!barbCanvas) {
+  const container = map.getContainer ? map.getContainer() : null;
+  let barbCanvas = container?.querySelector(".wind-barb-canvas");
+  if (!barbCanvas && container) {
     barbCanvas = document.createElement("canvas");
     barbCanvas.className = "wind-barb-canvas";
-    barbCanvas.style.position = "absolute";
-    barbCanvas.style.top = "0";
-    barbCanvas.style.left = "0";
-    barbCanvas.style.width = "100%";
-    barbCanvas.style.height = "100%";
-    barbCanvas.style.pointerEvents = "none";
-    barbCanvas.style.zIndex = "405";
+    if (barbCanvas.style) {
+      barbCanvas.style.position = "absolute";
+      barbCanvas.style.top = "0";
+      barbCanvas.style.left = "0";
+      barbCanvas.style.width = "100%";
+      barbCanvas.style.height = "100%";
+      barbCanvas.style.pointerEvents = "none";
+      barbCanvas.style.zIndex = "405";
+    }
     container.appendChild(barbCanvas);
   }
 
-  const ctx = barbCanvas.getContext("2d");
+  if (!barbCanvas) return;
+
+  const dpr = typeof window !== "undefined" ? Math.min(2, window.devicePixelRatio || 1) : 1;
 
   function sampleWind(lng, lat) {
     const gx = (lng - startLon) / dLon;
@@ -269,20 +353,30 @@ export function renderGridWindBarbs(map, gridData) {
   }
 
   function draw() {
-    const rect = container.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-    if (barbCanvas.width !== Math.round(rect.width) || barbCanvas.height !== Math.round(rect.height)) {
-      barbCanvas.width = Math.round(rect.width);
-      barbCanvas.height = Math.round(rect.height);
-    }
-    ctx.clearRect(0, 0, barbCanvas.width, barbCanvas.height);
+    if (!container) return;
+    const rect = container.getBoundingClientRect ? container.getBoundingClientRect() : { width: 800, height: 600 };
+    const w = Math.round(rect.width) || 800;
+    const h = Math.round(rect.height) || 600;
+    const targetW = Math.round(w * dpr);
+    const targetH = Math.round(h * dpr);
 
-    const step = 48; // Screen grid spacing for barbs
-    const w = barbCanvas.width;
-    const h = barbCanvas.height;
+    if (barbCanvas.width !== targetW || barbCanvas.height !== targetH) {
+      barbCanvas.width = targetW;
+      barbCanvas.height = targetH;
+    }
+    const ctx = barbCanvas.getContext("2d");
+    if (!ctx || typeof ctx.clearRect !== "function") return;
+
+    if (typeof ctx.setTransform === "function") {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    ctx.clearRect(0, 0, w, h);
+
+    const step = 48; // Screen grid spacing for barbs (§8.8.2)
 
     for (let sx = step / 2; sx < w; sx += step) {
       for (let sy = step / 2; sy < h; sy += step) {
+        if (typeof map.unproject !== "function") continue;
         const lngLat = map.unproject([sx, sy]);
         const vel = sampleWind(lngLat.lng, lngLat.lat);
         if (!vel) continue;
@@ -299,59 +393,71 @@ export function renderGridWindBarbs(map, gridData) {
         const x0 = sx, y0 = sy;
         const x1 = x0 + dx * staffLen, y1 = y0 + dy * staffLen;
 
-        ctx.strokeStyle = speed > 25 ? "#f85149" : (speed > 15 ? "#d29922" : (speed > 8 ? "#58a6ff" : "#79c0ff"));
-        ctx.fillStyle = ctx.strokeStyle;
-        ctx.lineWidth = 1.5;
-        ctx.lineCap = "round";
+        // Color coding by speed
+        if (speed > 25) {
+          ctx.strokeStyle = "rgba(240, 100, 30, 0.9)";
+          ctx.fillStyle = "rgba(240, 100, 30, 0.9)";
+        } else if (speed > 15) {
+          ctx.strokeStyle = "rgba(230, 200, 40, 0.9)";
+          ctx.fillStyle = "rgba(230, 200, 40, 0.9)";
+        } else if (speed > 8) {
+          ctx.strokeStyle = "rgba(80, 220, 120, 0.85)";
+          ctx.fillStyle = "rgba(80, 220, 120, 0.85)";
+        } else {
+          ctx.strokeStyle = "rgba(100, 190, 255, 0.8)";
+          ctx.fillStyle = "rgba(100, 190, 255, 0.8)";
+        }
+
+        ctx.lineWidth = 1.3;
+        ctx.beginPath();
+        ctx.arc(x0, y0, 1.8, 0, Math.PI * 2);
+        ctx.fill();
 
         ctx.beginPath();
         ctx.moveTo(x0, y0);
         ctx.lineTo(x1, y1);
         ctx.stroke();
 
-        ctx.beginPath();
-        ctx.arc(x0, y0, 1.8, 0, Math.PI * 2);
-        ctx.fill();
-
-        let s = speed;
+        let spd = speed;
         let pos = 0;
-        const barbLen = 8;
-        const space = 3.5;
-        // 110° angle relative to inward staff: bOffN (perpendicular), bOffD (slanted back towards tail)
-        const bOffN = barbLen * 0.940;
-        const bOffD = barbLen * 0.342;
+        const featherLen = 8;
+        const barbSpacing = 3.5;
 
-        while (s >= 18) {
-          const bx = x1 - dx * pos, by = y1 - dy * pos;
-          const ex = x1 - dx * (pos + 4.5), ey = y1 - dy * (pos + 4.5);
-          const tx = bx + nx * bOffN + dx * bOffD, ty = by + ny * bOffN + dy * bOffD;
+        // 50 m/s pennants (triangles)
+        while (spd >= 48) {
+          const px = x1 - dx * pos * barbSpacing;
+          const py = y1 - dy * pos * barbSpacing;
+          const px2 = x1 - dx * (pos + 1.5) * barbSpacing;
+          const py2 = y1 - dy * (pos + 1.5) * barbSpacing;
           ctx.beginPath();
-          ctx.moveTo(bx, by);
-          ctx.lineTo(tx, ty);
-          ctx.lineTo(ex, ey);
+          ctx.moveTo(px, py);
+          ctx.lineTo(px + nx * featherLen, py + ny * featherLen);
+          ctx.lineTo(px2, py2);
           ctx.closePath();
           ctx.fill();
-          pos += space + 2;
-          s -= 20;
+          pos += 1.8;
+          spd -= 50;
         }
 
-        while (s >= 3.5) {
-          const bx = x1 - dx * pos, by = y1 - dy * pos;
+        // 4 m/s full barbs
+        while (spd >= 3.5) {
+          const px = x1 - dx * pos * barbSpacing;
+          const py = y1 - dy * pos * barbSpacing;
           ctx.beginPath();
-          ctx.moveTo(bx, by);
-          ctx.lineTo(bx + nx * bOffN + dx * bOffD, by + ny * bOffN + dy * bOffD);
+          ctx.moveTo(px, py);
+          ctx.lineTo(px + nx * featherLen, py + ny * featherLen);
           ctx.stroke();
-          pos += space;
-          s -= 4;
+          pos += 1;
+          spd -= 4;
         }
 
-        if (s >= 1.5) {
-          // If only 1 short barb, indent from staff tip per WMO/NOAA standard
-          const barbPos = pos === 0 ? space : pos;
-          const bx = x1 - dx * barbPos, by = y1 - dy * barbPos;
+        // 2 m/s half barbs
+        if (spd >= 1.5) {
+          const px = x1 - dx * pos * barbSpacing;
+          const py = y1 - dy * pos * barbSpacing;
           ctx.beginPath();
-          ctx.moveTo(bx, by);
-          ctx.lineTo(bx + nx * (bOffN * 0.52) + dx * (bOffD * 0.52), by + ny * (bOffN * 0.52) + dy * (bOffD * 0.52));
+          ctx.moveTo(px, py);
+          ctx.lineTo(px + nx * (featherLen * 0.5), py + ny * (featherLen * 0.5));
           ctx.stroke();
         }
       }
@@ -360,28 +466,26 @@ export function renderGridWindBarbs(map, gridData) {
 
   draw();
 
-  if (map._windBarbMoveListener) {
-    map.off("move", map._windBarbMoveListener);
-    map.off("resize", map._windBarbMoveListener);
-  }
   map._windBarbMoveListener = draw;
-  map.on("move", draw);
-  map.on("resize", draw);
+  if (typeof map.on === "function") {
+    map.on("move", draw);
+    map.on("resize", draw);
+  }
 }
 
 export function removeGridWindBarbs(map = null) {
   if (map) {
-    if (map._windBarbMoveListener) {
+    if (map._windBarbMoveListener && typeof map.off === "function") {
       map.off("move", map._windBarbMoveListener);
       map.off("resize", map._windBarbMoveListener);
       map._windBarbMoveListener = null;
     }
-    const canvas = map.getContainer()?.querySelector(".wind-barb-canvas");
+    const canvas = map.getContainer ? map.getContainer()?.querySelector(".wind-barb-canvas") : null;
     if (canvas) {
       canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
       canvas.remove();
     }
-  } else {
+  } else if (typeof document !== "undefined" && typeof document.querySelectorAll === "function") {
     document.querySelectorAll(".wind-barb-canvas").forEach((canvas) => {
       canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
       canvas.remove();

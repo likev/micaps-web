@@ -8,6 +8,38 @@ const CONFIG_URL = new URL("./config.json", typeof document !== "undefined" ? do
 export let PRESET_GROUPS = [];
 export let CURRENT_CONFIG = { colormaps: {}, presets: [] };
 
+// Memory optimization budget (§8.8.4): max cells fed into Marching Squares.
+// Single source of compiled-in fallback; runtime value lives in
+// client/config.json -> performance.maxEffectiveCells (never hardcoded at call sites).
+export const DEFAULT_MAX_EFFECTIVE_CELLS = 50000;
+export const MIN_MAX_EFFECTIVE_CELLS = 1000;
+export const MAX_MAX_EFFECTIVE_CELLS = 4000000;
+
+/**
+ * Resolve the effective Marching Squares cell budget.
+ * Precedence: explicit override > CURRENT_CONFIG.performance.maxEffectiveCells
+ * > window.__MICAPS_CONFIG__.performance.maxEffectiveCells > compiled default.
+ * Invalid values fall back to the default; valid values are clamped to sane bounds.
+ */
+export function getMaxEffectiveCells(overrideValue) {
+  const pick = (v) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.floor(v) : null);
+  const fromOverride = pick(overrideValue);
+  if (fromOverride !== null) {
+    return Math.max(MIN_MAX_EFFECTIVE_CELLS, Math.min(MAX_MAX_EFFECTIVE_CELLS, fromOverride));
+  }
+  let fromConfig = null;
+  try {
+    fromConfig = pick(CURRENT_CONFIG?.performance?.maxEffectiveCells);
+  } catch {}
+  if (fromConfig === null) {
+    try {
+      fromConfig = pick(typeof window !== "undefined" ? window.__MICAPS_CONFIG__?.performance?.maxEffectiveCells : null);
+    } catch {}
+  }
+  if (fromConfig === null) return DEFAULT_MAX_EFFECTIVE_CELLS;
+  return Math.max(MIN_MAX_EFFECTIVE_CELLS, Math.min(MAX_MAX_EFFECTIVE_CELLS, fromConfig));
+}
+
 let autoSaveTimer = null;
 
 export async function loadPresetGroups() {
