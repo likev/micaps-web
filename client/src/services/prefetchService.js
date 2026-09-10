@@ -16,10 +16,34 @@ let lastPrefetchStats = {
 };
 
 /**
- * Computes prefetch targets for all 4 directions (Left, Right, Up, Down) based on the window state.
+ * Normalizes input direction(s) into canonical direction names ('left', 'right', 'up', 'down').
+ * Maps 'prev' -> 'left' and 'next' -> 'right'.
+ *
+ * @param {string|string[]} [directions]
+ * @returns {Set<string>|null} Set of canonical directions, or null if no restriction
+ */
+export function normalizeDirections(directions) {
+  if (!directions) return null;
+  const list = Array.isArray(directions) ? directions : [directions];
+  const set = new Set();
+  for (const d of list) {
+    if (!d) continue;
+    const lower = String(d).trim().toLowerCase();
+    if (lower === "prev" || lower === "left") set.add("left");
+    else if (lower === "next" || lower === "right") set.add("right");
+    else if (lower === "up") set.add("up");
+    else if (lower === "down") set.add("down");
+  }
+  return set.size > 0 ? set : null;
+}
+
+/**
+ * Computes prefetch targets for directional axes based on the window state.
+ * If options.directions is specified (e.g. ['prev'] or ['next']), only items for those
+ * directions will be resolved, leaving others empty.
  *
  * @param {Object} win - Window instance
- * @param {Object} [options] - Optional overrides (e.g. mock timelineSteps in tests)
+ * @param {Object} [options] - Optional overrides (e.g. mock timelineSteps, directions)
  * @returns {Object} { left, right, up, down }
  */
 export function getPrefetchTargets(win, options = {}) {
@@ -49,6 +73,12 @@ export function getPrefetchTargets(win, options = {}) {
     return Boolean(matched?.config?.showRaster);
   };
 
+  const allowed = normalizeDirections(options.directions);
+  const shouldFetchLeft = !allowed || allowed.has("left");
+  const shouldFetchRight = !allowed || allowed.has("right");
+  const shouldFetchUp = !allowed || allowed.has("up");
+  const shouldFetchDown = !allowed || allowed.has("down");
+
   const targets = {
     left: { direction: "left", mode, items: [] },
     right: { direction: "right", mode, items: [] },
@@ -69,10 +99,10 @@ export function getPrefetchTargets(win, options = {}) {
     targets.right.cycle = cycle;
 
     if (cycle) {
-      if (prevPeriod !== null && prevPeriod !== undefined && prevPeriod !== curPeriod) {
+      if (shouldFetchLeft && prevPeriod !== null && prevPeriod !== undefined && prevPeriod !== curPeriod) {
         targets.left.items = collectNwpItems(win, prevPeriod, cycle, hasRasterActive, "left");
       }
-      if (nextPeriod !== null && nextPeriod !== undefined && nextPeriod !== curPeriod) {
+      if (shouldFetchRight && nextPeriod !== null && nextPeriod !== undefined && nextPeriod !== curPeriod) {
         targets.right.items = collectNwpItems(win, nextPeriod, cycle, hasRasterActive, "right");
       }
     }
@@ -85,10 +115,10 @@ export function getPrefetchTargets(win, options = {}) {
     targets.left.obsFile = prevObsFile;
     targets.right.obsFile = nextObsFile;
 
-    if (prevObsFile && prevObsFile !== curObsFile) {
+    if (shouldFetchLeft && prevObsFile && prevObsFile !== curObsFile) {
       targets.left.items = collectObsItems(win, prevObsFile, "left");
     }
-    if (nextObsFile && nextObsFile !== curObsFile) {
+    if (shouldFetchRight && nextObsFile && nextObsFile !== curObsFile) {
       targets.right.items = collectObsItems(win, nextObsFile, "right");
     }
   }
@@ -115,7 +145,7 @@ export function getPrefetchTargets(win, options = {}) {
     targets.up.level = upLevel;
     targets.down.level = downLevel;
 
-    if (upLevel !== null) {
+    if (shouldFetchUp && upLevel !== null) {
       if (mode === "nwp") {
         const cycle = win.forecastCycle || timelineSteps.periods?.cycle;
         const curPeriod = timelineSteps.periods?.current ?? win.period ?? 24;
@@ -130,7 +160,7 @@ export function getPrefetchTargets(win, options = {}) {
       }
     }
 
-    if (downLevel !== null) {
+    if (shouldFetchDown && downLevel !== null) {
       if (mode === "nwp") {
         const cycle = win.forecastCycle || timelineSteps.periods?.cycle;
         const curPeriod = timelineSteps.periods?.current ?? win.period ?? 24;
@@ -232,10 +262,11 @@ function collectObsItems(win, targetObsFile, direction, overrideLevel = null) {
  * Immediately triggers prefetching of surrounding Left/Right/Up/Down data.
  * All requests run in the background with silent error catching.
  *
- * @param {Object} win - Target window instance
+ * @param {Object} [win] - Target window instance
+ * @param {Object} [options] - Optional overrides (e.g. directions: ['prev'] or ['next'])
  * @returns {Promise<Object>} Statistics of prefetched items
  */
-export async function prefetchSurroundingData(win) {
+export async function prefetchSurroundingData(win, options = {}) {
   if (!win) {
     try {
       const { getActiveWindow } = await import("../ui/tabWindowManager.js");
@@ -244,7 +275,13 @@ export async function prefetchSurroundingData(win) {
   }
   if (!win) return { prefetchedCount: 0, successfulCount: 0, cachedCount: 0, targets: null };
 
-  const targets = getPrefetchTargets(win);
+  const effectiveDirections = options.directions || win.prefetchDirections || null;
+  const targets = getPrefetchTargets(win, { ...options, directions: effectiveDirections });
+
+  if (win.prefetchDirections) {
+    win.prefetchDirections = null;
+  }
+
   const allItems = [
     ...(targets.left?.items || []),
     ...(targets.right?.items || []),
@@ -338,10 +375,11 @@ export async function prefetchSurroundingData(win) {
 /**
  * Schedules debounced prefetch (default 150ms) per window to ensure prefetch triggers once after state settles.
  *
- * @param {Object} win - Target window instance
+ * @param {Object} [win] - Target window instance
  * @param {number} [delayMs=150] - Debounce delay in milliseconds
+ * @param {Object} [options] - Optional prefetch options (e.g. { directions: ['next'] })
  */
-export function schedulePrefetch(win, delayMs = 150) {
+export function schedulePrefetch(win, delayMs = 150, options = {}) {
   const winKey = win?.id || (win?.winIdx !== undefined ? `w-${win.winIdx}` : "default");
   if (prefetchTimers.has(winKey)) {
     clearTimeout(prefetchTimers.get(winKey));
@@ -349,7 +387,7 @@ export function schedulePrefetch(win, delayMs = 150) {
   }
   const timer = setTimeout(() => {
     prefetchTimers.delete(winKey);
-    prefetchSurroundingData(win).catch(() => {});
+    prefetchSurroundingData(win, options).catch(() => {});
   }, delayMs);
   prefetchTimers.set(winKey, timer);
 }

@@ -42,19 +42,31 @@ graph TD
         WindL["Animated Particle Streamlines Simulator"]
         StationL["WMO / NOAA 9-Point Station Plot Model (LoD Culling)"]
         UI["Workstation UI (Catalog Drawer, Layer Controls, Time Slider)"]
+
+        KeyboardNav["Keyboard Shortcuts Engine (Arrow Keys: Time & Level)"]
+        PrefetchEngine["Intelligent Prefetch Engine (Left/Right/Up/Down Preload)"]
+        DataCache["apiClient 3-Minute TTL Cache & In-Flight Deduplicator"]
+        
+        KeyboardNav -->|Instant 0ms Step| DataCache
+        UI -->|Schedule Debounced (150ms)| PrefetchEngine
+        PrefetchEngine -->|Preload Orthogonal Neighbors| DataCache
+        DataCache -->|Cache Hits| ContourL
+        DataCache -->|Cache Hits| RasterL
+        DataCache -->|Cache Hits| StationL
     end
 
     subgraph Testing ["Automated Verification Test Suites"]
         GoTest["Go Test Suite (Parser QC, MDFS Headers, Config)"]
-        BunTest["Bun Test Runner (84 Tests: QC, Contours, Palettes, Streamlines)"]
+        BunTest["Bun Test Runner (174 Tests: QC, Contours, Palettes, Prefetch, Shortcuts)"]
         GoTest -->|Validate Parser & Normalization| Backend
-        BunTest -->|Test QC, Interpolation, Symbols, Formatter| Frontend
+        BunTest -->|Test QC, Interpolation, Contours, Prefetch, Shortcuts| Frontend
     end
 
-    StationQC -->|GeoJSON Station Collections| QCFilter --> ObjAnalysis --> GridData --> ContourL
-    StationQC -->|GeoJSON Point Features| StationL
+    StationQC -->|GeoJSON Station Collections| DataCache
+    Parser -->|REST JSON & Float32 Streams| DataCache
+    DataCache --> QCFilter --> ObjAnalysis --> GridData --> ContourL
+    DataCache --> StationL
     ObjAnalysis -->|Synthesized U/V Wind Grids| WindL
-    Parser -->|REST JSON & Float32 Streams| RasterL
     RangeServer -->|PMTiles Vector Chunks| PMTilesProto --> MapLibre
 ```
 
@@ -104,16 +116,19 @@ micaps-web/
 │   ├── src/
 │   │   ├── main.js                   # Application bootstrap & lifecycle orchestrator
 │   │   ├── style.css                 # Dark meteorological theme stylesheet
-│   │   ├── api/                      # REST & binary stream fetchers
+│   │   ├── tabs.css                  # Multi-window tabs & layout styling
+│   │   ├── api/                      # REST & binary stream fetchers (3-minute TTL cache & inflight deduplication)
 │   │   ├── layers/                   # MapLibre, Deck.gl, Canvas, Sounding & Surface analysis layers
 │   │   ├── map/                      # MapLibre GL setup, PMTiles protocol, graticule lines
+│   │   ├── services/                 # Intelligent background data prefetch engine (Left/Right/Up/Down)
 │   │   ├── store/                    # Reactive workstation state manager
 │   │   ├── ui/                       # Navbar, catalog drawer, layer control, time slider, tooltip
 │   │   └── utils/                    # CMA palettes, weather symbols, griddata-js adapter
-│   └── test/                         # Meteorological Unit Test Suite (117 bun tests across 14 files)
+│   └── test/                         # Meteorological Unit Test Suite (174 bun tests across 18 files)
 │       ├── colormaps.test.js         # Dynamic colormaps & level scaling tests
 │       ├── weather_symbols.test.js   # WMO symbols & 110° wind barbs tests
 │       ├── contour_logic.test.js     # Characteristic bold contour tests
+│       ├── contour_raster_exclusivity_legend.test.js # Colormap exclusivity & dynamic legend switching tests
 │       ├── config.test.js            # config.json validation & compact formatting tests
 │       ├── timeslider.test.js        # Timeline stepper, init-time, & sounding filter tests
 │       ├── formatters.test.js        # Meteorological unit and date formatting tests
@@ -124,7 +139,10 @@ micaps-web/
 │       ├── ui_review2_fixes.test.js  # UI layer controls & window manager synchronization tests
 │       ├── ui_review3_fixes.test.js  # UI Review 3 CSS/layout, a11y, multi-window & analysis consistency tests
 │       ├── dtd_analysis.test.js      # Dew-point depression (DTD = T - Td) QC, contours, plots & collision tests
-│       └── window_title.test.js      # Multi-window viewport title generation tests
+│       ├── window_title.test.js      # Multi-window viewport title generation tests
+│       ├── palette_persistence.test.js # Custom palettePath & colormap preservation across re-registration tests
+│       ├── keyboard_shortcuts.test.js # ArrowLeft/Right time stepping & ArrowUp/Down isobaric level shortcuts tests
+│       └── prefetch.test.js          # 3-min TTL cache, adjacent step resolution, prefetch targets & debouncing tests
 ```
 
 ---
@@ -225,7 +243,7 @@ Comprehensive automated testing is maintained across both frontend meteorologica
 
 ### 5.1. Client Meteorological Test Suite (Bun Test)
 
-Run all 117 client-side unit tests across 14 test suites covering meteorological objective analysis, contouring, symbology, and quality control:
+Run all 174 client-side unit tests across 18 test suites covering meteorological objective analysis, contouring, symbology, quality control, data prefetching, and keyboard shortcuts:
 
 ```bash
 cd client
@@ -239,6 +257,7 @@ Individual test suites:
 - **`colormaps.test.js`**: Dynamic colormap interpolation, discrete/continuous stops, and pressure level scaling.
 - **`weather_symbols.test.js`**: WMO standard present weather symbols and 110-degree wind barbs.
 - **`contour_logic.test.js`**: Characteristic bold contour line matching (e.g. 588 dam subtropical high, 0°C isotherm).
+- **`contour_raster_exclusivity_legend.test.js`**: Colormap exclusivity, dual rendering states, dynamic legend switching between contour and raster palettes, and visibility coordination.
 - **`config.test.js`**: `config.json` schema validation, preset loading, and compact JSON serialization.
 - **`timeslider.test.js`**: Timeline stepper intervals, upper-air synoptic sounding 08:00 / 20:00 UTC+8 filtering, and NWP forecast init-cycles.
 - **`formatters.test.js`**: Meteorological unit formatting, coordinate rounding, and date/time conversions.
@@ -247,6 +266,9 @@ Individual test suites:
 - **`ui_review3_fixes.test.js`**: UI layout contracts, CSS ellipsis, panel a11y, multi-window config recovery, step-length fallback, and layer label sizing.
 - **`dtd_analysis.test.js`**: Dew-point depression ($DTD = T - T_d$) multi-element extraction, physical supersaturation clamping & QC rejection, isobaric envelope validation, Delaunay triangulation & filled isoband contours, level-step layer renaming, station filter thresholding, station weather plot middle-left integer rendering with slot collision displacement/drop, and custom inverted moisture colormaps.
 - **`window_title.test.js`**: Dynamic multi-window viewport title generation from active layer metadata.
+- **`palette_persistence.test.js`**: Custom raster palette path and colormap preservation across layer re-registration, wind layer updates, preset config auto-save, and collapsible panel state persistence.
+- **`keyboard_shortcuts.test.js`**: Keyboard arrow key handling for operational forecasting, active window targeting, ArrowLeft / ArrowRight timeline stepping across NWP forecast lead hours and observation timestamps, and ArrowUp / ArrowDown isobaric level transitions.
+- **`prefetch.test.js`**: 3-minute TTL in-memory data cache, network in-flight request deduplication, JSON deep clone isolation, clock-skew prevention, tab visibility GC pause/resume, adjacent time step resolution (NWP periods & observation timestamps), 4-directional target calculation (Left/Right/Up/Down), surface vs upper-air level suppression, directional stepper prefetching (`btn-prev` only prev, `btn-next` and `btn-play` only next), and non-blocking debounced multi-window background prefetching.
 
 ### 5.2. Server Binary Parser Test Suite (Go Test)
 
@@ -487,4 +509,261 @@ graph LR
 3. **Station Wind Grid Synthesis**:
    - Upper-air vector winds $(u, v)$ from soundings are gridded into a regular 2D vector field via [`generateStationWindGrid`](file:///root/downloads/micaps-web/client/src/layers/windLayer.js).
    - This grid drives the client-side particle engine to render real-time animated streamlines directly from sparse station soundings without requiring gridded NWP model files.
+
+---
+
+### 8.6. NWP Gridded Contouring & Isoband Pipeline (ECMWF_HR & Global Models)
+
+Unlike sparse, irregularly distributed station observations (which require Delaunay Triangulation and IDW interpolation to synthesize a continuous field), Numerical Weather Prediction (NWP) model outputs from systems such as **ECMWF_HR**, **GFS**, and **CMA-GFS** are ingested directly from Cassandra MDFS tables as structured rectangular latitude-longitude meshes (MICAPS Diamond 4 scalar or Diamond 11 vector fields).
+
+The client contour engine ([`client/src/layers/contourLayer.js`](file:///root/downloads/micaps-web/client/src/layers/contourLayer.js)) executes a high-performance, in-browser Marching Squares pipeline that converts raw scalar grids into smooth, publication-grade vector isobands (filled polygons) and isolines (contour paths).
+
+```mermaid
+flowchart TD
+    GridMsg["Server REST Grid JSON (/api/data/grid)"] --> GridCheck{"Total Points (nLon * nLat) > 500,000?"}
+    GridCheck -->|Yes| Downsample["Adaptive Decimation (step = 2)"]
+    GridCheck -->|No| Native["Native Resolution (step = 1)"]
+    
+    Downsample --> LatOrient{"Latitude Descending (y[0] > y[end])?"}
+    Native --> LatOrient
+    
+    LatOrient -->|Yes| ReverseGrid["Reverse y coordinates & Z rows"]
+    LatOrient -->|No| SpatialFilter["2D 9-Point Spatial Filter (smoothGrid2D, w=0.4)"]
+    ReverseGrid --> SpatialFilter
+    
+    SpatialFilter --> MarchingSq["Marching Squares Engine (griddata-js)"]
+    
+    subgraph IsobandBranch ["Isobands (Contour Fills)"]
+        MarchingSq --> ContourF["griddata.contourf(Z, { x, y, levels })"]
+        ContourF --> IsobandGeoJSON["MultiPolygon Features with CMA Palette Colors"]
+    end
+    
+    subgraph IsolineBranch ["Isolines (Contour Lines & Labels)"]
+        MarchingSq --> ContourL["griddata.contour(Z, { x, y, levels })"]
+        ContourL --> BoldTag["Tag Characteristic Bold Values (588 dam, 0°C, etc.)"]
+        BoldTag --> DamFormat["Format Geopotential Decameters (formatContourLabel)"]
+        DamFormat --> Chaikin["Chaikin B-Spline Curve Smoothing (smoothFeatureCollection, iter=2)"]
+        Chaikin --> IsolineGeoJSON["MultiLineString Features with Bold Expressions"]
+    end
+    
+    IsobandGeoJSON --> MapLibreRender["MapLibre WebGL Layer Update (GPU Viewport Clipping & Dynamic Symbol Spacing)"]
+    IsolineGeoJSON --> MapLibreRender
+```
+
+#### 8.6.1. Domain Scope & Viewport Independence
+
+1. **Full Domain Computation**:
+   - The contouring engine computes geometry across the **entire bounding domain** returned by `/api/data/grid` (e.g. standard regional domain $70^\circ\text{E} \to 140^\circ\text{E}, 15^\circ\text{N} \to 55^\circ\text{N}$, or global $0^\circ \to 360^\circ, -90^\circ \to +90^\circ$).
+   - Calculations are **strictly viewport-independent**. The client does not clip, cull, or re-run Marching Squares when the user pans or zooms the map.
+2. **GPU Frustum Clipping**:
+   - Once computed, the full-domain GeoJSON `FeatureCollection` is uploaded to MapLibre GL's WebGL tile buffer (`map.getSource(srcId).setData(geojson)`).
+   - Viewport clipping, line tessellation, and polygon rasterization are handled natively on the GPU at 60 FPS, eliminating CPU overhead during viewport transformations.
+
+#### 8.6.2. Native Grid Resolution & Adaptive Decimation
+
+1. **Native Spacing ($d\text{lon} \times d\text{lat}$)**:
+   - For ECMWF_HR and regional models, the pipeline operates directly on the native grid spacing (typically $0.125^\circ \times 0.125^\circ$ or $0.25^\circ \times 0.25^\circ$).
+2. **Adaptive Decimation Guard (`step`)**:
+   - To preserve sub-second response times across divergent model domains, an adaptive step factor evaluates total mesh vertices:
+     $$\text{step} = \begin{cases} 2, & \text{if } N_{\text{lon}} \times N_{\text{lat}} > 500,000 \\ 1, & \text{otherwise} \end{cases}$$
+   - Regional domains (e.g., China $281 \times 161 = 45,241$ points) and standard global $0.5^\circ$ grids ($720 \times 361 = 259,920$ points) are evaluated at **100% full native resolution** (`step = 1`).
+   - Massive high-resolution global grids ($> 500,000$ points, such as $0.1^\circ$ global meshes with $3600 \times 1801 \approx 6.48 \times 10^6$ points) are dynamically downsampled by a factor of 2 (`step = 2`), preventing browser JavaScript thread locking while preserving smooth macro-scale fronts.
+3. **Coordinate Ascending Normalization**:
+   - In MICAPS format conventions, latitude grids frequently store northernmost latitudes first (e.g. $60.0^\circ\text{N} \to 0.0^\circ\text{N}$).
+   - Because `griddata-js` Marching Squares algorithms require monotonic ascending coordinates ($y_0 < y_1 < \dots < y_{N-1}$), the pipeline inspects $y$:
+     $$\text{If } y[0] > y[N_{\text{lat}}-1] \implies y \leftarrow \text{reverse}(y), \quad Z \leftarrow \text{reverseRows}(Z)$$
+   - This ensures correct topological winding and prevents upside-down or inverted contour orientation.
+
+#### 8.6.3. Pre-Contour 2D Spatial Filtering
+
+Raw NWP grids often contain high-frequency numerical discretization noise or Gibbs oscillations originating from spectral-to-grid transforms. Before vector extraction, scalar matrix $Z$ is filtered via a 2D 9-point smoothing stencil ([`client/src/utils/smoothContour.js`](file:///root/downloads/micaps-web/client/utils/smoothContour.js)):
+
+$$Z_{\text{smoothed}} = \text{smoothGrid2D}(Z, \text{iterations} = 1, \text{weight} = 0.4)$$
+
+- **Stencil Kernel ($3 \times 3$)**:
+  $$\mathbf{K} = \begin{bmatrix} \frac{w}{8} & \frac{w}{4} & \frac{w}{8} \\ \frac{w}{4} & 1 - w & \frac{w}{4} \\ \frac{w}{8} & \frac{w}{4} & \frac{w}{8} \end{bmatrix}, \quad \text{where } w = 0.4$$
+- **Boundary Handling**: Neumann zero-gradient reflective padding prevents boundary damping.
+- **Physical Conservation**: Spatial smoothing eliminates single-cell mathematical spikes without degrading synoptic ridge axes or trough depths.
+
+#### 8.6.4. Marching Squares & Isoband / Isoline Generation
+
+1. **Isobands (`griddata.contourf`)**:
+   - Decomposes the 2D scalar field into discrete polygonal bins defined by meteorological level intervals $[L_k, L_{k+1}]$.
+   - Emits a GeoJSON `FeatureCollection` of `MultiPolygon` geometries.
+   - Polygon features receive dynamic fill colors evaluated at the interval midpoint:
+     $$\text{fillColor} = \text{getHexColor}\left(\frac{L_k + L_{k+1}}{2}, \text{element}, \text{colormap}\right)$$
+2. **Isolines (`griddata.contour`)**:
+   - Extracts continuous planar isolines at exact contour thresholds $L_k$.
+   - Emits a GeoJSON `FeatureCollection` of `MultiLineString` geometries.
+
+#### 8.6.5. Post-Contour Chaikin Vector Curve Smoothing
+
+Marching squares output inherently consists of piecewise linear segments along grid cell edges. To achieve curved, cartographic-grade meteorological isolines, isoline paths undergo 2 iterations of **Chaikin's corner-cutting subdivision algorithm** ([`client/src/utils/smoothContour.js`](file:///root/downloads/micaps-web/client/src/utils/smoothContour.js)):
+
+$$\begin{aligned}
+Q_i &= \frac{3}{4} P_i + \frac{1}{4} P_{i+1} \\
+R_i &= \frac{1}{4} P_i + \frac{3}{4} P_{i+1}
+\end{aligned}$$
+
+- Replaces sharp grid vertex corners with quadratic B-spline curves.
+- Closed contours remain topologically closed; open boundary contours preserve their exact boundary entry and exit intercepts.
+
+#### 8.6.6. Characteristic Bold Isolines & Synoptic Formatting
+
+Operational meteorological standards dictate prominent emphasis of critical synoptic boundaries:
+
+| Element | Characteristic Values | Meteorological Significance | Default Presentation |
+| :---: | :---: | :---: | :---: |
+| **HGT** | $5880\text{ gpm}$ ($588\text{ dam}$), $5840\text{ gpm}$ | Western Pacific Subtropical High ridge boundary | Line width $4.0\text{px}$ (vs $2.0\text{px}$ standard) |
+| **TMP** | $0^\circ\text{C}$, $-20^\circ\text{C}$ | Freezing level isotherm / icing & snow boundary | Line width $4.0\text{px}$, highlighted stroke |
+| **SLP** | $1000\text{ hPa}$, $1010\text{ hPa}$, $1020\text{ hPa}$ | Synoptic surface high / low center benchmarks | Line width $4.0\text{px}$ |
+
+1. **Tagging Engine (`isFeatureBold`)**:
+   - Isolines are matched against configured bold values, handling decameter-to-meter scaling ($588 \leftrightarrow 5880$) and integer tolerances.
+   - Tagged features receive `properties.isBold = true`.
+2. **Decameter Label Formatting (`formatContourLabel`)**:
+   - For geopotential height (`element === "HGT"`), values $\ge 1000\text{ gpm}$ are converted to geopotential decameters ($dam$):
+     $$5880\text{ gpm} \longrightarrow \text{"588"}$$
+   - Matches standard WMO and CMA weather office synoptic charting conventions.
+3. **MapLibre Label Engine**:
+   - Isoline labels are rendered as MapLibre `symbol` layers along vector lines:
+     - `symbol-placement: "line"`: Aligns text along the curve tangent.
+     - `symbol-spacing: 160`: Maintains consistent physical spacing along the line regardless of zoom.
+     - `text-halo-color: "rgba(10, 15, 25, 0.95)"`, `text-halo-width: 2.0`: Dark halo prevents text illegibility when overlaying bright isoband fills or satellite imagery.
+     - `symbol-sort-key: ["case", ["get", "isBold"], 0, 10]`: Prioritizes characteristic bold contour labels over standard labels in MapLibre collision avoidance.
+
+#### 8.6.7. Zoom Independence & Lifecycle Contract
+
+- **One-Shot Execution**: Contours are generated **once** when the NWP data arrives (or when forecast lead time or level changes).
+- **Zero Zoom Re-Computation**: Panning and zooming do **not** re-invoke `renderContourLayers()`. MapLibre GL scales the vector tiles on the GPU without CPU recalculation.
+- **Comparison: NWP Gridded Contours vs. Station Sounding Objective Analysis**:
+
+| Feature | NWP Gridded Pipeline (§8.6) | Station Objective Analysis (§8.5.4) |
+| :--- | :--- | :--- |
+| **Input Data** | Structured regular 2D grid ($N_{\text{lat}} \times N_{\text{lon}}$) | Discrete, irregular station point observations |
+| **Interpolation** | None (direct grid traversal) | Delaunay Triangulation + IDW Mesh Resampling ($0.5^\circ$) |
+| **Domain Scope** | Full model grid (e.g. $70^\circ\text{E} \to 140^\circ\text{E}$) | Convex hull of filtered synoptic station points |
+| **Filtering** | 2D 9-point Laplacian spatial filter ($w=0.4$) | Isobaric climatological envelope QC rejection |
+| **Decimation** | Adaptive step ($step = 2$ if points $> 500,000$) | Fixed $0.5^\circ$ interpolation resolution |
+| **Smoothing** | Chaikin B-spline subdivision (2 iterations) | Chaikin B-spline + Douglas-Peucker simplification |
+| **Rendering** | MapLibre GeoJSON Line & Fill vector layers | MapLibre GeoJSON Line & Fill vector layers |
+
+---
+
+### 8.7. Keyboard Navigation & Intelligent Data Prefetch Architecture
+
+Meteorological forecasting requires rapid multi-dimensional data interrogation. Forecasters continuously cycle along two primary orthogonal axes:
+1. **Time Axis (Horizontal $\leftarrow$ / $\rightarrow$)**: Advancing or rewinding forecast lead times (e.g. $024\text{h} \leftrightarrow 027\text{h} \leftrightarrow 030\text{h}$) or surface/upper-air observation cycles.
+2. **Vertical Axis (Vertical $\uparrow$ / $\downarrow$)**: Ascending or descending standard isobaric pressure levels ($1000\text{ hPa} \leftrightarrow 850\text{ hPa} \leftrightarrow 700\text{ hPa} \leftrightarrow 500\text{ hPa} \leftrightarrow 200\text{ hPa}$).
+
+To eliminate network round-trip delays ($100\text{--}400\text{ ms}$) during keyboard navigation, MICAPS-Web integrates an **Intelligent Background Data Prefetch Engine** coupled with a **3-Minute TTL In-Memory Cache**.
+
+```mermaid
+flowchart TD
+    subgraph Triggers ["Navigation Triggers & Directional Constraints"]
+        BtnPrev["btn-prev (◀) / ArrowLeft"] -->|directions: ['prev']| Debounce["Per-Window Debounce / Immediate Start"]
+        BtnNextPlay["btn-next (▶) / btn-play (❚❚) / ArrowRight"] -->|directions: ['next']| Debounce
+        GeneralNav["Timeline Chip / Level Switch / Preset Load"] -->|directions: all 4 (unconstrained)| Debounce
+    end
+
+    Debounce --> TargetCalc["Prefetch Target Resolver (getPrefetchTargets)"]
+    
+    subgraph TargetResolution ["Directional Filtering & Target Resolution"]
+        TargetCalc --> DirCheck{"directions Filter Active?"}
+        DirCheck -->|prev only| DirLeft["Left Axis Only: Prior Forecast Step / Obs File"]
+        DirCheck -->|next only| DirRight["Right Axis Only: Next Forecast Step / Obs File"]
+        DirCheck -->|unconstrained| DirAll["All 4 Directions: Left/Right (Time) + Up/Down (Isobaric Levels)"]
+    end
+    
+    DirLeft --> TargetFilter["Collect Target Items (NWP Grids, Binary Streams, Station Obs)"]
+    DirRight --> TargetFilter
+    DirAll --> TargetFilter
+    
+    TargetFilter --> CacheCheck{"Is URL in 3-Min TTL Cache?"}
+    CacheCheck -->|Yes (Hit)| SkipItem["Skip Item (No Network Call)"]
+    CacheCheck -->|No (Miss)| InflightCheck{"Is Request In-Flight?"}
+    
+    InflightCheck -->|Yes| AttachPromise["Attach to Existing Pending Promise"]
+    InflightCheck -->|No| ExecFetch["Background Fetch (Promise.allSettled)"]
+    
+    ExecFetch --> StoreCache["Store in In-Memory Cache (expiresAt = now + 180s)"]
+    AttachPromise --> StoreCache
+    
+    subgraph InstantNavigation ["Meteorological Navigation"]
+        UserNav["User Steps (◀ / ▶) or Auto Playback Tick"] --> RequestData["apiClient.fetchJson / fetchBinary"]
+        RequestData --> CacheLookup{"Cache Lookup"}
+        CacheLookup -->|Hit| InstantRender["0ms Synchronous Return & Instant Layer Update"]
+        CacheLookup -->|Miss| FallbackFetch["Normal Network Fetch"]
+    end
+    
+    StoreCache -.->|Provides 0ms Data| CacheLookup
+```
+
+#### 8.7.1. 3-Minute TTL In-Memory Cache & Network Deduplication ([`apiClient.js`](file:///root/downloads/micaps-web/client/src/api/apiClient.js))
+
+The frontend network client implements an in-memory caching tier optimized for rapid switching and zero memory leakage:
+
+1. **3-Minute Time-To-Live (`DEFAULT_CACHE_TTL_MS = 180000`)**:
+   - Data fetched via prefetch or direct user interaction remains valid in memory for 180 seconds ($3\text{ minutes}$).
+   - If an entry exceeds its expiration timestamp (`Date.now() > entry.expiresAt`), it is discarded on access.
+2. **Deterministic Canonical URL Keying (`buildUrl`)**:
+   - Query parameter keys are sorted alphabetically before stringifying:
+     ```javascript
+     const sortedKeys = Array.from(new Set(query.keys())).sort();
+     ```
+   - Guarantees that requests with identical parameters in different orders generate the identical cache key (e.g., `/api/data/grid?file=...&path=...` matches `/api/data/grid?path=...&file=...`).
+3. **In-Flight Request Deduplication (`inflightRequests`)**:
+   - Tracks currently executing network promises in a map keyed by canonical URL.
+   - If a prefetch call requests data that is currently in-flight (or if the user presses a key while prefetch is in transit), the second caller attaches to the existing promise rather than initiating a duplicate HTTP connection.
+4. **Data Isolation via Deep Cloning (`cloneJson`)**:
+   - To prevent meteorological rendering layers from mutating cached master objects (e.g. attaching temporary GeoJSON properties or modifying stats), `fetchJson` clones data using `structuredClone` (with `JSON.parse(JSON.stringify)` fallback):
+     ```javascript
+     return cloneJson(cached.data);
+     ```
+   - Binary raster streams (`fetchBinary`) clone underlying buffers via `buf.slice(0)`.
+5. **Single-Timestamp Skew Protection**:
+   - Cache storage captures `const now = Date.now()` once and records both `cachedAt: now` and `expiresAt: now + ttl`, preventing clock drift between allocation steps.
+6. **Visibility-Aware Garbage Collection**:
+   - A background interval executes every 60 seconds to prune expired entries.
+   - When the user switches tabs (`document.hidden === true`), background pruning pauses to prevent unnecessary battery and CPU consumption. Upon tab reactivation (`visibilitychange`), pruning resumes immediately.
+
+#### 8.7.2. Orthogonal Target Resolution ([`prefetchService.js`](file:///root/downloads/micaps-web/client/src/services/prefetchService.js))
+
+The prefetch service determines exact data requirements along all 4 compass directions based on the active window state:
+
+1. **Left ($\leftarrow$) & Right ($\rightarrow$) Resolution**:
+   - **NWP Forecast Mode**: Resolves previous and next forecast periods from timeline discrete steps (e.g., current $24\text{h} \implies \text{Left: } 21\text{h}, \text{Right: } 27\text{h}$).
+   - **Observation Mode**: Resolves previous and next file timestamps from `obsFiles` sequence (e.g., current `...080000.000` $\implies \text{Left: } `...020000.000`, \text{Right: } `...140000.000`).
+2. **Up ($\uparrow$) & Down ($\downarrow$) Resolution**:
+   - Standard isobaric levels: `VERTICAL_LEVELS = [1000, 925, 850, 700, 500, 400, 300, 200, 100]` (sorted from surface to upper atmosphere).
+   - **Up ($\uparrow$)**: Steps toward lower pressure / higher altitude (e.g., $500\text{ hPa} \to 400\text{ hPa}$).
+   - **Down ($\downarrow$)**: Steps toward higher pressure / lower altitude (e.g., $500\text{ hPa} \to 700\text{ hPa}$).
+   - **Boundary Clamping**: The top level ($100\text{ hPa}$) has no Up target; the surface level ($1000\text{ hPa}$) has no Down target.
+   - **Surface Level Suppression**: Surface products (`model === "SURFACE"`, `level === 0`, or preset group `hasLevel === false`) strictly suppress Up/Down prefetching to eliminate wasteful 404 queries.
+3. **Composite Layer & Binary Stream Prefetch**:
+   - For multi-layer presets (e.g., 500 hPa Subtropical High consisting of $HGT$ contour and $TMP$ raster), prefetch resolves all constituent scalar layers.
+   - If `showRaster: true` or active raster overlays are detected on a layer, prefetch fetches both the scalar grid JSON (`/api/data/grid`) and the raw Float32 binary stream (`/api/data/grid/binary`).
+   - Derived layers (`derivedFrom: "station"`) are skipped since they compute locally without backend queries.
+4. **Directional Stepper Navigation Optimization (`btn-prev`, `btn-next`, `btn-play`)**:
+   - **`btn-prev` (Previous Step ◀)**: When moving backward in time, prefetch is strictly constrained to `directions: ["prev"]` (Left timeline axis). Next time steps and vertical isobaric levels (Up/Down) are skipped to eliminate redundant network fetches.
+   - **`btn-next` (Next Step ▶)**: When moving forward in time, prefetch is strictly constrained to `directions: ["next"]` (Right timeline axis), skipping previous time steps and vertical levels.
+   - **`btn-play` (Animation Playback)**: Upon playback start, an immediate prefetch for `directions: ["next"]` caches the upcoming frame before the first interval tick. Each subsequent tick continues to prefetch strictly `next`. This reduces network queries during animated playback from 4–8 down to exactly 1 query per frame, eliminating dropped frames.
+   - **General Navigation vs. Stepper Actions**: Unconstrained operations (such as clicking a timeline chip directly, switching presets in the catalog, or changing isobaric levels) continue to prefetch along all 4 orthogonal directions (`left`, `right`, `up`, `down`).
+
+#### 8.7.3. Non-Blocking Execution & Multi-Window Scheduling
+
+1. **Per-Window Debouncing (`prefetchTimers`)**:
+   - Prefetch triggers are scheduled with a 150 ms debounce delay (`schedulePrefetch(win, 150)`).
+   - In multi-window grid workspaces, timers are tracked in a `Map<string, Timer>` keyed by window ID (`win.id` or `w-${winIdx}`). Navigating Window 1 does not clear or postpone the prefetch timer of Window 2.
+2. **Zero Render / WebGL Contention**:
+   - Background prefetch operates strictly at the network fetching and caching layer.
+   - It performs **zero DOM manipulation**, **zero WebGL draw calls**, and **zero Marching Squares calculations**.
+   - Thread execution returns immediately upon queueing background promises, ensuring the UI thread maintains a locked 60 FPS during map interactions.
+3. **Best-Effort Silent Fault Tolerance**:
+   - All network requests execute inside `Promise.allSettled()` with silent exception suppression.
+   - Prefetch failures (e.g. missing forecast lead times at boundary ends or network dropouts) will never throw unhandled rejections, display notification toasts, or interfere with user operations.
+4. **Instantaneous 0ms Navigation**:
+   - When the forecaster presses `ArrowLeft`, `ArrowRight`, `ArrowUp`, or `ArrowDown`, the layer loading logic queries `apiClient.fetchJson` / `fetchBinary`.
+   - Because the target data was prefetched, the call hits the in-memory cache synchronously (0 ms network latency), delivering immediate chart transitions without loading spinners.
+
 

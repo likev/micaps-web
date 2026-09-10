@@ -1,6 +1,7 @@
 import { appState } from "../store/appState.js";
 import { formatLeadTime, formatObsTimestamp, formatForecastInitTime, formatForecastValidTime } from "../utils/formatters.js";
 import { generateDynamicForecastCycles } from "../utils/timelineSync.js";
+import { schedulePrefetch } from "../services/prefetchService.js";
 
 let playTimer = null;
 let currentMode = "nwp"; // "nwp" or "obs"
@@ -193,8 +194,8 @@ export function initTimeSlider(containerId = "timeslider-container", onTimeChang
     </div>
   `;
 
-  document.getElementById("btn-prev")?.addEventListener("click", () => step(-1));
-  document.getElementById("btn-next")?.addEventListener("click", () => step(1));
+  document.getElementById("btn-prev")?.addEventListener("click", () => step(-1, { source: "btn-prev", directions: ["prev"] }));
+  document.getElementById("btn-next")?.addEventListener("click", () => step(1, { source: "btn-next", directions: ["next"] }));
 
   document.getElementById("btn-play")?.addEventListener("click", () => {
     if (playTimer) {
@@ -408,13 +409,27 @@ function updateLabels() {
   }
 }
 
-export function step(delta) {
+export function step(delta, options = {}) {
+  let directions = options.directions || options.prefetchDirections;
+  if (!directions) {
+    if (options.source === "btn-prev") directions = ["prev"];
+    else if (options.source === "btn-next" || options.source === "btn-play") directions = ["next"];
+  }
+
   if (currentMode === "obs") {
     if (obsFiles.length === 0) return;
     currentObsIdx = (currentObsIdx + delta + obsFiles.length) % obsFiles.length;
     updateLabels();
     renderChips();
-    if (onTimeChangeCallback) onTimeChangeCallback({ isObs: true, file: obsFiles[currentObsIdx], _seq: ++periodStepSeq });
+    if (onTimeChangeCallback) {
+      onTimeChangeCallback({
+        isObs: true,
+        file: obsFiles[currentObsIdx],
+        _seq: ++periodStepSeq,
+        prefetchDirections: directions,
+        source: options.source || (delta < 0 ? "btn-prev" : "btn-next"),
+      });
+    }
   } else {
     currentPeriodIdx = (currentPeriodIdx + delta + discretePeriods.length) % discretePeriods.length;
     const period = discretePeriods[currentPeriodIdx];
@@ -423,7 +438,13 @@ export function step(delta) {
     renderChips();
     if (onTimeChangeCallback) {
       const seq = ++periodStepSeq;
-      const boxed = { period, _seq: seq, valueOf() { return period; } };
+      const boxed = {
+        period,
+        _seq: seq,
+        prefetchDirections: directions,
+        source: options.source || (delta < 0 ? "btn-prev" : "btn-next"),
+        valueOf() { return period; },
+      };
       onTimeChangeCallback(boxed);
     }
   }
@@ -440,8 +461,13 @@ function startPlayback() {
   }
   appState.set("isPlaying", true);
 
+  // Immediately prefetch next step when playback starts
+  try {
+    schedulePrefetch(null, 0, { directions: ["next"] });
+  } catch {}
+
   playTimer = setInterval(() => {
-    step(1);
+    step(1, { source: "btn-play", directions: ["next"] });
   }, appState.get("playbackSpeed") || 1800);
 }
 

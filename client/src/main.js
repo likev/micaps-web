@@ -243,7 +243,7 @@ async function bootstrap() {
   initConfigEditor(reloadConfiguration);
   initTooltip("tooltip");
   initKeyboardShortcuts({
-    onPeriodStep: (dir) => timeSliderStep(dir),
+    onPeriodStep: (dir) => timeSliderStep(dir, { source: dir < 0 ? "btn-prev" : "btn-next", directions: dir < 0 ? ["prev"] : ["next"] }),
     onLevelStep: async (dir) => {
       const m = getMap();
       if (!m) return;
@@ -302,6 +302,7 @@ async function bootstrap() {
       win.stepLength = data.stepLength;
     }
     if (typeof data === "object" && data !== null && data.isObs) {
+      win.prefetchDirections = data.prefetchDirections || null;
       win.loadSeq = (win.loadSeq || 0) + 1;
       const expectedSeq = win.loadSeq;
       win.obsTime = data.file;
@@ -369,12 +370,16 @@ async function bootstrap() {
       let period = win.period ?? 24;
       if (typeof data === "number") {
         period = data;
+        win.prefetchDirections = null;
       } else if (typeof data === "object" && data !== null) {
         if (typeof data.period === "number") {
           period = data.period;
         } else if (typeof data.valueOf === "function" && typeof data.valueOf() === "number") {
           period = data.valueOf();
         }
+        win.prefetchDirections = data.prefetchDirections || null;
+      } else {
+        win.prefetchDirections = null;
       }
       win.loadSeq = (win.loadSeq || 0) + 1;
       const expectedSeq = win.loadSeq;
@@ -589,7 +594,8 @@ async function loadWeatherField(map, model, element, level, period, customOption
     }
 
     if (win) {
-      schedulePrefetch(win);
+      const prefetchOpts = win.prefetchDirections ? { directions: win.prefetchDirections } : {};
+      schedulePrefetch(win, 150, prefetchOpts);
     }
   } catch (err) {
     console.error(`[Bootstrap] Field load failed for ${path}/${file}:`, err);
@@ -849,7 +855,8 @@ async function loadUpperAirComposite(map, level = 500, obsTime = "20260828170000
     await renderSoundingDerivedContoursForStation(map, stations, curLevel, activeGroup, win, layerId);
   }
   if (win) {
-    schedulePrefetch(win);
+    const prefetchOpts = win.prefetchDirections ? { directions: win.prefetchDirections } : {};
+    schedulePrefetch(win, 150, prefetchOpts);
   }
 }
 
@@ -889,7 +896,8 @@ async function loadObservationProduct(map, model, element, level, file, win = ge
       await renderSoundingDerivedContoursForStation(map, stations, curLevel, activeGroup, win, layerId);
     }
     if (win) {
-      schedulePrefetch(win);
+      const prefetchOpts = win.prefetchDirections ? { directions: win.prefetchDirections } : {};
+      schedulePrefetch(win, 150, prefetchOpts);
     }
   } catch (err) {
     console.error("[Main] Observation load error:", err);
@@ -1041,7 +1049,8 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
     win.layerSnapshots = null;
   }
   if (win) {
-    schedulePrefetch(win);
+    const prefetchOpts = win.prefetchDirections ? { directions: win.prefetchDirections } : {};
+    schedulePrefetch(win, 150, prefetchOpts);
   }
 }
 
