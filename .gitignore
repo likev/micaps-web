@@ -26,6 +26,7 @@ client/dist/
 .vite/
 dist/
 dist-ssr/
+*.zip
 
 # Logs & Temporary Files
 *.log
