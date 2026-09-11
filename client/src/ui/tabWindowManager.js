@@ -393,17 +393,22 @@ export function setTabLayout(tabId, layout = "1x1") {
 
   focusWindow(tab.id, tab.activeWinIdx);
 
-  if (layout !== "1x1" && tab.syncMap) {
-    setTimeout(() => {
-      syncTabCameras(tab);
-    }, 100);
-  }
+  const visibleWins = tab.windows.slice(0, numVisible);
 
-  setTimeout(() => {
-    tab.windows.forEach((win) => {
+  const scheduleLayoutSync = () => {
+    visibleWins.forEach((win) => {
       if (win.map) win.map.resize();
     });
-  }, 50);
+    if (layout !== "1x1" && tab.syncMap) {
+      syncTabCameras(tab);
+    }
+  };
+
+  if (typeof requestAnimationFrame === "function") {
+    requestAnimationFrame(scheduleLayoutSync);
+  } else {
+    setTimeout(scheduleLayoutSync, 20);
+  }
 }
 
 function updateLayoutButtons(layout) {
@@ -576,7 +581,8 @@ function initWindowMap(win) {
     }
   });
 
-  // Camera synchronization across visible windows in split mode
+  // Camera synchronization across visible windows in split mode (throttled via rAF)
+  let syncAnimId = null;
   map.on("move", () => {
     const tab = tabs.find((t) => t.id === win.tabId);
     if (!tab || !tab.syncMap || tab.layout === "1x1" || syncingTabs.has(tab.id)) return;
@@ -584,21 +590,27 @@ function initWindowMap(win) {
     const numVisible = tab.layout === "1x2" ? 2 : 4;
     if (win.winIdx >= numVisible) return;
 
-    syncingTabs.add(tab.id);
-    try {
-      const center = map.getCenter();
-      const zoom = map.getZoom();
-      const pitch = map.getPitch();
-      const bearing = map.getBearing();
+    if (syncAnimId) return;
+    const schedule = typeof requestAnimationFrame === "function" ? requestAnimationFrame : (cb) => setTimeout(cb, 16);
+    syncAnimId = schedule(() => {
+      syncAnimId = null;
+      if (!tab.syncMap || tab.layout === "1x1" || syncingTabs.has(tab.id)) return;
+      syncingTabs.add(tab.id);
+      try {
+        const center = map.getCenter();
+        const zoom = map.getZoom();
+        const pitch = map.getPitch();
+        const bearing = map.getBearing();
 
-      tab.windows.slice(0, numVisible).forEach((otherWin) => {
-        if (otherWin !== win && otherWin.map && (otherWin.map.isStyleLoaded() || otherWin.map.loaded())) {
-          otherWin.map.jumpTo({ center, zoom, pitch, bearing });
-        }
-      });
-    } finally {
-      syncingTabs.delete(tab.id);
-    }
+        tab.windows.slice(0, numVisible).forEach((otherWin) => {
+          if (otherWin !== win && otherWin.map && (otherWin.map.isStyleLoaded() || otherWin.map.loaded())) {
+            otherWin.map.jumpTo({ center, zoom, pitch, bearing });
+          }
+        });
+      } finally {
+        syncingTabs.delete(tab.id);
+      }
+    });
   });
 }
 

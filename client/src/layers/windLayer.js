@@ -104,25 +104,52 @@ export function renderWindStreamlines(map, gridData, options = {}) {
     return [uVal, vVal];
   }
 
-  // Adaptive particle count based on canvas area (§8.8.2 P4-2: clamp(area/1500, 400, 1600))
+  // Adaptive particle count based on canvas area (§8.8.2 P4-2: clamp(area/1800, 300, 1200))
   const canvasArea = cssWidth * cssHeight;
-  const numParticles = options.numParticles || Math.max(400, Math.min(1600, Math.round(canvasArea / 1500)));
+  const numParticles = options.numParticles || Math.max(300, Math.min(1200, Math.round(canvasArea / 1800)));
   const particles = [];
 
-  function resetParticle(p) {
-    const bounds = typeof map.getBounds === "function" ? map.getBounds() : null;
-    const west = bounds ? bounds.getWest() : startLon;
-    const east = bounds ? bounds.getEast() : endLon;
-    const south = bounds ? bounds.getSouth() : Math.min(startLat, endLat);
-    const north = bounds ? bounds.getNorth() : Math.max(startLat, endLat);
+  const gridWest = Math.min(startLon, endLon);
+  const gridEast = Math.max(startLon, endLon);
+  const gridSouth = Math.min(startLat, endLat);
+  const gridNorth = Math.max(startLat, endLat);
 
-    p.lng = west + Math.random() * (east - west);
-    p.lat = south + Math.random() * (north - south);
+  let spawnWest = gridWest;
+  let spawnEast = gridEast;
+  let spawnSouth = gridSouth;
+  let spawnNorth = gridNorth;
+
+  function updateSpawnBounds() {
+    const bounds = typeof map.getBounds === "function" ? map.getBounds() : null;
+    if (bounds) {
+      spawnWest = Math.max(gridWest, bounds.getWest());
+      spawnEast = Math.min(gridEast, bounds.getEast());
+      spawnSouth = Math.max(gridSouth, bounds.getSouth());
+      spawnNorth = Math.min(gridNorth, bounds.getNorth());
+      if (spawnWest >= spawnEast) { spawnWest = gridWest; spawnEast = gridEast; }
+      if (spawnSouth >= spawnNorth) { spawnSouth = gridSouth; spawnNorth = gridNorth; }
+    } else {
+      spawnWest = gridWest;
+      spawnEast = gridEast;
+      spawnSouth = gridSouth;
+      spawnNorth = gridNorth;
+    }
+  }
+  updateSpawnBounds();
+
+  function resetParticle(p) {
+    p.lng = spawnWest + Math.random() * (spawnEast - spawnWest);
+    p.lat = spawnSouth + Math.random() * (spawnNorth - spawnSouth);
     p.age = Math.random() * 40;
     p.maxAge = 40 + Math.random() * 50;
-    const pt = typeof map.project === "function" ? map.project([p.lng, p.lat]) : { x: 0, y: 0 };
-    p.x = pt.x;
-    p.y = pt.y;
+    if (typeof map.project === "function") {
+      const pt = map.project([p.lng, p.lat]);
+      p.x = pt ? pt.x : 0;
+      p.y = pt ? pt.y : 0;
+    } else {
+      p.x = 0;
+      p.y = 0;
+    }
   }
 
   for (let i = 0; i < numParticles; i++) {
@@ -132,6 +159,16 @@ export function renderWindStreamlines(map, gridData, options = {}) {
   }
 
   let animRunning = true;
+
+  // Reusable stroke buckets to batch Canvas2D draw calls (§8.8.2)
+  // bucket 0: <= 8 m/s, bucket 1: 8-15 m/s, bucket 2: 15-25 m/s, bucket 3: > 25 m/s
+  const bucketLines = [[], [], [], []];
+  const STROKE_COLORS = [
+    "rgba(100, 180, 255, 0.65)",
+    "rgba(100, 210, 140, 0.75)",
+    "rgba(230, 210, 50, 0.8)",
+    "rgba(240, 120, 40, 0.85)",
+  ];
 
   function animate() {
     if (!animRunning) return;
@@ -159,7 +196,23 @@ export function renderWindStreamlines(map, gridData, options = {}) {
     ctx.lineWidth = 1.4;
     ctx.lineCap = "round";
 
-    for (const p of particles) {
+    // Precalculate frame invariants outside the particle loop
+    updateSpawnBounds();
+    const currentZoom = typeof map.getZoom === "function" ? map.getZoom() : 4.5;
+    const zoomFactor = Math.pow(2, (4.5 - currentZoom) * 0.85);
+    const dt = 0.11 * zoomFactor;
+    const dtU = (dt * 1000) / 111320;
+    const dtV = (dt * 1000) / 110574;
+
+    bucketLines[0].length = 0;
+    bucketLines[1].length = 0;
+    bucketLines[2].length = 0;
+    bucketLines[3].length = 0;
+
+    const hasProject = typeof map.project === "function";
+
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
       const vel = sampleWind(p.lng, p.lat);
       if (!vel) {
         resetParticle(p);
@@ -177,39 +230,36 @@ export function renderWindStreamlines(map, gridData, options = {}) {
       // Physical displacement with zoom-adaptive velocity normalization (2x faster animation):
       const latRad = (p.lat * Math.PI) / 180;
       const cosLat = Math.max(0.1, Math.cos(latRad));
-      const currentZoom = typeof map.getZoom === "function" ? map.getZoom() : 4.5;
-      const zoomFactor = Math.pow(2, (4.5 - currentZoom) * 0.85);
-      const dt = 0.11 * zoomFactor;
 
-      const dLng = (uVal * dt * 1000) / (111320 * cosLat);
-      const dLat = (vVal * dt * 1000) / 110574;
+      const dLng = (uVal * dtU) / cosLat;
+      const dLat = vVal * dtV;
 
       const nextLng = p.lng + dLng;
       const nextLat = p.lat + dLat;
 
-      const currPt = typeof map.project === "function" ? map.project([p.lng, p.lat]) : { x: p.x, y: p.y };
-      const nextPt = typeof map.project === "function" ? map.project([nextLng, nextLat]) : { x: p.x, y: p.y };
+      // Reuse existing screen coordinates p.x, p.y to avoid redundant map.project calls (§8.8.2)
+      const currX = p.x;
+      const currY = p.y;
+      let nextX = currX;
+      let nextY = currY;
 
-      // Color coding based on wind speed
-      if (speed > 25) {
-        ctx.strokeStyle = "rgba(240, 120, 40, 0.85)";
-      } else if (speed > 15) {
-        ctx.strokeStyle = "rgba(230, 210, 50, 0.8)";
-      } else if (speed > 8) {
-        ctx.strokeStyle = "rgba(100, 210, 140, 0.75)";
-      } else {
-        ctx.strokeStyle = "rgba(100, 180, 255, 0.65)";
+      if (hasProject) {
+        const nextPt = map.project([nextLng, nextLat]);
+        if (nextPt) {
+          nextX = nextPt.x;
+          nextY = nextPt.y;
+        }
       }
 
-      ctx.beginPath();
-      ctx.moveTo(currPt.x, currPt.y);
-      ctx.lineTo(nextPt.x, nextPt.y);
-      ctx.stroke();
+      // Bucket line segment by wind speed
+      const bIdx = speed > 25 ? 3 : (speed > 15 ? 2 : (speed > 8 ? 1 : 0));
+      const bArr = bucketLines[bIdx];
+      bArr.push(currX, currY, nextX, nextY);
 
       p.lng = nextLng;
       p.lat = nextLat;
-      p.x = nextPt.x;
-      p.y = nextPt.y;
+      p.x = nextX;
+      p.y = nextY;
       p.age++;
 
       if (
@@ -219,6 +269,20 @@ export function renderWindStreamlines(map, gridData, options = {}) {
       ) {
         resetParticle(p);
       }
+    }
+
+    // Batch stroke calls into 4 buckets instead of 1,200+ separate draw calls (§8.8.2)
+    for (let b = 0; b < 4; b++) {
+      const bArr = bucketLines[b];
+      const len = bArr.length;
+      if (len === 0) continue;
+      ctx.strokeStyle = STROKE_COLORS[b];
+      ctx.beginPath();
+      for (let i = 0; i < len; i += 4) {
+        ctx.moveTo(bArr[i], bArr[i + 1]);
+        ctx.lineTo(bArr[i + 2], bArr[i + 3]);
+      }
+      ctx.stroke();
     }
   }
 
@@ -247,13 +311,31 @@ export function renderWindStreamlines(map, gridData, options = {}) {
 
   animate();
 
-  const onMove = () => {
-    resize();
-    for (const p of particles) {
-      if (p.lng !== undefined && p.lat !== undefined && typeof map.project === "function") {
+  // Throttle map move re-projection to at most once per animation frame (§8.8.2)
+  let moveAnimPending = false;
+  const updateParticlePositions = () => {
+    moveAnimPending = false;
+    map._windMoveAnimId = null;
+    if (typeof map.project !== "function") return;
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      if (p.lng !== undefined && p.lat !== undefined) {
         const pt = map.project([p.lng, p.lat]);
-        p.x = pt.x;
-        p.y = pt.y;
+        if (pt) {
+          p.x = pt.x;
+          p.y = pt.y;
+        }
+      }
+    }
+  };
+
+  const onMove = () => {
+    if (!moveAnimPending) {
+      moveAnimPending = true;
+      if (typeof requestAnimationFrame === "function") {
+        map._windMoveAnimId = requestAnimationFrame(updateParticlePositions);
+      } else {
+        updateParticlePositions();
       }
     }
   };
@@ -272,6 +354,10 @@ export function stopWindAnimation(map = null) {
     if (map._windAnimId) {
       if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(map._windAnimId);
       map._windAnimId = null;
+    }
+    if (map._windMoveAnimId) {
+      if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(map._windMoveAnimId);
+      map._windMoveAnimId = null;
     }
     if (map._windStreamlineMoveListener && typeof map.off === "function") {
       map.off("move", map._windStreamlineMoveListener);
@@ -352,11 +438,14 @@ export function renderGridWindBarbs(map, gridData) {
     return [uVal, vVal];
   }
 
-  function draw() {
+  let w = 800;
+  let h = 600;
+
+  function updateDimensions() {
     if (!container) return;
     const rect = container.getBoundingClientRect ? container.getBoundingClientRect() : { width: 800, height: 600 };
-    const w = Math.round(rect.width) || 800;
-    const h = Math.round(rect.height) || 600;
+    w = Math.round(rect.width) || 800;
+    h = Math.round(rect.height) || 600;
     const targetW = Math.round(w * dpr);
     const targetH = Math.round(h * dpr);
 
@@ -364,6 +453,12 @@ export function renderGridWindBarbs(map, gridData) {
       barbCanvas.width = targetW;
       barbCanvas.height = targetH;
     }
+  }
+  updateDimensions();
+
+  // 4 color buckets for barbs: 0: <=8, 1: 8-15, 2: 15-25, 3: >25 (§8.8.2)
+  function draw() {
+    if (!container) return;
     const ctx = barbCanvas.getContext("2d");
     if (!ctx || typeof ctx.clearRect !== "function") return;
 
@@ -373,11 +468,13 @@ export function renderGridWindBarbs(map, gridData) {
     ctx.clearRect(0, 0, w, h);
 
     const step = 48; // Screen grid spacing for barbs (§8.8.2)
+    const hasUnproject = typeof map.unproject === "function";
+    if (!hasUnproject) return;
 
     for (let sx = step / 2; sx < w; sx += step) {
       for (let sy = step / 2; sy < h; sy += step) {
-        if (typeof map.unproject !== "function") continue;
         const lngLat = map.unproject([sx, sy]);
+        if (!lngLat) continue;
         const vel = sampleWind(lngLat.lng, lngLat.lat);
         if (!vel) continue;
         const [uVal, vVal] = vel;
@@ -464,21 +561,62 @@ export function renderGridWindBarbs(map, gridData) {
     }
   }
 
+  // Throttle draw on map move to at most once per animation frame (§8.8.2)
+  let barbAnimPending = false;
+  const throttledDraw = () => {
+    if (barbAnimPending) return;
+    barbAnimPending = true;
+    if (typeof requestAnimationFrame === "function") {
+      map._windBarbAnimId = requestAnimationFrame(() => {
+        barbAnimPending = false;
+        map._windBarbAnimId = null;
+        draw();
+      });
+    } else {
+      barbAnimPending = false;
+      draw();
+    }
+  };
+
+  const onMoveEnd = () => {
+    throttledDraw();
+  };
+
+  const onResize = () => {
+    updateDimensions();
+    throttledDraw();
+  };
+
   draw();
 
-  map._windBarbMoveListener = draw;
+  map._windBarbMoveListener = throttledDraw;
+  map._windBarbMoveEndListener = onMoveEnd;
+  map._windBarbResizeListener = onResize;
+
   if (typeof map.on === "function") {
-    map.on("move", draw);
-    map.on("resize", draw);
+    map.on("move", throttledDraw);
+    map.on("moveend", onMoveEnd);
+    map.on("resize", onResize);
   }
 }
 
 export function removeGridWindBarbs(map = null) {
   if (map) {
+    if (map._windBarbAnimId) {
+      if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(map._windBarbAnimId);
+      map._windBarbAnimId = null;
+    }
     if (map._windBarbMoveListener && typeof map.off === "function") {
       map.off("move", map._windBarbMoveListener);
-      map.off("resize", map._windBarbMoveListener);
       map._windBarbMoveListener = null;
+    }
+    if (map._windBarbMoveEndListener && typeof map.off === "function") {
+      map.off("moveend", map._windBarbMoveEndListener);
+      map._windBarbMoveEndListener = null;
+    }
+    if (map._windBarbResizeListener && typeof map.off === "function") {
+      map.off("resize", map._windBarbResizeListener);
+      map._windBarbResizeListener = null;
     }
     const canvas = map.getContainer ? map.getContainer()?.querySelector(".wind-barb-canvas") : null;
     if (canvas) {
