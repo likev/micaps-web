@@ -4,6 +4,44 @@ import * as pmtiles from "pmtiles";
 import { getPMTilesStyle, applyBasemapScheme, getBasemapScheme } from "./pmtilesLayers.js";
 import { addGraticuleLayers, updateGraticuleScheme } from "./graticule.js";
 
+/**
+ * Disarms MapLibre GL v5's internal ProjectionErrorMeasurement subsystem.
+ *
+ * In MapLibre GL JS v5.x (Globe & Vertical-Perspective projections), ProjectionErrorMeasurement
+ * runs an offscreen 1x1 GPU readback loop using a WebGL2 PIXEL_PACK_BUFFER (STREAM_READ) and fenceSync
+ * to calibrate GPU atan() inaccuracies. On modern browsers (Chrome/Edge ANGLE), rapid re-renders or frame
+ * pauses cause subsequent writes into the PBO before the previous fence is read back, invalidating
+ * the driver's readback staging shadow copy and emitting:
+ *   "performance warning: READ-usage buffer was written, then fenced, but written again before being read back.
+ *    This discarded the shadow copy that was created to accelerate readback."
+ * (Tracked in MapLibre Issue #7872 and removed upstream in PR #7916).
+ *
+ * Disarming updateGPUdependent prevents PBO allocation, fence leaks, and shadow-copy invalidation.
+ */
+export function disarmProjectionErrorMeasurement(projection) {
+  if (!projection) return;
+  if (typeof projection.updateGPUdependent === "function") {
+    projection.updateGPUdependent = () => {};
+  }
+  if (projection._verticalPerspectiveProjection) {
+    disarmProjectionErrorMeasurement(projection._verticalPerspectiveProjection);
+  }
+  const proto = Object.getPrototypeOf(projection);
+  if (proto && typeof proto.updateGPUdependent === "function") {
+    proto.updateGPUdependent = () => {};
+  }
+}
+
+// Auto-patch MapLibre Style prototype once on import
+if (typeof maplibregl !== "undefined" && maplibregl?.Style?.prototype?._setProjectionInternal) {
+  const origSetProjectionInternal = maplibregl.Style.prototype._setProjectionInternal;
+  maplibregl.Style.prototype._setProjectionInternal = function (name) {
+    const res = origSetProjectionInternal.call(this, name);
+    disarmProjectionErrorMeasurement(this.projection);
+    return res;
+  };
+}
+
 let protocolRegistered = false;
 let activeMap = null;
 
@@ -94,6 +132,12 @@ export function createMapInstance(containerIdOrEl, options = {}) {
     addGraticuleLayers(mapInstance, schemeName);
   });
 
+  mapInstance.on("styledata", () => {
+    if (mapInstance.style?.projection) {
+      disarmProjectionErrorMeasurement(mapInstance.style.projection);
+    }
+  });
+
   // expose scheme and projection helpers on instance
   mapInstance.__basemapScheme = schemeName;
   mapInstance.__mapProjection = projectionType;
@@ -134,6 +178,9 @@ export function setMapProjection(map, projectionType) {
     try {
       if (typeof m.setProjection === "function") {
         m.setProjection({ type: proj });
+        if (m.style?.projection) {
+          disarmProjectionErrorMeasurement(m.style.projection);
+        }
         m.__mapProjection = proj;
         if (typeof m.triggerRepaint === "function") m.triggerRepaint();
         if (typeof m.fire === "function") m.fire("move");

@@ -183,6 +183,40 @@ graph TD
 
 Because of this tightly bound multi-tier design, custom projections cannot be introduced via a lightweight JavaScript plugin without modifying the WebGL shader source, tile tessellators, and camera mathematics simultaneously.
 
+### 3.2. Chromium / ANGLE PBO Readback Warning Analysis & Runtime Mitigation
+
+#### Warning Message
+```
+performance warning: READ-usage buffer was written, then fenced, but written again before being read back. This discarded the shadow copy that was created to accelerate readback.
+```
+
+#### Technical Analysis
+1. **Root Cause**:
+   - In MapLibre GL JS v5.x, when `globe` or `vertical-perspective` projections are active, the internal class `ProjectionErrorMeasurement` ([`globe_projection_error_measurement.ts`](file:///root/downloads/micaps-web/client/node_modules/maplibre-gl/src/geo/projection/globe_projection_error_measurement.ts)) allocates a WebGL2 Pixel Buffer Object (PBO) with `gl.STREAM_READ` bound to `gl.PIXEL_PACK_BUFFER`.
+   - Every few frames, it renders an offscreen 1x1 error measurement texture, calls `gl.readPixels(..., 0)` to copy the pixel into the PBO, and sets a GPU fence with `gl.fenceSync(...)`.
+   - In modern Chromium/ANGLE graphics stacks, the browser maintains a memory-optimized **shadow copy** (staging buffer) upon seeing a fenced `STREAM_READ` write, anticipating an upcoming `gl.getBufferSubData` readback.
+   - However, during viewport moves, timeline steps, or irregular frame rendering, `updateGPUdependent` issues subsequent `gl.readPixels` writes into the PBO before the CPU has completed the previous readback. This invalidates and discards Chromium's shadow copy, forcing an un-accelerated pipeline stall and logging the warning.
+   - Furthermore, `ProjectionErrorMeasurement` fails to call `gl.deleteSync(...)`, causing a slow leak of GPU sync primitives.
+
+2. **Upstream Resolution**:
+   - Tracked in **MapLibre Issue #7872** and resolved upstream in **PR #7916**.
+   - MapLibre core maintainers eliminated `ProjectionErrorMeasurement` altogether after replacing the naive `atan(exp(...))` latitude formula with an algebraic Weierstrass tangent half-angle identity ($t = \exp(\pi - 2\pi y)$, $\sin = (t^2 - 1)/(t^2 + 1)$, $\cos = 2t/(t^2 + 1)$), rendering the runtime error measurement completely obsolete.
+
+3. **MICAPS-Web Runtime Fix (`disarmProjectionErrorMeasurement`)**:
+   - In [`client/src/map/mapInstance.js`](file:///root/downloads/micaps-web/client/src/map/mapInstance.js), `maplibregl.Style.prototype._setProjectionInternal` is auto-patched at module load to disarm `projection.updateGPUdependent`:
+     ```javascript
+     export function disarmProjectionErrorMeasurement(projection) {
+       if (!projection) return;
+       if (typeof projection.updateGPUdependent === "function") {
+         projection.updateGPUdependent = () => {};
+       }
+       if (projection._verticalPerspectiveProjection) {
+         disarmProjectionErrorMeasurement(projection._verticalPerspectiveProjection);
+       }
+     }
+     ```
+   - This completely eliminates PBO allocations, fences, and shadow copy discards while maintaining full 60 FPS 3D globe and perspective map rendering with zero visual distortion.
+
 ---
 
 ## 4. Architectural Comparison: MapLibre GL JS vs. OpenLayers

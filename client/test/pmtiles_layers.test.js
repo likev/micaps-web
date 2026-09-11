@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { BASEMAP_SCHEMES, getPMTilesStyle, getBasemapScheme, applyBasemapScheme } from "../src/map/pmtilesLayers.js";
-import { resolvePMTilesUrl, MAP_PROJECTIONS, resolveInitialProjection, setMapProjection, getMapProjection } from "../src/map/mapInstance.js";
+import { resolvePMTilesUrl, MAP_PROJECTIONS, resolveInitialProjection, setMapProjection, getMapProjection, disarmProjectionErrorMeasurement } from "../src/map/mapInstance.js";
 
 describe("Multi-Tier Vector Basemap (World / China / Province / City / County)", () => {
   test("BASEMAP_SCHEMES defines complete 5-tier styles for dark, light, and micaps", () => {
@@ -183,4 +183,28 @@ describe("Map Projection Configuration & Selection (Mercator / Globe / Vertical-
     expect(appliedProjection).toEqual({ type: "mercator" });
     expect(getMapProjection(mockMap)).toBe("mercator");
   });
+
+  test("disarmProjectionErrorMeasurement replaces updateGPUdependent with no-op on projection and nested projections", () => {
+    let mockCalled = false;
+    const mockProjection = {
+      updateGPUdependent: () => { mockCalled = true; },
+      _verticalPerspectiveProjection: {
+        updateGPUdependent: () => { mockCalled = true; },
+      },
+    };
+
+    disarmProjectionErrorMeasurement(mockProjection);
+    mockProjection.updateGPUdependent();
+    mockProjection._verticalPerspectiveProjection.updateGPUdependent();
+
+    expect(mockCalled).toBe(false);
+    expect(typeof mockProjection.updateGPUdependent).toBe("function");
+    expect(typeof mockProjection._verticalPerspectiveProjection.updateGPUdependent).toBe("function");
+
+    // Null and undefined safety
+    expect(() => disarmProjectionErrorMeasurement(null)).not.toThrow();
+    expect(() => disarmProjectionErrorMeasurement(undefined)).not.toThrow();
+    expect(() => disarmProjectionErrorMeasurement({})).not.toThrow();
+  });
 });
+
