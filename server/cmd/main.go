@@ -73,7 +73,7 @@ func main() {
 	mux.HandleFunc("/api/data/grid/binary", gridH.BinaryHandler)
 	mux.HandleFunc("/api/data/station", statH.StationGeoJSONHandler)
 
-	// Map and PMTiles route
+	// Map and PMTiles route (serves configured PMTiles file, defaulting to map-china.pmtiles)
 	mux.HandleFunc("/map-china.pmtiles", staticH.PMTilesHandler)
 
 	// SPA fallback

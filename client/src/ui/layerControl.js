@@ -63,6 +63,7 @@ function createDefaultLayers(winId = "default") {
       isExpanded: false,
       config: {
         showGraticule: true,
+        showWorld: true,
         showProvinces: true,
         showCities: true,
         scheme: resolveDefaultScheme(),
@@ -555,6 +556,7 @@ function renderLayersManager(panel) {
 
       [
         [".chk-basemap-graticule", "showGraticule"],
+        [".chk-basemap-world", "showWorld"],
         [".chk-basemap-provinces", "showProvinces"],
         [".chk-basemap-cities", "showCities"],
       ].forEach(([sel, key]) => bindBasemapCheckbox(sel, key));
@@ -803,6 +805,12 @@ function renderLayerRow(layer) {
               <label>
                 <input type="checkbox" class="chk-basemap-graticule" ${layer.config?.showGraticule !== false ? "checked" : ""} />
                 <span>10° Lon/Lat Graticule Lines</span>
+              </label>
+            </div>
+            <div class="config-row">
+              <label>
+                <input type="checkbox" class="chk-basemap-world" ${layer.config?.showWorld !== false ? "checked" : ""} />
+                <span>World Country Boundaries</span>
               </label>
             </div>
             <div class="config-row">

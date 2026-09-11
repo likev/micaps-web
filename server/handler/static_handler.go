@@ -19,27 +19,42 @@ type StaticHandler struct {
 	Cfg *config.Config
 }
 
-// PMTilesHandler serves map-china.pmtiles supporting HTTP 206 Range requests
+// PMTilesHandler serves PMTiles files (*.pmtiles) supporting HTTP 206 Range requests
 func (h *StaticHandler) PMTilesHandler(w http.ResponseWriter, r *http.Request) {
-	pmtilesFile := h.Cfg.PMTilesPath
-	if _, err := os.Stat(pmtilesFile); os.IsNotExist(err) {
+	requestedFile := filepath.Base(r.URL.Path)
+	if requestedFile == "" || requestedFile == "." || requestedFile == "/" || !strings.HasSuffix(requestedFile, ".pmtiles") {
+		requestedFile = "map-china.pmtiles"
+	}
+
+	var pmtilesFile string
+	// If the standard map-china.pmtiles is requested (or filename matches configured path), serve configured PMTilesPath
+	if requestedFile == "map-china.pmtiles" || filepath.Base(h.Cfg.PMTilesPath) == requestedFile {
+		if _, err := os.Stat(h.Cfg.PMTilesPath); err == nil {
+			pmtilesFile = h.Cfg.PMTilesPath
+		}
+	}
+
+	if pmtilesFile == "" {
+		baseDir := filepath.Dir(h.Cfg.PMTilesPath)
 		candidates := []string{
-			"client/map/map-china.pmtiles",
-			"../client/map/map-china.pmtiles",
-			"map/map-china.pmtiles",
-			"client/public/map-china.pmtiles",
-			"../client/public/map-china.pmtiles",
-			filepath.Join(h.Cfg.StaticDir, "map-china.pmtiles"),
-			"client/dist/map-china.pmtiles",
-			"../client/dist/map-china.pmtiles",
-			"map-china.pmtiles",
+			filepath.Join(baseDir, requestedFile),
+			filepath.Join("client/map", requestedFile),
+			filepath.Join("../client/map", requestedFile),
+			filepath.Join("map", requestedFile),
+			filepath.Join("client/public", requestedFile),
+			filepath.Join("../client/public", requestedFile),
+			filepath.Join(h.Cfg.StaticDir, requestedFile),
+			filepath.Join("client/dist", requestedFile),
+			filepath.Join("../client/dist", requestedFile),
+			requestedFile,
+			h.Cfg.PMTilesPath,
 		}
 		if exePath, err := os.Executable(); err == nil {
 			exeDir := filepath.Dir(exePath)
 			candidates = append([]string{
-				filepath.Join(exeDir, "map", "map-china.pmtiles"),
-				filepath.Join(exeDir, "client", "map", "map-china.pmtiles"),
-				filepath.Join(exeDir, "map-china.pmtiles"),
+				filepath.Join(exeDir, "map", requestedFile),
+				filepath.Join(exeDir, "client", "map", requestedFile),
+				filepath.Join(exeDir, requestedFile),
 			}, candidates...)
 		}
 		for _, alt := range candidates {
@@ -48,6 +63,11 @@ func (h *StaticHandler) PMTilesHandler(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 		}
+	}
+
+	if pmtilesFile == "" {
+		http.NotFound(w, r)
+		return
 	}
 
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -172,6 +192,12 @@ func (h *StaticHandler) SPAHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// If requesting *.pmtiles, delegate to PMTilesHandler for HTTP 206 Range support
+	if strings.HasSuffix(r.URL.Path, ".pmtiles") {
+		h.PMTilesHandler(w, r)
+		return
+	}
+
 	distDir := h.Cfg.StaticDir
 	path := filepath.Join(distDir, filepath.Clean(r.URL.Path))
 
@@ -218,4 +244,3 @@ func (h *StaticHandler) SPAHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(`<!DOCTYPE html><html><head><title>MICAPS-Web</title></head><body><h1>MICAPS-Web Server Running</h1><p>Client build in progress or available at Vite dev server.</p></body></html>`))
 }
-

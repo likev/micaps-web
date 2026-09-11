@@ -31,10 +31,24 @@ export function resolveInitialBasemapScheme() {
   return "dark";
 }
 
+export function resolvePMTilesUrl(url) {
+  const origin = typeof window !== "undefined" && window.location ? window.location.origin : "http://localhost:8088";
+  if (typeof url !== "string" || !url.trim()) return `${origin}/map-china.pmtiles`;
+  const clean = url.trim();
+  if (clean.startsWith("http://") || clean.startsWith("https://")) {
+    return clean;
+  }
+  if (clean.startsWith("/")) {
+    return `${origin}${clean}`;
+  }
+  const filename = clean.endsWith(".pmtiles") ? clean : `${clean}.pmtiles`;
+  return `${origin}/${filename}`;
+}
+
 export function createMapInstance(containerIdOrEl, options = {}) {
   ensurePMTilesProtocol();
 
-  const pmtilesUrl = `${window.location.origin}/map-china.pmtiles`;
+  const pmtilesUrl = resolvePMTilesUrl(options.pmtilesUrl);
   const schemeName = options.scheme || options.basemapScheme || resolveInitialBasemapScheme();
 
   const mapInstance = new maplibregl.Map({

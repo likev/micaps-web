@@ -88,13 +88,16 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
       }
     } else if (layer.type === "pmtiles") {
       const showGraticule = value && (layer.config?.showGraticule !== false);
+      const showWorld = value && (layer.config?.showWorld !== false);
       const showProvinces = value && (layer.config?.showProvinces !== false);
       const showCities = value && (layer.config?.showCities !== false);
 
+      const worldLayers = ["world-fill", "world-boundary"];
       const chinaLayers = ["china-fill", "china-boundary"];
       const provLayers = ["provinces-bg-fill", "provinces-boundary", "provinces-fill", "provinces-detail-boundary"];
       const cityLayers = ["citys-fill", "citys-boundary", "county-fill", "county-boundary"];
 
+      worldLayers.forEach((id) => { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", showWorld ? "visible" : "none"); });
       chinaLayers.forEach((id) => { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", value ? "visible" : "none"); });
       provLayers.forEach((id) => { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", showProvinces ? "visible" : "none"); });
       cityLayers.forEach((id) => { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", showCities ? "visible" : "none"); });
@@ -127,6 +130,12 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
         if (map.getLayer("graticule-lines")) {
           map.setLayoutProperty("graticule-lines", "visibility", (layer.visible && value.showGraticule !== false) ? "visible" : "none");
         }
+      }
+      if (value.showWorld !== undefined) {
+        const worldLayers = ["world-fill", "world-boundary"];
+        worldLayers.forEach((id) => {
+          if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", (layer.visible && value.showWorld !== false) ? "visible" : "none");
+        });
       }
       if (value.showProvinces !== undefined) {
         const provLayers = ["provinces-bg-fill", "provinces-boundary", "provinces-fill", "provinces-detail-boundary"];

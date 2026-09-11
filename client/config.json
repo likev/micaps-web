@@ -3,7 +3,8 @@
     "scheme": "dark",
     "showCities": false,
     "showGraticule": false,
-    "showProvinces": false
+    "showProvinces": false,
+    "showWorld": true
   },
   "performance": {
     "maxEffectiveCells": 50000

@@ -9,6 +9,7 @@ export const BASEMAP_SCHEMES = {
     name: "Midnight Slate",
     background: "#0a0f19",
     fills: {
+      world: "#101622",
       china: "#121927",
       provincesBoundary: "#131b2a",
       provinces: "#151e2f",
@@ -17,6 +18,7 @@ export const BASEMAP_SCHEMES = {
     },
     fillOpacity: 0.85,
     boundaries: {
+      world: { color: "#334155", width: 0.85, opacity: 0.70 },
       china: { color: "#cbd5e1", width: 1.5, opacity: 0.96 },
       provinces: { color: "#94a3b8", width: 1.15, opacity: 0.88 },
       provincesDetail: { color: "#8193aa", width: 1.0, opacity: 0.85 },
@@ -30,6 +32,7 @@ export const BASEMAP_SCHEMES = {
     name: "Daybreak Neutral",
     background: "#e2e8f0",
     fills: {
+      world: "#f1f5f9",
       china: "#f8fafc",
       provincesBoundary: "#f4f7fa",
       provinces: "#f1f5f9",
@@ -38,6 +41,7 @@ export const BASEMAP_SCHEMES = {
     },
     fillOpacity: 1.0,
     boundaries: {
+      world: { color: "#94a3b8", width: 0.85, opacity: 0.75 },
       china: { color: "#1e293b", width: 1.5, opacity: 0.95 },
       provinces: { color: "#475569", width: 1.15, opacity: 0.88 },
       provincesDetail: { color: "#556880", width: 1.0, opacity: 0.85 },
@@ -51,6 +55,7 @@ export const BASEMAP_SCHEMES = {
     name: "MICAPS Classic",
     background: "#09111e",
     fills: {
+      world: "#0b1626",
       china: "#0f1b2e",
       provincesBoundary: "#101e33",
       provinces: "#13233c",
@@ -59,6 +64,7 @@ export const BASEMAP_SCHEMES = {
     },
     fillOpacity: 0.85,
     boundaries: {
+      world: { color: "#1e3a5f", width: 0.85, opacity: 0.75 },
       china: { color: "#f8fafc", width: 1.6, opacity: 0.98 },
       provinces: { color: "#38bdf8", width: 1.15, opacity: 0.92 },
       provincesDetail: { color: "#38bdf8", width: 1.0, opacity: 0.90 },
@@ -95,6 +101,17 @@ export function getPMTilesStyle(pmtilesUrl, schemeName = "dark") {
         type: "background",
         paint: {
           "background-color": scheme.background,
+        },
+      },
+      // --- Level 0: World Land Fills (Base land underneath admin layers) ---
+      {
+        id: "world-fill",
+        type: "fill",
+        source: "china-vector",
+        "source-layer": "world",
+        paint: {
+          "fill-color": scheme.fills.world,
+          "fill-opacity": scheme.fillOpacity,
         },
       },
       // --- Level 1: National (z0 - z1) ---
@@ -154,7 +171,19 @@ export function getPMTilesStyle(pmtilesUrl, schemeName = "dark") {
           "fill-opacity": scheme.fillOpacity,
         },
       },
-      // --- Boundaries: weight/color strictly decreasing country > province > city > county ---
+      // --- Boundaries: Painter's Algorithm stack (World < County < City < Province < National) ---
+      {
+        id: "world-boundary",
+        type: "line",
+        source: "china-vector",
+        "source-layer": "world",
+        paint: {
+          "line-color": scheme.boundaries.world.color,
+          "line-width": scheme.boundaries.world.width,
+          "line-opacity": scheme.boundaries.world.opacity,
+          ...(scheme.boundaries.world.dasharray ? { "line-dasharray": scheme.boundaries.world.dasharray } : {}),
+        },
+      },
       {
         id: "county-boundary",
         type: "line",
@@ -228,8 +257,9 @@ export function applyBasemapScheme(map, schemeName) {
   }
 
   const fillUpdates = [
+    ["world-fill", scheme.fills.world],
     ["china-fill", scheme.fills.china],
-    ["provinces-bg-fill", scheme.fills.provincesBoundary],
+    ["provinces-bg-fill", scheme.fills.provincesBoundary || scheme.fills.provinces],
     ["provinces-fill", scheme.fills.provinces],
     ["citys-fill", scheme.fills.citys],
     ["county-fill", scheme.fills.county],
@@ -242,6 +272,7 @@ export function applyBasemapScheme(map, schemeName) {
   }
 
   const lineUpdates = [
+    ["world-boundary", scheme.boundaries.world],
     ["county-boundary", scheme.boundaries.county],
     ["citys-boundary", scheme.boundaries.city],
     ["provinces-detail-boundary", scheme.boundaries.provincesDetail],
@@ -253,6 +284,9 @@ export function applyBasemapScheme(map, schemeName) {
     map.setPaintProperty(layerId, "line-color", cfg.color);
     map.setPaintProperty(layerId, "line-width", cfg.width);
     if (cfg.opacity !== undefined) map.setPaintProperty(layerId, "line-opacity", cfg.opacity);
+    if (cfg.dasharray !== undefined) {
+      map.setPaintProperty(layerId, "line-dasharray", cfg.dasharray);
+    }
   }
 
   if (map.getLayer("graticule-lines")) {
