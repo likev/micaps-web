@@ -224,14 +224,19 @@ export function cropGridValues(gridData, cropIdx, step = 1) {
 
   // 3. Build 2D matrix Z[latIndex][lonIndex]
   const is2D = Array.isArray(values) && Array.isArray(values[0]);
-  const Z = [];
+  const numCols = Math.floor((iMax - iMin) / s) + 1;
+  const numRows = Math.floor((jMax - jMin) / s) + 1;
+  const Z = new Array(numRows);
+  let rowIdx = 0;
   for (let j = jMin; j <= jMax; j += s) {
-    const row = [];
+    const row = new Array(numCols);
+    const rowValues = is2D ? values[j] : null;
+    const rowOffset = is2D ? 0 : j * nLon;
+    let colIdx = 0;
     for (let i = iMin; i <= iMax; i += s) {
-      const v = is2D ? values[j][i] : values[j * nLon + i];
-      row.push(v);
+      row[colIdx++] = is2D ? rowValues[i] : values[rowOffset + i];
     }
-    Z.push(row);
+    Z[rowIdx++] = row;
   }
 
   // 4. Normalize latitude to ascending order for Marching Squares

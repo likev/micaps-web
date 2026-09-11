@@ -1,5 +1,5 @@
 // rasterLayer.js - Zero-copy Float32Array streaming to Canvas & MapLibre raster image (§8.8.3)
-import { getColor } from "../utils/colormaps.js";
+import { getColor, createColorResolver } from "../utils/colormaps.js";
 
 // Active Blob URL tracking per raster source for memory leak prevention (§8.8.3)
 const activeObjectUrls = new Map(); // rasterSrcId -> objectUrl string
@@ -167,6 +167,20 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
   const isDescendingLat = slat > elat; // True if data row 0 is North
   const latSpanRaw = topLatRaw - bottomLatRaw || 1;
 
+  const resolveColor = createColorResolver(element, colormap, zMin, zMax);
+
+  // Precompute X source column lookup table to eliminate 800,000x redundant division, multiplication, and clamp in inner loop
+  const srcColLookup = new Int32Array(outWidth);
+  if (outWidth === nlon) {
+    for (let i = 0; i < outWidth; i++) srcColLookup[i] = i;
+  } else {
+    const colScale = (nlon - 1) / (outWidth - 1);
+    const maxCol = nlon - 1;
+    for (let i = 0; i < outWidth; i++) {
+      srcColLookup[i] = Math.max(0, Math.min(maxCol, Math.round(i * colScale)));
+    }
+  }
+
   // Reproject rows from Plate Carrée (EPSG:4326) to Web Mercator (EPSG:3857) so MapLibre quad texture aligns exactly
   for (let j = 0; j < outHeight; j++) {
     const yMerc = yTop - ((j + 0.5) / outHeight) * ySpan;
@@ -183,19 +197,29 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
     const r0 = Math.max(0, Math.min(nlat - 1, Math.floor(rowFrac)));
     const r1 = Math.max(0, Math.min(nlat - 1, Math.ceil(rowFrac)));
     const ry = rowFrac - r0;
+    const sameRow = r0 === r1 || ry === 0;
 
-    for (let i = 0; i < outWidth; i++) {
-      const dstIdx = (j * outWidth + i) * 4;
-      const srcCol = outWidth === nlon ? i : Math.max(0, Math.min(nlon - 1, Math.round((i / (outWidth - 1)) * (nlon - 1))));
+    // Hoist row array references and row offsets out of inner loop
+    const rowOffset0 = is2D ? 0 : r0 * nlon;
+    const rowOffset1 = is2D ? 0 : r1 * nlon;
+    const rowValues0 = is2D ? floatValues[r0] : null;
+    const rowValues1 = is2D ? floatValues[r1] : null;
+    const w0 = 1 - ry;
+    const w1 = ry;
+
+    let dstIdx = j * outWidth * 4;
+
+    for (let i = 0; i < outWidth; i++, dstIdx += 4) {
+      const srcCol = srcColLookup[i];
 
       let val;
-      if (r0 === r1 || ry === 0) {
-        val = is2D ? floatValues[r0][srcCol] : floatValues[r0 * nlon + srcCol];
+      if (sameRow) {
+        val = is2D ? rowValues0[srcCol] : floatValues[rowOffset0 + srcCol];
       } else {
-        const v0 = is2D ? floatValues[r0][srcCol] : floatValues[r0 * nlon + srcCol];
-        const v1 = is2D ? floatValues[r1][srcCol] : floatValues[r1 * nlon + srcCol];
+        const v0 = is2D ? rowValues0[srcCol] : floatValues[rowOffset0 + srcCol];
+        const v1 = is2D ? rowValues1[srcCol] : floatValues[rowOffset1 + srcCol];
         if (v0 !== undefined && v1 !== undefined && !isNaN(v0) && !isNaN(v1) && v0 > -9900 && v1 > -9900) {
-          val = v0 * (1 - ry) + v1 * ry;
+          val = v0 * w0 + v1 * w1;
         } else {
           val = v0 !== undefined && v0 > -9900 ? v0 : v1;
         }
@@ -204,11 +228,7 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
       if (val === undefined || val === null || isNaN(val) || val < -9900) {
         data[dstIdx + 3] = 0; // Transparent
       } else {
-        const [r, g, b, a] = getColor(val, element, colormap, zMin, zMax);
-        data[dstIdx] = r;
-        data[dstIdx + 1] = g;
-        data[dstIdx + 2] = b;
-        data[dstIdx + 3] = a;
+        resolveColor(val, data, dstIdx);
       }
     }
   }

@@ -506,6 +506,57 @@ export function matchesStationFilters(p, cfg) {
   return res1 && res2;
 }
 
+/**
+ * Pre-compiles station filter configuration once per frame to eliminate
+ * redundant array allocations and repeated Number() parsing for thousands of stations.
+ */
+export function compileStationFilter(cfg) {
+  if (!cfg) return () => true;
+
+  if (Array.isArray(cfg.filterRules)) {
+    const active = [];
+    for (let i = 0; i < cfg.filterRules.length; i++) {
+      const r = cfg.filterRules[i];
+      if (r && r.field && r.field !== "none" && r.val !== undefined && r.val !== null && r.val !== "") {
+        const numVal = Number(r.val);
+        if (!isNaN(numVal)) {
+          active.push({
+            field: r.field,
+            op: r.op || ">",
+            val: numVal,
+            val2: r.val2 !== undefined && r.val2 !== null && r.val2 !== "" ? Number(r.val2) : undefined,
+          });
+        }
+      }
+    }
+
+    if (active.length === 0) return () => true;
+
+    const logic = (cfg.filterLogic || "AND").toUpperCase();
+    if (logic === "NONE") {
+      const r0 = active[0];
+      return (p) => evaluateSingleRule(p, r0);
+    }
+    if (logic === "OR") {
+      return (p) => {
+        for (let i = 0; i < active.length; i++) {
+          if (evaluateSingleRule(p, active[i])) return true;
+        }
+        return false;
+      };
+    }
+    return (p) => {
+      for (let i = 0; i < active.length; i++) {
+        if (!evaluateSingleRule(p, active[i])) return false;
+      }
+      return true;
+    };
+  }
+
+  return (p) => matchesStationFilters(p, cfg);
+}
+
+
 // ----------------------------------------------------------------------------
 // Direct Canvas 2D Overlay Rendering Methods
 // ----------------------------------------------------------------------------
@@ -743,7 +794,6 @@ export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0)
   if (showCloud) {
     drawSkyCoverCanvas(ctx, cx, cy, cloudCover, scale);
   } else {
-    ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, 2.5 * scale, 0, Math.PI * 2);
     ctx.fillStyle = "#e3b341";
@@ -751,13 +801,11 @@ export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0)
     ctx.strokeStyle = "#000000";
     ctx.lineWidth = 0.8 * scale;
     ctx.stroke();
-    ctx.restore();
   }
 
-  // Text rendering with high-contrast dark halo
+  // Text rendering with high-contrast dark halo (eliminating 1,800 save/restore context operations)
   function drawPlotText(text, x, y, color, fontSize, align = "left", weight = "700") {
     if (!text) return;
-    ctx.save();
     ctx.font = `${weight} ${Math.round(fontSize * scale)}px 'SF Mono', -apple-system, monospace`;
     ctx.textAlign = align;
     ctx.textBaseline = "middle";
@@ -767,7 +815,6 @@ export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0)
     ctx.strokeText(text, x, y);
     ctx.fillStyle = color;
     ctx.fillText(text, x, y);
-    ctx.restore();
   }
 
   // 3. TT (Temperature) - Top-Left in Bold Red
@@ -854,18 +901,41 @@ export function drawStationCanvas(map) {
   }
 
   const bounds = typeof map.getBounds === "function" ? map.getBounds() : null;
+  let south = -90, north = 90, west = -180, east = 180, fullWorld = false;
+  if (bounds) {
+    south = bounds.getSouth();
+    north = bounds.getNorth();
+    west = bounds.getWest();
+    east = bounds.getEast();
+    fullWorld = (east - west >= 360);
+  }
+
   const curZoom = typeof map.getZoom === "function" ? map.getZoom() : 5;
   const scale = curZoom < 4.5 ? 0.85 : (curZoom < 6.5 ? 1.0 : 1.15);
   state.currentScale = scale;
+
+  // Pre-compile filter rules once outside the feature loop (§8.8)
+  const filterFn = compileStationFilter(state.config);
+  const hasProject = typeof map.project === "function";
 
   // 1. Group in-bounds stations matching filters into 100x100px screen pixel grid bins
   const screenBins = new Map();
   for (const f of state.geojson.features) {
     if (!f.geometry || !Array.isArray(f.geometry.coordinates) || f.geometry.coordinates.length < 2) continue;
     const [lon, lat] = f.geometry.coordinates;
-    if (!isPointInBounds(bounds, lon, lat)) continue;
-    if (!matchesStationFilters(f.properties || {}, state.config)) continue;
-    if (typeof map.project !== "function") continue;
+
+    if (bounds) {
+      if (lat < south - 1.5 || lat > north + 1.5) continue;
+      if (!fullWorld) {
+        let normLon = lon;
+        while (normLon < west) normLon += 360;
+        while (normLon > east) normLon -= 360;
+        if (normLon < west || normLon > east) continue;
+      }
+    }
+
+    if (!filterFn(f.properties || {})) continue;
+    if (!hasProject) continue;
 
     const pt = map.project([lon, lat]);
     if (pt.x < -60 || pt.x > w + 60 || pt.y < -60 || pt.y > h + 60) continue;
@@ -876,34 +946,29 @@ export function drawStationCanvas(map) {
       list = [];
       screenBins.set(binKey, list);
     }
-    list.push({ feature: f, pt, lon, lat });
+    // Precompute stable hash once per station candidate to eliminate repeated string conversions during sort
+    const hash = hashStation(f.properties?.station_id, lon, lat);
+    list.push({ feature: f, pt, lon, lat, hash });
   }
 
   // 2. In each 100x100px screen cell, show at most 5 stations (randomly sampled via stable hash)
   const selectedStations = [];
-  for (const list of screenBins.values()) {
+  const activeBins = new Map();
+  for (const [binKey, list] of screenBins.entries()) {
     if (list.length <= 5) {
+      activeBins.set(binKey, list);
       for (let i = 0; i < list.length; i++) selectedStations.push(list[i]);
     } else {
-      list.sort((a, b) => {
-        const ha = hashStation(a.feature.properties?.station_id, a.lon, a.lat);
-        const hb = hashStation(b.feature.properties?.station_id, b.lon, b.lat);
-        return ha - hb;
-      });
-      for (let i = 0; i < 5; i++) selectedStations.push(list[i]);
+      list.sort((a, b) => a.hash - b.hash);
+      const top5 = list.slice(0, 5);
+      activeBins.set(binKey, top5);
+      for (let i = 0; i < 5; i++) selectedStations.push(top5[i]);
     }
   }
 
-  // 3. Render each station onto the 2D canvas context and index into activeBins
-  const activeBins = new Map();
-  for (const s of selectedStations) {
-    const bKey = `${Math.floor(s.pt.x / 100)},${Math.floor(s.pt.y / 100)}`;
-    let bList = activeBins.get(bKey);
-    if (!bList) {
-      bList = [];
-      activeBins.set(bKey, bList);
-    }
-    bList.push(s);
+  // 3. Render each station onto the 2D canvas context
+  for (let i = 0; i < selectedStations.length; i++) {
+    const s = selectedStations[i];
     renderStationPlotToCanvas(ctx, s.feature.properties || {}, s.pt.x, s.pt.y, state.config, scale);
   }
 

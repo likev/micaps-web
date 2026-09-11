@@ -28,18 +28,19 @@ function chaikinOpenIteration(coords, factor) {
   const n = coords.length;
   if (n < 3) return coords;
 
+  const invFactor = 1 - factor;
   const result = [[coords[0][0], coords[0][1]]];
   for (let i = 0; i < n - 1; i++) {
     const p0 = coords[i];
     const p1 = coords[i + 1];
 
     // Q point: (1 - factor) * P0 + factor * P1 (25% along segment)
-    const qx = (1 - factor) * p0[0] + factor * p1[0];
-    const qy = (1 - factor) * p0[1] + factor * p1[1];
+    const qx = invFactor * p0[0] + factor * p1[0];
+    const qy = invFactor * p0[1] + factor * p1[1];
 
     // R point: factor * P0 + (1 - factor) * P1 (75% along segment)
-    const rx = factor * p0[0] + (1 - factor) * p1[0];
-    const ry = factor * p0[1] + (1 - factor) * p1[1];
+    const rx = factor * p0[0] + invFactor * p1[0];
+    const ry = factor * p0[1] + invFactor * p1[1];
 
     result.push([qx, qy], [rx, ry]);
   }
@@ -62,17 +63,18 @@ function chaikinClosedIteration(coords, factor) {
   // Exclude duplicate closing point for cyclic processing
   const pts = coords.slice(0, n - 1);
   const m = pts.length;
+  const invFactor = 1 - factor;
   const result = [];
 
   for (let i = 0; i < m; i++) {
     const p0 = pts[i];
     const p1 = pts[(i + 1) % m];
 
-    const qx = (1 - factor) * p0[0] + factor * p1[0];
-    const qy = (1 - factor) * p0[1] + factor * p1[1];
+    const qx = invFactor * p0[0] + factor * p1[0];
+    const qy = invFactor * p0[1] + factor * p1[1];
 
-    const rx = factor * p0[0] + (1 - factor) * p1[0];
-    const ry = factor * p0[1] + (1 - factor) * p1[1];
+    const rx = factor * p0[0] + invFactor * p1[0];
+    const ry = factor * p0[1] + invFactor * p1[1];
 
     result.push([qx, qy], [rx, ry]);
   }
@@ -247,39 +249,72 @@ export function smoothGrid2D(Z, iterations = 1, weight = 0.4, rows = null, cols 
         let sumWeights = wCenter;
         let weightedSum = val * wCenter;
 
-        // 4 orthogonal neighbors
-        const sideNeighbors = [
-          [r - 1, c],
-          [r + 1, c],
-          [r, c - 1],
-          [r, c + 1],
-        ];
+        const hasUp = r > 0;
+        const hasDown = r < nRows - 1;
+        const hasLeft = c > 0;
+        const hasRight = c < nCols - 1;
 
-        for (const [nr, nc] of sideNeighbors) {
-          if (nr >= 0 && nr < nRows && nc >= 0 && nc < nCols) {
-            const nVal = current[nr][nc];
-            if (typeof nVal === "number" && !isNaN(nVal) && isFinite(nVal)) {
-              weightedSum += nVal * wSide;
-              sumWeights += wSide;
-            }
+        const rowUp = hasUp ? current[r - 1] : null;
+        const rowDown = hasDown ? current[r + 1] : null;
+        const rowCur = current[r];
+
+        // 4 orthogonal neighbors
+        if (hasUp) {
+          const nVal = rowUp[c];
+          if (typeof nVal === "number" && !isNaN(nVal) && isFinite(nVal)) {
+            weightedSum += nVal * wSide;
+            sumWeights += wSide;
+          }
+        }
+        if (hasDown) {
+          const nVal = rowDown[c];
+          if (typeof nVal === "number" && !isNaN(nVal) && isFinite(nVal)) {
+            weightedSum += nVal * wSide;
+            sumWeights += wSide;
+          }
+        }
+        if (hasLeft) {
+          const nVal = rowCur[c - 1];
+          if (typeof nVal === "number" && !isNaN(nVal) && isFinite(nVal)) {
+            weightedSum += nVal * wSide;
+            sumWeights += wSide;
+          }
+        }
+        if (hasRight) {
+          const nVal = rowCur[c + 1];
+          if (typeof nVal === "number" && !isNaN(nVal) && isFinite(nVal)) {
+            weightedSum += nVal * wSide;
+            sumWeights += wSide;
           }
         }
 
         // 4 diagonal neighbors
-        const diagNeighbors = [
-          [r - 1, c - 1],
-          [r - 1, c + 1],
-          [r + 1, c - 1],
-          [r + 1, c + 1],
-        ];
-
-        for (const [nr, nc] of diagNeighbors) {
-          if (nr >= 0 && nr < nRows && nc >= 0 && nc < nCols) {
-            const nVal = current[nr][nc];
-            if (typeof nVal === "number" && !isNaN(nVal) && isFinite(nVal)) {
-              weightedSum += nVal * wDiag;
-              sumWeights += wDiag;
-            }
+        if (hasUp && hasLeft) {
+          const nVal = rowUp[c - 1];
+          if (typeof nVal === "number" && !isNaN(nVal) && isFinite(nVal)) {
+            weightedSum += nVal * wDiag;
+            sumWeights += wDiag;
+          }
+        }
+        if (hasUp && hasRight) {
+          const nVal = rowUp[c + 1];
+          if (typeof nVal === "number" && !isNaN(nVal) && isFinite(nVal)) {
+            weightedSum += nVal * wDiag;
+            sumWeights += wDiag;
+          }
+        }
+        if (hasDown && hasLeft) {
+          const nVal = rowDown[c - 1];
+          if (typeof nVal === "number" && !isNaN(nVal) && isFinite(nVal)) {
+            weightedSum += nVal * wDiag;
+            sumWeights += wDiag;
+          }
+        }
+        if (hasDown && hasRight) {
+          const nVal = rowDown[c + 1];
+          if (typeof nVal === "number" && !isNaN(nVal) && isFinite(nVal)) {
+            weightedSum += nVal * wDiag;
+            sumWeights += wDiag;
           }
         }
 
@@ -338,15 +373,39 @@ function simplifyDP(coords, sqTolerance) {
   markers[0] = 1;
   markers[n - 1] = 1;
 
-  const stack = [[0, n - 1]];
+  // Flattened stack [first, last] to avoid array allocations
+  const stack = [0, n - 1];
 
   while (stack.length > 0) {
-    const [first, last] = stack.pop();
+    const last = stack.pop();
+    const first = stack.pop();
     let maxSqDist = 0;
     let maxIdx = 0;
 
+    // Hoist segment vector invariants outside the point iteration loop
+    const p1 = coords[first];
+    const p2 = coords[last];
+    const x1 = p1[0], y1 = p1[1];
+    const segDx = p2[0] - x1, segDy = p2[1] - y1;
+    const segLenSq = segDx * segDx + segDy * segDy;
+
     for (let i = first + 1; i < last; i++) {
-      const sqDist = getSqSegDist(coords[i], coords[first], coords[last]);
+      const p = coords[i];
+      const px = p[0], py = p[1];
+      let cx = x1, cy = y1;
+      if (segLenSq !== 0) {
+        const t = ((px - x1) * segDx + (py - y1) * segDy) / segLenSq;
+        if (t > 1) {
+          cx = p2[0];
+          cy = p2[1];
+        } else if (t > 0) {
+          cx = x1 + segDx * t;
+          cy = y1 + segDy * t;
+        }
+      }
+      const ddx = px - cx;
+      const ddy = py - cy;
+      const sqDist = ddx * ddx + ddy * ddy;
       if (sqDist > maxSqDist) {
         maxSqDist = sqDist;
         maxIdx = i;
@@ -355,8 +414,12 @@ function simplifyDP(coords, sqTolerance) {
 
     if (maxSqDist > sqTolerance) {
       markers[maxIdx] = 1;
-      if (maxIdx - first > 1) stack.push([first, maxIdx]);
-      if (last - maxIdx > 1) stack.push([maxIdx, last]);
+      if (maxIdx - first > 1) {
+        stack.push(first, maxIdx);
+      }
+      if (last - maxIdx > 1) {
+        stack.push(maxIdx, last);
+      }
     }
   }
 

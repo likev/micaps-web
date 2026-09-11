@@ -367,11 +367,16 @@ function calculateFieldContours(stationsGeoJSON, valueExtractor, config = {}, le
 
   if (points.length < 3) return null;
 
-  // Grid bounds covering active stations domain
-  const stnMinLon = Math.min(...points.map((p) => p[0]));
-  const stnMaxLon = Math.max(...points.map((p) => p[0]));
-  const stnMinLat = Math.min(...points.map((p) => p[1]));
-  const stnMaxLat = Math.max(...points.map((p) => p[1]));
+  // Grid bounds covering active stations domain in single pass
+  let stnMinLon = Infinity, stnMaxLon = -Infinity;
+  let stnMinLat = Infinity, stnMaxLat = -Infinity;
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    if (p[0] < stnMinLon) stnMinLon = p[0];
+    if (p[0] > stnMaxLon) stnMaxLon = p[0];
+    if (p[1] < stnMinLat) stnMinLat = p[1];
+    if (p[1] > stnMaxLat) stnMaxLat = p[1];
+  }
 
   const padding = 2.5;
   let minLon = Math.floor(stnMinLon - padding);
@@ -433,10 +438,16 @@ function calculateFieldContours(stationsGeoJSON, valueExtractor, config = {}, le
   // Apply 2D spatial smoothing filter to reduce interpolation mesh facets
   interpolated = smoothGrid2D(interpolated, 1, 0.45, y.length, x.length);
 
+  let minV = Infinity;
+  let maxV = -Infinity;
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i];
+    if (v < minV) minV = v;
+    if (v > maxV) maxV = v;
+  }
+
   let levels = config.levels;
   if (!levels || !levels.length) {
-    const minV = Math.min(...values);
-    const maxV = Math.max(...values);
     levels = griddata.autoLevels(minV, maxV, 8);
   }
 
@@ -444,8 +455,6 @@ function calculateFieldContours(stationsGeoJSON, valueExtractor, config = {}, le
   try {
     lines = griddata.contour({ data: interpolated, rows: y.length, cols: x.length }, { x, y, levels }) || [];
     if ((!lines || lines.length === 0) && values.length > 0) {
-      const minV = Math.min(...values);
-      const maxV = Math.max(...values);
       if (maxV > minV) {
         const fallbackLevels = griddata.autoLevels(minV, maxV, 8);
         const fallbackLines = griddata.contour({ data: interpolated, rows: y.length, cols: x.length }, { x, y, levels: fallbackLevels });

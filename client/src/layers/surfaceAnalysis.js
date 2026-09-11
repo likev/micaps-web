@@ -241,11 +241,16 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
       return null;
     }
 
-    // Domain bounding box
-    const stnMinLon = Math.min(...points.map((p) => p[0]));
-    const stnMaxLon = Math.max(...points.map((p) => p[0]));
-    const stnMinLat = Math.min(...points.map((p) => p[1]));
-    const stnMaxLat = Math.max(...points.map((p) => p[1]));
+    // Domain bounding box computed in single pass (0 array allocations, no call stack pressure)
+    let stnMinLon = Infinity, stnMaxLon = -Infinity;
+    let stnMinLat = Infinity, stnMaxLat = -Infinity;
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      if (p[0] < stnMinLon) stnMinLon = p[0];
+      if (p[0] > stnMaxLon) stnMaxLon = p[0];
+      if (p[1] < stnMinLat) stnMinLat = p[1];
+      if (p[1] > stnMaxLat) stnMaxLat = p[1];
+    }
 
     const padding = 2.5;
     let minLon = Math.floor(stnMinLon - padding);
@@ -307,8 +312,13 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
     // Apply 2D spatial smoothing filter to eliminate triangular interpolation facet edges
     interpolated = smoothGrid2D(interpolated, 1, 0.45, y.length, x.length);
 
-    const minV = Math.min(...values);
-    const maxV = Math.max(...values);
+    let minV = Infinity;
+    let maxV = -Infinity;
+    for (let i = 0; i < values.length; i++) {
+      const v = values[i];
+      if (v < minV) minV = v;
+      if (v > maxV) maxV = v;
+    }
 
     const levels = options.levels || cfg.getLevels(minV, maxV);
     const boldValues = options.boldValues || cfg.boldValues || [];

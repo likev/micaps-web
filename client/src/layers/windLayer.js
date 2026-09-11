@@ -86,20 +86,28 @@ export function renderWindStreamlines(map, gridData, options = {}) {
     const fx = gx - x0;
     const fy = gy - y0;
 
-    const idx00 = y0 * nLon + x0;
-    const idx10 = y0 * nLon + x1;
-    const idx01 = y1 * nLon + x0;
-    const idx11 = y1 * nLon + x1;
+    const row0 = y0 * nLon;
+    const row1 = y1 * nLon;
+    const idx00 = row0 + x0;
+    const idx10 = row0 + x1;
+    const idx01 = row1 + x0;
+    const idx11 = row1 + x1;
 
-    const uVal = (1 - fx) * (1 - fy) * (u[idx00] || 0) +
-                 fx * (1 - fy) * (u[idx10] || 0) +
-                 (1 - fx) * fy * (u[idx01] || 0) +
-                 fx * fy * (u[idx11] || 0);
+    // Precalculate bilinear weights to eliminate duplicate multiplications
+    const w00 = (1 - fx) * (1 - fy);
+    const w10 = fx * (1 - fy);
+    const w01 = (1 - fx) * fy;
+    const w11 = fx * fy;
 
-    const vVal = (1 - fx) * (1 - fy) * (v[idx00] || 0) +
-                 fx * (1 - fy) * (v[idx10] || 0) +
-                 (1 - fx) * fy * (v[idx01] || 0) +
-                 fx * fy * (v[idx11] || 0);
+    const uVal = w00 * (u[idx00] || 0) +
+                 w10 * (u[idx10] || 0) +
+                 w01 * (u[idx01] || 0) +
+                 w11 * (u[idx11] || 0);
+
+    const vVal = w00 * (v[idx00] || 0) +
+                 w10 * (v[idx10] || 0) +
+                 w01 * (v[idx01] || 0) +
+                 w11 * (v[idx11] || 0);
 
     return [uVal, vVal];
   }
@@ -431,10 +439,16 @@ export function renderGridWindBarbs(map, gridData) {
     const x0 = Math.floor(gx), x1 = Math.min(x0 + 1, nLon - 1);
     const y0 = Math.floor(gy), y1 = Math.min(y0 + 1, nLat - 1);
     const fx = gx - x0, fy = gy - y0;
-    const idx00 = y0 * nLon + x0, idx10 = y0 * nLon + x1;
-    const idx01 = y1 * nLon + x0, idx11 = y1 * nLon + x1;
-    const uVal = (1 - fx) * (1 - fy) * (u[idx00] || 0) + fx * (1 - fy) * (u[idx10] || 0) + (1 - fx) * fy * (u[idx01] || 0) + fx * fy * (u[idx11] || 0);
-    const vVal = (1 - fx) * (1 - fy) * (v[idx00] || 0) + fx * (1 - fy) * (v[idx10] || 0) + (1 - fx) * fy * (v[idx01] || 0) + fx * fy * (v[idx11] || 0);
+    const row0 = y0 * nLon;
+    const row1 = y1 * nLon;
+    const idx00 = row0 + x0, idx10 = row0 + x1;
+    const idx01 = row1 + x0, idx11 = row1 + x1;
+    const w00 = (1 - fx) * (1 - fy);
+    const w10 = fx * (1 - fy);
+    const w01 = (1 - fx) * fy;
+    const w11 = fx * fy;
+    const uVal = w00 * (u[idx00] || 0) + w10 * (u[idx10] || 0) + w01 * (u[idx01] || 0) + w11 * (u[idx11] || 0);
+    const vVal = w00 * (v[idx00] || 0) + w10 * (v[idx10] || 0) + w01 * (v[idx01] || 0) + w11 * (v[idx11] || 0);
     return [uVal, vVal];
   }
 
@@ -704,12 +718,30 @@ export function generateStationWindGrid(stationsGeoJSON, level = null) {
     }
   }
 
-  if (points.length < 3) return null;
+  const numPts = points.length;
+  if (numPts < 3) return null;
 
-  const minLon = Math.max(60, Math.min(...points.map((pt) => pt[0])) - 2.0);
-  const maxLon = Math.min(145, Math.max(...points.map((pt) => pt[0])) + 2.0);
-  const minLat = Math.max(10, Math.min(...points.map((pt) => pt[1])) - 2.0);
-  const maxLat = Math.min(60, Math.max(...points.map((pt) => pt[1])) + 2.0);
+  // Single pass coordinate extraction and bounding box computation
+  let rawMinLon = Infinity, rawMaxLon = -Infinity;
+  let rawMinLat = Infinity, rawMaxLat = -Infinity;
+  const ptX = new Float64Array(numPts);
+  const ptY = new Float64Array(numPts);
+
+  for (let i = 0; i < numPts; i++) {
+    const px = points[i][0];
+    const py = points[i][1];
+    ptX[i] = px;
+    ptY[i] = py;
+    if (px < rawMinLon) rawMinLon = px;
+    if (px > rawMaxLon) rawMaxLon = px;
+    if (py < rawMinLat) rawMinLat = py;
+    if (py > rawMaxLat) rawMaxLat = py;
+  }
+
+  const minLon = Math.max(60, rawMinLon - 2.0);
+  const maxLon = Math.min(145, rawMaxLon + 2.0);
+  const minLat = Math.max(10, rawMinLat - 2.0);
+  const maxLat = Math.min(60, rawMaxLat + 2.0);
 
   const dDeg = 1.0;
   const x = [];
@@ -721,18 +753,27 @@ export function generateStationWindGrid(stationsGeoJSON, level = null) {
   const nRows = y.length;
   const uGrid = new Float32Array(nCols * nRows);
   const vGrid = new Float32Array(nCols * nRows);
+  const dySq = new Float64Array(numPts);
 
   for (let r = 0; r < nRows; r++) {
     const lat = y[r];
+    const rowOffset = r * nCols;
+
+    // Hoist lat distance calculation outside column loop (eliminates ~10,000,000 multiplications)
+    for (let i = 0; i < numPts; i++) {
+      const dLat = lat - ptY[i];
+      dySq[i] = dLat * dLat;
+    }
+
     for (let c = 0; c < nCols; c++) {
       const lon = x[c];
       let weightSum = 0;
       let uSum = 0;
       let vSum = 0;
 
-      for (let i = 0; i < points.length; i++) {
-        const [px, py] = points[i];
-        const distSq = (lon - px) * (lon - px) + (lat - py) * (lat - py);
+      for (let i = 0; i < numPts; i++) {
+        const dLon = lon - ptX[i];
+        const distSq = dLon * dLon + dySq[i];
         if (distSq < 0.0001) {
           weightSum = 1;
           uSum = uVals[i];
@@ -745,7 +786,7 @@ export function generateStationWindGrid(stationsGeoJSON, level = null) {
         vSum += vVals[i] * w;
       }
 
-      const idx = r * nCols + c;
+      const idx = rowOffset + c;
       uGrid[idx] = weightSum > 0 ? uSum / weightSum : 0;
       vGrid[idx] = weightSum > 0 ? vSum / weightSum : 0;
     }

@@ -109,10 +109,25 @@ export function getColormap(reference = null, element = "TMP") {
   return COLORMAPS[element] || COLORMAPS.TMP || COLORMAPS.default || FALLBACK_COLORMAP;
 }
 
-export function getColor(val, element = "TMP", colormap = null, zMin = undefined, zMax = undefined) {
+export function createColorResolver(element = "TMP", colormap = null, zMin = undefined, zMax = undefined) {
   const palette = getColormap(colormap, element);
-  if (!palette || palette.length === 0) return [100, 150, 240, 255];
-  if (palette.length === 1) return palette[0].color;
+  if (!palette || palette.length === 0) {
+    return (val, out, offset = 0) => {
+      out[offset] = 100;
+      out[offset + 1] = 150;
+      out[offset + 2] = 240;
+      out[offset + 3] = 255;
+    };
+  }
+  if (palette.length === 1) {
+    const [r, g, b, a] = palette[0].color;
+    return (val, out, offset = 0) => {
+      out[offset] = r;
+      out[offset + 1] = g;
+      out[offset + 2] = b;
+      out[offset + 3] = a;
+    };
+  }
 
   const elUpper = (element || "").toUpperCase();
   const cmUpper = (typeof colormap === "string" ? colormap : "").toUpperCase();
@@ -128,79 +143,102 @@ export function getColor(val, element = "TMP", colormap = null, zMin = undefined
   const isHGT = elUpper === "HGT" || cmUpper.includes("HGT");
   const isSLP = elUpper === "SLP" || cmUpper.includes("SLP");
 
-  let checkVal = val;
   const palMin = palette[0].val;
   const palMax = palette[palette.length - 1].val;
+  const palLen = palette.length;
+  const hgtScale = isHGT && palMax > 2500;
 
-  // Handle HGT decameter (dagpm) vs meter (gpm) scaling
-  if (isHGT && val < 2500 && palMax > 2500) {
-    checkVal = val * 10;
-  }
+  const canBeRelative = !isFixedPhysical && zMin !== undefined && zMax !== undefined && zMax > zMin;
+  const effMin = (canBeRelative && hgtScale && zMax < 2500) ? zMin * 10 : zMin;
+  const effMax = (canBeRelative && hgtScale && zMax < 2500) ? zMax * 10 : zMax;
+  const relSpan = (canBeRelative && effMax > effMin) ? (effMax - effMin) : 0;
+  const isAlwaysRelative = canBeRelative && relSpan > 0 && (isHGT || isSLP);
 
-  // 1. Fixed physical scale elements (RH, WIND, TMP, RAIN):
-  // Cleanly clamp to physical bounds [palMin, palMax] and interpolate directly across defined stops
-  if (isFixedPhysical) {
-    if (checkVal <= palMin) return palette[0].color;
-    if (checkVal >= palMax) return palette[palette.length - 1].color;
+  return (val, out, offset = 0) => {
+    let checkVal = val;
+    if (hgtScale && val < 2500) {
+      checkVal = val * 10;
+    }
 
-    for (let i = 0; i < palette.length - 1; i++) {
+    if (isFixedPhysical) {
+      if (checkVal <= palMin) {
+        const c = palette[0].color;
+        out[offset] = c[0]; out[offset + 1] = c[1]; out[offset + 2] = c[2]; out[offset + 3] = c[3];
+        return;
+      }
+      if (checkVal >= palMax) {
+        const c = palette[palLen - 1].color;
+        out[offset] = c[0]; out[offset + 1] = c[1]; out[offset + 2] = c[2]; out[offset + 3] = c[3];
+        return;
+      }
+
+      for (let i = 0; i < palLen - 1; i++) {
+        const c0 = palette[i];
+        const c1 = palette[i + 1];
+        if (checkVal >= c0.val && checkVal <= c1.val) {
+          const denom = c1.val - c0.val;
+          const t = denom > 0 ? (checkVal - c0.val) / denom : 0;
+          out[offset] = Math.round(c0.color[0] + t * (c1.color[0] - c0.color[0]));
+          out[offset + 1] = Math.round(c0.color[1] + t * (c1.color[1] - c0.color[1]));
+          out[offset + 2] = Math.round(c0.color[2] + t * (c1.color[2] - c0.color[2]));
+          out[offset + 3] = Math.round(c0.color[3] + t * (c1.color[3] - c0.color[3]));
+          return;
+        }
+      }
+      const c = palette[0].color;
+      out[offset] = c[0]; out[offset + 1] = c[1]; out[offset + 2] = c[2]; out[offset + 3] = c[3];
+      return;
+    }
+
+    if (isAlwaysRelative || (relSpan > 0 && (checkVal < palMin || checkVal > palMax))) {
+      const fraction = Math.max(0, Math.min(1, (checkVal - effMin) / relSpan));
+      const targetIdx = fraction * (palLen - 1);
+      const i0 = Math.floor(targetIdx);
+      const i1 = Math.min(i0 + 1, palLen - 1);
+      const t = targetIdx - i0;
+      const c0 = palette[i0].color;
+      const c1 = palette[i1].color;
+      out[offset] = Math.round(c0[0] + t * (c1[0] - c0[0]));
+      out[offset + 1] = Math.round(c0[1] + t * (c1[1] - c0[1]));
+      out[offset + 2] = Math.round(c0[2] + t * (c1[2] - c0[2]));
+      out[offset + 3] = Math.round(c0[3] + t * (c1[3] - c0[3]));
+      return;
+    }
+
+    if (checkVal <= palMin) {
+      const c = palette[0].color;
+      out[offset] = c[0]; out[offset + 1] = c[1]; out[offset + 2] = c[2]; out[offset + 3] = c[3];
+      return;
+    }
+    if (checkVal >= palMax) {
+      const c = palette[palLen - 1].color;
+      out[offset] = c[0]; out[offset + 1] = c[1]; out[offset + 2] = c[2]; out[offset + 3] = c[3];
+      return;
+    }
+
+    for (let i = 0; i < palLen - 1; i++) {
       const c0 = palette[i];
       const c1 = palette[i + 1];
       if (checkVal >= c0.val && checkVal <= c1.val) {
         const denom = c1.val - c0.val;
         const t = denom > 0 ? (checkVal - c0.val) / denom : 0;
-        return [
-          Math.round(c0.color[0] + t * (c1.color[0] - c0.color[0])),
-          Math.round(c0.color[1] + t * (c1.color[1] - c0.color[1])),
-          Math.round(c0.color[2] + t * (c1.color[2] - c0.color[2])),
-          Math.round(c0.color[3] + t * (c1.color[3] - c0.color[3])),
-        ];
+        out[offset] = Math.round(c0.color[0] + t * (c1.color[0] - c0.color[0]));
+        out[offset + 1] = Math.round(c0.color[1] + t * (c1.color[1] - c0.color[1]));
+        out[offset + 2] = Math.round(c0.color[2] + t * (c1.color[2] - c0.color[2]));
+        out[offset + 3] = Math.round(c0.color[3] + t * (c1.color[3] - c0.color[3]));
+        return;
       }
     }
-    return palette[0].color;
-  }
+    const c = palette[0].color;
+    out[offset] = c[0]; out[offset + 1] = c[1]; out[offset + 2] = c[2]; out[offset + 3] = c[3];
+  };
+}
 
-  // 2. Relative Level-Adaptive elements (HGT, SLP, or unspecified broad-range fields):
-  // Stretch palette across actual field range [zMin, zMax] so narrow height/pressure bands have rich contrast.
-  if ((isHGT || isSLP || (checkVal < palMin || checkVal > palMax)) && zMin !== undefined && zMax !== undefined && zMax > zMin) {
-    const effMin = (isHGT && zMax < 2500 && palMax > 2500) ? zMin * 10 : zMin;
-    const effMax = (isHGT && zMax < 2500 && palMax > 2500) ? zMax * 10 : zMax;
-    if (effMax > effMin) {
-      const fraction = Math.max(0, Math.min(1, (checkVal - effMin) / (effMax - effMin)));
-      const targetIdx = fraction * (palette.length - 1);
-      const i0 = Math.floor(targetIdx);
-      const i1 = Math.min(i0 + 1, palette.length - 1);
-      const t = targetIdx - i0;
-      const c0 = palette[i0].color;
-      const c1 = palette[i1].color;
-      return [
-        Math.round(c0[0] + t * (c1[0] - c0[0])),
-        Math.round(c0[1] + t * (c1[1] - c0[1])),
-        Math.round(c0[2] + t * (c1[2] - c0[2])),
-        Math.round(c0[3] + t * (c1[3] - c0[3])),
-      ];
-    }
-  }
-
-  // 3. Fallback direct physical value interpolation across palette stops
-  if (checkVal <= palMin) return palette[0].color;
-  if (checkVal >= palMax) return palette[palette.length - 1].color;
-
-  for (let i = 0; i < palette.length - 1; i++) {
-    const c0 = palette[i];
-    const c1 = palette[i + 1];
-    if (checkVal >= c0.val && checkVal <= c1.val) {
-      const denom = c1.val - c0.val;
-      const t = denom > 0 ? (checkVal - c0.val) / denom : 0;
-      return [
-        Math.round(c0.color[0] + t * (c1.color[0] - c0.color[0])),
-        Math.round(c0.color[1] + t * (c1.color[1] - c0.color[1])),
-        Math.round(c0.color[2] + t * (c1.color[2] - c0.color[2])),
-        Math.round(c0.color[3] + t * (c1.color[3] - c0.color[3])),
-      ];
-    }
-  }
-  return palette[0].color;
+export function getColor(val, element = "TMP", colormap = null, zMin = undefined, zMax = undefined) {
+  const resolver = createColorResolver(element, colormap, zMin, zMax);
+  const out = [0, 0, 0, 0];
+  resolver(val, out, 0);
+  return out;
 }
 
 export function getHexColor(val, element = "TMP", colormap = null, zMin = undefined, zMax = undefined) {
