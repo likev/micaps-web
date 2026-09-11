@@ -1074,5 +1074,162 @@ MICAPS-Web provides two specialized, high-performance rendering engines tailored
 - **Unified Lifecycle & Cleanup**:
   Integrated with streamline particle animations into `cleanupWindLayer(map)`, ensuring that map pan, zoom, tab switching, and layer deletion safely clear canvas buffers and cancel pending animation frames without memory leaks.
 
+---
 
+### 8.10. Map Projection & Coordinate Systems Architecture
 
+MICAPS-Web bridges two fundamentally different geospatial coordinate spaces:
+1. **Spherical Mercator (Web Mercator / EPSG:3857)**: The display and camera projection utilized by the MapLibre GL WebGL engine and vector basemap tiling schemes.
+2. **Equirectangular (Plate Carrée / EPSG:4326)**: The native coordinate system of raw atmospheric gridded fields (CMA/ECMWF/NCEP NWP models) and synoptic weather observation stations (WMO/CMA).
+
+```mermaid
+graph TD
+    subgraph DataSources ["Meteorological Data Sources (EPSG:4326 - Plate Carrée)"]
+        NWPGrid["NWP Scalar Grids (Float32 Binary / Diamond 4)"]
+        NWPWind["NWP Vector Wind (U / V Grids / Diamond 11)"]
+        Stations["WMO/CMA Station Observations (Diamond 1 / 2)"]
+    end
+
+    subgraph TransformationPipelines ["Reprojection & Coordinate Transformation Pipelines"]
+        MercatorReproj["Offscreen Canvas Reprojection (latToMercatorY / mercatorYToLat)"]
+        GeoJSONPipe["GeoJSON Feature Pipeline (Vector Marching Squares Contours)"]
+        ScreenProject["Direct Screen Projection (map.project / map.unproject)"]
+    end
+
+    subgraph DisplayEngine ["Map Rendering Engine (EPSG:3857 - Web Mercator)"]
+        PMTilesBase["PMTiles Vector Basemap (EPSG:3857 Tiles)"]
+        RasterImage["MapLibre Image Source (Mercator Quad Texture)"]
+        GLVector["MapLibre Vector Layers (GPU Vertex Shader Projection)"]
+        CanvasOverlay["HTML5 Overlay Canvases (Streamlines, Barbs, Station Plots)"]
+    end
+
+    NWPGrid --> MercatorReproj --> RasterImage --> PMTilesBase
+    NWPGrid --> GeoJSONPipe --> GLVector --> PMTilesBase
+    NWPWind --> ScreenProject --> CanvasOverlay --> PMTilesBase
+    Stations --> ScreenProject --> CanvasOverlay --> PMTilesBase
+```
+
+#### 8.10.1. Primary Map Engine Projection: Web Mercator (EPSG:3857)
+
+- **MapLibre GL JS Native Projection**:
+  The client map container is initialized via [`createMapInstance`](file:///root/downloads/micaps-web/client/src/map/mapInstance.js#L48) using MapLibre GL JS (`maplibre-gl ^5.0.1`) without non-Mercator projection overrides, operating natively in **Web Mercator (EPSG:3857)** (conformal cylindrical projection between $\approx -85.0511^\circ$ and $+85.0511^\circ$ latitude).
+- **PMTiles Vector Basemap**:
+  Offline vector basemap tiles (`map-china.pmtiles`) are generated and partitioned in standard Web Mercator Slippy Map tile pyramids ($Z/X/Y$). Boundary paths (national boundaries, provincial borders, city and county boundaries) and land polygons are rendered directly by WebGL tile shaders in EPSG:3857 (see [`pmtilesLayers.js`](file:///root/downloads/micaps-web/client/src/map/pmtilesLayers.js)).
+- **Graticule System**:
+  Dynamic parallels and meridians generated in [`graticule.js`](file:///root/downloads/micaps-web/client/src/map/graticule.js) are fed as EPSG:4326 GeoJSON lines, allowing MapLibre's internal projection matrix to render the characteristic Mercator curvature and spacing of latitude lines.
+
+#### 8.10.2. Native Meteorological Space: Equirectangular (EPSG:4326)
+
+Operational meteorological models and observation networks index spatial positions in geographic degrees:
+- **Global & Regional Grids**: NWP scalar and vector grids (ECMWF_HR, GFS, CMA-GFS) are spaced evenly in spherical angular degrees:
+  $$\lambda \in [\text{slon}, \text{elon}], \quad \phi \in [\text{slat}, \text{elat}]$$
+  with constant angular grid increments $\Delta\text{lon}$ and $\Delta\text{lat}$.
+- **Observational Networks**: Surface stations, upper-air soundings, and radar sites are cataloged by WMO/CMA station metadata with WGS 84 $(\text{lon}, \text{lat}, h)$ tuples.
+
+#### 8.10.3. Transformation & Reprojection Implementations
+
+Because Web Mercator stretches vertical distance with increasing latitude by a factor of $\sec(\phi)$, raw equirectangular data cannot be placed directly onto the map without distortion. MICAPS-Web deploys three specialized reprojection pathways tailored to the rendering engine:
+
+##### 1. Non-Linear CPU Raster Reprojection ([`rasterLayer.js`](file:///root/downloads/micaps-web/client/src/layers/rasterLayer.js))
+
+For scalar field color shading (`showRaster`), linear quad-stretching produces intolerable positional drift at mid and high latitudes. To achieve exact cartographic alignment without GPU shader overhead, the offscreen canvas ([`renderRasterImage`](file:///root/downloads/micaps-web/client/src/layers/rasterLayer.js#L113)) resamples each output row using the spherical Mercator conformal mapping:
+
+- **Mathematical Rationale & Physical Distortion**:
+  Raw meteorological model grids (ECMWF, GFS, CMA-GFS) are indexed in regular angular increments ($\Delta\text{lat} = \text{const}$, Plate Carrée / EPSG:4326). However, Web Mercator distances expand non-linearly towards the poles by $\sec(\phi) = \frac{1}{\cos(\phi)}$:
+  - At the Equator ($0^\circ$): $1^\circ$ latitude has length $L$.
+  - At $60^\circ\text{N}$: $1^\circ$ latitude expands to $2 \times L$.
+  - At $80^\circ\text{N}$: $1^\circ$ latitude expands to $5.8 \times L$.
+  If the raw equidistant grid were painted directly into an image quad, MapLibre's linear UV texture mapping would place the $30^\circ\text{N}$ data at the visual 50% midpoint between $0^\circ$ and $60^\circ$ (which in Mercator is geographically at $\approx 35.3^\circ\text{N}$), creating tens of kilometers of latitudinal error.
+
+- **Forward Transformation (Latitude to Mercator $Y$)**:
+  $$y = \ln\left(\tan\left(\frac{\pi}{4} + \frac{\phi_{\text{rad}}}{2}\right)\right), \quad \text{where } \phi_{\text{rad}} = \phi \cdot \frac{\pi}{180}$$
+  Implemented in [`latToMercatorY`](file:///root/downloads/micaps-web/client/src/layers/rasterLayer.js#L104):
+  ```javascript
+  function latToMercatorY(lat) {
+    const rad = (Math.max(-85.05112878, Math.min(85.05112878, lat)) * Math.PI) / 180;
+    return Math.log(Math.tan(Math.PI / 4 + rad / 2));
+  }
+  ```
+- **Inverse Transformation (Mercator $Y$ to Latitude)**:
+  $$\phi = \left(2\arctan(e^y) - \frac{\pi}{2}\right) \cdot \frac{180}{\pi}$$
+  Implemented in [`mercatorYToLat`](file:///root/downloads/micaps-web/client/src/layers/rasterLayer.js#L109):
+  ```javascript
+  function mercatorYToLat(y) {
+    return (2 * Math.atan(Math.exp(y)) - Math.PI / 2) * (180 / Math.PI);
+  }
+  ```
+- **Canvas Bitmap Synthesis**:
+  The offscreen canvas iterates down each Mercator raster line $j \in [0, \text{outHeight}-1]$, computes the exact geographic latitude $\phi = \text{mercatorYToLat}(y_{\text{merc}})$, and bilinearly samples the scalar values from the original EPSG:4326 grid columns. The resulting Mercator-aligned bitmap is bound as a native MapLibre Image Source (`coordinates: [[leftLon, topLat], [rightLon, topLat], [rightLon, bottomLat], [leftLon, bottomLat]]`).
+
+- **Architectural Comparison: MapLibre GL JS vs. OpenLayers Reprojection**:
+  In GIS suites like **OpenLayers**, data sources natively accept a source-level projection parameter:
+  ```javascript
+  // OpenLayers automates client-side raster warping via ol/reproj
+  new ol.layer.Image({
+    source: new ol.source.ImageStatic({
+      url: '...',
+      imageExtent: [slon, slat, elon, elat],
+      projection: 'EPSG:4326' // OpenLayers automatically resamples to view projection
+    })
+  });
+  ```
+  MapLibre GL JS, by contrast, has **no source-level `projection` parameter** on `map.addSource()`. To maintain a lightweight footprint and locked 60 FPS GPU rendering, MapLibre strictly assumes all raster and image sources map directly into normalized Web Mercator tile space ($0 \dots 1$). It possesses no built-in `ol/reproj` triangle-warping engine. Consequently, [`latToMercatorY`](file:///root/downloads/micaps-web/client/src/layers/rasterLayer.js#L104) serves as MICAPS-Web's lightweight, zero-dependency substitute for OpenLayers' internal raster reprojection pipeline.
+
+- **Necessity of `latToMercatorY` in 3D Globe Projection**:
+  Even when the map is switched to 3D Globe (`globe` or `vertical-perspective`), this CPU resampling remains **strictly necessary**. MapLibre GL JS v5's internal `ImageSource` implementation converts corner coordinates to Mercator tile coordinates (`MercatorCoordinate.fromLngLat`). MapLibre's globe vertex shaders then map tile coordinates onto the 3D unit sphere via `mercatorCoordinatesToAngularCoordinatesRadians` $\to$ `angularCoordinatesRadiansToVector`. Because MapLibre's globe shader assumes the incoming image's UV texture space is already Mercator-distributed, feeding an un-resampled (equidistant) texture would cause double-distortion on the 3D sphere.
+
+##### 2. GPU Vertex Shader Projection for Vector Contours ([`contourLayer.js`](file:///root/downloads/micaps-web/client/src/layers/contourLayer.js))
+- Isobands (`contourf`) and isolines (`contour`) generated by [`griddata-js`](file:///root/downloads/micaps-web/client/src/layers/contourLayer.js) produce GeoJSON features with coordinates expressed in geographic longitude/latitude degrees (EPSG:4326).
+- When bound to MapLibre GeoJSON sources (`map.addSource(id, { type: "geojson", data })`), MapLibre's WebGL vertex shaders reproject all polygon and line vertices to Web Mercator screen space dynamically on the GPU every frame.
+
+##### 3. Screen-Space Projection Matrix for Canvas Overlays ([`windLayer.js`](file:///root/downloads/micaps-web/client/src/layers/windLayer.js) & [`stationLayer.js`](file:///root/downloads/micaps-web/client/src/layers/stationLayer.js))
+For high-density overlays that bypass MapLibre's GeoJSON pipeline to eliminate memory overhead, projections are evaluated on the fly via MapLibre's camera matrix:
+- **Station Plots ([`stationLayer.js`](file:///root/downloads/micaps-web/client/src/layers/stationLayer.js))**:
+  Station geographic coordinates $(\lambda_i, \phi_i)$ are projected to viewport screen coordinates $(x_i, y_i)$ via:
+  $$(x_i, y_i) = \text{map.project}([\lambda_i, \phi_i])$$
+  Station symbols (WMO 9-point plots, wind feathers, sky cover octas) are drawn centered at screen pixels $(x_i, y_i)$ using HTML5 Canvas 2D.
+- **Gridded Wind Barbs & Streamlines ([`windLayer.js`](file:///root/downloads/micaps-web/client/src/layers/windLayer.js))**:
+  - **Screen Decimation**: To guarantee constant visual density across all zoom levels, gridded wind barbs evaluate screen pixels at uniform intervals ($\text{step} = 48\text{ px}$).
+  - **Inverse Camera Unprojection**: For each screen node $(x, y)$, the map calculates the geographic coordinate:
+    $$[\lambda, \phi] = \text{map.unproject}([x, y])$$
+    and samples velocity vectors $(u, v)$ from the underlying EPSG:4326 Float32 array via bilinear interpolation.
+
+#### 8.10.4. Coordinate Systems & Projection Summary
+
+| Subsystem / Layer | Source Data CRS | Internal Transformation | Display / Rendering Projection | Primary Implementation |
+| :--- | :--- | :--- | :--- | :--- |
+| **Map Engine & Camera** | N/A | Mercator tile pyramid & camera matrix | **Web Mercator (EPSG:3857)** | [`mapInstance.js`](file:///root/downloads/micaps-web/client/src/map/mapInstance.js) |
+| **Basemap Layers** | Vector PMTiles | Pre-projected EPSG:3857 vector tiles | **Web Mercator (EPSG:3857)** | [`pmtilesLayers.js`](file:///root/downloads/micaps-web/client/src/map/pmtilesLayers.js) |
+| **Graticule (Grid lines)** | Parametric lat/lon | MapLibre GeoJSON vertex shader | **Web Mercator (EPSG:3857)** | [`graticule.js`](file:///root/downloads/micaps-web/client/src/map/graticule.js) |
+| **Raster Scalar Overlay** | EPSG:4326 Float32 Grid | Offscreen CPU resampling (`latToMercatorY`) | **Web Mercator (EPSG:3857)** (Image Source) | [`rasterLayer.js`](file:///root/downloads/micaps-web/client/src/layers/rasterLayer.js) |
+| **Vector Contours (Lines/Fills)** | EPSG:4326 Float32 Grid | GPU vertex shader reprojection | **Web Mercator (EPSG:3857)** (WebGL Polygons) | [`contourLayer.js`](file:///root/downloads/micaps-web/client/src/layers/contourLayer.js) |
+| **Station Plot Overlay** | EPSG:4326 Station Points | Per-frame screen projection (`map.project`) | **Screen Space (px)** on Canvas 2D | [`stationLayer.js`](file:///root/downloads/micaps-web/client/src/layers/stationLayer.js) |
+| **Gridded Wind Barbs** | EPSG:4326 $U/V$ Grids | Viewport unprojection (`map.unproject`) | **Screen Space (px)** on Canvas 2D | [`windLayer.js`](file:///root/downloads/micaps-web/client/src/layers/windLayer.js) |
+| **Animated Streamlines** | EPSG:4326 $U/V$ Grids | Bilinear sample + screen advection | **Screen Space (px)** on Canvas 2D | [`windLayer.js`](file:///root/downloads/micaps-web/client/src/layers/windLayer.js) |
+
+#### 8.10.5. Multi-Projection Support & Runtime Switching Architecture
+
+MICAPS-Web provides an integrated projection selection architecture allowing forecasters to toggle between 2D conformal planar analysis and 3D planetary views without page reload.
+
+##### 1. Supported Projection Types (MapLibre GL JS v5+)
+
+| Projection ID | Name | Type | Characteristics & Synoptic Role |
+| :--- | :--- | :--- | :--- |
+| **`mercator`** *(default)* | 🗺️ Mercator (2D) | Conformal Cylindrical (EPSG:3857) | Standard workstation view. Zero angular distortion locally; preserves Rhumb lines and compass headings. Best for meso-scale analysis, radar, and station plots. |
+| **`globe`** | 🌍 Globe (3D) | Adaptive 3D Sphere $\to$ Mercator | Renders a 3D Earth globe at synoptic scales ($z < 11$), automatically morphing via linear interpolation into flat Mercator at local scales ($z \ge 12$). Eliminates polar area distortion while retaining local zoom precision. |
+| **`vertical-perspective`** | 🪐 Perspective (3D) | Fixed 3D Orthographic Globe | Continuous 3D vertical perspective looking down at the spherical Earth without transitioning into Mercator at high zoom. Ideal for global planetary circulation and satellite overviews. |
+
+##### 2. Configuration & Runtime State Flow
+
+- **Persistence Layer**: Declared in [`config.json`](file:///root/downloads/micaps-web/client/config.json#L2-L8) under `"basemap": { "projection": "mercator", ... }`. Persisted dynamically to `localStorage.getItem("micaps-map-projection")` and synchronized across app restarts via [`resolveInitialProjection`](file:///root/downloads/micaps-web/client/src/map/mapInstance.js#L23).
+- **Interactive UI Drawer**: The China Vector Basemap drawer in [`layerControl.js`](file:///root/downloads/micaps-web/client/src/ui/layerControl.js#L865-L872) exposes a dedicated `🌐 Projection` select menu alongside the Basemap Theme selector.
+- **Dynamic Dispatcher**: When toggled, [`handleLayerAction`](file:///root/downloads/micaps-web/client/src/ui/layerActions.js#L129-L133) invokes [`setMapProjection(map, newProjection)`](file:///root/downloads/micaps-web/client/src/map/mapInstance.js#L126), executing `map.setProjection({ type })`, triggering `map.triggerRepaint()`, and firing synthetic `move` events to refresh canvas overlays instantly.
+
+##### 3. Cross-Subsystem Behavioral Compatibility on 3D Globe
+
+| Subsystem | Compatibility on Globe | Architectural Behavior & Considerations |
+| :--- | :--- | :--- |
+| **PMTiles Vector Basemap** | **100% Seamless** ✅ | Handled natively by MapLibre v5 GPU tessellation. International boundaries, provincial borders, and fills curve around the 3D sphere with zero edge tearing. |
+| **Marching Squares Contours** | **100% Seamless** ✅ | GeoJSON `LineString` and `MultiPolygon` vertices in EPSG:4326 are transformed into spherical coordinates in GPU vertex shaders. |
+| **Canvas Image Source (`showRaster`)** | **Supported with Bounds** ⚠️ | Pins 4 corners to the globe mesh. Functions cleanly for regional domains (China/East Asia). For whole-world ($360^\circ$) grids, vector contour fills (`showFill`) are recommended over a single quad to prevent antimeridian ($\pm 180^\circ$) wrap clipping. |
+| **Direct Canvas Overlays (Wind & Stations)** | **Supported with Horizon Culling** ⚠️ | Screen coordinates are computed via `map.project([lng, lat])`. On a 3D sphere, features on the occluded far-side hemisphere are clamped or clipped by MapLibre's horizon plane. Grid barb pixel unprojection (`map.unproject([x, y])`) automatically clamps points beyond the globe silhouette to the visible limb. |

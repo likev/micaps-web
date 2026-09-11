@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { BASEMAP_SCHEMES, getPMTilesStyle, getBasemapScheme, applyBasemapScheme } from "../src/map/pmtilesLayers.js";
-import { resolvePMTilesUrl } from "../src/map/mapInstance.js";
+import { resolvePMTilesUrl, MAP_PROJECTIONS, resolveInitialProjection, setMapProjection, getMapProjection } from "../src/map/mapInstance.js";
 
 describe("Multi-Tier Vector Basemap (World / China / Province / City / County)", () => {
   test("BASEMAP_SCHEMES defines complete 5-tier styles for dark, light, and micaps", () => {
@@ -125,5 +125,62 @@ describe("Multi-Tier Vector Basemap (World / China / Province / City / County)",
     };
 
     expect(() => applyBasemapScheme(mockMap, "dark")).not.toThrow();
+  });
+});
+
+describe("Map Projection Configuration & Selection (Mercator / Globe / Vertical-Perspective)", () => {
+  test("MAP_PROJECTIONS defines standard projections defaulting to mercator", () => {
+    expect(MAP_PROJECTIONS).toBeDefined();
+    const ids = MAP_PROJECTIONS.map((p) => p.id);
+    expect(ids).toContain("mercator");
+    expect(ids).toContain("globe");
+    expect(ids).toContain("vertical-perspective");
+    expect(ids[0]).toBe("mercator");
+  });
+
+  test("getPMTilesStyle includes projection object and defaults to mercator", () => {
+    const defaultStyle = getPMTilesStyle("http://localhost:8088/map-china.pmtiles", "dark");
+    expect(defaultStyle.projection).toBeDefined();
+    expect(defaultStyle.projection.type).toBe("mercator");
+
+    const globeStyle = getPMTilesStyle("http://localhost:8088/map-china.pmtiles", "dark", "globe");
+    expect(globeStyle.projection.type).toBe("globe");
+
+    const perspectiveStyle = getPMTilesStyle("http://localhost:8088/map-china.pmtiles", "dark", { type: "vertical-perspective" });
+    expect(perspectiveStyle.projection.type).toBe("vertical-perspective");
+  });
+
+  test("resolveInitialProjection returns mercator as fallback or stored projection", () => {
+    // Default fallback
+    expect(resolveInitialProjection()).toBe("mercator");
+  });
+
+  test("setMapProjection applies projection to map and fires move/repaint", () => {
+    let appliedProjection = null;
+    let repaintTriggered = false;
+    let moveFired = false;
+
+    const mockMap = {
+      isStyleLoaded: () => true,
+      setProjection: (proj) => {
+        appliedProjection = proj;
+      },
+      triggerRepaint: () => {
+        repaintTriggered = true;
+      },
+      fire: (event) => {
+        if (event === "move") moveFired = true;
+      },
+    };
+
+    setMapProjection(mockMap, "globe");
+    expect(appliedProjection).toEqual({ type: "globe" });
+    expect(repaintTriggered).toBe(true);
+    expect(moveFired).toBe(true);
+    expect(getMapProjection(mockMap)).toBe("globe");
+
+    setMapProjection(mockMap, "mercator");
+    expect(appliedProjection).toEqual({ type: "mercator" });
+    expect(getMapProjection(mockMap)).toBe("mercator");
   });
 });

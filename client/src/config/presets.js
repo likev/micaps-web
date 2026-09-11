@@ -64,11 +64,15 @@ export async function loadPresetGroups() {
   if (!Array.isArray(config) && config.colormaps !== undefined) {
     setColormaps(config.colormaps);
   }
-  // persist basemap scheme for next map creation (maptile only, no UI chrome change)
+  // persist basemap scheme and projection for next map creation (maptile only, no UI chrome change)
   try {
     const scheme = config?.basemap?.scheme;
-    if (scheme === "light" || scheme === "dark") {
+    if (scheme === "light" || scheme === "dark" || scheme === "micaps") {
       try { if (typeof localStorage !== "undefined") localStorage.setItem("micaps-basemap-scheme", scheme); } catch {}
+    }
+    const proj = config?.basemap?.projection;
+    if (proj === "mercator" || proj === "globe" || proj === "vertical-perspective") {
+      try { if (typeof localStorage !== "undefined") localStorage.setItem("micaps-map-projection", proj); } catch {}
     }
   } catch {}
   PRESET_GROUPS = groups;

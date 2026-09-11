@@ -1,5 +1,6 @@
 {
   "basemap": {
+    "projection": "mercator",
     "scheme": "dark",
     "showCities": false,
     "showGraticule": false,

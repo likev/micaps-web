@@ -39,7 +39,11 @@ const paletteLoadSeq = new Map();
 function resolveDefaultScheme() {
   try {
     const s = localStorage.getItem("micaps-basemap-scheme");
-    if (s === "light" || s === "dark") return s;
+    if (s === "light" || s === "dark" || s === "micaps") return s;
+  } catch {}
+  try {
+    const cfg = typeof window !== "undefined" ? window.__MICAPS_CONFIG__ : null;
+    if (cfg?.basemap?.scheme) return cfg.basemap.scheme;
   } catch {}
   try {
     if (typeof document !== "undefined") {
@@ -50,7 +54,20 @@ function resolveDefaultScheme() {
   return "dark";
 }
 
+function resolveDefaultProjection() {
+  try {
+    const p = localStorage.getItem("micaps-map-projection");
+    if (p === "mercator" || p === "globe" || p === "vertical-perspective") return p;
+  } catch {}
+  try {
+    const cfg = typeof window !== "undefined" ? window.__MICAPS_CONFIG__ : null;
+    if (cfg?.basemap?.projection) return cfg.basemap.projection;
+  } catch {}
+  return "mercator";
+}
+
 function createDefaultLayers(winId = "default") {
+  const cfg = typeof window !== "undefined" ? window.__MICAPS_CONFIG__?.basemap : null;
   return [
     {
       id: `layer-pmtiles-${winId}`,
@@ -62,11 +79,12 @@ function createDefaultLayers(winId = "default") {
       color: "#238636",
       isExpanded: false,
       config: {
-        showGraticule: true,
-        showWorld: true,
-        showProvinces: true,
-        showCities: true,
-        scheme: resolveDefaultScheme(),
+        showGraticule: cfg?.showGraticule !== undefined ? cfg.showGraticule : true,
+        showWorld: cfg?.showWorld !== undefined ? cfg.showWorld : true,
+        showProvinces: cfg?.showProvinces !== undefined ? cfg.showProvinces : true,
+        showCities: cfg?.showCities !== undefined ? cfg.showCities : true,
+        scheme: cfg?.scheme || resolveDefaultScheme(),
+        projection: cfg?.projection || resolveDefaultProjection(),
       },
     },
   ];
@@ -571,6 +589,17 @@ function renderLayersManager(panel) {
           if (onLayerActionCallback) onLayerActionCallback("config", layer.id, { scheme: e.target.value }, layer, currentActiveWinId);
         });
       }
+
+      const projSel = configDrawer.querySelector(".sel-basemap-projection");
+      if (projSel) {
+        projSel.addEventListener("click", (e) => e.stopPropagation());
+        projSel.addEventListener("change", (e) => {
+          if (!layer.config) layer.config = {};
+          layer.config.projection = e.target.value;
+          autoSaveLayerConfig(layer);
+          if (onLayerActionCallback) onLayerActionCallback("config", layer.id, { projection: e.target.value }, layer, currentActiveWinId);
+        });
+      }
     }
   });
 
@@ -831,6 +860,14 @@ function renderLayerRow(layer) {
                 <option value="dark" ${(layer.config?.scheme || "dark") === "dark" ? "selected" : ""}>🌙 Midnight Slate (Dark)</option>
                 <option value="light" ${layer.config?.scheme === "light" ? "selected" : ""}>☀️ Daybreak Neutral (Light)</option>
                 <option value="micaps" ${layer.config?.scheme === "micaps" ? "selected" : ""}>🌐 MICAPS Classic (Navy)</option>
+              </select>
+            </div>
+            <div class="config-row" style="margin-top:4px;">
+              <label style="color: var(--text-secondary); font-size:11px; display:flex; align-items:center; gap:4px;">🌐 Projection</label>
+              <select class="sel-basemap-projection" style="background: var(--bg-secondary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:4px; padding:3px 6px; font-size:11px; min-width:140px; max-width:100%;">
+                <option value="mercator" ${(layer.config?.projection || "mercator") === "mercator" ? "selected" : ""}>🗺️ Mercator (2D)</option>
+                <option value="globe" ${layer.config?.projection === "globe" ? "selected" : ""}>🌍 Globe (3D)</option>
+                <option value="vertical-perspective" ${layer.config?.projection === "vertical-perspective" ? "selected" : ""}>🪐 Perspective (3D)</option>
               </select>
             </div>
             `))

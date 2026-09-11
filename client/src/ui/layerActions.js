@@ -126,6 +126,11 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
           try { updateGraticuleScheme(map, value.scheme); } catch {}
         });
       }
+      if (value.projection !== undefined) {
+        import("../map/mapInstance.js").then(({ setMapProjection }) => {
+          try { setMapProjection(map, value.projection); } catch {}
+        });
+      }
       if (value.showGraticule !== undefined) {
         if (map.getLayer("graticule-lines")) {
           map.setLayoutProperty("graticule-lines", "visibility", (layer.visible && value.showGraticule !== false) ? "visible" : "none");

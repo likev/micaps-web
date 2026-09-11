@@ -15,6 +15,24 @@ export function ensurePMTilesProtocol() {
   }
 }
 
+export const MAP_PROJECTIONS = [
+  { id: "mercator", name: "Mercator (2D)", icon: "🗺️" },
+  { id: "globe", name: "Globe (3D)", icon: "🌍" },
+  { id: "vertical-perspective", name: "Perspective (3D)", icon: "🪐" },
+];
+
+export function resolveInitialProjection() {
+  try {
+    const stored = typeof localStorage !== "undefined" ? localStorage.getItem("micaps-map-projection") : null;
+    if (stored && (stored === "mercator" || stored === "globe" || stored === "vertical-perspective")) return stored;
+  } catch {}
+  try {
+    const cfg = typeof window !== "undefined" ? window.__MICAPS_CONFIG__ : null;
+    if (cfg?.basemap?.projection) return cfg.basemap.projection;
+  } catch {}
+  return "mercator";
+}
+
 export function resolveInitialBasemapScheme() {
   try {
     const stored = typeof localStorage !== "undefined" ? localStorage.getItem("micaps-basemap-scheme") : null;
@@ -50,10 +68,11 @@ export function createMapInstance(containerIdOrEl, options = {}) {
 
   const pmtilesUrl = resolvePMTilesUrl(options.pmtilesUrl);
   const schemeName = options.scheme || options.basemapScheme || resolveInitialBasemapScheme();
+  const projectionType = options.projection || resolveInitialProjection();
 
   const mapInstance = new maplibregl.Map({
     container: containerIdOrEl,
-    style: getPMTilesStyle(pmtilesUrl, schemeName),
+    style: getPMTilesStyle(pmtilesUrl, schemeName, projectionType),
     center: options.center || [108.0, 34.0],
     zoom: options.zoom || 4.2,
     minZoom: 2,
@@ -75,8 +94,9 @@ export function createMapInstance(containerIdOrEl, options = {}) {
     addGraticuleLayers(mapInstance, schemeName);
   });
 
-  // expose scheme helper on instance
+  // expose scheme and projection helpers on instance
   mapInstance.__basemapScheme = schemeName;
+  mapInstance.__mapProjection = projectionType;
 
   return mapInstance;
 }
@@ -103,6 +123,50 @@ export function setBasemapScheme(map, schemeName) {
       window.__MICAPS_CONFIG__.basemap = { ...(window.__MICAPS_CONFIG__.basemap || {}), scheme: scheme.id };
     }
   } catch {}
+}
+
+export function setMapProjection(map, projectionType) {
+  const m = map || getActiveMap();
+  if (!m) return;
+  const proj = projectionType || "mercator";
+
+  const applyProj = () => {
+    try {
+      if (typeof m.setProjection === "function") {
+        m.setProjection({ type: proj });
+        m.__mapProjection = proj;
+        if (typeof m.triggerRepaint === "function") m.triggerRepaint();
+        if (typeof m.fire === "function") m.fire("move");
+      }
+    } catch (err) {
+      console.warn("Failed to set projection:", err);
+    }
+  };
+
+  if (m.isStyleLoaded && m.isStyleLoaded()) {
+    applyProj();
+  } else {
+    m.once("load", applyProj);
+  }
+
+  try {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem("micaps-map-projection", proj);
+    }
+  } catch {}
+  try {
+    if (typeof window !== "undefined" && window.__MICAPS_CONFIG__) {
+      window.__MICAPS_CONFIG__.basemap = {
+        ...(window.__MICAPS_CONFIG__.basemap || {}),
+        projection: proj,
+      };
+    }
+  } catch {}
+}
+
+export function getMapProjection(map) {
+  const m = map || getActiveMap();
+  return m?.__mapProjection || resolveInitialProjection();
 }
 
 export function getBasemapSchemeName(map) {

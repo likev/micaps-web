@@ -81,11 +81,15 @@ export function getBasemapScheme(name) {
   return BASEMAP_SCHEMES[key] || BASEMAP_SCHEMES.dark;
 }
 
-export function getPMTilesStyle(pmtilesUrl, schemeName = "dark") {
+export function getPMTilesStyle(pmtilesUrl, schemeName = "dark", projectionType = "mercator") {
   const scheme = getBasemapScheme(schemeName);
+  const proj = typeof projectionType === "object" ? (projectionType?.type || "mercator") : (projectionType || "mercator");
   return {
     version: 8,
     name: `MICAPS-${scheme.name}-Basemap`,
+    projection: {
+      type: proj,
+    },
     glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
     sources: {
       "china-vector": {
