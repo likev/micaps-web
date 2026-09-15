@@ -163,12 +163,13 @@ export function getPMTilesStyle(pmtilesUrl, schemeName = "dark", projectionType 
           "fill-opacity": scheme.fillOpacity,
         },
       },
-      // --- Level 5: County / District Polygons (z8 - z12+, level=district) ---
+      // --- Level 5: County / District Polygons (z7 - z12+, level=district) ---
       {
         id: "county-fill",
         type: "fill",
         source: "china-vector",
         "source-layer": "citys",
+        minzoom: 7,
         filter: ["==", ["get", "level"], "district"],
         paint: {
           "fill-color": scheme.fills.county,
@@ -193,6 +194,7 @@ export function getPMTilesStyle(pmtilesUrl, schemeName = "dark", projectionType 
         type: "line",
         source: "china-vector",
         "source-layer": "citys",
+        minzoom: 7,
         filter: ["==", ["get", "level"], "district"],
         paint: {
           "line-color": scheme.boundaries.county.color,

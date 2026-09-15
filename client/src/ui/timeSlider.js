@@ -4,7 +4,11 @@ import { generateDynamicForecastCycles } from "../utils/timelineSync.js";
 import { schedulePrefetch } from "../services/prefetchService.js";
 import { DEFAULT_MOCK_OBS_FILES } from "../config/presets.js";
 
+export const DEFAULT_PLAYBACK_MS = 1500;
+
 let playTimer = null;
+let isTickLoading = false;
+let playbackLoopOptions = { loop: true };
 let currentMode = "nwp"; // "nwp" or "obs"
 let currentStepLength = 6; // 6h forecast, 3h surface, 12h upper-air
 
@@ -236,13 +240,14 @@ export function setTimeSliderVisible(visible = true) {
 export function initTimeSlider(containerId = "timeslider-container", onTimeChange) {
   const container = document.getElementById(containerId);
   if (!container) return;
+  pausePlayback();
   onTimeChangeCallback = onTimeChange;
   container.classList.add("hidden");
 
   container.innerHTML = `
     <div class="timeline-stepper">
       <button id="btn-prev" class="step-nav-btn" title="Previous Step (wraps)">◀</button>
-      <button id="btn-play" class="play-btn" title="Play / Pause Animation" aria-label="Play / Pause Animation" aria-pressed="false">▶</button>
+      <button id="btn-play" class="play-btn" title="Play / Pause Animation (loops)" aria-label="Play Animation" aria-pressed="false" aria-keyshortcuts="Space">▶</button>
       <button id="btn-next" class="step-nav-btn" title="Next Step (wraps)">▶</button>
       <div class="step-length-control">
         <label for="select-step-length" class="step-length-label">Step:</label>
@@ -252,6 +257,14 @@ export function initTimeSlider(containerId = "timeslider-container", onTimeChang
           <option value="6" selected>6h</option>
           <option value="12">12h</option>
           <option value="24">24h</option>
+        </select>
+      </div>
+      <div class="playback-speed-control">
+        <label for="select-playback-speed" class="step-length-label">Speed:</label>
+        <select id="select-playback-speed" class="step-length-select" title="Change animation playback speed">
+          <option value="3000">0.5x</option>
+          <option value="1500" selected>1x</option>
+          <option value="750">2x</option>
         </select>
       </div>
     </div>
@@ -273,50 +286,84 @@ export function initTimeSlider(containerId = "timeslider-container", onTimeChang
     </div>
   `;
 
-  document.getElementById("btn-prev")?.addEventListener("click", () => step(-1, { source: "btn-prev", directions: ["prev"] }));
-  document.getElementById("btn-next")?.addEventListener("click", () => step(1, { source: "btn-next", directions: ["next"] }));
-
-  document.getElementById("btn-play")?.addEventListener("click", () => {
-    if (playTimer) {
+  const btnPrev = document.getElementById("btn-prev");
+  if (btnPrev) {
+    btnPrev.onclick = () => {
       pausePlayback();
-    } else {
-      startPlayback();
-    }
-  });
+      step(-1, { source: "btn-prev", directions: ["prev"] });
+    };
+  }
+
+  const btnNext = document.getElementById("btn-next");
+  if (btnNext) {
+    btnNext.onclick = () => {
+      pausePlayback();
+      step(1, { source: "btn-next", directions: ["next"] });
+    };
+  }
+
+  const btnPlay = document.getElementById("btn-play");
+  if (btnPlay) {
+    btnPlay.onclick = () => {
+      if (appState.get("isPlaying")) {
+        pausePlayback();
+      } else {
+        startPlayback();
+      }
+    };
+  }
 
   const selStep = document.getElementById("select-step-length");
   if (selStep) {
-    selStep.addEventListener("change", (e) => {
+    // R3: property assignment (not addEventListener) so re-init is idempotent,
+    // same treatment M1 gave the transport buttons above.
+    selStep.onchange = (e) => {
       const newStep = parseInt(e.target.value, 10) || 6;
       setStepLength(newStep, true);
-    });
+    };
+  }
+
+  const selSpeed = document.getElementById("select-playback-speed");
+  if (selSpeed) {
+    const curSpeed = appState.get("playbackSpeed") || DEFAULT_PLAYBACK_MS;
+    selSpeed.value = String(curSpeed);
+    // R3: property assignment — see selStep note above.
+    selSpeed.onchange = (e) => {
+      const newSpeed = parseInt(e.target.value, 10) || DEFAULT_PLAYBACK_MS;
+      setPlaybackSpeed(newSpeed);
+    };
   }
 
   const selInit = document.getElementById("select-init-time");
   if (selInit) {
-    selInit.addEventListener("change", (e) => {
+    // R3: property assignment — see selStep note above.
+    selInit.onchange = (e) => {
       const newCycle = e.target.value;
       if (newCycle && newCycle !== currentInitCycle) {
         currentInitCycle = newCycle;
         updateLabels();
         if (onTimeChangeCallback) {
-          onTimeChangeCallback({
+          // R2: route through fireTimeChange so a throwing/slow init callback
+          // cannot produce an unhandled rejection from this ignored return.
+          fireTimeChange({
             isInitChange: true,
             initCycle: newCycle,
             period: discretePeriods[currentPeriodIdx] ?? 24,
           });
         }
       }
-    });
+    };
   }
 
   renderChips();
   updateLabels();
   // Re-sync step-length select in case setTimelineMode was called before the DOM was ready
   updateStepLengthOptions(isUpperAirMode, currentStepLength);
+  updatePlayButtonDisabledState();
 }
 
 export function setStepLength(step, triggerCallback = false) {
+  pausePlayback();
   currentStepLength = parseInt(step, 10) || (currentMode === "obs" ? 3 : 6);
   const selStep = typeof document !== "undefined" ? document.getElementById("select-step-length") : null;
   if (selStep) {
@@ -357,9 +404,11 @@ export function setStepLength(step, triggerCallback = false) {
       if (typeof payload === "number") {
         // wrap in object for seq-aware callers while keeping number via valueOf
         const boxed = { period: payload, stepLength: currentStepLength, _seq: seq, valueOf() { return payload; } };
-        onTimeChangeCallback(boxed);
+        // R2: swallow via fireTimeChange — this return is ignored by callers.
+        fireTimeChange(boxed);
       } else {
-        onTimeChangeCallback(payload);
+        // R2: same — ignored return, must not reject unhandled.
+        fireTimeChange(payload);
       }
     }
   } else {
@@ -375,9 +424,11 @@ export function setStepLength(step, triggerCallback = false) {
     updateLabels();
     renderChips();
     if (triggerCallback && onTimeChangeCallback && obsFiles[currentObsIdx]) {
-      onTimeChangeCallback({ isObs: true, file: obsFiles[currentObsIdx], stepLength: currentStepLength, _seq: ++periodStepSeq });
+      // R2: swallow via fireTimeChange — ignored return, must not reject unhandled.
+      fireTimeChange({ isObs: true, file: obsFiles[currentObsIdx], stepLength: currentStepLength, _seq: ++periodStepSeq });
     }
   }
+  updatePlayButtonDisabledState();
 }
 
 function renderChips() {
@@ -401,10 +452,12 @@ function renderChips() {
       btn.textContent = timeLabel;
       btn.title = formatObsTimestamp(file);
       btn.addEventListener("click", () => {
+        pausePlayback();
         currentObsIdx = idx;
         updateLabels();
         renderChips();
-        if (onTimeChangeCallback) onTimeChangeCallback({ isObs: true, file, _seq: ++periodStepSeq });
+        // R2: ignored return — must not reject unhandled.
+        fireTimeChange({ isObs: true, file, _seq: ++periodStepSeq });
       });
       chipsContainer.appendChild(btn);
     });
@@ -417,6 +470,7 @@ function renderChips() {
       btn.setAttribute("aria-label", period === 0 ? "Analysis 000h" : `Forecast +${period}h`);
       btn.textContent = period === 0 ? "000h" : `+${period}h`;
       btn.addEventListener("click", () => {
+        pausePlayback();
         currentPeriodIdx = idx;
         const p = discretePeriods[idx];
         appState.set("period", p);
@@ -425,7 +479,8 @@ function renderChips() {
         if (onTimeChangeCallback) {
           const seq = ++periodStepSeq;
           const boxed = { period: p, _seq: seq, valueOf() { return p; } };
-          onTimeChangeCallback(boxed);
+          // R2: ignored return — must not reject unhandled.
+          fireTimeChange(boxed);
         }
       });
       chipsContainer.appendChild(btn);
@@ -436,6 +491,7 @@ function renderChips() {
   try {
     chipsContainer.querySelector(".chip-btn.active")?.scrollIntoView({ inline: "nearest", block: "nearest" });
   } catch {}
+  updatePlayButtonDisabledState();
 }
 
 function updateLabels() {
@@ -493,6 +549,24 @@ function updateLabels() {
   }
 }
 
+// R2: single choke point for time-change callbacks — sync throws and async
+// rejections are logged and swallowed (resolving null) so manual
+// step/chip/keyboard paths, which ignore the return, can never produce
+// unhandled promise rejections. Playback serialization is preserved:
+// step() still awaits the callback promise before reporting completion.
+function fireTimeChange(payload) {
+  if (!onTimeChangeCallback) return null;
+  try {
+    return Promise.resolve(onTimeChangeCallback(payload)).catch((err) => {
+      console.warn("[TimeSlider] Time-change error:", err);
+      return null;
+    });
+  } catch (err) {
+    console.warn("[TimeSlider] Time-change error:", err);
+    return Promise.resolve(null);
+  }
+}
+
 export function step(delta, options = {}) {
   let directions = options.directions || options.prefetchDirections;
   if (!directions) {
@@ -501,12 +575,17 @@ export function step(delta, options = {}) {
   }
 
   if (currentMode === "obs") {
-    if (obsFiles.length === 0) return;
+    if (obsFiles.length === 0 || (options.source === "btn-play" && obsFiles.length <= 1)) {
+      return Promise.resolve({ wrapped: false, noop: true, mode: "obs" });
+    }
+    const prevIdx = currentObsIdx;
     currentObsIdx = (currentObsIdx + delta + obsFiles.length) % obsFiles.length;
+    const wrapped = delta > 0 ? currentObsIdx < prevIdx : (delta < 0 ? currentObsIdx > prevIdx : false);
     updateLabels();
     renderChips();
+    let callbackPromise = null;
     if (onTimeChangeCallback) {
-      onTimeChangeCallback({
+      callbackPromise = fireTimeChange({
         isObs: true,
         file: obsFiles[currentObsIdx],
         _seq: ++periodStepSeq,
@@ -514,12 +593,24 @@ export function step(delta, options = {}) {
         source: options.source || (delta < 0 ? "btn-prev" : "btn-next"),
       });
     }
+    return Promise.resolve(callbackPromise).then(() => ({
+      wrapped,
+      mode: "obs",
+      index: currentObsIdx,
+      file: obsFiles[currentObsIdx],
+    }));
   } else {
+    if (discretePeriods.length === 0 || (options.source === "btn-play" && discretePeriods.length <= 1)) {
+      return Promise.resolve({ wrapped: false, noop: true, mode: "nwp" });
+    }
+    const prevIdx = currentPeriodIdx;
     currentPeriodIdx = (currentPeriodIdx + delta + discretePeriods.length) % discretePeriods.length;
+    const wrapped = delta > 0 ? currentPeriodIdx < prevIdx : (delta < 0 ? currentPeriodIdx > prevIdx : false);
     const period = discretePeriods[currentPeriodIdx];
     appState.set("period", period);
     updateLabels();
     renderChips();
+    let callbackPromise = null;
     if (onTimeChangeCallback) {
       const seq = ++periodStepSeq;
       const boxed = {
@@ -529,47 +620,176 @@ export function step(delta, options = {}) {
         source: options.source || (delta < 0 ? "btn-prev" : "btn-next"),
         valueOf() { return period; },
       };
-      onTimeChangeCallback(boxed);
+      callbackPromise = fireTimeChange(boxed);
+    }
+    return Promise.resolve(callbackPromise).then(() => ({
+      wrapped,
+      mode: "nwp",
+      index: currentPeriodIdx,
+      period,
+    }));
+  }
+}
+
+function setPlayButtonBusy(isBusy) {
+  if (typeof document === "undefined") return;
+  const btnPlay = document.getElementById("btn-play");
+  if (btnPlay) {
+    if (isBusy) {
+      btnPlay.setAttribute("aria-busy", "true");
+      btnPlay.classList.add("loading");
+    } else {
+      btnPlay.removeAttribute("aria-busy");
+      btnPlay.classList.remove("loading");
     }
   }
 }
 
-function startPlayback() {
+function updatePlayButtonDisabledState() {
+  if (typeof document === "undefined") return;
+  const btnPlay = document.getElementById("btn-play");
+  if (!btnPlay) return;
+  const isSingle = (currentMode === "obs" && obsFiles.length <= 1) || (currentMode === "nwp" && discretePeriods.length <= 1);
+  if (isSingle) {
+    btnPlay.setAttribute("disabled", "true");
+    btnPlay.classList.add("disabled");
+    btnPlay.title = "Animation requires at least 2 time steps";
+    if (appState.get("isPlaying")) {
+      pausePlayback();
+    }
+  } else {
+    btnPlay.removeAttribute("disabled");
+    btnPlay.classList.remove("disabled");
+    btnPlay.title = "Play / Pause Animation (loops)";
+  }
+}
+
+function scheduleNextTick(delay) {
+  if (playTimer) {
+    clearTimeout(playTimer);
+    playTimer = null;
+  }
+  playTimer = setTimeout(runTick, delay);
+}
+
+async function runTick() {
+  if (!appState.get("isPlaying")) return;
+  if (isTickLoading) return;
+
+  const speed = Number(appState.get("playbackSpeed")) || DEFAULT_PLAYBACK_MS;
+  const t0 = Date.now();
+  isTickLoading = true;
+  setPlayButtonBusy(true);
+
+  let stepResult = null;
+  try {
+    stepResult = await step(1, { source: "btn-play", directions: ["next"] });
+  } catch (err) {
+    console.warn("[TimeSlider] Playback step error:", err);
+  } finally {
+    isTickLoading = false;
+    setPlayButtonBusy(false);
+  }
+
+  if (!appState.get("isPlaying")) return;
+
+  if (stepResult?.wrapped && playbackLoopOptions.loop === false) {
+    pausePlayback();
+    return;
+  }
+
+  const elapsed = Date.now() - t0;
+  const nextDelay = Math.max(50, speed - elapsed);
+  scheduleNextTick(nextDelay);
+}
+
+export function startPlayback(options = {}) {
+  // Re-entrancy guard (M1): Clear existing timer if any
+  if (playTimer) {
+    clearTimeout(playTimer);
+    playTimer = null;
+  }
+
+  // Singleton timeline guard (m7): cannot animate single or empty timelines
+  if ((currentMode === "obs" && obsFiles.length <= 1) || (currentMode === "nwp" && discretePeriods.length <= 1)) {
+    return;
+  }
+
+  playbackLoopOptions = { loop: options.loop !== false };
+
   if (typeof document !== "undefined") {
     const btnPlay = document.getElementById("btn-play");
     if (btnPlay) {
       btnPlay.textContent = "❚❚";
       btnPlay.classList.add("active");
       btnPlay.setAttribute("aria-pressed", "true");
+      btnPlay.setAttribute("aria-label", "Pause Animation");
     }
   }
   appState.set("isPlaying", true);
 
-  // Immediately prefetch next step when playback starts
-  try {
-    schedulePrefetch(null, 0, { directions: ["next"] });
-  } catch {}
+  // m4: Immediately prefetch next step for the active window
+  import("./tabWindowManager.js")
+    .then(({ getActiveWindow }) => {
+      const win = getActiveWindow?.();
+      schedulePrefetch(win || null, 0, { directions: ["next"] });
+    })
+    .catch(() => {
+      try { schedulePrefetch(null, 0, { directions: ["next"] }); } catch {}
+    });
 
-  playTimer = setInterval(() => {
-    step(1, { source: "btn-play", directions: ["next"] });
-  }, appState.get("playbackSpeed") || 1800);
+  const speed = Number(appState.get("playbackSpeed")) || DEFAULT_PLAYBACK_MS;
+  scheduleNextTick(speed);
 }
 
-function pausePlayback() {
+export function pausePlayback() {
   if (playTimer) {
-    clearInterval(playTimer);
+    clearTimeout(playTimer);
     playTimer = null;
   }
+  isTickLoading = false;
+  setPlayButtonBusy(false);
   if (typeof document !== "undefined") {
     const btnPlay = document.getElementById("btn-play");
     if (btnPlay) {
       btnPlay.textContent = "▶";
       btnPlay.classList.remove("active");
       btnPlay.setAttribute("aria-pressed", "false");
+      btnPlay.setAttribute("aria-label", "Play Animation");
     }
   }
   appState.set("isPlaying", false);
 }
+
+export function setPlaybackSpeed(speedMs) {
+  const speed = parseInt(speedMs, 10) || DEFAULT_PLAYBACK_MS;
+  appState.set("playbackSpeed", speed);
+  if (typeof document !== "undefined") {
+    const sel = document.getElementById("select-playback-speed");
+    if (sel && sel.value !== String(speed)) {
+      sel.value = String(speed);
+    }
+  }
+  // R1: skip re-arm while a tick is loading — the in-flight runTick already
+  // reads the fresh speed (runTick :658) and re-arms itself on settle.
+  if (appState.get("isPlaying") && !isTickLoading) {
+    scheduleNextTick(speed);
+  }
+}
+
+appState.subscribe("playbackSpeed", (speed) => {
+  const speedVal = parseInt(speed, 10) || DEFAULT_PLAYBACK_MS;
+  if (typeof document !== "undefined") {
+    const sel = document.getElementById("select-playback-speed");
+    if (sel && sel.value !== String(speedVal)) {
+      sel.value = String(speedVal);
+    }
+  }
+  // R1: same guard as setPlaybackSpeed — in-flight tick re-arms itself.
+  if (appState.get("isPlaying") && !isTickLoading) {
+    scheduleNextTick(speedVal);
+  }
+});
 
 export function setTimelineMode(mode, customData = {}) {
   currentMode = mode === "obs" ? "obs" : "nwp";
@@ -638,24 +858,29 @@ export function setTimelineMode(mode, customData = {}) {
     }
   }
 
-  pausePlayback();
+  if (customData.pause !== false && !customData.silent) {
+    pausePlayback();
+  }
   updateLabels();
   renderChips();
+  updatePlayButtonDisabledState();
   if (customData.visible !== false) {
     setTimeSliderVisible(true);
   }
 }
 
 // Pause playback when window/tab is hidden to save resources and avoid background fetch spam
-if (typeof document !== "undefined" && typeof document.addEventListener === "function" && !document.__timeSliderVisibilityBound) {
-  document.__timeSliderVisibilityBound = true;
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) pausePlayback();
+export function bindVisibilityPause(doc = (typeof document !== "undefined" ? document : null)) {
+  if (!doc || typeof doc.addEventListener !== "function" || doc.__timeSliderVisibilityBound) return;
+  doc.__timeSliderVisibilityBound = true;
+  doc.addEventListener("visibilitychange", () => {
+    if (doc.hidden) pausePlayback();
   });
-  if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
-    window.addEventListener("blur", () => pausePlayback());
-  }
+  // Note (m8 fix): window "blur" listener is omitted so focusing DevTools or secondary monitor
+  // does not pause playback while tab is still visible.
 }
+
+bindVisibilityPause();
 
 export function getPeriodStepSeq() { return periodStepSeq; }
 

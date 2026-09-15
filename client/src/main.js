@@ -154,7 +154,7 @@ async function bootstrap() {
       if (win.isObservation) {
         const effectiveLevel = win.level || group.defaultLevel || 500;
         const obsPath = group.id?.includes("upper") ? `UPPER_AIR/PLOT/${effectiveLevel}` : "SURFACE/PLOT_GLOBAL_3H";
-        const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle);
+        const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle, win);
         win.obsTime = latestFile;
         updateWindowTitle(win);
       } else {
@@ -162,8 +162,11 @@ async function bootstrap() {
         const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", win.level || 500);
         win.forecastCycle = cycles[0];
         updateWindowTitle(win);
+        const nwpPayload = { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 };
         if (getActiveWindow() === win) {
-          setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 });
+          setTimelineMode("nwp", nwpPayload);
+        } else {
+          win._pendingNwp = nwpPayload;
         }
       }
       await loadPresetGroup(win.map, group, win.period, null, win);
@@ -217,7 +220,7 @@ async function bootstrap() {
       setWindowHeaderPreset(win, group.id);
       if (win.isObservation) {
         const obsPath = group.id?.includes("upper") ? `UPPER_AIR/PLOT/${effectiveLevel}` : "SURFACE/PLOT_GLOBAL_3H";
-        const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle);
+        const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle, win);
         win.obsTime = latestFile;
         updateWindowTitle(win);
       } else {
@@ -225,7 +228,12 @@ async function bootstrap() {
         const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", win.level || 500);
         win.forecastCycle = cycles[0];
         updateWindowTitle(win);
-        setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 });
+        const nwpPayload = { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 };
+        if (getActiveWindow() === win) {
+          setTimelineMode("nwp", nwpPayload);
+        } else {
+          win._pendingNwp = nwpPayload;
+        }
       }
       await loadPresetGroup(map, group, win.period, overrideLevel, win);
     },
@@ -241,6 +249,10 @@ async function bootstrap() {
       await changeVerticalLevel(m, dir);
     },
     onToggleSplit: () => toggleTabsAndSplit(),
+    onTogglePlay: () => {
+      const btnPlay = document.getElementById("btn-play");
+      btnPlay?.click();
+    },
   });
 
   initCatalogDrawer("catalog-drawer", async ({ model, element, level, period, obsTime, isObservation }) => {
@@ -379,6 +391,9 @@ async function bootstrap() {
       win.loadSeq = (win.loadSeq || 0) + 1;
       const expectedSeq = win.loadSeq;
       win.period = period;
+      if (win._nwpTimeline) {
+        win._nwpTimeline.period = period;
+      }
       appState.set("period", period);
       updateWindowTitle(win);
 
@@ -1059,7 +1074,7 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
             ? `UPPER_AIR/${layer.element || "PLOT"}/${targetLevel || 500}`
             : `${layer.model}/${layer.element}`));
         let file = win?.obsTime;
-        if (!file || (group.isObservation && level !== null)) {
+        if (!file || (!isTimeStep && group.isObservation && level !== null)) {
           file = await syncObservationTimeline(obsPath, win?.obsTime, winTitle, win);
           if (win) {
             win.obsTime = file;

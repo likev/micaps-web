@@ -75,6 +75,12 @@ describe("Multi-Tier Vector Basemap (World / China / Province / City / County)",
     expect(countyBndIdx).toBeLessThan(cityBndIdx);
     expect(cityBndIdx).toBeLessThan(provBndIdx);
     expect(provBndIdx).toBeLessThan(chinaBndIdx);
+
+    // County / district layers suppressed at low map zoom levels (minzoom: 7)
+    const countyFill = style.layers.find((l) => l.id === "county-fill");
+    const countyBnd = style.layers.find((l) => l.id === "county-boundary");
+    expect(countyFill.minzoom).toBe(7);
+    expect(countyBnd.minzoom).toBe(7);
   });
 
   test("resolvePMTilesUrl resolves URLs and safely handles non-string / empty inputs", () => {

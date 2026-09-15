@@ -20,9 +20,9 @@ function isTextInput(el) {
 let lastKeyTime = 0;
 const REPEAT_THROTTLE_MS = 150;
 
-export function initKeyboardShortcuts({ onPeriodStep, onLevelStep, onToggleSplit }) {
-  if (typeof window === "undefined") return;
-  window.addEventListener(
+export function initKeyboardShortcuts({ onPeriodStep, onLevelStep, onToggleSplit, onTogglePlay }, targetWindow = (typeof window !== "undefined" ? window : null)) {
+  if (!targetWindow) return;
+  targetWindow.addEventListener(
     "keydown",
     async (e) => {
       if (isTextInput(e.target)) return;
@@ -32,8 +32,15 @@ export function initKeyboardShortcuts({ onPeriodStep, onLevelStep, onToggleSplit
       const isUp = e.key === "ArrowUp" || e.key === "Up" || e.code === "ArrowUp";
       const isDown = e.key === "ArrowDown" || e.key === "Down" || e.code === "ArrowDown";
       const isSplit = e.key === "F4" || (e.altKey && (e.key === "s" || e.key === "S" || e.code === "KeyS"));
+      const isSpace = e.code === "Space" || e.key === " " || e.key === "Spacebar";
 
-      if (!isLeft && !isRight && !isUp && !isDown && !isSplit) {
+      if (!isLeft && !isRight && !isUp && !isDown && !isSplit && !isSpace) {
+        return;
+      }
+
+      // R4: Space on a focused button already activates it natively (click on
+      // key-up) — running the play shortcut too would double-toggle.
+      if (isSpace && (e.target?.id === "btn-play" || e.target?.tagName === "BUTTON")) {
         return;
       }
 
@@ -47,7 +54,10 @@ export function initKeyboardShortcuts({ onPeriodStep, onLevelStep, onToggleSplit
       }
       lastKeyTime = Date.now();
 
-      if (isLeft) {
+      if (isSpace) {
+        e.preventDefault();
+        onTogglePlay?.();
+      } else if (isLeft) {
         e.preventDefault();
         await onPeriodStep?.(-1);
       } else if (isRight) {

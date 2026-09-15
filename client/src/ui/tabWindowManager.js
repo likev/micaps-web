@@ -520,15 +520,22 @@ export function focusWindow(tabId, winIdx) {
     isObservation: activeWin.isObservation,
   });
 
+  // Pause any running playback when switching windows (L1)
+  import("./timeSlider.js").then(({ pausePlayback }) => {
+    try { pausePlayback(); } catch {}
+  });
+
   // Apply pending or cached observation timeline for active window
   if (activeWin._pendingTimeline) {
     const pt = activeWin._pendingTimeline;
+    if (activeWin.obsTime) pt.file = activeWin.obsTime;
     delete activeWin._pendingTimeline;
     import("./timeSlider.js").then(({ setTimelineMode }) => {
       try { setTimelineMode("obs", pt); } catch {}
     });
   } else if (activeWin.isObservation && activeWin._obsTimeline) {
     const ot = activeWin._obsTimeline;
+    if (activeWin.obsTime) ot.file = activeWin.obsTime;
     import("./timeSlider.js").then(({ setTimelineMode }) => {
       try { setTimelineMode("obs", ot); } catch {}
     });
@@ -537,12 +544,14 @@ export function focusWindow(tabId, winIdx) {
   // Apply pending or cached NWP timeline for active window
   if (activeWin._pendingNwp) {
     const pn = activeWin._pendingNwp;
+    if (activeWin.period !== undefined) pn.period = activeWin.period;
     delete activeWin._pendingNwp;
     import("./timeSlider.js").then(({ setTimelineMode }) => {
       try { setTimelineMode("nwp", pn); } catch {}
     });
   } else if (!activeWin.isObservation && activeWin._nwpTimeline) {
     const nt = activeWin._nwpTimeline;
+    if (activeWin.period !== undefined) nt.period = activeWin.period;
     import("./timeSlider.js").then(({ setTimelineMode }) => {
       try { setTimelineMode("nwp", nt); } catch {}
     });
