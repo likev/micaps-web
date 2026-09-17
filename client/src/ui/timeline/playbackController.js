@@ -175,19 +175,10 @@ export function startPlayback(options = {}) {
   appState.set("isPlaying", true);
 
   // m4: Immediately prefetch next step for the active window
-  if (typeof timelineState.activeWindowProvider === "function") {
-    const win = timelineState.activeWindowProvider();
-    schedulePrefetch(win || null, 0, { directions: ["next"] });
-  } else {
-    import("../tabWindowManager.js")
-      .then(({ getActiveWindow }) => {
-        const win = getActiveWindow?.();
-        schedulePrefetch(win || null, 0, { directions: ["next"] });
-      })
-      .catch(() => {
-        try { schedulePrefetch(null, 0, { directions: ["next"] }); } catch {}
-      });
-  }
+  const win = typeof timelineState.activeWindowProvider === "function"
+    ? timelineState.activeWindowProvider()
+    : null;
+  schedulePrefetch(win || null, 0, { directions: ["next"] });
 
   const speed = Number(appState.get("playbackSpeed")) || DEFAULT_PLAYBACK_MS;
   scheduleNextTick(speed);
