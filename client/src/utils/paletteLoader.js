@@ -12,6 +12,8 @@ const ELEMENT_PALETTE_CATEGORY = {
   CAPE:  "STABILITY",
   VIS:   "ENV_VIS",
   DTD:   "TMP",
+  VOR:   "PRS_HGT",
+  DIV:   "PRS_HGT",
 };
 
 // Cache: category → [{name, path}]

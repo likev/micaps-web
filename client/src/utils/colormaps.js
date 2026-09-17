@@ -63,6 +63,28 @@ const DEFAULT_COLORMAPS = {
     { val: 18, color: [220, 70, 40, 255] },
     { val: 30, color: [140, 40, 30, 255] },
   ],
+  VOR: [
+    { val: -20, color: [30, 60, 180, 255] },
+    { val: -10, color: [60, 120, 220, 255] },
+    { val: -4, color: [140, 190, 240, 255] },
+    { val: -2, color: [200, 225, 250, 255] },
+    { val: 0, color: [240, 240, 240, 0] },
+    { val: 2, color: [254, 224, 182, 255] },
+    { val: 4, color: [253, 174, 97, 255] },
+    { val: 10, color: [227, 74, 51, 255] },
+    { val: 20, color: [179, 0, 0, 255] },
+  ],
+  DIV: [
+    { val: -20, color: [118, 42, 131, 255] },
+    { val: -10, color: [153, 112, 171, 255] },
+    { val: -4, color: [194, 165, 207, 255] },
+    { val: -2, color: [231, 212, 232, 255] },
+    { val: 0, color: [245, 245, 245, 0] },
+    { val: 2, color: [254, 224, 182, 255] },
+    { val: 4, color: [253, 174, 97, 255] },
+    { val: 10, color: [227, 74, 51, 255] },
+    { val: 20, color: [179, 0, 0, 255] },
+  ],
 };
 
 const FALLBACK_COLORMAP = DEFAULT_COLORMAPS.TMP;
@@ -258,6 +280,12 @@ export function getElementLevels(element = "TMP", zMin, zMax, colormap = null) {
   }
   if (elUpper === "DTD") {
     return [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30];
+  }
+  if (elUpper === "VOR") {
+    return [-20, -15, -10, -8, -6, -4, -2, 0, 2, 4, 6, 8, 10, 15, 20];
+  }
+  if (elUpper === "DIV") {
+    return [-20, -15, -10, -8, -6, -4, -2, 0, 2, 4, 6, 8, 10, 15, 20];
   }
 
   if (zMin !== undefined && zMax !== undefined && zMax > zMin) {

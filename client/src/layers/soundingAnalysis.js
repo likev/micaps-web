@@ -5,6 +5,16 @@ import { addOrUpdateLayer } from "../ui/layerControl.js";
 import { smoothGrid2D } from "../utils/smoothContour.js";
 import { getHexColor } from "../utils/colormaps.js";
 import { formatContourLabel } from "../utils/formatters.js";
+import { generateStationWindGrid } from "./windLayer.js";
+import {
+  buildKinematicGridData,
+  VOR_LEVELS,
+  DIV_LEVELS,
+  VOR_BOLD,
+  DIV_BOLD,
+  VOR_COLOR,
+  DIV_COLOR,
+} from "./kinematics.js";
 
 const standardHgtLevels = {
   1000: [-80, -40, 0, 40, 80, 120, 160, 200, 240, 280, 320],
@@ -230,6 +240,56 @@ export const SOUNDING_CONTOUR_CONFIGS = {
     showLine: false,
     showRaster: true,
   },
+  VOR: {
+    name: "Relative Vorticity",
+    element: "VOR",
+    unit: "1e-5/s",
+    defaultColor: VOR_COLOR,
+    colormap: "VOR",
+    isKinematic: true,
+    extract: null,
+    showFill: false,
+    showLine: true,
+    showRaster: false,
+    getLevels: (level, minV, maxV) => {
+      let min = minV;
+      let max = maxV;
+      if (typeof level === "number" && typeof minV === "number" && maxV === undefined) {
+        min = level;
+        max = minV;
+      }
+      if (typeof max === "number" && typeof min === "number" && Math.abs(max - min) < 5) {
+        return Array.from(griddata.autoLevels(min, max, 8));
+      }
+      return VOR_LEVELS;
+    },
+    getBoldValues: () => VOR_BOLD,
+  },
+  DIV: {
+    name: "Divergence",
+    element: "DIV",
+    unit: "1e-5/s",
+    defaultColor: DIV_COLOR,
+    colormap: "DIV",
+    isKinematic: true,
+    extract: null,
+    showFill: false,
+    showLine: true,
+    showRaster: false,
+    getLevels: (level, minV, maxV) => {
+      let min = minV;
+      let max = maxV;
+      if (typeof level === "number" && typeof minV === "number" && maxV === undefined) {
+        min = level;
+        max = minV;
+      }
+      if (typeof max === "number" && typeof min === "number" && Math.abs(max - min) < 5) {
+        return Array.from(griddata.autoLevels(min, max, 8));
+      }
+      return DIV_LEVELS;
+    },
+    getBoldValues: () => DIV_BOLD,
+  },
 };
 
 function normalizeSoundingElementKey(elem) {
@@ -239,6 +299,8 @@ function normalizeSoundingElementKey(elem) {
   if (norm === "TD" || norm === "DPT" || norm === "DEWPOINT" || norm === "DEW_POINT") return "TD";
   if (norm === "WIND" || norm === "WS" || norm === "WINDSPEED" || norm === "WIND_SPEED" || norm === "FF") return "WIND";
   if (norm === "DTD" || norm === "T-TD" || norm === "TTD" || norm === "DEPRESSION" || norm === "DPTDPR") return "DTD";
+  if (norm === "VOR" || norm === "VORT" || norm === "VORTICITY" || norm === "RVOR" || norm === "REL_VOR") return "VOR";
+  if (norm === "DIV" || norm === "DIVERGENCE") return "DIV";
   return "HGT";
 }
 
@@ -248,9 +310,13 @@ export function analyzeAndRenderSoundingElementContour(map, stationsGeoJSON, lev
     return null;
   }
 
+  const elementKey = normalizeSoundingElementKey(rawElement);
+  if (elementKey === "VOR" || elementKey === "DIV") {
+    return analyzeAndRenderSoundingKinematicContour(map, stationsGeoJSON, level, elementKey, options, win);
+  }
+
   try {
     const numLevel = parseInt(level, 10) || 500;
-    const elementKey = normalizeSoundingElementKey(rawElement);
     const cfg = SOUNDING_CONTOUR_CONFIGS[elementKey] || SOUNDING_CONTOUR_CONFIGS.HGT;
 
     const result = calculateFieldContours(stationsGeoJSON, cfg.extract, {
@@ -513,4 +579,162 @@ function calculateFieldContours(stationsGeoJSON, valueExtractor, config = {}, le
       values: interpolated,
     },
   };
+}
+
+export function analyzeAndRenderSoundingKinematicContour(map, stationsGeoJSON, level = 500, rawElement = "VOR", options = {}, win = null) {
+  if (!map || !stationsGeoJSON || !stationsGeoJSON.features || stationsGeoJSON.features.length < 3) {
+    console.warn("[SoundingAnalysis] Insufficient sounding stations for kinematic contour calculation");
+    return null;
+  }
+
+  try {
+    const numLevel = parseInt(level, 10) || 500;
+    const elementKey = normalizeSoundingElementKey(rawElement);
+    const cfg = SOUNDING_CONTOUR_CONFIGS[elementKey] || SOUNDING_CONTOUR_CONFIGS.VOR;
+
+    // 1. Generate regular station wind grid with level-aware WIND_QC_BOUNDS
+    const windGrid = generateStationWindGrid(stationsGeoJSON, numLevel);
+    if (!windGrid || !windGrid.u || !windGrid.v || !windGrid.header) {
+      console.warn(`[SoundingAnalysis] Fewer than 3 stations have valid wind observations at ${numLevel} hPa for ${cfg.name}`);
+      return null;
+    }
+
+    // 2. Compute kinematic grid (VOR or DIV) with pre-smoothing
+    const kinData = buildKinematicGridData(elementKey, windGrid.u, windGrid.v, windGrid, {
+      smoothInput: true,
+      inputSmoothIterations: 1,
+      inputSmoothWeight: 0.45,
+      smoothOutput: options.smooth !== false,
+      outputSmoothIterations: options.smoothIterations ?? 1,
+      outputSmoothWeight: 0.4,
+    });
+
+    if (!kinData || !kinData.values || kinData.stats.count < 3) {
+      console.warn(`[SoundingAnalysis] Insufficient kinematic grid points for ${cfg.name}`);
+      return null;
+    }
+
+    const { header, values, stats, x, y } = kinData;
+    const nCols = x.length;
+    const nRows = y.length;
+
+    // Fill NaNs with field average for contour extraction
+    const avgVal = stats.mean || 0;
+    const filledValues = new Float32Array(values.length);
+    for (let i = 0; i < values.length; i++) {
+      filledValues[i] = Number.isNaN(values[i]) ? avgVal : values[i];
+    }
+
+    const levels = options.levels || cfg.getLevels(numLevel, stats.min, stats.max);
+    const boldValues = options.boldValues || cfg.getBoldValues(numLevel) || [];
+
+    let lines = [];
+    try {
+      lines = griddata.contour({ data: filledValues, rows: nRows, cols: nCols }, { x, y, levels }) || [];
+    } catch (err) {
+      console.warn(`[SoundingAnalysis] contour calculation failed for ${cfg.name}:`, err);
+      lines = [];
+    }
+
+    if (Array.isArray(lines)) {
+      for (const f of lines) {
+        if (!f.properties) f.properties = {};
+        const val = f.value ?? f.properties?.value ?? f.properties?.level ?? 0;
+        f.properties.value = val;
+        f.properties.label = formatContourLabel(val, elementKey);
+        f.properties.isBold = isFeatureBold(val, boldValues);
+      }
+    }
+
+    let fills = [];
+    try {
+      fills = griddata.contourf({ data: filledValues, rows: nRows, cols: nCols }, { x, y, levels }) || [];
+      if (Array.isArray(fills)) {
+        for (const feature of fills) {
+          if (feature.properties && feature.properties.level) {
+            const midVal = (feature.properties.level[0] + feature.properties.level[1]) / 2;
+            feature.properties.fillColor = getHexColor(midVal, cfg.element, cfg.colormap);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`[SoundingAnalysis] contourf calculation failed for ${cfg.name}:`, err);
+      fills = [];
+    }
+
+    const isolineFC = { type: "FeatureCollection", features: lines || [] };
+    const isobandFC = { type: "FeatureCollection", features: fills || [] };
+
+    const layerId = options.layerId || `contour-sounding-${elementKey.toLowerCase()}-${numLevel}`;
+    const lineColor = options.lineColor || cfg.defaultColor;
+
+    const showFill = options.showFill !== undefined ? Boolean(options.showFill) : false;
+    const showLine = options.showLine !== undefined ? Boolean(options.showLine) : true;
+    const showRaster = options.showRaster !== undefined ? Boolean(options.showRaster) : false;
+    const palettePath = options.palettePath || cfg.palettePath || null;
+    const colormap = options.colormap || (palettePath ? `palette:${layerId}` : (cfg.colormap || cfg.element));
+
+    renderCustomContourGeoJSON(map, isobandFC, isolineFC, {
+      layerId,
+      showFill,
+      showLine,
+      visible: options.visible !== false,
+      lineColor,
+      lineWidth: options.lineWidth || 2.0,
+      boldLineWidth: options.boldLineWidth || 4.0,
+      boldValues,
+      element: cfg.element,
+      colormap,
+      smooth: options.smooth !== false,
+      smoothIterations: options.smoothIterations ?? 2,
+      labelSize: options.labelSize,
+    });
+
+    addOrUpdateLayer({
+      id: layerId,
+      name: `${numLevel} hPa ${cfg.name} (Sounding Analysis)`,
+      type: "contour",
+      element: cfg.element,
+      model: "UPPER_AIR",
+      level: numLevel,
+      derivedFrom: options.derivedFrom || `upperair-obs-${numLevel}`,
+      visible: options.visible !== false,
+      colormap,
+      gridData: {
+        header: {
+          start_lon: x[0],
+          end_lon: x[x.length - 1],
+          start_lat: y[0],
+          end_lat: y[y.length - 1],
+          n_lon: nCols,
+          n_lat: nRows,
+          d_lon: header.d_lon,
+          d_lat: header.d_lat,
+        },
+        values: filledValues,
+        stats,
+      },
+      color: lineColor,
+      removable: true,
+      config: {
+        showFill,
+        showLine,
+        showRaster,
+        lineColor,
+        opacity: options.opacity ?? 0.75,
+        lineWidth: options.lineWidth || 2.0,
+        boldLineWidth: options.boldLineWidth || 4.0,
+        boldValues,
+        smooth: options.smooth !== false,
+        smoothIterations: options.smoothIterations ?? 2,
+        labelSize: options.labelSize,
+        palettePath,
+      },
+    }, win);
+
+    return { lines, levels, pointsCount: kinData.stats.count, element: elementKey, layerId };
+  } catch (err) {
+    console.warn(`[SoundingAnalysis] Failed to analyze sounding kinematic contours for ${rawElement}:`, err);
+    return null;
+  }
 }

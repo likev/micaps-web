@@ -4,7 +4,7 @@ import { initNavBar, refreshNavBarPresets, setNavBarLevel, setNavBarPreset } fro
 import { initCatalogDrawer } from "./ui/catalogDrawer.js";
 import { initLayerControl, addOrUpdateLayer, syncLayerControlForWindow, clearWindowWeatherLayers, getLayerById, getLayersForWindow } from "./ui/layerControl.js";
 import { initTimeSlider, setTimelineMode, setTimeSliderVisible, step as timeSliderStep } from "./ui/timeSlider.js";
-import { handleLayerAction, triggerStationStreamlines, triggerRasterOverlay } from "./ui/layerActions.js";
+import { handleLayerAction, triggerStationStreamlines, triggerRasterOverlay, triggerVortDivOverlay } from "./ui/layerActions.js";
 import { initTooltip } from "./ui/tooltip.js";
 import { renderContourLayers, removeAllContourLayers } from "./layers/contourLayer.js";
 import { renderBinaryRaster, renderGridRaster, removeRasterLayer } from "./layers/rasterLayer.js";
@@ -281,7 +281,8 @@ async function bootstrap() {
       if (model === "UPPER_AIR") await loadUpperAirComposite(map, win.level || 500, latestFile, win);
       else await loadObservationProduct(map, model, element, win.level, latestFile, win);
     } else {
-      const cycles = await resolveForecastCycles(model, element, win.level || 500);
+      const dataElement = (element === "VOR" || element === "DIV") ? "WIND" : element;
+      const cycles = await resolveForecastCycles(model, dataElement, win.level || 500);
       win.forecastCycle = cycles[0];
       updateWindowTitle(win);
       setTimelineMode("nwp", { period: win.period ?? 24, winTitle: winBannerTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 });
@@ -418,6 +419,19 @@ async function bootstrap() {
         await loadPresetGroup(map, activeGroup, period, win.level, win, true, expectedSeq);
       } else {
         await loadWeatherField(map, win.model, win.element, win.level, period, null, win, true, expectedSeq);
+        if (win && expectedSeq !== null && expectedSeq !== undefined && win.loadSeq !== expectedSeq) {
+          return;
+        }
+        const extraLayers = getLayersForWindow(win).filter(
+          (l) => l.type === "contour" && (l.element === "VOR" || l.element === "DIV" || (l.element === "WIND" && l.derivedFrom)) && l.element !== win.element
+        );
+        for (const extra of extraLayers) {
+          extra.gridData = null;
+          await triggerVortDivOverlay(map, extra, win);
+          if (win && expectedSeq !== null && expectedSeq !== undefined && win.loadSeq !== expectedSeq) {
+            return;
+          }
+        }
       }
     }
   });
@@ -441,9 +455,14 @@ async function bootstrap() {
 }
 
 async function loadWeatherField(map, model, element, level, period, customOptions = null, win = null, isTimeStep = false, expectedSeq = null) {
+  const isVOR = element === "VOR";
+  const isDIV = element === "DIV";
+  const isDerivedWind = element === "WIND" && (customOptions?.type === "contour" || (customOptions?.id && customOptions.id.startsWith("contour-")) || customOptions?.derivedFrom);
+  const isVortDiv = isVOR || isDIV || isDerivedWind;
+
   let cycle = win?.forecastCycle;
   if (!cycle) {
-    cycle = await resolveLatestForecastCycle(model, element, level);
+    cycle = await resolveLatestForecastCycle(model, isVortDiv ? "WIND" : element, level);
     if (win) {
       win.forecastCycle = cycle;
       updateWindowTitle(win);
@@ -451,9 +470,14 @@ async function loadWeatherField(map, model, element, level, period, customOption
   }
   const file = `${cycle}.${String(period).padStart(3, "0")}`;
   const path = `${model}/${element}/${level}`;
-  const isWind = element === "WIND" || customOptions?.isWind;
-  const layerId = customOptions?.id || (isWind ? `wind-${element}` : `contour-${element}`);
-  const name = isWind ? `${level} hPa Wind Field (${model})` : `${level} hPa ${element} (${model})`;
+  const dataPath = isVortDiv ? `${model}/WIND/${level}` : path;
+  const isWind = (element === "WIND" && !isDerivedWind) || customOptions?.isWind;
+  const layerId = customOptions?.id || (isWind ? `wind-${element}` : (isVortDiv ? `contour-${model}-${element.toLowerCase()}-${level}` : `contour-${element}`));
+  const name = isWind
+    ? `${level} hPa Wind Field (${model})`
+    : (isVortDiv
+      ? `${level} hPa Derived ${isVOR ? "Relative Vorticity" : (isDIV ? "Divergence" : "Wind Speed")} (${model})`
+      : `${level} hPa ${element} (${model})`);
 
   const existingLayer = getLayerById(layerId, win);
   const snap = win?.layerSnapshots?.find((s) => s.id === layerId || (s.element === element && s.model === model));
@@ -461,18 +485,20 @@ async function loadWeatherField(map, model, element, level, period, customOption
 
   const isHeight = element === "HGT";
   const isTemp = element === "TMP";
-  const defaultLineColor = isHeight ? "#58a6ff" : (isTemp ? "#f85149" : "#ffffff");
+  const defaultLineColor = isHeight ? "#58a6ff" : (isTemp ? "#f85149" : (isVOR ? "#c678dd" : (isDIV ? "#56d4dd" : "#58a6ff")));
   const lineColor = existingLayer?.color || snap?.color || exCfg.lineColor || customOptions?.lineColor || defaultLineColor;
   const opacity = exCfg.opacity ?? customOptions?.opacity ?? 0.75;
-  let showFill = exCfg.showFill ?? customOptions?.showFill ?? (!isHeight && !isWind);
+  let showFill = exCfg.showFill ?? customOptions?.showFill ?? (!isHeight && !isWind && !isVortDiv);
   const showLine = exCfg.showLine ?? customOptions?.showLine ?? !isWind;
-  const lineWidth = exCfg.lineWidth ?? customOptions?.lineWidth ?? 1.4;
+  const lineWidth = exCfg.lineWidth ?? customOptions?.lineWidth ?? (isVortDiv ? 2.0 : 1.4);
   const showWind = exCfg.showWind ?? customOptions?.showWind ?? isWind;
   const showBarbs = exCfg.showBarbs ?? customOptions?.showBarbs ?? false;
-  let showRaster = exCfg.showRaster ?? customOptions?.showRaster ?? Boolean(appState.state?.layers?.raster);
+  let showRaster = exCfg.showRaster ?? customOptions?.showRaster ?? (isVortDiv ? false : Boolean(appState.state?.layers?.raster));
   if (showFill && showRaster) {
     showRaster = false;
   }
+  const defaultBoldValues = isVOR ? [0, 10] : (isDIV ? [0] : customOptions?.boldValues);
+  const boldValues = exCfg.boldValues ?? customOptions?.boldValues ?? defaultBoldValues;
   const savedPalettePath = exCfg.palettePath || customOptions?.palettePath || snap?.config?.palettePath || null;
   const isVisible = existingLayer ? (existingLayer.visible !== false) : (snap ? snap.visible !== false : true);
   const smooth = exCfg.smooth ?? customOptions?.smooth ?? true;
@@ -480,7 +506,40 @@ async function loadWeatherField(map, model, element, level, period, customOption
   const labelSize = exCfg.labelSize ?? customOptions?.labelSize;
 
   try {
-    const gridData = await fetchGridData(path, file);
+    let gridData;
+    if (isVortDiv) {
+      const cacheKey = `${model}/WIND/${level}/${file}`;
+      let windData = null;
+      if (win?._windGridCache?.has(cacheKey)) {
+        windData = win._windGridCache.get(cacheKey);
+      } else if (win?.windGridData && (win.level === level || !level) && win.windGridData.u && win.windGridData.v) {
+        windData = win.windGridData;
+      } else {
+        windData = await fetchGridData(dataPath, file);
+        if (win) {
+          if (!win._windGridCache) win._windGridCache = new Map();
+          win._windGridCache.set(cacheKey, windData);
+        }
+      }
+      if (win && !win.windGridData) {
+        win.windGridData = windData;
+      }
+      const { buildKinematicGridData } = await import("./layers/kinematics.js");
+      gridData = buildKinematicGridData(element, windData.u, windData.v, windData, {
+        smoothOutput: smooth,
+        outputSmoothIterations: smoothIterations,
+      });
+    } else {
+      gridData = await fetchGridData(path, file);
+      if (isWind) {
+        const cacheKey = `${model}/WIND/${level}/${file}`;
+        if (win) {
+          if (!win._windGridCache) win._windGridCache = new Map();
+          win._windGridCache.set(cacheKey, gridData);
+        }
+      }
+    }
+
     if (win && expectedSeq !== null && expectedSeq !== undefined && win.loadSeq !== expectedSeq) {
       return; // Discard stale in-flight response from fast navigation
     }
@@ -522,7 +581,7 @@ async function loadWeatherField(map, model, element, level, period, customOption
         showLine: isVisible && showLine,
         lineColor,
         lineWidth,
-        boldValues: customOptions?.boldValues,
+        boldValues,
         boldLineWidth: customOptions?.boldLineWidth,
         opacity,
         colormap,
@@ -540,12 +599,13 @@ async function loadWeatherField(map, model, element, level, period, customOption
       element,
       level,
       model,
-      path,
+      path: dataPath,
       file,
       gridData,
       colormap,
       color: lineColor,
       visible: isVisible,
+      derivedFrom: customOptions?.derivedFrom || (isVortDiv ? `wind-${model}-${level}` : undefined),
       config: isWind ? {
         showWind,
         showBarbs,
@@ -1055,7 +1115,7 @@ async function loadPresetGroup(map, group, period = null, level = null, win = nu
       }
 
       if (layer.type === "contour" || layer.type === "wind") {
-        if (layer.derivedFrom) {
+        if (layer.derivedFrom && (layer.model === "SURFACE" || layer.model === "UPPER_AIR")) {
           // Skip loadWeatherField for station-derived contours;
           // station pass derives them once station data is fetched.
           return;
@@ -1183,9 +1243,14 @@ async function changeVerticalLevel(map, direction, explicitLevel = null, win = g
           } else if (l.derivedFrom) {
             l.id = `contour-sounding-${(l.element || "HGT").toLowerCase()}-${targetLevel}`;
             if (targetStationId) l.derivedFrom = targetStationId;
-            const elemName = l.element === "HGT" ? "Geopotential Height" : (l.element === "TMP" ? "Temperature" : (l.element === "DTD" ? "Dew-Point Depression" : l.element));
+            const elemName = l.element === "HGT" ? "Geopotential Height" : (l.element === "TMP" ? "Temperature" : (l.element === "DTD" ? "Dew-Point Depression" : (l.element === "VOR" ? "Relative Vorticity" : (l.element === "DIV" ? "Divergence" : l.element))));
             l.name = `${targetLevel} hPa Derived ${elemName}`;
           }
+        } else if (l.derivedFrom && (l.element === "VOR" || l.element === "DIV" || l.element === "WIND")) {
+          l.level = targetLevel;
+          l.id = `contour-${l.model || "ECMWF_HR"}-${(l.element).toLowerCase()}-${targetLevel}`;
+          const elemName = l.element === "VOR" ? "Relative Vorticity" : (l.element === "DIV" ? "Divergence" : "Wind Speed");
+          l.name = `${targetLevel} hPa Derived ${elemName}`;
         }
       }
     }
@@ -1193,15 +1258,19 @@ async function changeVerticalLevel(map, direction, explicitLevel = null, win = g
   } else if (win?.isObservation || win?.model === "UPPER_AIR") {
     const prevContours = getLayersForWindow(win)
       .filter((l) => l.type === "contour" && l.model === "UPPER_AIR")
-      .map((l) => ({
-        id: `contour-sounding-${(l.element || "HGT").toLowerCase()}-${targetLevel}`,
-        model: l.model,
-        element: l.element,
-        level: targetLevel,
-        config: { ...(l.config || {}) },
-        derivedFrom: l.derivedFrom,
-        visible: l.visible !== false,
-      }));
+      .map((l) => {
+        const elemName = l.element === "HGT" ? "Geopotential Height" : (l.element === "TMP" ? "Temperature" : (l.element === "DTD" ? "Dew-Point Depression" : (l.element === "VOR" ? "Relative Vorticity" : (l.element === "DIV" ? "Divergence" : l.element))));
+        return {
+          id: `contour-sounding-${(l.element || "HGT").toLowerCase()}-${targetLevel}`,
+          name: `${targetLevel} hPa Derived ${elemName}`,
+          model: l.model,
+          element: l.element,
+          level: targetLevel,
+          config: { ...(l.config || {}) },
+          derivedFrom: l.derivedFrom,
+          visible: l.visible !== false,
+        };
+      });
     clearAllWeatherLayersFromMap(map, win);
     if (prevContours.length > 0) {
       win.derivedContourSnapshots = prevContours;
@@ -1216,6 +1285,18 @@ async function changeVerticalLevel(map, direction, explicitLevel = null, win = g
     }
     await loadObservationProduct(map, "UPPER_AIR", "PLOT", targetLevel, file, win, obsPath, currentSeq);
   } else {
+    const prevDerived = getLayersForWindow(win)
+      .filter((l) => l.type === "contour" && (l.element === "VOR" || l.element === "DIV" || l.derivedFrom))
+      .map((l) => ({
+        id: l.id,
+        model: l.model,
+        element: l.element,
+        level: targetLevel,
+        config: { ...(l.config || {}) },
+        derivedFrom: l.derivedFrom,
+        visible: l.visible !== false,
+        colormap: l.colormap,
+      }));
     clearAllWeatherLayersFromMap(map, win);
     const model = win?.model || "ECMWF_HR";
     const element = win?.element || "TMP";
@@ -1224,6 +1305,24 @@ async function changeVerticalLevel(map, direction, explicitLevel = null, win = g
       updateWindowTitle(win, `${targetLevel} hPa ${element} (${model})`);
     }
     await loadWeatherField(map, model, element, targetLevel, period, null, win, false, currentSeq);
+    if (win && currentSeq !== null && currentSeq !== undefined && win.loadSeq !== currentSeq) {
+      return;
+    }
+    for (const snap of prevDerived) {
+      if (snap.element === element) continue;
+      const liveLayerId = `contour-${snap.model || model}-${snap.element.toLowerCase()}-${targetLevel}`;
+      const restored = {
+        ...snap,
+        id: liveLayerId,
+        level: targetLevel,
+        gridData: null,
+      };
+      addOrUpdateLayer(restored, win);
+      await triggerVortDivOverlay(map, restored, win);
+      if (win && currentSeq !== null && currentSeq !== undefined && win.loadSeq !== currentSeq) {
+        return;
+      }
+    }
   }
 
   if (win?.layerSnapshots) {

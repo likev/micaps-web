@@ -34,6 +34,8 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
           <option value="HGT">HGT - Geopotential Height (gpm)</option>
           <option value="RAIN">RAIN - Precipitation (mm)</option>
           <option value="WIND">WIND - Wind Vectors (m/s)</option>
+          <option value="VOR">VOR - Relative Vorticity (10⁻⁵/s)</option>
+          <option value="DIV">DIV - Divergence (10⁻⁵/s)</option>
         </select>
       </div>
 
@@ -176,6 +178,8 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
         <option value="HGT">HGT - Geopotential Height (gpm)</option>
         <option value="RAIN">RAIN - Precipitation (mm)</option>
         <option value="WIND">WIND - Wind Vectors (m/s)</option>
+        <option value="VOR">VOR - Relative Vorticity (10⁻⁵/s)</option>
+        <option value="DIV">DIV - Divergence (10⁻⁵/s)</option>
       `;
       selectLevel.innerHTML = `
         <option value="1000">1000 hPa</option>

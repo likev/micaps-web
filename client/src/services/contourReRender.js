@@ -52,6 +52,7 @@ function cleanupKey(key, map = null) {
  */
 export function armContourReRender(map, layer, win = null, opts = {}) {
   if (!map || !layer || !layer.id || !layer.gridData) return;
+  if (layer.type === "wind" && !layer.config?.showRaster) return;
 
   const winKey = getWinKey(win);
   const layerId = layer.id;
@@ -156,7 +157,7 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
             } catch {}
           }
 
-          if (liveLayer.gridData?.values) {
+          if (liveLayer.type === "contour" && liveLayer.gridData?.values) {
             renderContourLayers(map, liveLayer.gridData, liveLayer.element || "TMP", {
               ...liveLayer.config,
               layerId: liveLayer.id,

@@ -720,7 +720,7 @@ export function computeFullWindowTitle(win, baseText = null) {
 }
 
 export function updateWindowTitle(win, text = null) {
-  if (!win) return;
+  if (!win || typeof document === "undefined") return;
   const fullTitle = computeFullWindowTitle(win, text);
 
   const el = document.getElementById(win.titleId);
@@ -737,11 +737,13 @@ export function updateWindowTitle(win, text = null) {
 }
 
 export function setWindowHeaderPreset(win, groupId) {
+  if (!win || typeof document === "undefined") return;
   const el = document.getElementById(win.presetSelectId);
   if (el) el.value = groupId || "";
 }
 
 export function setWindowHeaderLevel(win, level) {
+  if (!win || typeof document === "undefined") return;
   const el = document.getElementById(win.levelSelectId);
   if (el) {
     if (level == null || level === "") el.value = "";
@@ -750,6 +752,7 @@ export function setWindowHeaderLevel(win, level) {
 }
 
 export function refreshPresetControls() {
+  if (typeof document === "undefined") return;
   tabs.forEach((tab) => {
     tab.windows.forEach((win) => {
       const currentGroupId = win.activeGroup?.id;

@@ -38,6 +38,9 @@ export function formatElementUnit(element = "TMP") {
       return "hPa";
     case "VIS":
       return "km";
+    case "VOR":
+    case "DIV":
+      return "1e-5/s";
     default:
       return "";
   }
@@ -54,7 +57,7 @@ export function formatContourLabel(val, element = "", isDam = false) {
     }
     return String(Math.round(val));
   }
-  if (elem === "TMP" || elem === "TD" || elem === "DTD" || elem === "VIS" || elem === "RAIN6") {
+  if (elem === "TMP" || elem === "TD" || elem === "DTD" || elem === "VIS" || elem === "RAIN6" || elem === "VOR" || elem === "DIV") {
     return String(Math.round(val * 10) / 10);
   }
   return String(Math.round(val));

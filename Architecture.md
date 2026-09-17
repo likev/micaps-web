@@ -174,13 +174,13 @@ micaps-web/
 │   │   ├── style.css                 # Dark meteorological theme stylesheet
 │   │   ├── tabs.css                  # Multi-window tabs & layout styling
 │   │   ├── api/                      # REST & binary stream fetchers (3-minute TTL cache & inflight deduplication)
-│   │   ├── layers/                   # MapLibre, Deck.gl, Canvas, Sounding & Surface analysis layers
+│   │   ├── layers/                   # MapLibre, Deck.gl, Canvas, Kinematics, Sounding & Surface analysis layers
 │   │   ├── map/                      # MapLibre GL setup, PMTiles protocol, graticule lines
 │   │   ├── services/                 # Intelligent background data prefetch engine (Left/Right/Up/Down)
 │   │   ├── store/                    # Reactive workstation state manager
 │   │   ├── ui/                       # Navbar, catalog drawer, layer control, time slider, tooltip
 │   │   └── utils/                    # CMA palettes, weather symbols, griddata-js adapter
-│   └── test/                         # Meteorological Unit Test Suite (201 bun tests across 20 files)
+│   └── test/                         # Meteorological Unit Test Suite (274 bun tests across 24 files)
 │       ├── colormaps.test.js         # Dynamic colormaps & level scaling tests
 │       ├── weather_symbols.test.js   # WMO symbols & CMA/MICAPS 110° wind barbs tests
 │       ├── contour_logic.test.js     # Characteristic bold contour tests
@@ -200,7 +200,8 @@ micaps-web/
 │       ├── keyboard_shortcuts.test.js # ArrowLeft/Right time stepping & ArrowUp/Down isobaric level shortcuts tests
 │       ├── prefetch.test.js          # 3-min TTL cache, adjacent step resolution, prefetch targets & debouncing tests
 │       ├── viewport_crop.test.js     # Performance maxEffectiveCells budget & cell-count LOD step decimation tests
-│       └── memory_optimization.test.js # Viewport BBox culling, zero-GeoJSON vector wind, & tile cache flush tests
+│       ├── memory_optimization.test.js # Viewport BBox culling, zero-GeoJSON vector wind, & tile cache flush tests
+│       └── vorticity_divergence.test.js # Relative vorticity & divergence kinematics, QC, adapters, caching & UI tests
 ```
 
 ---
@@ -496,6 +497,73 @@ graph LR
 3. **Station Wind Grid Synthesis**:
    - Upper-air vector winds $(u, v)$ from soundings are gridded into a regular 2D vector field via [`generateStationWindGrid`](file:///root/downloads/micaps-web/client/src/layers/windLayer.js).
    - This grid drives the client-side particle engine to render real-time animated streamlines directly from sparse station soundings without requiring gridded NWP model files.
+
+### 7.5. Derived Relative Vorticity ($\zeta$) & Divergence ($D$) Kinematics & Quality Control
+
+Horizontal kinematic derivatives—relative vertical vorticity ($\zeta = \mathbf{k} \cdot \nabla \times \mathbf{v}$) and horizontal divergence ($D = \nabla \cdot \mathbf{v}$)—are computed on the client side across Surface observations, Upper-Air soundings, and NWP vector wind grids via [`client/src/layers/kinematics.js`](file:///root/downloads/micaps-web/client/src/layers/kinematics.js):
+
+```mermaid
+graph TD
+    subgraph DataSources ["Horizontal Velocity Inputs (u, v in m/s)"]
+        SFC["Surface Synoptic Observations (ws, wd)"]
+        UA["Upper-Air Sounding Profiles (ws, wd by Level)"]
+        NWP["NWP Diamond-11 Vector Grids (u, v Components)"]
+    end
+
+    subgraph Adapters ["Vector Grid Synthesis & QC"]
+        SFC --> SFC_Grid["generateStationWindGrid (0.5° Mesh, Gaussian Smooth)"]
+        UA --> UA_QC["Isobaric Climatological QC (§7.3)"]
+        UA_QC --> UA_Grid["generateStationWindGrid (Level QC Filtering)"]
+        NWP --> NWP_Cache["Parent WIND Cache (_windGridCache)"]
+    end
+
+    subgraph KinematicEngine ["Spherical Metric Differencing (kinematics.js)"]
+        SFC_Grid --> MetricDiff["Finite Differencing: dx = R cos(phi) dLam, dy = R dPhi"]
+        UA_Grid --> MetricDiff
+        NWP_Cache --> MetricDiff
+        MetricDiff --> Formulas["zeta = dv/dx - du/dy;  D = du/dx + dv/dy"]
+        Formulas --> Scaling["Scale x 10^5 (Unit: 1e-5/s)"]
+        Scaling --> QC_Clip["QC Envelope: Outliers |zeta|, |D| > 100 -> NaN"]
+    end
+
+    subgraph DisplayPipe ["Contour & Shading Display Pipeline"]
+        QC_Clip --> MarchingSquares["Marching Squares (griddata-js)"]
+        MarchingSquares --> Splines["Chaikin B-Spline Smoothing"]
+        Splines --> Overlays["MapLibre Isoband & Isoline Overlays (Bold at 0, 10)"]
+    end
+```
+
+1. **Mathematical Formulation & Spherical Metric Differencing**:
+   - In spherical coordinates with mean Earth radius $R = 6,371,000\text{ m}$:
+     $$\zeta = \frac{\partial v}{\partial x} - \frac{\partial u}{\partial y} = \frac{1}{R \cos\phi}\frac{\partial v}{\partial \lambda} - \frac{1}{R}\frac{\partial u}{\partial \phi}$$
+     $$D = \frac{\partial u}{\partial x} + \frac{\partial v}{\partial y} = \frac{1}{R \cos\phi}\frac{\partial u}{\partial \lambda} + \frac{1}{R}\frac{\partial v}{\partial \phi}$$
+   - Sign conventions: Northern Hemisphere cyclonic rotation $\zeta > 0$, anticyclonic $\zeta < 0$; horizontal divergence $D > 0$, convergence $D < 0$. Formulas preserve identical kinematic sign conventions in the Southern Hemisphere without arbitrary negation.
+   - Coordinate metric scales:
+     $$\Delta x_j = R \cos(\phi_j) \Delta\lambda_{\text{rad}}, \quad \Delta y = R \Delta\phi_{\text{rad}}$$
+   - Grid orientation awareness: Centered finite differences for interior cells ($2\Delta x$, $2\Delta y$) and forward/backward differences along domain boundaries. Automatically detects grid row ordering: South-to-North ($\Delta\phi > 0$, standard for Delaunay station IDW grids) versus North-to-South ($\Delta\phi < 0$, standard for ECMWF/GFS NWP grids), ensuring correct meridional derivative signs.
+
+2. **Atmospheric Units & Scaling**:
+   - Typical synoptic-scale vorticity and divergence magnitudes are $\sim 10^{-5}\text{ s}^{-1}$.
+   - All derivative fields are scaled by $10^5$ during computation:
+     $$\zeta_{\text{scaled}} = \zeta \times 10^5, \quad D_{\text{scaled}} = D \times 10^5$$
+   - Display unit is standardized across formatters, legends, and popups as $10^{-5}\text{ s}^{-1}$ (ASCII format `"1e-5/s"`). Values are formatted with one decimal place.
+
+3. **Multi-Stage Quality Control & Outlier Clamping**:
+   - **Upstream Sounding QC**: When computing upper-air kinematic fields, raw radiosonde wind observations are strictly validated against isobaric climatological envelopes (§7.3) before vector gridding.
+   - **Minimum Station Density**: A minimum of $\ge 3$ stations with valid vector winds within the bounding domain is required. If fewer than 3 valid stations exist, kinematic contour generation is skipped gracefully with a user notification.
+   - **Display QC Cutoff**: Finite difference singularities at high latitudes or boundary extrapolations producing unphysical magnitudes exceeding $|\zeta| > 100 \times 10^{-5}\text{ s}^{-1}$ or $|D| > 100 \times 10^{-5}\text{ s}^{-1}$ are clipped to `NaN` (masked from isoline extraction and raster fills).
+
+4. **Standardized Cartographic Styling**:
+   - **Contour Intervals**: $[-20, -15, -10, -8, -6, -4, -2, 0, 2, 4, 6, 8, 10, 15, 20] \times 10^{-5}\text{ s}^{-1}$.
+   - **Characteristic Bold Isolines**: $\zeta$ highlights $0$ and $+10 \times 10^{-5}\text{ s}^{-1}$ (synoptic cyclonic shear boundary); $D$ highlights $0 \times 10^{-5}\text{ s}^{-1}$ (nondivergent level boundary).
+   - **Line Stroke Colors**: Vorticity defaults to `#c678dd` (purple/magenta); Divergence defaults to `#56d4dd` (cyan/teal).
+   - **Centered Diverging Colormaps**: Colormaps center zero on white/neutral, mapping negative/anticyclonic/convergent values to one pole and positive/cyclonic/divergent values to the opposite pole, assigned to diverging palette category `PRS_HGT`.
+
+5. **Multi-Source Lifecycle & Caching Architecture**:
+   - **Zero Backend Changes**: Computations run entirely client-side using existing Diamond-1/2 station observations and Diamond-11 NWP vector grids.
+   - **3-Tier Parent Caching**: NWP kinematic layers dynamically locate their parent wind field via `layer.gridData` $\to$ window `_windGridCache` $\to$ `fetchGridData`, eliminating redundant network queries.
+   - **Scalar Wind Speed Contour Reuse**: Scalar wind speed magnitude ($ff = \sqrt{u^2 + v^2}$) contours reuse the identical kinematic calculation and caching pipeline (`buildKinematicGridData("WIND", ...)`). In the UI, the wind layer accordion intentionally exposes `VOR` and `DIV` options to avoid redundancy with the Wind Magnitude Raster overlay, while station and programmatic workflows can generate scalar wind speed contours through this shared pathway.
+   - **Lifecycle Integration**: Full support for isobaric vertical level steps (700 $\to$ 500 hPa renaming `contour-sounding-vor-700` $\to$ `contour-sounding-vor-500` with eye state preservation), prefetch service parent WIND item resolution, and preset configuration persistence.
 
 ---
 
@@ -1322,7 +1390,7 @@ Comprehensive automated testing is maintained across both frontend meteorologica
 
 ### 13.1. Client Meteorological Test Suite (Bun Test)
 
-Run all 224 client-side unit tests across 22 test suites covering meteorological objective analysis, contouring, symbology, quality control, data prefetching, and keyboard shortcuts:
+Run all 274 client-side unit tests across 24 test suites covering meteorological objective analysis, kinematics, contouring, symbology, quality control, data prefetching, and keyboard shortcuts:
 
 ```bash
 cd client
@@ -1351,6 +1419,8 @@ Individual test suites:
 - **`pmtiles_layers.test.js`**: Multi-tier vector basemap styling, painter's algorithm order, URL resolution, scheme switching, and MapLibre projection configuration (`mercator`, `globe`, `vertical-perspective`).
 - **`viewport_crop.test.js`**: Config-driven performance `maxEffectiveCells` budget (50,000 ceiling), cell-count-driven step decimation, and Marching Squares small-grid bypass.
 - **`memory_optimization.test.js`**: Viewport bounding box spatial culling, cell-count-driven LOD, Douglas-Peucker collinear vertex simplification, main-thread FeatureCollection dereferencing, timeline stepper tile flushing, debounced viewport re-rendering in `contourReRender.js`, and zero-GeoJSON vector wind streamline/barb lifecycle cleanup.
+- **`vorticity_divergence.test.js`**: Relative vertical vorticity ($\zeta$) and horizontal divergence ($D$) kinematics acceptance test suite verifying mathematical finite differencing (solid-body rotation, pure divergence, uniform flow, N-to-S and S-to-N orientations, anticyclonic shear), spherical metric scaling ($1/\cos\phi$), Southern Hemisphere coordinate invariance, non-physical outlier clipping ($\pm 100 \times 10^{-5}\text{ s}^{-1} \to \text{NaN}$), surface observation kinematic gridding ($\ge 3$ station requirement), upper-air sounding level QC bounds rejection, isobaric vertical level step layer renaming with eye state preservation, NWP derived grid synthesis with 3-tier caching, background prefetch parent `WIND` resolution, and UI integration (station drawers, formatters, colormaps, XML palettes, and `config.json`).
+
 
 ### 13.2. Server Binary Parser Test Suite (Go Test)
 

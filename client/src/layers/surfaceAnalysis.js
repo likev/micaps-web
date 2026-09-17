@@ -4,6 +4,16 @@ import { renderCustomContourGeoJSON, isFeatureBold } from "./contourLayer.js";
 import { addOrUpdateLayer } from "../ui/layerControl.js";
 import { smoothGrid2D } from "../utils/smoothContour.js";
 import { getHexColor } from "../utils/colormaps.js";
+import { generateStationWindGrid } from "./windLayer.js";
+import {
+  buildKinematicGridData,
+  VOR_LEVELS,
+  DIV_LEVELS,
+  VOR_BOLD,
+  DIV_BOLD,
+  VOR_COLOR,
+  DIV_COLOR,
+} from "./kinematics.js";
 
 export const SURFACE_CONTOUR_CONFIGS = {
   SLP: {
@@ -197,6 +207,44 @@ export const SURFACE_CONTOUR_CONFIGS = {
       return [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30];
     },
   },
+  VOR: {
+    name: "Relative Vorticity",
+    element: "VOR",
+    unit: "1e-5/s",
+    defaultColor: VOR_COLOR,
+    colormap: "VOR",
+    boldValues: VOR_BOLD,
+    isKinematic: true,
+    extract: null,
+    showFill: false,
+    showLine: true,
+    showRaster: false,
+    getLevels: (minV, maxV) => {
+      if (typeof maxV === "number" && typeof minV === "number" && Math.abs(maxV - minV) < 5) {
+        return Array.from(griddata.autoLevels(minV, maxV, 8));
+      }
+      return VOR_LEVELS;
+    },
+  },
+  DIV: {
+    name: "Divergence",
+    element: "DIV",
+    unit: "1e-5/s",
+    defaultColor: DIV_COLOR,
+    colormap: "DIV",
+    boldValues: DIV_BOLD,
+    isKinematic: true,
+    extract: null,
+    showFill: false,
+    showLine: true,
+    showRaster: false,
+    getLevels: (minV, maxV) => {
+      if (typeof maxV === "number" && typeof minV === "number" && Math.abs(maxV - minV) < 5) {
+        return Array.from(griddata.autoLevels(minV, maxV, 8));
+      }
+      return DIV_LEVELS;
+    },
+  },
 };
 
 function normalizeSurfaceElementKey(elem) {
@@ -208,6 +256,8 @@ function normalizeSurfaceElementKey(elem) {
   if (norm === "RAIN6" || norm === "RAIN6H" || norm === "RAIN_6H" || norm === "RAIN" || norm === "PRECIPITATION") return "RAIN6";
   if (norm === "WIND" || norm === "WS" || norm === "WINDSPEED" || norm === "WIND_SPEED" || norm === "FF") return "WIND";
   if (norm === "DTD" || norm === "T-TD" || norm === "TTD" || norm === "DEPRESSION" || norm === "DPTDPR") return "DTD";
+  if (norm === "VOR" || norm === "VORT" || norm === "VORTICITY" || norm === "RVOR" || norm === "REL_VOR") return "VOR";
+  if (norm === "DIV" || norm === "DIVERGENCE") return "DIV";
   return "SLP";
 }
 
@@ -217,8 +267,12 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
     return null;
   }
 
+  const elementKey = normalizeSurfaceElementKey(rawElement);
+  if (elementKey === "VOR" || elementKey === "DIV") {
+    return analyzeAndRenderSurfaceKinematicContours(map, stationsGeoJSON, elementKey, options, win);
+  }
+
   try {
-    const elementKey = normalizeSurfaceElementKey(rawElement);
     const cfg = SURFACE_CONTOUR_CONFIGS[elementKey] || SURFACE_CONTOUR_CONFIGS.SLP;
 
     const points = [];
@@ -436,4 +490,161 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
 
 export function analyzeAndRenderSurfaceSLPContours(map, stationsGeoJSON, options = {}, win = null) {
   return analyzeAndRenderSurfaceContours(map, stationsGeoJSON, "SLP", options, win);
+}
+
+export function analyzeAndRenderSurfaceKinematicContours(map, stationsGeoJSON, rawElement = "VOR", options = {}, win = null) {
+  if (!map || !stationsGeoJSON || !stationsGeoJSON.features || stationsGeoJSON.features.length < 3) {
+    console.warn("[SurfaceAnalysis] Insufficient surface stations for kinematic contour calculation");
+    return null;
+  }
+
+  try {
+    const elementKey = normalizeSurfaceElementKey(rawElement);
+    const cfg = SURFACE_CONTOUR_CONFIGS[elementKey] || SURFACE_CONTOUR_CONFIGS.VOR;
+
+    // 1. Generate regular station wind grid (surface: level=null)
+    const windGrid = generateStationWindGrid(stationsGeoJSON, null);
+    if (!windGrid || !windGrid.u || !windGrid.v || !windGrid.header) {
+      console.warn(`[SurfaceAnalysis] Fewer than 3 stations have valid wind observations for ${cfg.name}`);
+      return null;
+    }
+
+    // 2. Compute kinematic grid (VOR or DIV) with pre-smoothing to damp IDW bullseyes
+    const kinData = buildKinematicGridData(elementKey, windGrid.u, windGrid.v, windGrid, {
+      smoothInput: true,
+      inputSmoothIterations: 1,
+      inputSmoothWeight: 0.45,
+      smoothOutput: options.smooth !== false,
+      outputSmoothIterations: options.smoothIterations ?? 1,
+      outputSmoothWeight: 0.4,
+    });
+
+    if (!kinData || !kinData.values || kinData.stats.count < 3) {
+      console.warn(`[SurfaceAnalysis] Insufficient kinematic grid points for ${cfg.name}`);
+      return null;
+    }
+
+    const { header, values, stats, x, y } = kinData;
+    const nCols = x.length;
+    const nRows = y.length;
+
+    // Fill NaNs with field average for contour extraction
+    const avgVal = stats.mean || 0;
+    const filledValues = new Float32Array(values.length);
+    for (let i = 0; i < values.length; i++) {
+      filledValues[i] = Number.isNaN(values[i]) ? avgVal : values[i];
+    }
+
+    const levels = options.levels || cfg.getLevels(stats.min, stats.max);
+    const boldValues = options.boldValues || cfg.boldValues || [];
+
+    let lines = [];
+    try {
+      lines = griddata.contour({ data: filledValues, rows: nRows, cols: nCols }, { x, y, levels }) || [];
+    } catch (err) {
+      console.warn(`[SurfaceAnalysis] contour calculation failed for ${cfg.name}:`, err);
+      lines = [];
+    }
+
+    if (Array.isArray(lines)) {
+      for (const f of lines) {
+        if (!f.properties) f.properties = {};
+        const val = f.value ?? f.properties.value ?? f.properties.level ?? 0;
+        f.properties.value = val;
+        f.properties.label = String(Math.round(val * 10) / 10);
+        f.properties.isBold = isFeatureBold(val, boldValues);
+      }
+    }
+
+    let fills = [];
+    try {
+      fills = griddata.contourf({ data: filledValues, rows: nRows, cols: nCols }, { x, y, levels }) || [];
+      if (Array.isArray(fills)) {
+        for (const feature of fills) {
+          if (feature.properties && feature.properties.level) {
+            const midVal = (feature.properties.level[0] + feature.properties.level[1]) / 2;
+            feature.properties.fillColor = getHexColor(midVal, cfg.element, cfg.colormap);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`[SurfaceAnalysis] contourf calculation failed for ${cfg.name}:`, err);
+      fills = [];
+    }
+
+    const isolineFC = { type: "FeatureCollection", features: lines || [] };
+    const isobandFC = { type: "FeatureCollection", features: fills || [] };
+
+    const layerId = options.layerId || `contour-surface-${elementKey.toLowerCase()}`;
+    const lineColor = options.lineColor || cfg.defaultColor;
+
+    const showFill = options.showFill !== undefined ? Boolean(options.showFill) : false;
+    const showLine = options.showLine !== undefined ? Boolean(options.showLine) : true;
+    const showRaster = options.showRaster !== undefined ? Boolean(options.showRaster) : false;
+    const palettePath = options.palettePath || cfg.palettePath || null;
+    const colormap = options.colormap || (palettePath ? `palette:${layerId}` : (cfg.colormap || cfg.element));
+
+    renderCustomContourGeoJSON(map, isobandFC, isolineFC, {
+      layerId,
+      showFill,
+      showLine,
+      visible: options.visible !== false,
+      lineColor,
+      lineWidth: options.lineWidth || 2.0,
+      boldLineWidth: options.boldLineWidth || 4.0,
+      boldValues,
+      element: cfg.element,
+      colormap,
+      smooth: options.smooth !== false,
+      smoothIterations: options.smoothIterations ?? 2,
+      labelSize: options.labelSize,
+    });
+
+    addOrUpdateLayer({
+      id: layerId,
+      name: `${cfg.name} (Surface Analysis)`,
+      type: "contour",
+      element: cfg.element,
+      model: "SURFACE",
+      level: null,
+      derivedFrom: options.derivedFrom || "surface-obs",
+      visible: options.visible !== false,
+      colormap,
+      gridData: {
+        header: {
+          start_lon: x[0],
+          end_lon: x[x.length - 1],
+          start_lat: y[0],
+          end_lat: y[y.length - 1],
+          n_lon: nCols,
+          n_lat: nRows,
+          d_lon: header.d_lon,
+          d_lat: header.d_lat,
+        },
+        values: filledValues,
+        stats,
+      },
+      color: lineColor,
+      removable: true,
+      config: {
+        showFill,
+        showLine,
+        showRaster,
+        lineColor,
+        opacity: options.opacity ?? 0.75,
+        lineWidth: options.lineWidth || 2.0,
+        boldLineWidth: options.boldLineWidth || 4.0,
+        boldValues,
+        smooth: options.smooth !== false,
+        smoothIterations: options.smoothIterations ?? 2,
+        labelSize: options.labelSize,
+        palettePath,
+      },
+    }, win);
+
+    return { lines, levels, pointsCount: kinData.stats.count, element: elementKey, layerId };
+  } catch (err) {
+    console.warn(`[SurfaceAnalysis] Failed to analyze surface kinematic contours for ${rawElement}:`, err);
+    return null;
+  }
 }

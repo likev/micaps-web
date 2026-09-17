@@ -115,7 +115,7 @@ export function clearWindowWeatherLayers(winOrId) {
   const current = getLayersForWindow(winId);
   const baseLayers = current.filter((l) => !l.removable);
   windowLayersMap.set(winId, baseLayers.length ? baseLayers : createDefaultLayers(winId));
-  if (winId === currentActiveWinId) {
+  if (winId === currentActiveWinId && typeof document !== "undefined") {
     const panel = document.getElementById("layer-control");
     if (panel) renderLayersManager(panel);
   }
@@ -196,12 +196,12 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
         showRaster: layerDef.config?.showRaster !== undefined ? layerDef.config.showRaster : false,
         palettePath: layerDef.config?.palettePath || null,
       } : {
-        showFill: layerDef.config?.showFill !== undefined ? layerDef.config.showFill : (layerDef.element !== "HGT" && layerDef.element !== "DTD" && layerDef.type !== "wind"),
+        showFill: layerDef.config?.showFill !== undefined ? layerDef.config.showFill : (layerDef.element !== "HGT" && layerDef.element !== "DTD" && layerDef.element !== "VOR" && layerDef.element !== "DIV" && layerDef.type !== "wind"),
         showLine: layerDef.config?.showLine !== undefined ? layerDef.config.showLine : (layerDef.element === "DTD" ? false : true),
         opacity: layerDef.config?.opacity || 0.75,
-        lineColor: layerDef.config?.lineColor || (layerDef.element === "HGT" ? "#58a6ff" : layerDef.element === "TMP" ? "#f85149" : layerDef.element === "DTD" ? "#e3b341" : "#ffffff"),
+        lineColor: layerDef.config?.lineColor || (layerDef.element === "HGT" ? "#58a6ff" : layerDef.element === "TMP" ? "#f85149" : layerDef.element === "DTD" ? "#e3b341" : (layerDef.element === "VOR" ? "#c678dd" : (layerDef.element === "DIV" ? "#56d4dd" : "#ffffff"))),
         lineWidth: layerDef.config?.lineWidth !== undefined ? layerDef.config.lineWidth : 2.0,
-        boldValues: layerDef.config?.boldValues || (layerDef.element === "HGT" ? [5880, 588] : layerDef.element === "SLP" ? [1010] : layerDef.element === "TMP" ? [0] : layerDef.element === "DTD" ? [2, 10] : []),
+        boldValues: layerDef.config?.boldValues || (layerDef.element === "HGT" ? [5880, 588] : layerDef.element === "SLP" ? [1010] : layerDef.element === "TMP" ? [0] : layerDef.element === "DTD" ? [2, 10] : (layerDef.element === "VOR" ? [0, 10] : (layerDef.element === "DIV" ? [0] : []))),
         boldLineWidth: layerDef.config?.boldLineWidth !== undefined ? layerDef.config.boldLineWidth : 4.0,
         showWind: layerDef.config?.showWind !== undefined ? layerDef.config.showWind : false,
         showBarbs: layerDef.config?.showBarbs !== undefined ? layerDef.config.showBarbs : false,
@@ -217,7 +217,7 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
       removable: layerDef.removable !== undefined ? layerDef.removable : true,
       visible: layerDef.visible !== undefined ? layerDef.visible : true,
       isExpanded: Boolean(layerDef.isExpanded),
-      color: layerDef.color || (layerDef.element === "HGT" ? "#58a6ff" : layerDef.element === "TMP" ? "#f85149" : "#388bfd"),
+      color: layerDef.color || (layerDef.element === "HGT" ? "#58a6ff" : layerDef.element === "TMP" ? "#f85149" : (layerDef.element === "VOR" ? "#c678dd" : (layerDef.element === "DIV" ? "#56d4dd" : "#388bfd"))),
       ...layerDef,
       config: baseConfig,
     });
@@ -228,7 +228,7 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
     curLayer.config.showRaster = false;
   }
 
-  if (winId === currentActiveWinId) {
+  if (winId === currentActiveWinId && typeof document !== "undefined") {
     const panel = document.getElementById("layer-control");
     if (panel) renderLayersManager(panel);
   }
@@ -242,7 +242,7 @@ export function removeLayer(layerId, winOrId = null) {
   const idx = layers.findIndex((l) => l.id === layerId);
   if (idx >= 0) {
     layers.splice(idx, 1);
-    if (winId === currentActiveWinId) {
+    if (winId === currentActiveWinId && typeof document !== "undefined") {
       const panel = document.getElementById("layer-control");
       if (panel) renderLayersManager(panel);
     }
@@ -253,8 +253,10 @@ export function syncLayerControlForWindow(win) {
   if (!win) return;
   currentActiveWinId = win.id || "default";
   currentActiveWinTitle = win.title ? `W${win.winIdx + 1}: ${win.title}` : (win.activeGroup ? `W${win.winIdx + 1}: ${win.activeGroup.name}` : `Window ${win.winIdx + 1}`);
-  const panel = document.getElementById("layer-control");
-  if (panel) renderLayersManager(panel);
+  if (typeof document !== "undefined") {
+    const panel = document.getElementById("layer-control");
+    if (panel) renderLayersManager(panel);
+  }
 }
 
 export function getLayers() {
@@ -543,8 +545,11 @@ function renderLayersManager(panel) {
       ].forEach(([sel, key]) => bindStationCheckbox(sel, key));
 
       bindStationFilterEvents(configDrawer, layer, onLayerActionCallback, currentActiveWinId);
+    }
 
-      const btnAddContour = configDrawer.querySelector(".btn-add-station-contour");
+    // Contour generation button (station or wind layer drawers)
+    if (configDrawer) {
+      const btnAddContour = configDrawer.querySelector(".btn-add-station-contour, .btn-add-contour");
       const selContourElem = configDrawer.querySelector(".sel-contour-element");
       if (btnAddContour && selContourElem) {
         btnAddContour.addEventListener("click", (e) => {
@@ -631,6 +636,43 @@ function renderLayersManager(panel) {
   bindAuxCheckbox("chk-wind", "wind");
 }
 
+export function renderWindDrawerHTML(layer) {
+  return `
+    <div class="config-row">
+      <label>
+        <input type="checkbox" class="chk-show-wind" ${layer.config?.showWind !== false ? "checked" : ""} />
+        <span>Wind Streamlines</span>
+      </label>
+    </div>
+    <div class="config-row">
+      <label>
+        <input type="checkbox" class="chk-show-barbs" ${layer.config?.showBarbs ? "checked" : ""} />
+        <span>Wind Barbs</span>
+      </label>
+    </div>
+    <div class="config-row">
+      <label>
+        <input type="checkbox" class="chk-show-raster" ${layer.config?.showRaster ? "checked" : ""} />
+        <span>Wind Magnitude Raster</span>
+      </label>
+    </div>
+    <div class="config-row station-contour-selector-row wind-contour-selector-row" style="flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 6px; padding-top: 6px; border-top: 1px solid #30363d; width: 100%;">
+      <label style="color: var(--text-secondary, #8b949e); font-size: 11px; display: flex; align-items: center; gap: 4px; font-weight: 600;">
+        <span>📈 Add Contour Layer</span>
+      </label>
+      <div style="display: flex; gap: 4px; width: 100%;">
+        <select class="sel-contour-element" style="flex: 1; height: 24px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; padding: 0 6px; font-size: 11px;">
+          <option value="VOR">Relative Vorticity (VOR)</option>
+          <option value="DIV">Divergence (DIV)</option>
+        </select>
+        <button class="btn-add-station-contour btn-add-contour" title="Generate and add contour layer" style="height: 24px; padding: 0 10px; font-size: 11px; font-weight: 500; background: #238636; color: #ffffff; border: 1px solid #2ea043; border-radius: 4px; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 2px;">
+          ＋ Add
+        </button>
+      </div>
+    </div>
+  `;
+}
+
 export function renderStationDrawerHTML(layer) {
   const upper = isUpperAirStationLayer(layer);
   const items = upper ? [
@@ -672,6 +714,8 @@ export function renderStationDrawerHTML(layer) {
             <option value="TD">Dew Point (TD)</option>
             <option value="DTD">Dew-Pt Depression (DTD)</option>
             <option value="WIND">Wind Speed (WIND)</option>
+            <option value="VOR">Relative Vorticity (VOR)</option>
+            <option value="DIV">Divergence (DIV)</option>
           ` : `
             <option value="SLP">Sea Level Pressure (SLP)</option>
             <option value="TMP">Temperature (TMP)</option>
@@ -680,6 +724,8 @@ export function renderStationDrawerHTML(layer) {
             <option value="VIS">Visibility (VIS)</option>
             <option value="RAIN6">6h Precipitation (RAIN6)</option>
             <option value="WIND">Wind Speed (WIND)</option>
+            <option value="VOR">Relative Vorticity (VOR)</option>
+            <option value="DIV">Divergence (DIV)</option>
           `}
         </select>
         <button class="btn-add-station-contour" title="Generate and add contour layer" style="height: 24px; padding: 0 10px; font-size: 11px; font-weight: 500; background: #238636; color: #ffffff; border: 1px solid #2ea043; border-radius: 4px; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 2px;">
@@ -725,26 +771,7 @@ function renderLayerRow(layer) {
       <div class="layer-config ${layer.isExpanded ? "" : "hidden"}" data-layer-id="${layer.id}">
         ${
           layer.type === "wind" || (isWindRelated(layer) && !isContour)
-            ? `
-            <div class="config-row">
-              <label>
-                <input type="checkbox" class="chk-show-wind" ${layer.config?.showWind !== false ? "checked" : ""} />
-                <span>Wind Streamlines</span>
-              </label>
-            </div>
-            <div class="config-row">
-              <label>
-                <input type="checkbox" class="chk-show-barbs" ${layer.config?.showBarbs ? "checked" : ""} />
-                <span>Wind Barbs</span>
-              </label>
-            </div>
-            <div class="config-row">
-              <label>
-                <input type="checkbox" class="chk-show-raster" ${layer.config?.showRaster ? "checked" : ""} />
-                <span>Wind Magnitude Raster</span>
-              </label>
-            </div>
-            `
+            ? renderWindDrawerHTML(layer)
             : (isContour
             ? `
             <div class="config-row">

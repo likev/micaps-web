@@ -80,8 +80,9 @@ function extractCyclesFromFiles(fileEntries) {
 }
 
 export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP", level = 500, forceRefresh = false) {
-  const path = `${model}/${element}/${level || 500}`;
-  const shortPath = `${model}/${element}`;
+  const elem = (element === "VOR" || element === "DIV") ? "WIND" : element;
+  const path = `${model}/${elem}/${level || 500}`;
+  const shortPath = `${model}/${elem}`;
 
   if (!forceRefresh) {
     const cached = forecastCyclesCache[path] || forecastCyclesCache[shortPath] || forecastCyclesCache[model];

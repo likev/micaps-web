@@ -209,6 +209,7 @@ export function upsertDerivedLayerToPreset(presetId, layerEntry) {
     if (layerEntry.id) existing.id = layerEntry.id;
     if (layerEntry.level !== undefined) existing.level = layerEntry.level;
     if (layerEntry.name) existing.name = layerEntry.name;
+    if (layerEntry.visible !== undefined) existing.visible = layerEntry.visible;
     if (layerEntry.render) {
       existing.render = { ...(existing.render || {}), ...layerEntry.render };
     }

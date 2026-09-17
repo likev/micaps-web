@@ -222,6 +222,82 @@
         "color": [160, 20, 120, 255],
         "val": 45
       }
+    ],
+    "VOR": [
+      {
+        "color": [30, 60, 180, 255],
+        "val": -20
+      },
+      {
+        "color": [60, 120, 220, 255],
+        "val": -10
+      },
+      {
+        "color": [140, 190, 240, 255],
+        "val": -4
+      },
+      {
+        "color": [200, 225, 250, 255],
+        "val": -2
+      },
+      {
+        "color": [240, 240, 240, 0],
+        "val": 0
+      },
+      {
+        "color": [254, 224, 182, 255],
+        "val": 2
+      },
+      {
+        "color": [253, 174, 97, 255],
+        "val": 4
+      },
+      {
+        "color": [227, 74, 51, 255],
+        "val": 10
+      },
+      {
+        "color": [179, 0, 0, 255],
+        "val": 20
+      }
+    ],
+    "DIV": [
+      {
+        "color": [118, 42, 131, 255],
+        "val": -20
+      },
+      {
+        "color": [153, 112, 171, 255],
+        "val": -10
+      },
+      {
+        "color": [194, 165, 207, 255],
+        "val": -4
+      },
+      {
+        "color": [231, 212, 232, 255],
+        "val": -2
+      },
+      {
+        "color": [245, 245, 245, 0],
+        "val": 0
+      },
+      {
+        "color": [254, 224, 182, 255],
+        "val": 2
+      },
+      {
+        "color": [253, 174, 97, 255],
+        "val": 4
+      },
+      {
+        "color": [227, 74, 51, 255],
+        "val": 10
+      },
+      {
+        "color": [179, 0, 0, 255],
+        "val": 20
+      }
     ]
   },
   "presets": [
@@ -342,6 +418,31 @@
             "keepWind": true
           },
           "type": "wind"
+        },
+        {
+          "derivedFrom": "wind",
+          "element": "VOR",
+          "id": "contour-ECMWF_HR-vor-850",
+          "model": "ECMWF_HR",
+          "name": "850 hPa Derived Relative Vorticity",
+          "render": {
+            "boldLineWidth": 4,
+            "boldValues": [
+              0,
+              10
+            ],
+            "colormap": "VOR",
+            "lineColor": "#c678dd",
+            "lineWidth": 2,
+            "opacity": 0.75,
+            "showFill": false,
+            "showLine": true,
+            "showRaster": false,
+            "smooth": true,
+            "smoothIterations": 2
+          },
+          "type": "contour",
+          "visible": false
         }
       ],
       "name": "850hPa Low-Level Jet (HGT + TMP + WIND)"

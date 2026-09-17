@@ -187,7 +187,24 @@ function collectNwpItems(win, targetPeriod, cycle, hasRasterActive, direction, o
   if (activeGroup && Array.isArray(activeGroup.layers) && activeGroup.layers.length > 0) {
     for (const layer of activeGroup.layers) {
       if (layer.derivedFrom) {
-        // Skip derived contour layers (computed client-side from station observations)
+        // Skip derived contour layers computed from station observations
+        if (layer.model === "SURFACE" || layer.model === "UPPER_AIR") {
+          continue;
+        }
+        // NWP VOR/DIV derived layers: prefetch parent WIND field
+        const elem = (layer.element || "").toUpperCase();
+        if (elem === "VOR" || elem === "DIV") {
+          const model = layer.model || win.model || "ECMWF_HR";
+          const lvl =
+            overrideLevel !== null
+              ? overrideLevel
+              : (win.level || layer.level || (activeGroup.hasLevel ? activeGroup.defaultLevel : 500));
+
+          const path = lvl ? `${model}/WIND/${lvl}` : `${model}/WIND`;
+          items.push({ type: "grid", path, file, direction, level: lvl, period: targetPeriod });
+          // Note: VOR/DIV rasters are computed client-side from the parent wind vector grid (JSON),
+          // so no server-side binary stream fetch is required or consumed for derived kinematic rasters.
+        }
         continue;
       }
       if (layer.type === "contour" || layer.type === "wind") {
@@ -211,8 +228,11 @@ function collectNwpItems(win, targetPeriod, cycle, hasRasterActive, direction, o
     // Single NWP field
     const model = win.model || "ECMWF_HR";
     const element = win.element || "TMP";
+    const isVortDiv = element === "VOR" || element === "DIV";
     const lvl = overrideLevel !== null ? overrideLevel : (win.level || 500);
-    const path = lvl ? `${model}/${element}/${lvl}` : `${model}/${element}`;
+    const path = isVortDiv
+      ? (lvl ? `${model}/WIND/${lvl}` : `${model}/WIND`)
+      : (lvl ? `${model}/${element}/${lvl}` : `${model}/${element}`);
     items.push({ type: "grid", path, file, direction, level: lvl, period: targetPeriod });
 
     if (hasRasterActive(element, model)) {

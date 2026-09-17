@@ -14,8 +14,8 @@ import { renderBinaryRaster, renderGridRaster, setRasterVisibility, removeRaster
 import { renderWindStreamlines, stopWindAnimation, renderGridWindBarbs, removeGridWindBarbs, generateStationWindGrid } from "../layers/windLayer.js";
 import { fetchGridBinaryStream, fetchGridData, fetchStationObservations } from "../api/catalogApi.js";
 import { appState } from "../store/appState.js";
-import { getActiveWindow, getWindowById } from "./tabWindowManager.js";
-import { getLayersForWindow } from "./layerControl.js";
+import { getActiveWindow, getWindowById, updateWindowTitle } from "./tabWindowManager.js";
+import { getLayersForWindow, addOrUpdateLayer } from "./layerControl.js";
 import { updateLegend, removeLegend } from "./legend.js";
 import { upsertDerivedLayerToPreset, removeDerivedLayerFromPreset } from "../config/presets.js";
 import { armContourReRender, disarmContourReRender } from "../services/contourReRender.js";
@@ -63,15 +63,15 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
           setRasterVisibility(map, false, layerId);
         }
       }
-      if (layer.config?.showWind) {
-        if (value) {
+      if (layer.type === "wind" || layer.config?.showWind) {
+        if (value && layer.config?.showWind !== false) {
           triggerWindStreamlines(map, layer, winObj);
         } else {
           stopWindAnimation(map);
         }
       }
-      if (layer.config?.showBarbs) {
-        if (value) {
+      if (layer.type === "wind" || layer.config?.showBarbs) {
+        if (value && layer.config?.showBarbs) {
           triggerWindBarbs(map, layer, winObj);
         } else {
           removeGridWindBarbs(map);
@@ -217,7 +217,8 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
 
       if (value.smooth !== undefined && layer.type === "contour") {
         const isUpper = (layer.model === "UPPER_AIR") || (layer.id && layer.id.startsWith("contour-sounding-"));
-        const isSurface = (layer.model === "SURFACE_ANALYSIS") || (layer.id && layer.id.startsWith("contour-surface-"));
+        const isSurface = (layer.model === "SURFACE" || layer.model === "SURFACE_ANALYSIS") || (layer.id && layer.id.startsWith("contour-surface-"));
+        const isNwpKinematic = (layer.element === "VOR" || layer.element === "DIV" || (layer.element === "WIND" && layer.type === "contour")) && !isUpper && !isSurface;
         if (isUpper || isSurface) {
           const geojson = layer?.stationsGeoJSON || getStationGeoJSON(map) || win?.stationsGeoJSON || appState.get("stationData");
           if (geojson && geojson.features && geojson.features.length >= 3) {
@@ -240,6 +241,8 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
               });
             }
           }
+        } else if (isNwpKinematic) {
+          triggerVortDivOverlay(map, layer, winObj);
         } else if (layer.gridData) {
           renderContourLayers(map, layer.gridData, layer.element || "TMP", {
             ...layer.config,
@@ -326,7 +329,12 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
                   setColormaps({ ...COLORMAPS, [key]: stops });
                   // Store key on layer so contour isobands and raster pick it up
                   layer.colormap = key;
-                  if (layer.type === "contour" && layer.gridData) {
+                  const isUpper = (layer.model === "UPPER_AIR") || (layer.id && layer.id.startsWith("contour-sounding-"));
+                  const isSurface = (layer.model === "SURFACE" || layer.model === "SURFACE_ANALYSIS") || (layer.id && layer.id.startsWith("contour-surface-"));
+                  const isNwpKinematic = (elem === "VOR" || elem === "DIV" || (elem === "WIND" && layer.type === "contour")) && !isUpper && !isSurface;
+                  if (isNwpKinematic) {
+                    triggerVortDivOverlay(map, layer, winObj);
+                  } else if (layer.type === "contour" && layer.gridData) {
                     renderContourLayers(map, layer.gridData, elem, {
                       ...layer.config,
                       layerId,
@@ -351,7 +359,7 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
                       removeLegend(elem, winObj);
                     }
                   }
-                  if (layer.config?.showRaster && layer.visible) {
+                  if (layer.config?.showRaster && layer.visible && !isNwpKinematic) {
                     triggerRasterOverlay(map, layer, winObj);
                   }
                   armContourReRender(map, layer, winObj);
@@ -372,7 +380,115 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
       }
     }
   } else if (action === "addContour") {
-    const elem = (value || "SLP").toUpperCase();
+    let elem = (value || "SLP").toUpperCase();
+    if (elem === "VORT" || elem === "VORTICITY" || elem === "RVOR" || elem === "REL_VOR") elem = "VOR";
+    if (elem === "DIVERGENCE") elem = "DIV";
+    if (elem === "SPEED" || elem === "WS") elem = "WIND";
+
+    const isWindLayer = (layer?.type === "wind" || layer?.element === "WIND") && layer?.type !== "station";
+    if (isWindLayer) {
+      const model = layer?.model || winObj?.model || "ECMWF_HR";
+      const level = layer?.level !== undefined && layer?.level !== null ? layer.level : (winObj?.level !== undefined ? winObj.level : 850);
+      const liveLayerId = `contour-${model}-${elem.toLowerCase()}-${level}`;
+
+      // If wind vectors are available on layer, cache them for triggerVortDivOverlay
+      if (layer?.gridData && layer.gridData.u && layer.gridData.v) {
+        if (winObj) {
+          winObj.windGridData = layer.gridData;
+          if (!winObj._windGridCache) winObj._windGridCache = new Map();
+          const period = winObj.period ?? 24;
+          const cycle = winObj.forecastCycle || (layer.file ? layer.file.split(".")[0] : null);
+          const file = layer.file || (cycle ? `${cycle}.${String(period).padStart(3, "0")}` : null);
+          if (file) {
+            winObj._windGridCache.set(`${model}/WIND/${level}/${file}`, layer.gridData);
+          }
+        }
+      }
+
+      const activeGroup = winObj?.activeGroup || appState.get("activeGroup");
+      const derivedFrom = layer?.id || "wind";
+      const elemName = elem === "VOR" ? "Relative Vorticity" : (elem === "DIV" ? "Divergence" : "Wind Speed");
+      const defaultColor = elem === "VOR" ? "#c678dd" : (elem === "DIV" ? "#56d4dd" : "#58a6ff");
+      const boldValues = elem === "VOR" ? [0, 10] : (elem === "DIV" ? [0] : undefined);
+      const boldLineWidth = (elem === "VOR" || elem === "DIV") ? 4 : undefined;
+
+      const layers = getLayersForWindow(winObj);
+      let existingLayer = layers.find((l) => l.id === liveLayerId);
+
+      if (existingLayer) {
+        existingLayer.visible = true;
+        if (!existingLayer.config) existingLayer.config = {};
+        if (existingLayer.config.showLine === undefined) existingLayer.config.showLine = true;
+        addOrUpdateLayer(existingLayer, winObj);
+        triggerVortDivOverlay(map, existingLayer, winObj);
+      } else {
+        const newLayer = {
+          id: liveLayerId,
+          name: `${level ? `${level} hPa ` : ""}Derived ${elemName}`,
+          type: "contour",
+          element: elem,
+          model,
+          level,
+          visible: true,
+          removable: true,
+          derivedFrom,
+          colormap: elem,
+          color: defaultColor,
+          config: {
+            showFill: false,
+            showLine: true,
+            showRaster: false,
+            colormap: elem,
+            lineColor: defaultColor,
+            lineWidth: 2,
+            boldValues,
+            boldLineWidth,
+            smooth: true,
+            smoothIterations: 2,
+            opacity: 0.75,
+          },
+        };
+        addOrUpdateLayer(newLayer, winObj);
+        triggerVortDivOverlay(map, newLayer, winObj);
+      }
+
+      if (activeGroup?.id) {
+        const derivedEntry = {
+          id: liveLayerId,
+          model,
+          element: elem,
+          level,
+          name: `${level ? `${level} hPa ` : ""}Derived ${elemName}`,
+          type: "contour",
+          derivedFrom,
+          visible: true,
+          render: {
+            showFill: false,
+            showLine: true,
+            showRaster: false,
+            lineColor: defaultColor,
+            colormap: elem,
+            lineWidth: 2,
+            boldValues,
+            boldLineWidth,
+            smooth: true,
+            smoothIterations: 2,
+            opacity: 0.75,
+          },
+        };
+        upsertDerivedLayerToPreset(activeGroup.id, derivedEntry);
+        if (Array.isArray(activeGroup.layers)) {
+          const idx = activeGroup.layers.findIndex((l) => l.id === liveLayerId || (l.model === model && l.element === elem && l.derivedFrom));
+          if (idx >= 0) {
+            activeGroup.layers[idx] = { ...activeGroup.layers[idx], ...derivedEntry };
+          } else {
+            activeGroup.layers.push(derivedEntry);
+          }
+        }
+      }
+      return;
+    }
+
     const geojson = layer?.stationsGeoJSON || getStationGeoJSON(map) || win?.stationsGeoJSON || appState.get("stationData");
     if (!geojson || !geojson.features || geojson.features.length < 3) {
       console.warn("[LayerActions] Insufficient station data to generate contour for:", elem);
@@ -386,19 +502,25 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
       import("../layers/soundingAnalysis.js").then(({ analyzeAndRenderSoundingElementContour, SOUNDING_CONTOUR_CONFIGS }) => {
         const liveLayerId = `contour-sounding-${elem.toLowerCase()}-${level}`;
         const cfg = SOUNDING_CONTOUR_CONFIGS?.[elem];
-        const defaultColor = cfg?.defaultColor || (elem === "TMP" ? "#f85149" : "#58a6ff");
+        const defaultColor = cfg?.defaultColor || (elem === "TMP" ? "#f85149" : (elem === "VOR" ? "#c678dd" : (elem === "DIV" ? "#56d4dd" : "#58a6ff")));
         const activeGroup = win?.activeGroup || appState.get("activeGroup");
         const stnLayerInGroup = activeGroup?.layers?.find((l) => l.type === "station");
         const derivedFrom = stnLayerInGroup?.id || layer?.id || `upperair-obs-${level}`;
         const isDTD = elem === "DTD";
-        const dtdDefaults = isDTD ? { showFill: false, showLine: false, showRaster: true } : {};
+        const isKinematic = elem === "VOR" || elem === "DIV";
+        const contourDefaults = isDTD ? { showFill: false, showLine: false, showRaster: true } : (isKinematic ? { showFill: false, showLine: true, showRaster: false } : {});
 
-        analyzeAndRenderSoundingElementContour(map, geojson, level, elem, {
+        const res = analyzeAndRenderSoundingElementContour(map, geojson, level, elem, {
           layerId: liveLayerId,
           lineColor: defaultColor,
           derivedFrom,
-          ...dtdDefaults,
+          ...contourDefaults,
         }, win);
+
+        if (!res) {
+          notifyError(`Insufficient valid wind observations (< 3 stations) to generate ${elem} contour.`);
+          return;
+        }
 
         if (activeGroup?.id) {
           const derivedEntry = {
@@ -430,19 +552,25 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
       import("../layers/surfaceAnalysis.js").then(({ analyzeAndRenderSurfaceContours, SURFACE_CONTOUR_CONFIGS }) => {
         const liveLayerId = `contour-surface-${elem.toLowerCase()}`;
         const cfg = SURFACE_CONTOUR_CONFIGS?.[elem];
-        const defaultColor = cfg?.defaultColor || "#58a6ff";
+        const defaultColor = cfg?.defaultColor || (elem === "VOR" ? "#c678dd" : (elem === "DIV" ? "#56d4dd" : "#58a6ff"));
         const activeGroup = win?.activeGroup || appState.get("activeGroup");
         const stnLayerInGroup = activeGroup?.layers?.find((l) => l.type === "station");
         const derivedFrom = stnLayerInGroup?.id || layer?.id || "surface-obs";
         const isDTD = elem === "DTD";
-        const dtdDefaults = isDTD ? { showFill: false, showLine: false, showRaster: true } : {};
+        const isKinematic = elem === "VOR" || elem === "DIV";
+        const contourDefaults = isDTD ? { showFill: false, showLine: false, showRaster: true } : (isKinematic ? { showFill: false, showLine: true, showRaster: false } : {});
 
-        analyzeAndRenderSurfaceContours(map, geojson, elem, {
+        const res = analyzeAndRenderSurfaceContours(map, geojson, elem, {
           layerId: liveLayerId,
           lineColor: defaultColor,
           derivedFrom,
-          ...dtdDefaults,
+          ...contourDefaults,
         }, win);
+
+        if (!res) {
+          notifyError(`Insufficient valid wind observations (< 3 stations) to generate ${elem} contour.`);
+          return;
+        }
 
         if (activeGroup?.id) {
           const derivedEntry = {
@@ -477,22 +605,59 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
     if (layer.type === "contour" || layer.type === "wind") {
       removeContourLayer(map, layerId);
       removeRasterLayer(map, layerId);
-      if (layer.config?.showWind) stopWindAnimation(map);
-      if (layer.config?.showBarbs) removeGridWindBarbs(map);
+      if (layer.type === "wind" || layer.config?.showWind) {
+        stopWindAnimation(map);
+      }
+      if (layer.type === "wind" || layer.config?.showBarbs) {
+        removeGridWindBarbs(map);
+      }
 
-      // Persist deletion of derived contour layer from preset configuration
+      // Persist deletion of layer from preset configuration
       const activeGroup = win?.activeGroup || appState.get("activeGroup");
-      if (activeGroup?.id && (layer.derivedFrom || layer.id?.startsWith("contour-surface-") || layer.id?.startsWith("contour-sounding-"))) {
-        removeDerivedLayerFromPreset(activeGroup.id, layer);
+      if (activeGroup?.id) {
+        if (layer.derivedFrom || layer.id?.startsWith("contour-surface-") || layer.id?.startsWith("contour-sounding-")) {
+          removeDerivedLayerFromPreset(activeGroup.id, layer);
+        }
+        if (Array.isArray(activeGroup.layers)) {
+          const aIdx = activeGroup.layers.findIndex((l) => l.id === layerId || (l.model === layer.model && l.element === layer.element));
+          if (aIdx >= 0) {
+            activeGroup.layers.splice(aIdx, 1);
+          }
+        }
       }
       if (Array.isArray(win?.derivedContourSnapshots)) {
         win.derivedContourSnapshots = win.derivedContourSnapshots.filter(
-          (s) => s.id !== layer.id && !(s.model === layer.model && s.element === layer.element)
+          (s) => s.id !== layerId && !(s.model === layer.model && s.element === layer.element)
         );
+      }
+      if (Array.isArray(win?.layerSnapshots)) {
+        win.layerSnapshots = win.layerSnapshots.filter(
+          (s) => s.id !== layerId && !(s.model === layer.model && s.element === layer.element)
+        );
+      }
+
+      // If in non-preset single-product mode and the base element layer was removed,
+      // update win.element to the next remaining weather layer (e.g. derived divergence)
+      if (!activeGroup) {
+        const remaining = getLayersForWindow(win).filter(
+          (l) => l.type !== "pmtiles" && l.id !== layerId && l.id !== layer?.id
+        );
+        if (remaining.length > 0) {
+          if (win && (win.element === layer.element || layerId === `wind-${win.element}` || layerId === `contour-${win.element}`)) {
+            const nextLayer = remaining[0];
+            win.element = nextLayer.element;
+            if (nextLayer.model) win.model = nextLayer.model;
+            if (nextLayer.level !== undefined && nextLayer.level !== null) win.level = nextLayer.level;
+            updateWindowTitle(win);
+          }
+        }
       }
     } else if (layer.type === "station") {
       setStationVisibility(map, false);
       if (layer.config?.showStreamlines) stopWindAnimation(map);
+      if (Array.isArray(win?.layerSnapshots)) {
+        win.layerSnapshots = win.layerSnapshots.filter((s) => s.id !== layerId);
+      }
     }
   } else if (action === "aux") {
     if (layerId === "raster") {
@@ -549,7 +714,7 @@ function getSourceFeatures(src) {
 }
 
 export async function triggerIsobandOverlay(map, layer = null, win = null) {
-  if (!map || !layer) return;
+  if (!map || !layer || layer.type === "wind") return;
   const layerId = layer.id || (layer.element ? `contour-${layer.element}` : "default");
   const { isobandSrcId } = getLayerDOMIds(layerId);
   const isobandSrc = map.getSource(isobandSrcId);
@@ -593,6 +758,14 @@ export async function triggerIsobandOverlay(map, layer = null, win = null) {
   }
 
   // 2. Fetch gridData if missing (for catalog-loaded NWP layers)
+  const isUpper = (layer.model === "UPPER_AIR") || (layer.id && layer.id.startsWith("contour-sounding-"));
+  const isSurface = (layer.model === "SURFACE" || layer.model === "SURFACE_ANALYSIS") || (layer.id && layer.id.startsWith("contour-surface-"));
+  const isNwpKinematic = (layer.element === "VOR" || layer.element === "DIV" || (layer.element === "WIND" && layer.type === "contour")) && !isUpper && !isSurface;
+  if (isNwpKinematic) {
+    await triggerVortDivOverlay(map, layer, win);
+    return;
+  }
+
   const model = layer.model || win?.model || "ECMWF_HR";
   const level = layer.level !== undefined && layer.level !== null ? layer.level : (win?.level !== undefined ? win.level : null);
   let path = layer.path;
@@ -698,6 +871,14 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
   }
 
   // 3. Dynamic model, element, level and file from layer or window
+  const isUpper = (layer?.model === "UPPER_AIR") || (layer?.id && layer?.id.startsWith("contour-sounding-"));
+  const isSurface = (layer?.model === "SURFACE" || layer?.model === "SURFACE_ANALYSIS") || (layer?.id && layer?.id.startsWith("contour-surface-"));
+  const isNwpKinematic = (element === "VOR" || element === "DIV" || (element === "WIND" && layer?.type === "contour")) && !isUpper && !isSurface;
+  if (isNwpKinematic) {
+    await triggerVortDivOverlay(map, layer, win);
+    return;
+  }
+
   const model = layer?.model || win?.model || "ECMWF_HR";
   const level = layer?.level !== undefined && layer?.level !== null ? layer.level : (win?.level !== undefined ? win.level : null);
 
@@ -896,4 +1077,142 @@ export async function triggerStationStreamlines(map, layer = null, win = null) {
       console.warn("[StationStreamlines] Fetch failed:", err);
       notifyError(`Failed to load station streamlines: ${err?.message || err}`);
     });
+}
+
+export async function triggerVortDivOverlay(map, layer = null, win = null) {
+  if (!map || !layer) return;
+  const element = (layer.element || "VOR").toUpperCase();
+  const model = layer.model || win?.model || "ECMWF_HR";
+  const level = layer.level !== undefined && layer.level !== null ? layer.level : (win?.level !== undefined ? win.level : 850);
+  const layerId = layer.id || `contour-${model}-${element.toLowerCase()}-${level}`;
+  const isVisible = layer.visible !== false;
+
+  let colormap = layer.colormap || layer.render?.colormap || element;
+  const palettePath = layer.config?.palettePath || layer.render?.palettePath;
+  if (palettePath && (!layer.colormap || !layer.colormap.startsWith("palette:"))) {
+    const paletteKey = `palette:${layerId}`;
+    try {
+      const { loadXMLPalette } = await import("../utils/paletteLoader.js");
+      const { setColormaps, COLORMAPS } = await import("../utils/colormaps.js");
+      const stops = await loadXMLPalette(palettePath);
+      if (stops) {
+        setColormaps({ ...COLORMAPS, [paletteKey]: stops });
+        layer.colormap = paletteKey;
+        colormap = paletteKey;
+      }
+    } catch {}
+  }
+
+  const period = win?.period ?? 24;
+  let cycle = win?.forecastCycle || (layer.file ? layer.file.split(".")[0] : null);
+  if (!cycle) {
+    try {
+      const { resolveLatestForecastCycle } = await import("../utils/timelineSync.js");
+      cycle = await resolveLatestForecastCycle(model, "WIND", level);
+    } catch {}
+  }
+  const file = cycle ? `${cycle}.${String(period).padStart(3, "0")}` : (layer.file || null);
+  if (file && layer.file !== file) {
+    layer.file = file;
+    layer.gridData = null;
+  }
+
+  // 1. Check if layer already has computed kinematic gridData
+  if (layer.gridData && layer.gridData.header && layer.gridData.values) {
+    renderContourLayers(map, layer.gridData, element, {
+      ...layer.config,
+      layerId,
+      showFill: isVisible && Boolean(layer.config?.showFill),
+      showRaster: isVisible && Boolean(layer.config?.showRaster),
+      showLine: isVisible && layer.config?.showLine !== false,
+      lineColor: layer.config?.lineColor || (element === "VOR" ? "#c678dd" : (element === "DIV" ? "#56d4dd" : "#58a6ff")),
+      lineWidth: layer.config?.lineWidth,
+      boldValues: layer.config?.boldValues,
+      boldLineWidth: layer.config?.boldLineWidth,
+      colormap,
+      smooth: layer.config?.smooth,
+      smoothIterations: layer.config?.smoothIterations,
+      labelSize: layer.config?.labelSize,
+      viewportBounds: (map && typeof map.getBounds === "function") ? map.getBounds().toArray() : null,
+    });
+    armContourReRender(map, layer, win);
+    if (layer.config?.showRaster && isVisible) {
+      renderGridRaster(map, layer.gridData, element, colormap, { layerId, opacity: layer.config?.opacity ?? 0.75 });
+    }
+    const hasShading = isVisible && (Boolean(layer.config?.showFill) || Boolean(layer.config?.showRaster));
+    if (hasShading) {
+      updateLegend(element, colormap, layer.gridData.stats?.min, layer.gridData.stats?.max, win);
+    } else {
+      removeLegend(element, win);
+    }
+    return;
+  }
+
+  // 2. Resolve parent wind field via three-tier fallback: layer.gridData -> win.windGridData / win._windGridCache -> fetch
+  let windGrid = null;
+  const cacheKey = file ? `${model}/WIND/${level}/${file}` : null;
+
+  if (cacheKey && win?._windGridCache?.has(cacheKey)) {
+    windGrid = win._windGridCache.get(cacheKey);
+  } else if (win?.windGridData && win.windGridData._file === file && (win.level === level || !level) && win.windGridData.u && win.windGridData.v) {
+    windGrid = win.windGridData;
+  } else if (file) {
+    try {
+      const { fetchGridData } = await import("../api/catalogApi.js");
+      windGrid = await fetchGridData(`${model}/WIND/${level}`, file);
+      if (windGrid) windGrid._file = file;
+      if (win && cacheKey) {
+        if (!win._windGridCache) win._windGridCache = new Map();
+        win._windGridCache.set(cacheKey, windGrid);
+      }
+    } catch (err) {
+      console.warn(`[LayerActions] Failed to fetch wind grid for ${model}/WIND/${level}/${file}:`, err);
+      return;
+    }
+  }
+
+  if (!windGrid || !windGrid.u || !windGrid.v) {
+    console.warn(`[LayerActions] No valid wind vectors found for kinematic calculation: ${model}/WIND/${level}`);
+    return;
+  }
+
+  // 3. Compute kinematic grid
+  const { buildKinematicGridData } = await import("../layers/kinematics.js");
+  const kinGrid = buildKinematicGridData(element, windGrid.u, windGrid.v, windGrid, {
+    smoothOutput: layer.config?.smooth !== false,
+    outputSmoothIterations: layer.config?.smoothIterations ?? 1,
+  });
+
+  if (!kinGrid) return;
+  layer.gridData = kinGrid;
+
+  // 4. Render contour layers
+  renderContourLayers(map, kinGrid, element, {
+    ...layer.config,
+    layerId,
+    showFill: isVisible && Boolean(layer.config?.showFill),
+    showRaster: isVisible && Boolean(layer.config?.showRaster),
+    showLine: isVisible && layer.config?.showLine !== false,
+    lineColor: layer.config?.lineColor || (element === "VOR" ? "#c678dd" : (element === "DIV" ? "#56d4dd" : "#58a6ff")),
+    lineWidth: layer.config?.lineWidth,
+    boldValues: layer.config?.boldValues,
+    boldLineWidth: layer.config?.boldLineWidth,
+    colormap,
+    smooth: layer.config?.smooth,
+    smoothIterations: layer.config?.smoothIterations,
+    labelSize: layer.config?.labelSize,
+    viewportBounds: (map && typeof map.getBounds === "function") ? map.getBounds().toArray() : null,
+  });
+  armContourReRender(map, layer, win);
+
+  if (layer.config?.showRaster && isVisible) {
+    renderGridRaster(map, kinGrid, element, colormap, { layerId, opacity: layer.config?.opacity ?? 0.75 });
+  }
+
+  const hasShading = isVisible && (Boolean(layer.config?.showFill) || Boolean(layer.config?.showRaster));
+  if (hasShading) {
+    updateLegend(element, colormap, kinGrid.stats?.min, kinGrid.stats?.max, win);
+  } else {
+    removeLegend(element, win);
+  }
 }
