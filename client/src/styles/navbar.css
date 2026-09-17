@@ -1,0 +1,75 @@
+/* navbar.css - Navigation bar styles */
+#navbar {
+  height: 48px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 1000;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.brand-link {
+  color: var(--text-primary);
+  text-decoration: none;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  transition: color 0.15s ease;
+}
+
+.brand-link:hover {
+  color: var(--accent-blue);
+  text-decoration: underline;
+}
+
+.brand-badge {
+  background: var(--accent-blue);
+  color: white;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.nav-middle { display: flex; align-items: center; gap: 12px; overflow-x: auto; min-width: 0; }
+.nav-control-group { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+.nav-select { background: #21262d; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px; font-size: 12px; outline: none; cursor: pointer; }
+.nav-select:focus { border-color: var(--accent-blue); }
+.nav-keyboard-hint { display: flex; align-items: center; gap: 6px; }
+.kbd-pill { background: rgba(56, 139, 253, 0.15); border: 1px solid rgba(56, 139, 253, 0.4); border-radius: 4px; padding: 2px 6px; font-size: 11px; font-family: var(--font-mono); color: #79c0ff; }
+
+.nav-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.nav-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-green);
+}
+
+.status-dot.warning { background: var(--accent-orange); }

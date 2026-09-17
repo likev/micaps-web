@@ -2,6 +2,7 @@
 import { test, expect, describe, beforeAll, beforeEach } from "bun:test";
 import fs from "fs";
 import path from "path";
+import { readStyleCss } from "./helpers/cssText.js";
 import { initTabWindowManager, getWindowById, getActiveWindow, getActiveTab } from "../src/ui/tabWindowManager.js";
 import { activateConfigTab, closeConfigTab } from "../src/ui/configEditor.js";
 import { setStepLength } from "../src/ui/timeSlider.js";
@@ -122,7 +123,7 @@ function createMockMap() {
 }
 
 describe("UI Review 3: CSS & Layout Residuals (§1)", () => {
-  const styleCss = fs.readFileSync(path.resolve(__dirname, "../src/style.css"), "utf8");
+  const styleCss = readStyleCss();
   const tabsCss = fs.readFileSync(path.resolve(__dirname, "../src/tabs.css"), "utf8");
 
   test("L1: .panel max-height uses container-relative calc(100% - 24px)", () => {

@@ -1,0 +1,26 @@
+/* responsive.css - Responsive media query overrides */
+@media (max-width: 768px) {
+  .nav-keyboard-hint,
+  .layout-label,
+  .step-length-label,
+  .init-time-label {
+    display: none !important;
+  }
+  .nav-status {
+    max-width: 110px;
+  }
+}
+
+@media (max-width: 520px) {
+  #navbar {
+    padding: 0 8px;
+    gap: 6px;
+  }
+  .nav-brand span.brand-badge {
+    display: none;
+  }
+  #timeslider-container {
+    padding: 6px 8px;
+    gap: 8px;
+  }
+}

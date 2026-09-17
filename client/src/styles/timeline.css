@@ -1,0 +1,123 @@
+/* timeline.css - Time slider and playback control styles */
+#timeslider-container {
+  min-height: 60px;
+  height: auto;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  padding: 6px 20px;
+  gap: 16px;
+  z-index: 1000;
+}
+
+.play-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 13px;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.play-btn:hover { background: #58a6ff; }
+.play-btn.active {
+  background: #1f6feb;
+  box-shadow: 0 0 10px rgba(56, 139, 253, 0.6);
+}
+.play-btn:focus-visible, .step-nav-btn:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+.play-btn.loading, .play-btn[aria-busy="true"] {
+  opacity: 0.7;
+  cursor: wait;
+}
+.play-btn:disabled, .play-btn.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.timeline-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.step-nav-btn { width: 28px; height: 28px; border-radius: 4px; background: #21262d; color: #c9d1d9; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 11px; }
+.step-nav-btn:hover { background: #30363d; color: #ffffff; }
+
+.step-length-control, .playback-speed-control { display: flex; align-items: center; gap: 4px; margin-left: 6px; font-size: 11px; color: var(--text-secondary); }
+.step-length-label { font-size: 11px; color: #8b949e; font-weight: 500; }
+.step-length-select { background: #21262d; color: #58a6ff; font-weight: 600; border: 1px solid var(--border-color); border-radius: 4px; padding: 3px 6px; font-size: 11px; font-family: var(--font-mono); outline: none; cursor: pointer; transition: all 0.15s ease; }
+.step-length-select:hover, .step-length-select:focus { border-color: var(--accent-blue); background: #282e37; }
+
+.init-time-control { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary); }
+.init-time-label { font-size: 11px; color: #8b949e; font-weight: 500; }
+.init-time-select { background: #21262d; color: #58a6ff; font-weight: 600; border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 6px; font-size: 11px; font-family: var(--font-mono); outline: none; cursor: pointer; transition: all 0.15s ease; }
+.init-time-select:hover, .init-time-select:focus { border-color: var(--accent-blue); background: #282e37; }
+
+.timeline-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.timeline-info {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  row-gap: 4px;
+  column-gap: 12px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  min-width: 0;
+}
+
+.mode-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(56, 139, 253, 0.2);
+  border: 1px solid var(--accent-blue);
+  color: #79c0ff;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.mode-badge.obs-badge {
+  background: rgba(46, 160, 67, 0.2);
+  border-color: #2ea043;
+  color: #56d364;
+}
+
+#time-lead-wrapper {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.valid-label {
+  margin-left: auto;
+  color: #8b949e;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.timeline-chips { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.chip-btn { padding: 4px 10px; border-radius: 12px; background: #21262d; border: 1px solid var(--border-color); color: #8b949e; font-family: var(--font-mono); font-size: 11px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease; }
+.chip-btn:hover { background: #30363d; color: #c9d1d9; }
+.chip-btn.active { background: var(--accent-blue); border-color: #58a6ff; color: #ffffff; font-weight: bold; box-shadow: 0 0 8px rgba(56, 139, 253, 0.4); }

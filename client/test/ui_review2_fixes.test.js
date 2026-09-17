@@ -1,6 +1,7 @@
 // ui_review2_fixes.test.js - Automated tests verifying all issues from UI Review 2
 import { test, expect, describe, beforeEach } from "bun:test";
 import fs from "fs";
+import { readStyleCss } from "./helpers/cssText.js";
 import { updateLegend, removeLegend, clearLegends } from "../src/ui/legend.js";
 import { setLayerIsolineStyle } from "../src/layers/contourLayer.js";
 import { setStationConfig, renderStationWeatherPlots } from "../src/layers/stationLayer.js";
@@ -51,7 +52,7 @@ function createMockMap() {
 }
 
 describe("UI Review 2: CSS Overflow Verifications", () => {
-  const styleCss = fs.readFileSync("./src/style.css", "utf8");
+  const styleCss = readStyleCss();
   const tabsCss = fs.readFileSync("./src/tabs.css", "utf8");
 
   test("O1: .panel has overflow-y: auto and .layers-manage-container expands naturally without max-height clipping", () => {
@@ -87,7 +88,7 @@ describe("UI Review 2: CSS Overflow Verifications", () => {
 });
 
 describe("UI Review 2: Operator & Interactive Status", () => {
-  const styleCss = fs.readFileSync("./src/style.css", "utf8");
+  const styleCss = readStyleCss();
   const layerControlJs = fs.readFileSync("./src/ui/layerControl.js", "utf8");
 
   test("S1: Eye icon uses 👁 / 🚫 and toggles layer-hidden class with strikethrough", () => {
