@@ -5,6 +5,7 @@ import { addOrUpdateLayer } from "../../ui/layerControl.js";
 import { smoothGrid2D } from "../../utils/smoothContour.js";
 import { getHexColor } from "../../utils/colormaps.js";
 import { formatContourLabel } from "../../utils/formatters.js";
+import { clipLevelsToRange } from "../contour/contourLevels.js";
 
 export function extractPointsAndValues(features, extractFn, level = null) {
   const points = [];
@@ -86,12 +87,29 @@ export function interpolateAndSmoothGrid(points, values, x, y, smoothIterations 
   return smoothGrid2D(interpolated, smoothIterations, smoothWeight, y.length, x.length);
 }
 
-export function tagLinesAndFills(interpolated, x, y, levels, element, colormap, boldValues = [], isSounding = false, values = null) {
+export function tagLinesAndFills(interpolated, x, y, levels, element, colormap, boldValues = [], isSounding = false, values = null, isCustomLevels = false) {
   let lines = [];
   let actualLevels = levels;
+  // Custom interval levels may extend beyond the observed data range.
+  // Clip to the in-range subset up front so contouring runs on levels that
+  // can actually produce isolines (e.g. Start 5000/End 6000/Span 100 on a
+  // 5400-5600 field contours [5400, 5500, 5600]). Never auto-fallback below.
+  if (isSounding && isCustomLevels && Array.isArray(levels) && levels.length >= 2 && values && values.length > 0) {
+    let minV = Infinity, maxV = -Infinity;
+    for (let i = 0; i < values.length; i++) {
+      if (values[i] < minV) minV = values[i];
+      if (values[i] > maxV) maxV = values[i];
+    }
+    if (maxV > minV) {
+      const clipped = clipLevelsToRange(levels, minV, maxV);
+      if (clipped.length >= 1) {
+        actualLevels = clipped;
+      }
+    }
+  }
   try {
-    lines = griddata.contour({ data: interpolated, rows: y.length, cols: x.length }, { x, y, levels }) || [];
-    if (isSounding && (!lines || lines.length === 0) && values && values.length > 0) {
+    lines = griddata.contour({ data: interpolated, rows: y.length, cols: x.length }, { x, y, levels: actualLevels }) || [];
+    if (isSounding && !isCustomLevels && (!lines || lines.length === 0) && values && values.length > 0) {
       let minV = Infinity, maxV = -Infinity;
       for (let i = 0; i < values.length; i++) {
         if (values[i] < minV) minV = values[i];
@@ -192,6 +210,8 @@ export function buildContourRenderOptions({ layerId, element, colormap, lineColo
     smooth: options.smooth !== false,
     smoothIterations: options.smoothIterations ?? 2,
     labelSize: options.labelSize,
+    interval: options.interval || null,
+    levels: options.levels || null,
   };
 }
 

@@ -62,6 +62,8 @@ export async function loadWeatherField(map, model, element, level, period, custo
   const smooth = exCfg.smooth ?? customOptions?.smooth ?? true;
   const smoothIterations = exCfg.smoothIterations ?? customOptions?.smoothIterations ?? 2;
   const labelSize = exCfg.labelSize ?? customOptions?.labelSize;
+  const interval = exCfg.interval ?? customOptions?.interval ?? snap?.config?.interval ?? null;
+  const levels = exCfg.levels ?? customOptions?.levels ?? snap?.config?.levels ?? null;
 
   try {
     let gridData;
@@ -134,6 +136,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
     if (!isWind) {
       renderContourLayers(map, gridData, element, {
         layerId,
+        levels,
         showFill: isVisible && showFill,
         showRaster: isVisible && showRaster,
         showLine: isVisible && showLine,
@@ -184,6 +187,8 @@ export async function loadWeatherField(map, model, element, level, period, custo
         showBarbs: false,
         smooth,
         smoothIterations,
+        interval,
+        levels,
       },
     }, win);
 
@@ -211,6 +216,8 @@ export async function loadWeatherField(map, model, element, level, period, custo
           showRaster,
           smooth,
           smoothIterations,
+          interval,
+          levels,
         },
       };
       armContourReRender(map, layerObj, win);

@@ -4,6 +4,7 @@ import { buildKinematicGridData } from "../kinematics.js";
 import { SURFACE_CONTOUR_CONFIGS, normalizeSurfaceElementKey } from "./contourConfigsSurface.js";
 import { SOUNDING_CONTOUR_CONFIGS, normalizeSoundingElementKey } from "./contourConfigsSounding.js";
 import { tagLinesAndFills, resolveShowFlags, registerContourLayer } from "./objectiveAnalysis.js";
+import { resolveRenderLevels } from "../contour/contourLevels.js";
 
 export function analyzeKinematicContours({
   map,
@@ -62,7 +63,8 @@ export function analyzeKinematicContours({
       filledValues[i] = Number.isNaN(values[i]) ? avgVal : values[i];
     }
 
-    let levels = options.levels;
+    const customLevels = resolveRenderLevels(options);
+    let levels = customLevels;
     if (!levels) {
       if (typeof cfg.getLevels === "function") {
         levels = cfg.getLevels.length >= 3
@@ -89,7 +91,8 @@ export function analyzeKinematicContours({
       cfg.colormap,
       boldValues,
       isSounding,
-      filledValues
+      filledValues,
+      Boolean(customLevels)
     );
 
     const isolineFC = { type: "FeatureCollection", features: lines || [] };

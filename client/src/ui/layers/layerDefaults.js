@@ -189,6 +189,9 @@ export function buildBaseConfig(layerDef) {
         ? true
         : false,
     palettePath: layerDef.config?.palettePath || null,
+    interval: layerDef.config?.interval || null,
+    levels: layerDef.config?.levels || null,
     ...(layerDef.config || {}),
   };
 }
+

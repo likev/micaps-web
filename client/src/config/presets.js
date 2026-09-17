@@ -150,6 +150,8 @@ export function autoSaveLayerConfig(layer) {
             if (layer.config.showWind !== undefined) pLayer.render.showWind = layer.config.showWind;
             if (layer.config.showBarbs !== undefined) pLayer.render.showBarbs = layer.config.showBarbs;
             if (layer.config.palettePath !== undefined) pLayer.render.palettePath = layer.config.palettePath;
+            if (layer.config.interval !== undefined) pLayer.render.interval = layer.config.interval;
+            if (layer.config.levels !== undefined) pLayer.render.levels = layer.config.levels;
 
             // Station plot field visibility
             if (layer.config.showTemp !== undefined) pLayer.render.showTemp = layer.config.showTemp;

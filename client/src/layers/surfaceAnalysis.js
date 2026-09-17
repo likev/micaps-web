@@ -16,6 +16,7 @@ import {
   buildContourLayerMeta,
 } from "./analysis/objectiveAnalysis.js";
 import { analyzeKinematicContours } from "./analysis/kinematicContours.js";
+import { resolveRenderLevels } from "./contour/contourLevels.js";
 
 export { SURFACE_CONTOUR_CONFIGS };
 
@@ -52,8 +53,8 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
     }
 
     const { minV, maxV } = computeValueRange(values);
-
-    const levels = options.levels || cfg.getLevels(minV, maxV);
+    const customLevels = resolveRenderLevels(options);
+    const levels = customLevels || cfg.getLevels(minV, maxV);
     const boldValues = options.boldValues || cfg.boldValues || [];
 
     const { lines, fills, levels: actualLevels } = tagLinesAndFills(
@@ -65,7 +66,8 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
       cfg.colormap,
       boldValues,
       false,
-      values
+      values,
+      Boolean(customLevels)
     );
 
     const isolineFC = { type: "FeatureCollection", features: lines || [] };

@@ -19,6 +19,7 @@ import {
   computeGridStats,
   evaluateCropAndLOD,
 } from "./contourCompute.js";
+import { resolveRenderLevels } from "./contourLevels.js";
 
 export function updateMapLibreContour(map, isobands, isolines, options = {}) {
   const layerId = options.layerId || "default";
@@ -231,7 +232,7 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
   }
 
   const { zMin, zMax } = computeGridStats(gridData);
-  const levels = options.levels || getElementLevels(element, zMin, zMax, options.colormap);
+  const levels = resolveRenderLevels(options) || getElementLevels(element, zMin, zMax, options.colormap);
 
   const isVisible = options.visible !== false;
   const showRaster = options.showRaster === true;

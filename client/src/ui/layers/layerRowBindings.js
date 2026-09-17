@@ -2,6 +2,7 @@
 import { appState } from "../../store/appState.js";
 import { autoSaveLayerConfig } from "../../config/presets.js";
 import { parseBoldValues } from "../../layers/contourLayer.js";
+import { buildLevelsFromInterval, validateInterval } from "../../layers/contour/contourLevels.js";
 import { loadXMLPalette } from "../../utils/paletteLoader.js";
 import { bindStationFilterEvents } from "../stationFilterControl.js";
 import { populatePaletteSelect } from "./palettePicker.js";
@@ -93,8 +94,8 @@ export function bindLayerRowEvents(panel, layers, currentActiveWinId, onLayerAct
           el.addEventListener("click", (e) => e.stopPropagation());
           el.addEventListener(eventType, (e) => {
             const changed = handler(e);
-            if (onLayerActionCallback) {
-              onLayerActionCallback("config", layer.id, changed || layer.config, layer, currentActiveWinId);
+            if (changed !== null && changed !== undefined && onLayerActionCallback) {
+              onLayerActionCallback("config", layer.id, changed, layer, currentActiveWinId);
             }
           });
         }
@@ -154,12 +155,144 @@ export function bindLayerRowEvents(panel, layers, currentActiveWinId, onLayerAct
         autoSaveLayerConfig(layer);
         return { boldLineWidth: bw };
       });
+
+      // Interval controls (Start / Span / End / Auto) - contour layers only
+      if (layer.type === "contour") {
+        const getIntervalInputs = () => ({
+          startEl: configDrawer.querySelector(".input-interval-start"),
+          stepEl: configDrawer.querySelector(".input-interval-step"),
+          endEl: configDrawer.querySelector(".input-interval-end"),
+        });
+
+        const setInputsValidity = (startEl, stepEl, endEl, isValid, message = "", count = null) => {
+          const border = isValid ? "#30363d" : "#f85149";
+          if (startEl) {
+            startEl.style.borderColor = border;
+            startEl.title = isValid
+              ? (count ? `${count} levels: Start` : "First contour value (empty = auto)")
+              : message;
+          }
+          if (stepEl) {
+            stepEl.style.borderColor = border;
+            stepEl.title = isValid
+              ? (count ? `${count} levels: Span` : "Interval spacing, > 0 (empty = auto)")
+              : message;
+          }
+          if (endEl) {
+            endEl.style.borderColor = border;
+            endEl.title = isValid
+              ? (count ? `${count} levels: End` : "Last contour value (empty = auto)")
+              : message;
+          }
+        };
+
+        const handleIntervalInput = () => {
+          const { startEl, stepEl, endEl } = getIntervalInputs();
+          if (!startEl || !stepEl || !endEl) return;
+          const sVal = startEl.value.trim();
+          const spVal = stepEl.value.trim();
+          const eVal = endEl.value.trim();
+
+          if (!sVal && !spVal && !eVal) {
+            setInputsValidity(startEl, stepEl, endEl, true, "");
+            return;
+          }
+          if (!sVal || !spVal || !eVal) {
+            setInputsValidity(startEl, stepEl, endEl, true, "");
+            return;
+          }
+
+          const validation = validateInterval(sVal, spVal, eVal);
+          if (!validation.valid) {
+            setInputsValidity(startEl, stepEl, endEl, false, validation.message);
+          } else {
+            setInputsValidity(startEl, stepEl, endEl, true, "", validation.count);
+          }
+        };
+
+        const handleIntervalChange = () => {
+          const { startEl, stepEl, endEl } = getIntervalInputs();
+          if (!startEl || !stepEl || !endEl) return null;
+          const sVal = startEl.value.trim();
+          const spVal = stepEl.value.trim();
+          const eVal = endEl.value.trim();
+
+          // 1. All three empty: reset to Auto
+          if (!sVal && !spVal && !eVal) {
+            setInputsValidity(startEl, stepEl, endEl, true, "");
+            if (layer.config?.interval || layer.config?.levels) {
+              layer.config.interval = null;
+              layer.config.levels = null;
+              autoSaveLayerConfig(layer);
+              return { interval: null, levels: null };
+            }
+            return null;
+          }
+
+          // 2. Partial triple: do not apply override or trigger re-render
+          if (!sVal || !spVal || !eVal) {
+            setInputsValidity(startEl, stepEl, endEl, true, "");
+            return null;
+          }
+
+          // 3. Complete triple: validate
+          const res = buildLevelsFromInterval(sVal, spVal, eVal);
+          if (!res.levels) {
+            setInputsValidity(startEl, stepEl, endEl, false, res.message);
+            return null;
+          }
+
+          // 4. Valid triple: store and emit
+          setInputsValidity(startEl, stepEl, endEl, true, "", res.levels.length);
+          const triple = {
+            start: parseFloat(sVal),
+            step: parseFloat(spVal),
+            end: parseFloat(eVal),
+          };
+          layer.config.interval = triple;
+          layer.config.levels = res.levels;
+          autoSaveLayerConfig(layer);
+          return { interval: triple, levels: res.levels };
+        };
+
+        bindProp(".input-interval-start", "change", handleIntervalChange);
+        bindProp(".input-interval-step", "change", handleIntervalChange);
+        bindProp(".input-interval-end", "change", handleIntervalChange);
+
+        [".input-interval-start", ".input-interval-step", ".input-interval-end"].forEach((sel) => {
+          const el = configDrawer.querySelector(sel);
+          if (el) {
+            el.addEventListener("input", handleIntervalInput);
+          }
+        });
+
+        const autoBtn = configDrawer.querySelector(".btn-interval-auto");
+        if (autoBtn) {
+          autoBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const { startEl, stepEl, endEl } = getIntervalInputs();
+            if (startEl) startEl.value = "";
+            if (stepEl) stepEl.value = "";
+            if (endEl) endEl.value = "";
+            setInputsValidity(startEl, stepEl, endEl, true, "");
+            layer.config.interval = null;
+            layer.config.levels = null;
+            autoSaveLayerConfig(layer);
+            if (onLayerActionCallback) {
+              onLayerActionCallback("config", layer.id, { interval: null, levels: null }, layer, currentActiveWinId);
+            }
+          });
+        }
+      }
+
+
       bindProp(".input-label-size", "change", (e) => {
         const ls = parseInt(e.target.value, 10) || 13;
         layer.config.labelSize = ls;
         autoSaveLayerConfig(layer);
         return { labelSize: ls };
       });
+
       bindProp(".chk-show-raster", "change", (e) => {
         layer.config.showRaster = e.target.checked;
         let showFill = layer.config.showFill;

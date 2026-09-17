@@ -47,6 +47,7 @@ export async function triggerVortDivOverlay(map, layer = null, win = null) {
     renderContourLayers(map, layer.gridData, element, {
       ...layer.config,
       layerId,
+      levels: layer.config?.levels,
       showFill: isVisible && Boolean(layer.config?.showFill),
       showRaster: isVisible && Boolean(layer.config?.showRaster),
       showLine: isVisible && layer.config?.showLine !== false,
@@ -121,6 +122,7 @@ export async function triggerVortDivOverlay(map, layer = null, win = null) {
   renderContourLayers(map, kinGrid, element, {
     ...layer.config,
     layerId,
+    levels: layer.config?.levels,
     showFill: isVisible && Boolean(layer.config?.showFill),
     showRaster: isVisible && Boolean(layer.config?.showRaster),
     showLine: isVisible && layer.config?.showLine !== false,

@@ -65,6 +65,7 @@ export async function triggerIsobandOverlay(map, layer = null, win = null) {
     renderContourLayers(map, layer.gridData, layer.element || "TMP", {
       ...layer.config,
       layerId,
+      levels: layer.config?.levels,
       showFill: isVisible,
       showRaster: false,
       showLine: isVisible && layer.config?.showLine !== false,
@@ -122,6 +123,7 @@ export async function triggerIsobandOverlay(map, layer = null, win = null) {
         renderContourLayers(map, gridData, layer.element || "TMP", {
           ...layer.config,
           layerId,
+          levels: layer.config?.levels,
           showFill: isVisible,
           showRaster: false,
           showLine: isVisible && layer.config?.showLine !== false,

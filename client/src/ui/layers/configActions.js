@@ -130,7 +130,10 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
       });
     }
 
-    if (value.smooth !== undefined && layer.type === "contour") {
+    if (
+      (value.smooth !== undefined || value.interval !== undefined || value.levels !== undefined) &&
+      layer.type === "contour"
+    ) {
       const isUpper = layer.model === "UPPER_AIR" || (layer.id && layer.id.startsWith("contour-sounding-"));
       const isSurface =
         layer.model === "SURFACE" ||
@@ -140,6 +143,15 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
         (layer.element === "VOR" || layer.element === "DIV" || (layer.element === "WIND" && layer.type === "contour")) &&
         !isUpper &&
         !isSurface;
+
+      const levels = value.levels !== undefined ? value.levels : (layer.config?.levels ?? null);
+      if (value.interval !== undefined) {
+        layer.config.interval = value.interval;
+      }
+      layer.config.levels = levels;
+
+      const smooth = value.smooth !== undefined ? value.smooth : (layer.config?.smooth !== false);
+
       if (isUpper || isSurface) {
         const geojson = layer?.stationsGeoJSON || getStationGeoJSON(map) || winObj?.stationsGeoJSON || appState.get("stationData");
         if (geojson && geojson.features && geojson.features.length >= 3) {
@@ -151,7 +163,7 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
                 geojson,
                 level,
                 layer.element,
-                { ...layer.config, layerId, smooth: value.smooth },
+                { ...layer.config, layerId, smooth, levels },
                 winObj
               );
             });
@@ -161,7 +173,7 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
                 map,
                 geojson,
                 layer.element,
-                { ...layer.config, layerId, smooth: value.smooth },
+                { ...layer.config, layerId, smooth, levels },
                 winObj
               );
             });
@@ -173,7 +185,8 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
         renderContourLayers(map, layer.gridData, layer.element || "TMP", {
           ...layer.config,
           layerId,
-          smooth: value.smooth,
+          levels,
+          smooth,
           showFill: layer.visible && layer.config?.showFill,
           showLine: layer.visible && layer.config?.showLine,
           opacity: layer.config?.opacity,

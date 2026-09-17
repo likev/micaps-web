@@ -1,6 +1,7 @@
 // layerRowView.js - HTML templates for layer row, wind drawer, and station drawer
 import { renderStationFilterSection } from "../stationFilterControl.js";
 import { isWindRelated, isUpperAirStationLayer } from "./layerDefaults.js";
+import { buildLevelsFromInterval } from "../../layers/contour/contourLevels.js";
 
 export function renderWindDrawerHTML(layer) {
   return `
@@ -107,6 +108,16 @@ export function renderStationDrawerHTML(layer) {
 
 export function renderLayerRow(layer) {
   const isContour = layer.type === "contour";
+  const interval = layer.config?.interval;
+  const intervalStart = interval?.start !== undefined && interval?.start !== null ? interval.start : "";
+  const intervalStep = interval?.step !== undefined && interval?.step !== null ? interval.step : "";
+  const intervalEnd = interval?.end !== undefined && interval?.end !== null ? interval.end : "";
+  const intervalCount = Array.isArray(layer.config?.levels)
+    ? layer.config.levels.length
+    : (intervalStart !== "" && intervalStep !== "" && intervalEnd !== ""
+      ? buildLevelsFromInterval(intervalStart, intervalStep, intervalEnd).levels?.length
+      : null);
+  const intervalTooltip = intervalCount ? `${intervalCount} levels` : null;
 
   return `
     <div class="layer-item" data-layer-id="${layer.id}" role="group" aria-label="${layer.name}">
@@ -172,6 +183,15 @@ export function renderLayerRow(layer) {
                   <span style="color: #8b949e;">px</span>
                 </div>
               </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 100%; box-sizing: border-box; padding-left: 20px; font-size: 11px; flex-wrap: wrap; gap: 4px; min-width: 0;" title="Contour interval sequence [Start, Start+Span, ... <= End]. Bold values apply only if included in sequence.">
+                <span style="color: #8b949e; flex-shrink: 0;" title="Contour interval sequence [Start, Start+Span, ... <= End]. Bold values apply only if included in sequence.">Interval:</span>
+                <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap; min-width: 0; max-width: 100%;">
+                  <input type="number" step="any" class="input-interval-start" placeholder="Start" value="${intervalStart}" style="width: 56px; min-width: 0; height: 20px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; text-align: center; font-size: 11px;" title="${intervalTooltip ? `${intervalTooltip}: Start` : 'First contour value (empty = auto)'}" />
+                  <input type="number" step="any" class="input-interval-step" placeholder="Span" value="${intervalStep}" style="width: 48px; min-width: 0; height: 20px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; text-align: center; font-size: 11px;" title="${intervalTooltip ? `${intervalTooltip}: Span` : 'Interval spacing, > 0 (empty = auto)'}" />
+                  <input type="number" step="any" class="input-interval-end" placeholder="End" value="${intervalEnd}" style="width: 56px; min-width: 0; height: 20px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; text-align: center; font-size: 11px;" title="${intervalTooltip ? `${intervalTooltip}: End` : 'Last contour value (empty = auto)'}" />
+                  <button type="button" class="btn-interval-auto" style="height: 20px; background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; padding: 0 6px; font-size: 11px; cursor: pointer; line-height: 18px;" title="Reset to automatic levels">Auto</button>
+                </div>
+              </div>
               <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 100%; box-sizing: border-box; padding-left: 20px; font-size: 11px; flex-wrap: wrap; gap: 4px; min-width: 0;">
                 <span style="color: #8b949e; flex-shrink: 0;">Label Size:</span>
                 <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap; min-width: 0;">
@@ -180,6 +200,7 @@ export function renderLayerRow(layer) {
                 </div>
               </div>
             </div>
+
 
             <div class="config-row">
               <label>

@@ -28,6 +28,7 @@ import {
   buildContourLayerMeta,
 } from "./analysis/objectiveAnalysis.js";
 import { analyzeKinematicContours } from "./analysis/kinematicContours.js";
+import { resolveRenderLevels } from "./contour/contourLevels.js";
 
 export {
   standardHgtLevels,
@@ -60,6 +61,8 @@ export function calculateFieldContours(stationsGeoJSON, valueExtractor, config =
     levels = griddata.autoLevels(minV, maxV, 8);
   }
 
+  const isCustomLevels = config.isCustomLevels !== undefined ? Boolean(config.isCustomLevels) : false;
+
   const { lines, fills, levels: actualLevels } = tagLinesAndFills(
     interpolated,
     x,
@@ -69,7 +72,8 @@ export function calculateFieldContours(stationsGeoJSON, valueExtractor, config =
     config.colormap,
     [],
     true,
-    values
+    values,
+    isCustomLevels
   );
 
   return {
@@ -77,6 +81,7 @@ export function calculateFieldContours(stationsGeoJSON, valueExtractor, config =
     fills,
     levels: actualLevels,
     pointsCount: points.length,
+    element: config.element,
     gridData: {
       header: {
         start_lon: x[0],
@@ -108,10 +113,12 @@ export function analyzeAndRenderSoundingElementContour(map, stationsGeoJSON, lev
     const numLevel = parseInt(level, 10) || 500;
     const cfg = SOUNDING_CONTOUR_CONFIGS[elementKey] || SOUNDING_CONTOUR_CONFIGS.HGT;
 
+    const isCustomLevels = Boolean(resolveRenderLevels(options));
     const result = calculateFieldContours(stationsGeoJSON, cfg.extract, {
       element: cfg.element,
       colormap: cfg.colormap || undefined,
-      levels: options.levels || cfg.getLevels(numLevel, -100, 100000),
+      levels: isCustomLevels ? resolveRenderLevels(options) : cfg.getLevels(numLevel, -100, 100000),
+      isCustomLevels,
     }, numLevel);
 
     if (!result || !result.lines || result.lines.length === 0) {
