@@ -101,3 +101,25 @@ type CategoryInfo struct {
 	Category string   `json:"category"`
 	Tables   []string `json:"tables"`
 }
+
+// SoundingLevel represents one vertical level in a T-lnP sounding profile
+type SoundingLevel struct {
+	Pressure  float64 `json:"pressure"`  // hPa
+	Height    float64 `json:"height"`    // meters (gpm)
+	Temp      float64 `json:"temp"`      // °C
+	DewPoint  float64 `json:"dewPoint"`  // °C
+	WindDir   float64 `json:"windDir"`   // degrees
+	WindSpeed float64 `json:"windSpeed"` // m/s
+}
+
+// StationSounding represents vertical sounding observations for a specific station
+type StationSounding struct {
+	StationID   string          `json:"stationId"`
+	StationName string          `json:"stationName"`
+	Lon         float64         `json:"lon"`
+	Lat         float64         `json:"lat"`
+	Elevation   float64         `json:"elevation"`
+	ObsTime     string          `json:"obsTime"`
+	NumLevels   int             `json:"numLevels"`
+	Levels      []SoundingLevel `json:"levels"`
+}

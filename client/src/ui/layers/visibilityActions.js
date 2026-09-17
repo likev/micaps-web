@@ -103,6 +103,10 @@ export function handleVisibilityAction(map, layerId, value, layer, winObj) {
     if (map.getLayer("graticule-lines")) {
       map.setLayoutProperty("graticule-lines", "visibility", showGraticule ? "visible" : "none");
     }
+  } else if (layer.type === "tlogp") {
+    import("../../layers/tlogp/tlogpLayer.js").then(({ setTLogPVisibility }) => {
+      setTLogPVisibility(map, value, winObj);
+    });
   }
 
   // Synchronize legend lifecycle on layer visibility change (contour/wind only)

@@ -36,13 +36,13 @@ export function onStationMouseMove(map, e) {
   }
 }
 
-export function handleStationHover(map, e) {
+export function findStationAtPoint(map, point) {
   const state = getState(map);
-  if (!state.visible || !state.activeVisibleStations || state.activeVisibleStations.length === 0) return;
-  if (!e || !e.point) return;
+  if (!state.visible || !state.activeVisibleStations || state.activeVisibleStations.length === 0) return null;
+  if (!point) return null;
 
-  const px = e.point.x;
-  const py = e.point.y;
+  const px = point.x;
+  const py = point.y;
   const scale = state.currentScale || 1.0;
   const minDist = 22 * scale; // Hit radius scales with zoom
   let closestDistSq = minDist * minDist;
@@ -82,6 +82,38 @@ export function handleStationHover(map, e) {
       }
     }
   }
+  return hovered;
+}
+
+export function handleStationClick(map, e) {
+  if (!map || !e || !e.point) return;
+  const hit = findStationAtPoint(map, e.point);
+  if (hit && hit.feature && hit.feature.properties) {
+    const props = hit.feature.properties;
+    const stnId = props.station_id || props.id;
+    if (stnId) {
+      Promise.all([
+        import("../tlogp/tlogpController.js"),
+        import("../../ui/tabWindowManager.js").catch(() => ({})),
+      ]).then(([{ tlogpController }, tabWinModule]) => {
+        if (tlogpController && tlogpController.isActive()) {
+          const getActiveWindow = tabWinModule?.getActiveWindow;
+          const targetWin = map._micapsWindow || (typeof getActiveWindow === "function" ? getActiveWindow() : null) || (typeof window !== "undefined" && window.__MICAPS_ACTIVE_WIN__) || null;
+          tlogpController.setStation(String(stnId), targetWin, map);
+        }
+      });
+    }
+  }
+}
+
+export function handleStationHover(map, e) {
+  const state = getState(map);
+  if (!state.visible || !state.activeVisibleStations || state.activeVisibleStations.length === 0) return;
+  if (!e || !e.point) return;
+
+  const px = e.point.x;
+  const py = e.point.y;
+  const hovered = findStationAtPoint(map, e.point);
 
   const targetGlobal = typeof window !== "undefined" ? window : globalThis;
   if (hovered) {

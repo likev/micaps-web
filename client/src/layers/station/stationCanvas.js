@@ -10,6 +10,7 @@ import { renderStationPlotToCanvas } from "./stationPlot.js";
 import {
   onStationMouseMove,
   handleStationMouseOut,
+  handleStationClick,
 } from "./stationHover.js";
 
 const reqAnim = typeof requestAnimationFrame === "function" ? requestAnimationFrame : (cb) => setTimeout(cb, 16);
@@ -105,8 +106,10 @@ export function renderStationWeatherPlots(map, geojson, visible = true, config =
     if (!state.mouseMoveListener) {
       state.mouseMoveListener = (e) => onStationMouseMove(map, e);
       state.mouseOutListener = () => handleStationMouseOut(map);
+      state.clickListener = (e) => handleStationClick(map, e);
       map.on("mousemove", state.mouseMoveListener);
       map.on("mouseout", state.mouseOutListener);
+      map.on("click", state.clickListener);
     }
   }
 
@@ -283,6 +286,10 @@ export function removeStationLayer(map) {
   if (state.mouseOutListener && typeof map.off === "function") {
     map.off("mouseout", state.mouseOutListener);
     state.mouseOutListener = null;
+  }
+  if (state.clickListener && typeof map.off === "function") {
+    map.off("click", state.clickListener);
+    state.clickListener = null;
   }
   if (state.canvas) {
     if (state.ctx) {

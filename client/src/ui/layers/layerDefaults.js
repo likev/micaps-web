@@ -134,6 +134,22 @@ export function buildBaseConfig(layerDef) {
     };
   }
 
+  if (layerDef.type === "tlogp") {
+    return {
+      stationId: layerDef.config?.stationId || layerDef.stationId || "58362",
+      parcelLevel: layerDef.config?.parcelLevel || "surface",
+      showTemp: layerDef.config?.showTemp !== false,
+      showDewpoint: layerDef.config?.showDewpoint !== false,
+      showWind: layerDef.config?.showWind !== false,
+      showParcel: layerDef.config?.showParcel !== false,
+      showDryAdiabats: layerDef.config?.showDryAdiabats !== false,
+      showMoistAdiabats: layerDef.config?.showMoistAdiabats !== false,
+      showMixingRatio: layerDef.config?.showMixingRatio !== false,
+      showIndices: layerDef.config?.showIndices !== false,
+      ...(layerDef.config || {}),
+    };
+  }
+
   return {
     showFill:
       layerDef.config?.showFill !== undefined

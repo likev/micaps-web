@@ -1,7 +1,7 @@
 // prefetchService.js - Intelligent prefetch engine for keyboard shortcuts (Left/Right/Up/Down)
 import { getAdjacentTimeSteps } from "../ui/timeSlider.js";
 import { fetchGridData, fetchGridBinaryStream, fetchStationObservations } from "../api/catalogApi.js";
-import { isCached } from "../api/apiClient.js";
+import { isCached, fetchJson } from "../api/apiClient.js";
 import { getLayersForWindow } from "../ui/layerControl.js";
 
 export const VERTICAL_LEVELS = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
@@ -260,6 +260,25 @@ function collectObsItems(win, targetObsFile, direction, overrideLevel = null) {
             : (layer.path || (model === "UPPER_AIR" ? `UPPER_AIR/${element}/${lvl || 500}` : `${model}/${element}`));
 
         items.push({ type: "station", path: obsPath, file: targetObsFile, direction, level: lvl });
+      } else if (layer.type === "tlogp" || (layer.model === "UPPER_AIR" && layer.element === "TLOGP")) {
+        const activeStationId = layer.config?.stationId || win?.tlogpStation || layer.stationId || "58362";
+
+        // 1. Station Sounding Profile JSON
+        items.push({
+          type: "tlogp",
+          path: "UPPER_AIR/TLOGP",
+          file: targetObsFile,
+          station: activeStationId,
+          direction,
+        });
+
+        // 2. Sounding Station Network GeoJSON
+        items.push({
+          type: "station",
+          path: "UPPER_AIR/TLOGP",
+          file: targetObsFile,
+          direction,
+        });
       }
     }
   } else {
@@ -313,7 +332,7 @@ export async function prefetchSurroundingData(win, options = {}) {
   const seen = new Set();
   const uniqueItems = [];
   for (const item of allItems) {
-    const key = `${item.type}:${item.path}:${item.file}`;
+    const key = `${item.type}:${item.path}:${item.file}:${item.station || ""}`;
     if (!seen.has(key)) {
       seen.add(key);
       uniqueItems.push(item);
@@ -341,6 +360,8 @@ export async function prefetchSurroundingData(win, options = {}) {
       cached = isCached("/api/data/grid/binary", { path: item.path, file: item.file });
     } else if (item.type === "station") {
       cached = isCached("/api/data/station", { path: item.path, file: item.file });
+    } else if (item.type === "tlogp") {
+      cached = isCached("/api/data/tlogp", { file: item.file, station: item.station });
     }
     if (cached) {
       cachedCount++;
@@ -369,6 +390,8 @@ export async function prefetchSurroundingData(win, options = {}) {
           return await fetchGridBinaryStream(item.path, item.file);
         } else if (item.type === "station") {
           return await fetchStationObservations(item.path, item.file);
+        } else if (item.type === "tlogp") {
+          return await fetchJson("/api/data/tlogp", { file: item.file, station: item.station });
         }
       } catch (err) {
         // Silent catch: prefetch is best-effort and must not throw or alert

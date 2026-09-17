@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"micaps-web/db"
 	"micaps-web/mock"
@@ -65,6 +67,14 @@ func (h *StationHandler) fetchStations(r *http.Request) (*model.GeoJSONFeatureCo
 	decompressed, err := parser.DecompressGzip(rawBlob)
 	if err != nil {
 		return nil, err
+	}
+
+	if bytes.HasPrefix(bytes.TrimSpace(decompressed), []byte("diamond 5")) || strings.Contains(dataPath, "TLOGP") {
+		fc, err := parser.ExtractStationsGeoJSON(decompressed)
+		if err == nil && fc != nil && len(fc.Features) > 0 {
+			return fc, nil
+		}
+		// Gracefully fallback to generic station parser if Diamond 5 extraction fails
 	}
 
 	return parser.ParseStationData(decompressed)

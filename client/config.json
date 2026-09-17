@@ -640,6 +640,55 @@
         }
       ],
       "name": "500 hPa Upper-Air Sounding"
+    },
+    {
+      "id": "composite-tlogp",
+      "name": "T-lnP Sounding Analysis (TlogP)",
+      "category": "TlogP Observation",
+      "isObservation": true,
+      "hasLevel": false,
+      "defaultLevel": null,
+      "layers": [
+        {
+          "id": "upperair-tlogp-stations",
+          "name": "Sounding Station Network",
+          "type": "station",
+          "model": "UPPER_AIR",
+          "element": "TLOGP",
+          "path": "UPPER_AIR/TLOGP",
+          "removable": false,
+          "render": {
+            "showTemp": true,
+            "showDewpoint": true,
+            "showWind": true,
+            "showPressure": true
+          }
+        },
+        {
+          "id": "upperair-tlogp-diagram",
+          "name": "T-lnP Sounding Diagram (58362 Shanghai)",
+          "type": "tlogp",
+          "model": "UPPER_AIR",
+          "element": "TLOGP",
+          "stationId": "58362",
+          "defaultStation": "58362",
+          "parcelLevel": "surface",
+          "visible": true,
+          "removable": true,
+          "config": {
+            "stationId": "58362",
+            "parcelLevel": "surface",
+            "showTemp": true,
+            "showDewpoint": true,
+            "showWind": true,
+            "showParcel": true,
+            "showDryAdiabats": true,
+            "showMoistAdiabats": true,
+            "showMixingRatio": true,
+            "showIndices": true
+          }
+        }
+      ]
     }
   ]
 }

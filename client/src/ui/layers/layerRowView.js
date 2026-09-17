@@ -40,6 +40,79 @@ export function renderWindDrawerHTML(layer) {
   `;
 }
 
+export function renderTLogPDrawerHTML(layer) {
+  const currentStn = layer.config?.stationId || layer.stationId || "58362";
+  const currentParcel = layer.config?.parcelLevel || "surface";
+
+  return `
+    <div class="config-row" style="flex-direction: column; align-items: flex-start; gap: 6px; width: 100%;">
+      <label style="color: var(--text-secondary, #8b949e); font-size: 11px; font-weight: 600;">
+        📍 Station Selection:
+      </label>
+      <div style="display: flex; gap: 6px; width: 100%; align-items: center;">
+        <input type="text" class="input-tlogp-station" 
+               value="${currentStn}" 
+               placeholder="Station ID (e.g. 58362)" 
+               title="Enter 5-digit station ID and press Enter"
+               style="width: 80px; height: 24px; background: #161b22; border: 1px solid #30363d; color: #58a6ff; font-weight: 600; border-radius: 4px; text-align: center; font-size: 12px;" />
+        <button class="btn-tlogp-apply" style="height: 24px; padding: 0 10px; font-size: 11px; background: #238636; color: #fff; border: 1px solid #2ea043; border-radius: 4px; cursor: pointer;">
+          Apply
+        </button>
+        <select class="sel-tlogp-quick-station" style="flex: 1; height: 24px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; font-size: 11px; padding: 0 4px;">
+          <option value="">— Major Stations —</option>
+          <option value="58362" ${currentStn === "58362" ? "selected" : ""}>58362 上海 (Shanghai)</option>
+          <option value="54511" ${currentStn === "54511" ? "selected" : ""}>54511 北京 (Beijing)</option>
+          <option value="59287" ${currentStn === "59287" ? "selected" : ""}>59287 广州 (Guangzhou)</option>
+          <option value="57516" ${currentStn === "57516" ? "selected" : ""}>57516 重庆 (Chongqing)</option>
+          <option value="57494" ${currentStn === "57494" ? "selected" : ""}>57494 武汉 (Wuhan)</option>
+          <option value="51463" ${currentStn === "51463" ? "selected" : ""}>51463 乌鲁木齐 (Urumqi)</option>
+          <option value="56778" ${currentStn === "56778" ? "selected" : ""}>56778 昆明 (Kunming)</option>
+          <option value="50953" ${currentStn === "50953" ? "selected" : ""}>50953 哈尔滨 (Harbin)</option>
+        </select>
+      </div>
+      <div class="tlogp-station-meta-badge" style="font-size: 11px; color: #8b949e; margin-top: 2px;">
+        Active: <span style="color: #e3b341; font-weight: 600;">${layer.config?.stationName || currentStn + " 上海/宝山"}</span>
+      </div>
+    </div>
+
+    <!-- 2. Parcel Ascent Starting Layer Row (Surface, 925, 850, 700 hPa) -->
+    <div class="config-row" style="flex-direction: column; align-items: flex-start; gap: 4px; width: 100%; margin-top: 6px; padding-top: 6px; border-top: 1px solid #30363d;">
+      <label style="color: var(--text-secondary, #8b949e); font-size: 11px; font-weight: 600;">
+        🔺 Parcel Ascent Starting Level:
+      </label>
+      <div style="display: flex; gap: 6px; width: 100%; align-items: center;">
+        <select class="sel-tlogp-parcel-level" style="flex: 1; height: 24px; background: #161b22; border: 1px solid #30363d; color: #e3b341; font-weight: 600; border-radius: 4px; font-size: 11px; padding: 0 6px;">
+          <option value="surface" ${currentParcel === "surface" ? "selected" : ""}>Surface (Surface-Based Parcel)</option>
+          <option value="925" ${currentParcel === "925" ? "selected" : ""}>925 hPa (Low-Level Inversion / Boundary)</option>
+          <option value="850" ${currentParcel === "850" ? "selected" : ""}>850 hPa (Low-Level Jet / Elevated Convection)</option>
+          <option value="700" ${currentParcel === "700" ? "selected" : ""}>700 hPa (Mid-Level Inflow / Overrunning)</option>
+          <option value="custom" ${currentParcel === "custom" ? "selected" : ""}>Custom Level (Click Diagram to Set)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 3. Curve Display Toggles -->
+    <div class="config-grid-2col" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #30363d;">
+      <label class="config-checkbox-item">
+        <input type="checkbox" class="chk-tlogp-temp" ${layer.config?.showTemp !== false ? "checked" : ""} />
+        <span style="color: #f85149;">Temperature (T)</span>
+      </label>
+      <label class="config-checkbox-item">
+        <input type="checkbox" class="chk-tlogp-dewpoint" ${layer.config?.showDewpoint !== false ? "checked" : ""} />
+        <span style="color: #39c5bb;">Dew Point (Td)</span>
+      </label>
+      <label class="config-checkbox-item">
+        <input type="checkbox" class="chk-tlogp-wind" ${layer.config?.showWind !== false ? "checked" : ""} />
+        <span>Wind Barbs</span>
+      </label>
+      <label class="config-checkbox-item">
+        <input type="checkbox" class="chk-tlogp-parcel" ${layer.config?.showParcel !== false ? "checked" : ""} />
+        <span style="color: #e3b341;">Parcel & CAPE</span>
+      </label>
+    </div>
+  `;
+}
+
 export function renderStationDrawerHTML(layer) {
   const upper = isUpperAirStationLayer(layer);
   const items = upper
@@ -245,6 +318,8 @@ export function renderLayerRow(layer) {
             `
             : (layer.type === "station"
             ? renderStationDrawerHTML(layer)
+            : (layer.type === "tlogp"
+            ? renderTLogPDrawerHTML(layer)
             : `
             <div class="config-row">
               <label>
@@ -286,7 +361,7 @@ export function renderLayerRow(layer) {
                 <option value="vertical-perspective" ${layer.config?.projection === "vertical-perspective" ? "selected" : ""}>🪐 Perspective (3D)</option>
               </select>
             </div>
-            `))
+            `)))
         }
       </div>
     </div>

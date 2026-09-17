@@ -313,21 +313,26 @@ func GenerateMockStationsForPath(dataPath string) *model.GeoJSONFeatureCollectio
 			Properties: map[string]interface{}{
 				"station_id":    s.ID,
 				"name":          s.Name,
-				"temperature":   stnT,
-				"dewpoint":      stnTd,
-				"height":        float32(math.Round(float64(baseHgt+(float64(s.T)-25.0)*15.0)*10) / 10),
-				"slp":           s.SLP,
-				"slp_encoded":   encodeSLP(s.SLP),
-				"press_diff_3h": s.P3,
-				"press_tend":    s.Pt,
-				"cloud_cover":   s.N,
-				"weather_code":  s.Ww,
-				"wind_speed":    s.FF,
-				"wind_dir":      s.DD,
-				"visibility":    10.0,
-				"rain_1h":       0.0,
-				"rain_6h":       0.5,
-				"rain_24h":      2.4,
+				"surface_temp":       stnT,
+				"surface_dewpoint":   stnTd,
+				"surface_wind_speed": s.FF,
+				"surface_wind_dir":   s.DD,
+				"num_levels":         1020,
+				"temperature":        stnT,
+				"dewpoint":           stnTd,
+				"height":             float32(math.Round(float64(baseHgt+(float64(s.T)-25.0)*15.0)*10) / 10),
+				"slp":                s.SLP,
+				"slp_encoded":        encodeSLP(s.SLP),
+				"press_diff_3h":      s.P3,
+				"press_tend":         s.Pt,
+				"cloud_cover":        s.N,
+				"weather_code":       s.Ww,
+				"wind_speed":         s.FF,
+				"wind_dir":           s.DD,
+				"visibility":         10.0,
+				"rain_1h":            0.0,
+				"rain_6h":            0.5,
+				"rain_24h":           2.4,
 			},
 		}
 	}
@@ -344,4 +349,122 @@ func encodeSLP(slp float32) string {
 	}
 	val := int(math.Round(float64(slp * 10)))
 	return fmt.Sprintf("%03d", val%1000)
+}
+
+// GenerateMockTLogPProfile creates a realistic vertical sounding profile for mock testing
+func GenerateMockTLogPProfile(stationID string, file string) *model.StationSounding {
+	if stationID == "" {
+		stationID = "58362"
+	}
+
+	stationName := fmt.Sprintf("Station %s", stationID)
+	lon := 121.44
+	lat := 31.39
+	elev := 5.5
+
+	switch stationID {
+	case "58362":
+		stationName = "上海/宝山 (Shanghai)"
+		lon = 121.44
+		lat = 31.39
+		elev = 5.5
+	case "54511":
+		stationName = "北京 (Beijing)"
+		lon = 116.47
+		lat = 39.80
+		elev = 31.3
+	case "59287":
+		stationName = "广州 (Guangzhou)"
+		lon = 113.48
+		lat = 23.17
+		elev = 71.0
+	case "57516":
+		stationName = "重庆 (Chongqing)"
+		lon = 106.48
+		lat = 29.58
+		elev = 259.1
+	case "57494":
+		stationName = "武汉 (Wuhan)"
+		lon = 114.13
+		lat = 30.60
+		elev = 23.3
+	case "51463":
+		stationName = "乌鲁木齐 (Urumqi)"
+		lon = 87.65
+		lat = 43.78
+		elev = 917.9
+	}
+
+	obsTime := "2026-03-20 20:00"
+	if len(file) >= 12 {
+		y := file[0:4]
+		m := file[4:6]
+		d := file[6:8]
+		h := file[8:10]
+		obsTime = fmt.Sprintf("%s-%s-%s %s:00", y, m, d, h)
+	}
+
+	// Generate realistic atmospheric sounding profile with 1020 vertical levels from surface (1020 hPa) to 10 hPa
+	// matching live Diamond 5 profile resolution for station 58362 and national radiosonde network
+	levelsCount := 1020
+	levels := make([]model.SoundingLevel, levelsCount)
+	sfcT := 22.5
+	sfcTd := 17.0
+
+	for i := 0; i < levelsCount; i++ {
+		p := 1020.0 - float64(i)*0.99 // 1020 down to ~10.2 hPa
+		// Standard atmosphere height approximation
+		h := 44330.0 * (1.0 - math.Pow(p/1013.25, 0.1903))
+
+		// Temperature profile with tropospheric lapse rate and tropopause at ~200 hPa
+		var t float64
+		if p >= 200 {
+			t = sfcT - 0.0065*h
+		} else {
+			// Tropopause / lower stratosphere isothermal/slight inversion
+			t = -56.5 + (200-p)*0.05
+		}
+
+		// Dew point profile: moist in boundary layer, dry aloft
+		var td float64
+		if p >= 850 {
+			td = sfcTd - 0.005*h
+		} else if p >= 500 {
+			td = t - 8.0 - (850-p)*0.02
+		} else {
+			td = t - 25.0
+		}
+		if td > t {
+			td = t
+		}
+
+		// Wind speed increasing with height to jet stream at 250 hPa
+		ws := 4.0 + (1013.25-p)*0.04
+		if p <= 300 && p >= 150 {
+			ws += 20.0 * math.Sin((300-p)/(150)*math.Pi)
+		}
+
+		// Wind direction veering with height
+		wd := math.Mod(110.0+(1013.25-p)*0.18, 360.0)
+
+		levels[i] = model.SoundingLevel{
+			Pressure:  math.Round(p*10) / 10,
+			Height:    math.Round(h*10) / 10,
+			Temp:      math.Round(t*10) / 10,
+			DewPoint:  math.Round(td*10) / 10,
+			WindDir:   math.Round(wd),
+			WindSpeed: math.Round(ws*10) / 10,
+		}
+	}
+
+	return &model.StationSounding{
+		StationID:   stationID,
+		StationName: stationName,
+		Lon:         lon,
+		Lat:         lat,
+		Elevation:   elev,
+		ObsTime:     obsTime,
+		NumLevels:   len(levels),
+		Levels:      levels,
+	}
 }

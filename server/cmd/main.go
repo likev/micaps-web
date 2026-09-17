@@ -58,6 +58,7 @@ func main() {
 	catH := &handler.CatalogHandler{Client: cqlClient, MockMode: cfg.MockMode}
 	gridH := &handler.GridHandler{Client: cqlClient, MockMode: cfg.MockMode}
 	statH := &handler.StationHandler{Client: cqlClient, MockMode: cfg.MockMode}
+	tlogpH := &handler.TLogPHandler{Client: cqlClient, MockMode: cfg.MockMode}
 	staticH := &handler.StaticHandler{Cfg: cfg}
 
 	mux := http.NewServeMux()
@@ -72,6 +73,7 @@ func main() {
 	mux.HandleFunc("/api/data/grid", gridH.JSONHandler)
 	mux.HandleFunc("/api/data/grid/binary", gridH.BinaryHandler)
 	mux.HandleFunc("/api/data/station", statH.StationGeoJSONHandler)
+	mux.HandleFunc("/api/data/tlogp", tlogpH.Handler)
 
 	// Map and PMTiles route (serves configured PMTiles file, defaulting to map-china.pmtiles)
 	mux.HandleFunc("/map-china.pmtiles", staticH.PMTilesHandler)

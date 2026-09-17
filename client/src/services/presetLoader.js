@@ -4,6 +4,7 @@ import { removeAllContourLayers } from "../layers/contourLayer.js";
 import { stopWindAnimation, removeGridWindBarbs } from "../layers/windLayer.js";
 import { removeStationLayer } from "../layers/stationLayer.js";
 import { removeRasterLayer } from "../layers/rasterLayer.js";
+import { loadTLogPLayer, removeTLogPLayer, tlogpController } from "../layers/tlogp/tlogpLayer.js";
 import { clearLegends } from "../ui/legend.js";
 import { getActiveWindow, updateWindowTitle, setWindowHeaderPreset, refreshPresetControls } from "../ui/tabWindowManager.js";
 import { setNavBarPreset, refreshNavBarPresets } from "../ui/navBar.js";
@@ -45,6 +46,7 @@ export function clearAllWeatherLayersFromMap(map, win = null) {
     removeGridWindBarbs(map);
     removeStationLayer(map);
     removeRasterLayer(map);
+    removeTLogPLayer(map, win);
     clearLegends(win);
   } catch (err) {
     console.warn("[Main] Error cleaning up weather layers:", err);
@@ -56,6 +58,9 @@ export function clearAllWeatherLayersFromMap(map, win = null) {
 
 export async function loadPresetGroup(map, group, period = null, level = null, win = null, isTimeStep = false, expectedSeq = null) {
   if (!group || !group.layers) return;
+  if (map && win) {
+    map._micapsWindow = win;
+  }
   if (!isTimeStep) {
     clearAllWeatherLayersFromMap(map, win);
   }
@@ -147,6 +152,20 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
         }
         const stationLayerId = (layer.model === "UPPER_AIR" && targetLevel) ? `upperair-obs-${targetLevel}` : layer.id;
         await loadObservationProduct(map, layer.model, layer.element, targetLevel, file, win, obsPath, expectedSeq, stationLayerId);
+      } else if (layer.type === "tlogp") {
+        let file = win?.obsTime;
+        if (!file || (!isTimeStep && group.isObservation && !win?.obsTime)) {
+          file = await syncObservationTimeline(layer.path || "UPPER_AIR/TLOGP", win?.obsTime, winTitle, win);
+          if (win) {
+            win.obsTime = file;
+            updateWindowTitle(win);
+          }
+        }
+        if (isTimeStep && tlogpController.isActive()) {
+          await tlogpController.updateCycle(file, win, map);
+        } else {
+          await loadTLogPLayer(map, layer, curPeriod, targetLevel, win);
+        }
       }
     })
   );

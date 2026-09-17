@@ -160,7 +160,7 @@ export async function resolveLatestForecastCycle(model = "ECMWF_HR", element = "
 }
 
 export async function syncObservationTimeline(path, currentFile = null, winTitle = "", win = null) {
-  const isUpper = path.includes("UPPER_AIR") || winTitle.toLowerCase().includes("upper") || winTitle.toLowerCase().includes("sounding");
+  const isUpper = path.includes("UPPER_AIR") || path.includes("TLOGP") || winTitle.toLowerCase().includes("upper") || winTitle.toLowerCase().includes("sounding") || winTitle.toLowerCase().includes("tlogp");
   const stepLength = (win && win.stepLength) ? win.stepLength : (isUpper ? 12 : 3);
   const applyTimeline = (file, files) => {
     const timelineData = { file, files, winTitle, stepLength, path, isUpper };

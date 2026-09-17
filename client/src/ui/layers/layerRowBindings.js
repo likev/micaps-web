@@ -461,6 +461,93 @@ export function bindLayerRowEvents(panel, layers, currentActiveWinId, onLayerAct
         });
       }
     }
+
+    // Config controls for T-lnP Sounding Diagram
+    if (layer.type === "tlogp" && configDrawer) {
+      const stnInput = configDrawer.querySelector(".input-tlogp-station");
+      const btnApply = configDrawer.querySelector(".btn-tlogp-apply");
+      const quickSel = configDrawer.querySelector(".sel-tlogp-quick-station");
+      const parcelSel = configDrawer.querySelector(".sel-tlogp-parcel-level");
+
+      const applyStation = (val) => {
+        val = String(val).trim();
+        if (!val) return;
+        if (!/^\d{5}$/.test(val)) {
+          showErrorToast(`Invalid station ID "${val}": must be 5 digits`);
+          if (stnInput && layer.config?.stationId) {
+            stnInput.value = layer.config.stationId;
+          }
+          return;
+        }
+        import("../../layers/tlogp/tlogpController.js").then(({ tlogpController }) => {
+          tlogpController.setStation(val);
+        });
+      };
+
+      if (stnInput) {
+        stnInput.addEventListener("click", (e) => e.stopPropagation());
+        stnInput.addEventListener("keyup", (e) => {
+          if (e.key === "Enter") {
+            applyStation(stnInput.value);
+          }
+        });
+      }
+
+      if (btnApply) {
+        btnApply.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (stnInput) applyStation(stnInput.value);
+        });
+      }
+
+      if (quickSel) {
+        quickSel.addEventListener("click", (e) => e.stopPropagation());
+        quickSel.addEventListener("change", (e) => {
+          if (quickSel.value) {
+            if (stnInput) stnInput.value = quickSel.value;
+            applyStation(quickSel.value);
+          }
+        });
+      }
+
+      if (parcelSel) {
+        parcelSel.addEventListener("click", (e) => e.stopPropagation());
+        parcelSel.addEventListener("change", (e) => {
+          const lvl = parcelSel.value;
+          import("../../layers/tlogp/tlogpController.js").then(({ tlogpController }) => {
+            const p = lvl === "custom" ? (tlogpController.customPressure || 700) : null;
+            tlogpController.setParcelLevel(lvl, p);
+          });
+        });
+      }
+
+      const bindTLogPCheckbox = (selector, key) => {
+        const chk = configDrawer.querySelector(selector);
+        if (chk) {
+          chk.addEventListener("click", (e) => e.stopPropagation());
+          chk.addEventListener("change", (e) => {
+            if (!layer.config) layer.config = {};
+            layer.config[key] = e.target.checked;
+            autoSaveLayerConfig(layer);
+            import("../../layers/tlogp/tlogpController.js").then(({ tlogpController }) => {
+              if (tlogpController.panel && tlogpController.panel.canvasRenderer) {
+                tlogpController.panel.canvasRenderer.setOptions({ [key]: e.target.checked });
+              }
+            });
+            if (onLayerActionCallback) {
+              onLayerActionCallback("config", layer.id, { [key]: e.target.checked }, layer, currentActiveWinId);
+            }
+          });
+        }
+      };
+
+      [
+        [".chk-tlogp-temp", "showTemp"],
+        [".chk-tlogp-dewpoint", "showDewpoint"],
+        [".chk-tlogp-wind", "showWind"],
+        [".chk-tlogp-parcel", "showParcel"],
+      ].forEach(([sel, key]) => bindTLogPCheckbox(sel, key));
+    }
   });
 }
 

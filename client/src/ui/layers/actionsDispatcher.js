@@ -78,6 +78,10 @@ export function handleRemoveAction(map, layerId, layer, win) {
     if (Array.isArray(win?.layerSnapshots)) {
       win.layerSnapshots = win.layerSnapshots.filter((s) => s.id !== layerId);
     }
+  } else if (layer.type === "tlogp") {
+    import("../../layers/tlogp/tlogpLayer.js").then(({ removeTLogPLayer }) => {
+      removeTLogPLayer(map, win);
+    });
   }
 }
 
