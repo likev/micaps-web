@@ -114,6 +114,7 @@ export function renderTLogPDrawerHTML(layer) {
 }
 
 export function renderStationDrawerHTML(layer) {
+  const isTLogP = layer.element === "TLOGP" || (layer.path && layer.path.includes("TLOGP")) || layer.id?.includes("tlogp");
   const upper = isUpperAirStationLayer(layer);
   const items = upper
     ? [
@@ -144,6 +145,7 @@ export function renderStationDrawerHTML(layer) {
         <span style="color: #58a6ff; font-weight: 600;">Wind Streamlines (Flow Analysis)</span>
       </label>
     </div>
+    ${isTLogP ? "" : `
     <div class="config-row station-contour-selector-row" style="flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 6px; padding-top: 6px; border-top: 1px solid #30363d; width: 100%;">
       <label style="color: var(--text-secondary, #8b949e); font-size: 11px; display: flex; align-items: center; gap: 4px; font-weight: 600;">
         <span>📈 Add Contour Layer</span>
@@ -175,6 +177,7 @@ export function renderStationDrawerHTML(layer) {
         </button>
       </div>
     </div>
+    `}
     ${renderStationFilterSection(layer)}
   `;
 }

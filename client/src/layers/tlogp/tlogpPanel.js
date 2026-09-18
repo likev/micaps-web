@@ -292,7 +292,9 @@ export class TLogPPanel {
       btn.textContent = this.isMinimized ? "□" : "—";
     }
     if (!this.isMinimized && this.canvasRenderer) {
-      setTimeout(() => this.canvasRenderer.resize(), 50);
+      setTimeout(() => {
+        if (this.canvasRenderer) this.canvasRenderer.resize();
+      }, 50);
     }
   }
 
@@ -300,7 +302,9 @@ export class TLogPPanel {
     if (!this.container) return;
     this.container.style.display = "flex";
     if (this.canvasRenderer) {
-      setTimeout(() => this.canvasRenderer.resize(), 50);
+      setTimeout(() => {
+        if (this.canvasRenderer) this.canvasRenderer.resize();
+      }, 50);
     }
   }
 

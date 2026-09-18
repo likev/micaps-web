@@ -3,13 +3,16 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import fs from "fs";
 import { tlogpController } from "../../src/layers/tlogp/tlogpController.js";
 import { computeParcelAscent, calculateThermodynamicIndices } from "../../src/layers/tlogp/tlogpMath.js";
-import { setTLogPVisibility } from "../../src/layers/tlogp/tlogpLayer.js";
+import { setTLogPVisibility, loadTLogPLayer } from "../../src/layers/tlogp/tlogpLayer.js";
 import { getPrefetchTargets, prefetchSurroundingData } from "../../src/services/prefetchService.js";
 import { syncObservationTimeline } from "../../src/utils/timelineSync.js";
 import { findStationAtPoint, handleStationClick } from "../../src/layers/station/stationHover.js";
 import { getState } from "../../src/layers/station/stationState.js";
 import { isCached, clearDataCache, fetchJson } from "../../src/api/apiClient.js";
 import { filterObsFilesByStep } from "../../src/ui/timeline/timelineMath.js";
+import { getLayersForWindow, getLayerById } from "../../src/ui/layers/layerStore.js";
+import { renderLayerRow, renderStationDrawerHTML } from "../../src/ui/layers/layerRowView.js";
+import { loadPresetGroup } from "../../src/services/presetLoader.js";
 
 let map;
 
@@ -551,5 +554,117 @@ describe("V11: End-to-End Stability Indices", () => {
     expect(indices.totalTotals).toBeGreaterThan(0);
     expect(indices.showalterIndex).toBeDefined();
     expect(indices.precipitableWater).toBeGreaterThan(0);
+  });
+});
+
+describe("V12: Layer Control Configuration for TLogP & 500hPa Exclusion", () => {
+  beforeEach(() => {
+    map = createMockMap();
+    clearDataCache();
+  });
+
+  it("registers upperair-tlogp-diagram layer in layerStore when loaded", async () => {
+    global.fetch = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => mockSoundingShanghai,
+    });
+
+    const win = { id: "test-win-tlogp-1", obsTime: "20260320200000.000", layers: [] };
+    await loadTLogPLayer(map, { id: "upperair-tlogp-diagram", type: "tlogp" }, null, null, win);
+
+    const layer = getLayerById("upperair-tlogp-diagram", win);
+    expect(layer).toBeDefined();
+    expect(layer.type).toBe("tlogp");
+    expect(layer.stationId).toBe("58362");
+    expect(layer.config?.parcelLevel).toBe("surface");
+  });
+
+  it("renders T-LogP configuration drawer with station input, parcel selector, and curve toggles", async () => {
+    global.fetch = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => mockSoundingShanghai,
+    });
+
+    const win = { id: "test-win-tlogp-2", obsTime: "20260320200000.000", layers: [] };
+    await loadTLogPLayer(map, { id: "upperair-tlogp-diagram", type: "tlogp" }, null, null, win);
+
+    const layer = getLayerById("upperair-tlogp-diagram", win);
+    const html = renderLayerRow(layer);
+
+    expect(html).toContain("input-tlogp-station");
+    expect(html).toContain("btn-tlogp-apply");
+    expect(html).toContain("sel-tlogp-quick-station");
+    expect(html).toContain("sel-tlogp-parcel-level");
+    expect(html).toContain("chk-tlogp-temp");
+    expect(html).toContain("chk-tlogp-dewpoint");
+    expect(html).toContain("chk-tlogp-wind");
+    expect(html).toContain("chk-tlogp-parcel");
+  });
+
+  it("omits contour selector row from TLogP sounding station network drawer", () => {
+    const tlogpStationLayer = {
+      id: "upperair-tlogp-stations",
+      name: "Sounding Station Network",
+      type: "station",
+      model: "UPPER_AIR",
+      element: "TLOGP",
+      config: { showTemp: true, showDewpoint: true, showWind: true },
+    };
+
+    const html = renderStationDrawerHTML(tlogpStationLayer);
+    expect(html).not.toContain("station-contour-selector-row");
+    expect(html).not.toContain("📈 Add Contour Layer");
+    expect(html).toContain("chk-station-temp");
+    expect(html).toContain("chk-station-wind");
+  });
+
+  it("loads composite-tlogp preset without retaining 500hPa sounding contours and with win.level=null", async () => {
+    global.fetch = async (url) => {
+      const u = String(url);
+      if (u.includes("/api/data/tlogp")) {
+        return { ok: true, status: 200, json: async () => mockSoundingShanghai };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          type: "FeatureCollection",
+          features: [
+            { type: "Feature", geometry: { type: "Point", coordinates: [121.44, 31.39] }, properties: { station_id: "58362" } },
+          ],
+        }),
+      };
+    };
+
+    const win = {
+      id: "test-win-tlogp-preset",
+      obsTime: "20260320200000.000",
+      level: 500, // previously on 500hPa
+      layers: [],
+    };
+
+    const cfg = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+    const tlogpPreset = cfg.presets.find((p) => p.id === "composite-tlogp");
+    expect(tlogpPreset).toBeDefined();
+
+    await loadPresetGroup(map, tlogpPreset, 24, null, win);
+
+    // win.level must be null for full-column TLogP sounding
+    expect(win.level).toBeNull();
+
+    const winLayers = getLayersForWindow(win);
+    // TLogP diagram layer must be present
+    const tlogpDiagram = winLayers.find((l) => l.type === "tlogp");
+    expect(tlogpDiagram).toBeDefined();
+    expect(tlogpDiagram.id).toBe("upperair-tlogp-diagram");
+
+    // No 500hPa derived contour layers should exist
+    const contourLayers = winLayers.filter((l) => l.type === "contour");
+    expect(contourLayers.length).toBe(0);
+
+    const old500Plots = winLayers.find((l) => l.id === "upperair-obs-500");
+    expect(old500Plots).toBeUndefined();
   });
 });

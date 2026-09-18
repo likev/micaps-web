@@ -27,6 +27,7 @@ import { loadWeatherField } from "../services/weatherLoader.js";
 import { loadUpperAirComposite, loadObservationProduct } from "../services/derivedContours.js";
 import { loadPresetGroup, clearAllWeatherLayersFromMap, reloadConfiguration } from "../services/presetLoader.js";
 import { changeVerticalLevel } from "../services/levelController.js";
+import { loadTLogPLayer, tlogpController } from "../layers/tlogp/tlogpLayer.js";
 
 export function getMap() {
   const win = getActiveWindow();
@@ -106,7 +107,11 @@ export async function bootstrap() {
       win.activeGroup = group;
       win.isObservation = Boolean(group.isObservation);
       win.forecastCycle = null;
-      if (group.defaultLevel) win.level = group.defaultLevel;
+      if (group.hasLevel === false) {
+        win.level = null;
+      } else if (group.defaultLevel) {
+        win.level = group.defaultLevel;
+      }
       const winTitle = `W${win.winIdx + 1}: ${group.name}`;
       updateWindowTitle(win, group.name);
       setWindowHeaderPreset(win, group.id);
@@ -175,7 +180,11 @@ export async function bootstrap() {
       win.activeGroup = group;
       win.isObservation = Boolean(group.isObservation);
       win.forecastCycle = null;
-      if (overrideLevel !== null) win.level = overrideLevel;
+      if (group.hasLevel === false) {
+        win.level = null;
+      } else if (overrideLevel !== null) {
+        win.level = overrideLevel;
+      }
       const effectiveLevel = overrideLevel || win.level || group.defaultLevel || 500;
       const winTitle = `W${win.winIdx + 1}: ${group.name}`;
       updateWindowTitle(win, group.name);
@@ -246,8 +255,23 @@ export async function bootstrap() {
       const latestFile = await syncObservationTimeline(obsPath, obsTime || win.obsTime, winBannerTitle);
       win.obsTime = latestFile;
       updateWindowTitle(win);
-      if (model === "UPPER_AIR") await loadUpperAirComposite(map, win.level || 500, latestFile, win);
-      else await loadObservationProduct(map, model, element, win.level, latestFile, win);
+      if (isTLogP) {
+        win.level = null;
+        await loadObservationProduct(map, "UPPER_AIR", "TLOGP", null, latestFile, win, "UPPER_AIR/TLOGP", null, "upperair-tlogp-stations");
+        await loadTLogPLayer(map, {
+          id: "upperair-tlogp-diagram",
+          name: "T-lnP Sounding Diagram",
+          type: "tlogp",
+          model: "UPPER_AIR",
+          element: "TLOGP",
+          visible: true,
+          removable: true,
+        }, null, null, win);
+      } else if (model === "UPPER_AIR") {
+        await loadUpperAirComposite(map, win.level || 500, latestFile, win);
+      } else {
+        await loadObservationProduct(map, model, element, win.level, latestFile, win);
+      }
     } else {
       const dataElement = (element === "VOR" || element === "DIV") ? "WIND" : element;
       const cycles = await resolveForecastCycles(model, dataElement, win.level || 500);
@@ -323,7 +347,13 @@ export async function bootstrap() {
         const model = win.model || "SURFACE";
         const element = win.element || "PLOT_GLOBAL_3H";
         const level = win.level;
-        if (model === "UPPER_AIR") {
+        const isTLogP = element === "TLOGP" || win.activeGroup?.id === "composite-tlogp";
+        if (isTLogP) {
+          await loadObservationProduct(map, "UPPER_AIR", "TLOGP", null, data.file, win, "UPPER_AIR/TLOGP", expectedSeq, "upperair-tlogp-stations");
+          if (tlogpController.isActive()) {
+            await tlogpController.updateCycle(data.file, win, map);
+          }
+        } else if (model === "UPPER_AIR") {
           await loadUpperAirComposite(map, level || 500, data.file, win, expectedSeq);
         } else {
           await loadObservationProduct(map, model, element, level, data.file, win, null, expectedSeq);

@@ -1,5 +1,5 @@
 // presetLoader.js - Preset group loading, weather layer teardown, and config reload
-import { getLayersForWindow, clearWindowWeatherLayers } from "../ui/layerControl.js";
+import { getLayersForWindow, clearWindowWeatherLayers, syncLayerControlForWindow } from "../ui/layerControl.js";
 import { removeAllContourLayers } from "../layers/contourLayer.js";
 import { stopWindAnimation, removeGridWindBarbs } from "../layers/windLayer.js";
 import { removeStationLayer } from "../layers/stationLayer.js";
@@ -70,8 +70,22 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
   const prevPeriod = win?.period;
 
   if (win) {
-    if (level !== null) win.level = level;
+    if (group.hasLevel === false) {
+      win.level = null;
+    } else if (level !== null) {
+      win.level = level;
+    }
     win.period = curPeriod;
+    if (group.hasLevel === false || group.id === "composite-tlogp" || group.layers?.some((l) => l.element === "TLOGP")) {
+      if (win.layerSnapshots) {
+        win.layerSnapshots = win.layerSnapshots.filter(
+          (s) => s.type !== "contour" && !s.id?.startsWith("contour-sounding-") && s.id !== "upperair-obs-500"
+        );
+      }
+      if (win.derivedContourSnapshots) {
+        win.derivedContourSnapshots = null;
+      }
+    }
     const titleName = group.hasLevel && level !== null
       ? group.name
         // Rewrite the level prefix ("500 hPa ..." -> "700 hPa ...", space included)
@@ -184,6 +198,9 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
   // Clear here so a later unrelated preset cannot inherit stale visibility.
   if (win?.layerSnapshots) {
     win.layerSnapshots = null;
+  }
+  if (win && getActiveWindow() === win) {
+    syncLayerControlForWindow(win);
   }
   if (win) {
     const prefetchOpts = win.prefetchDirections ? { directions: win.prefetchDirections } : {};

@@ -153,12 +153,14 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
         <option value="PLOT">PLOT - Standard Surface Plots</option>
       `;
     } else if (model === "UPPER_AIR") {
-      setGroupVisible(groupLevel, true);
+      const isTL = selectElement.value === "TLOGP";
+      setGroupVisible(groupLevel, !isTL);
       setGroupVisible(groupPeriod, false);
       setGroupVisible(groupObsTime, true);
 
       selectElement.innerHTML = `
         <option value="PLOT" selected>PLOT - Upper Air Sounding Plots</option>
+        <option value="TLOGP">TLOGP - T-lnP Thermodynamic Sounding</option>
       `;
       selectLevel.innerHTML = `
         <option value="500" selected>500 hPa</option>
@@ -200,9 +202,17 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
     if (prevElement && elementOptions.includes(prevElement)) {
       selectElement.value = prevElement;
     }
+    if (model === "UPPER_AIR") {
+      setGroupVisible(groupLevel, selectElement.value !== "TLOGP");
+    }
   }
 
   selectModel.addEventListener("change", updateFormVisibility);
+  selectElement.addEventListener("change", () => {
+    if (selectModel.value === "UPPER_AIR") {
+      setGroupVisible(groupLevel, selectElement.value !== "TLOGP");
+    }
+  });
 
   // Dynamically populate observation times filtered by model type
   async function refreshObsTimeOptions(model) {
@@ -298,7 +308,7 @@ export function initCatalogDrawer(containerId = "catalog-drawer", onLoadCallback
     appState.update({
       model,
       element,
-      level: level !== null ? level : 850,
+      level: (element === "TLOGP" || !levelVisible) ? null : (level !== null ? level : 850),
       period: period !== null ? period : 0,
       obsTime,
       isObservation: isObs,

@@ -4,6 +4,8 @@ import { computeParcelAscent } from "./tlogpMath.js";
 import { TLogPPanel } from "./tlogpPanel.js";
 import { autoSaveLayerConfig } from "../../config/presets.js";
 import { showErrorToast } from "../../ui/toast.js";
+import { addOrUpdateLayer, getLayerById, getLayersForWindow, syncLayerControlForWindow } from "../../ui/layers/layerStore.js";
+import { getActiveWindow } from "../../ui/tabs/tabsStore.js";
 
 class TLogPController {
   constructor() {
@@ -39,9 +41,7 @@ class TLogPController {
       win.tlogpStation = this.activeStationId;
     }
 
-    if (layerDef.config?.parcelLevel) {
-      this.activeParcelLevel = layerDef.config.parcelLevel;
-    }
+    this.activeParcelLevel = layerDef.config?.parcelLevel || layerDef.parcelLevel || "surface";
 
     if (!this.panel) {
       this.panel = new TLogPPanel({
@@ -118,6 +118,18 @@ class TLogPController {
       }
 
       this._syncLayerControlUI(win, data);
+      if (win) {
+        const layer = this._findTLogPLayer(win);
+        if (layer) {
+          const stnName = data.stationName || stn;
+          if (!layer.config) layer.config = {};
+          layer.config.stationId = stn;
+          layer.config.stationName = `${stn} ${stnName}`;
+          layer.stationId = stn;
+          layer.name = `T-lnP Sounding Diagram (${stn} ${stnName})`;
+          addOrUpdateLayer(layer, win);
+        }
+      }
       return data;
     } catch (err) {
       console.warn(`[TLogPController] Failed to load sounding for station ${stn}:`, err);
@@ -156,13 +168,19 @@ class TLogPController {
 
     if (syncConfig && win) {
       const layer = this._findTLogPLayer(win);
+      const stnName = data.stationName || stationId;
       if (layer) {
         if (!layer.config) layer.config = {};
         layer.config.stationId = stationId;
-        layer.config.stationName = data.stationName || stationId;
+        layer.config.stationName = `${stationId} ${stnName}`;
         layer.stationId = stationId;
+        layer.name = `T-lnP Sounding Diagram (${stationId} ${stnName})`;
+        addOrUpdateLayer(layer, win);
       }
       autoSaveLayerConfig();
+      if (typeof getActiveWindow === "function" && getActiveWindow() === win) {
+        syncLayerControlForWindow(win);
+      }
     }
   }
 
@@ -195,6 +213,7 @@ class TLogPController {
       if (layer) {
         if (!layer.config) layer.config = {};
         layer.config.parcelLevel = level;
+        addOrUpdateLayer(layer, win);
       }
       autoSaveLayerConfig();
     }
@@ -322,12 +341,19 @@ class TLogPController {
     }
     this.sounding = null;
     this.parcelResult = null;
+    this.activeParcelLevel = "surface";
+    this.activeStationId = "58362";
+    this.customPressure = null;
     this.activeMap = null;
     this.activeWin = null;
   }
 
   _findTLogPLayer(win) {
     if (!win) return null;
+    try {
+      const fromStore = getLayerById("upperair-tlogp-diagram", win) || getLayersForWindow(win)?.find((lyr) => lyr.type === "tlogp");
+      if (fromStore) return fromStore;
+    } catch {}
     if (win.layers) {
       const l = win.layers.find((lyr) => lyr.type === "tlogp");
       if (l) return l;

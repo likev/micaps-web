@@ -1,8 +1,9 @@
 // derivedContours.js - Observation station plot loading and objective analysis derived contours
 import { getActiveWindow, updateWindowTitle } from "../ui/tabWindowManager.js";
-import { getLayerById, addOrUpdateLayer, getLayersForWindow, syncLayerControlForWindow } from "../ui/layerControl.js";
+import { getLayerById, addOrUpdateLayer, removeLayer, getLayersForWindow, syncLayerControlForWindow } from "../ui/layerControl.js";
 import { triggerStationStreamlines, triggerRasterOverlay } from "../ui/layerActions.js";
 import { renderStationWeatherPlots } from "../layers/stationLayer.js";
+import { removeContourLayer } from "../layers/contourLayer.js";
 import { analyzeAndRenderSoundingContours, analyzeAndRenderSoundingElementContour } from "../layers/soundingAnalysis.js";
 import { analyzeAndRenderSurfaceContours } from "../layers/surfaceAnalysis.js";
 import { fetchStationObservations } from "../api/catalogApi.js";
@@ -12,6 +13,7 @@ import { showErrorToast } from "../ui/toast.js";
 import { appState } from "../store/appState.js";
 
 export async function renderSoundingDerivedContoursForStation(map, stations, curLevel, activeGroup, win, stationLayerId) {
+  if (!curLevel || activeGroup?.id === "composite-tlogp" || activeGroup?.hasLevel === false) return;
   const groupDerived = activeGroup?.layers?.filter((l) => l.type === "contour" && l.model === "UPPER_AIR" && Boolean(l.derivedFrom)) || [];
   if (groupDerived.length > 0) {
     for (const cLayer of groupDerived) {
@@ -286,6 +288,16 @@ export async function loadObservationProduct(map, model, element, level, file, w
     const activeGroup = win?.activeGroup;
     const groupStationLayer = activeGroup?.layers?.find((l) => l.id === customStationLayerId || l.type === "station");
     const isTLogP = element === "TLOGP" || (path && path.includes("TLOGP"));
+    if (isTLogP) {
+      const winLayers = getLayersForWindow(win);
+      const staleContours = winLayers.filter(
+        (l) => l.type === "contour" && (l.model === "UPPER_AIR" || l.id?.startsWith("contour-sounding-"))
+      );
+      for (const sc of staleContours) {
+        removeContourLayer(map, sc.id);
+        removeLayer(sc.id, win);
+      }
+    }
     const layerId = customStationLayerId || groupStationLayer?.id || (isTLogP ? "upperair-tlogp-stations" : (model === "UPPER_AIR" ? "station-upper" : `station-${model.toLowerCase()}`));
     const existingStn = getLayerById(layerId, win);
     const snapStn = win?.layerSnapshots?.find((s) => s.id === layerId || (s.type === "station" && s.model === model));
