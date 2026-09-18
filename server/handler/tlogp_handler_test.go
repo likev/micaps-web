@@ -58,7 +58,7 @@ func TestTLogPHandlerMockMode(t *testing.T) {
 }
 
 func TestTLogPHandlerLiveCassandra(t *testing.T) {
-	cqlClient, err := db.NewCQLClient("bore.pub:59042", 5*time.Second)
+	cqlClient, err := db.NewCQLClient("bore.pub:59042", 15*time.Second)
 	if err != nil {
 		t.Skipf("Live Cassandra bore.pub:59042 not reachable: %v", err)
 		return
@@ -113,7 +113,7 @@ func TestTLogPHandlerLiveCassandra(t *testing.T) {
 	}
 
 	// 3. Specifically verify Shanghai 58362 in synoptic 08:00 BJT release
-	req3 := httptest.NewRequest("GET", "/api/data/tlogp?file=20260917080000.000&station=58362", nil)
+	req3 := httptest.NewRequest("GET", "/api/data/tlogp?file=20260918080000.000&station=58362", nil)
 	w3 := httptest.NewRecorder()
 	h.Handler(w3, req3)
 	if w3.Code == http.StatusOK {
@@ -126,5 +126,14 @@ func TestTLogPHandlerLiveCassandra(t *testing.T) {
 				t.Errorf("Expected >100 levels for Shanghai, got %d", len(shProfile.Levels))
 			}
 		}
+	}
+
+	// 4. Verify StationHandler handles UPPER_AIR/TLOGP/500 defensively
+	statH := &handler.StationHandler{Client: cqlClient, MockMode: false}
+	req4 := httptest.NewRequest("GET", "/api/data/station?path=UPPER_AIR/TLOGP/500&file=latest", nil)
+	w4 := httptest.NewRecorder()
+	statH.StationGeoJSONHandler(w4, req4)
+	if w4.Code != http.StatusOK {
+		t.Errorf("Expected StationHandler to return 200 for UPPER_AIR/TLOGP/500, got %d: %s", w4.Code, w4.Body.String())
 	}
 }

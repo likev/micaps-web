@@ -35,20 +35,29 @@ func NewCQLClient(addr string, timeout time.Duration) (*CQLClient, error) {
 }
 
 func (c *CQLClient) reconnect() error {
-	if c.conn != nil {
-		c.conn.Close()
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		if c.conn != nil {
+			c.conn.Close()
+			c.conn = nil
+		}
+		conn, err := net.DialTimeout("tcp", c.addr, c.timeout)
+		if err != nil {
+			lastErr = fmt.Errorf("failed to dial Cassandra at %s: %w", c.addr, err)
+			time.Sleep(300 * time.Millisecond)
+			continue
+		}
+		c.conn = conn
+		if err := c.startup(); err != nil {
+			c.conn.Close()
+			c.conn = nil
+			lastErr = fmt.Errorf("CQL STARTUP failed: %w", err)
+			time.Sleep(300 * time.Millisecond)
+			continue
+		}
+		return nil
 	}
-	conn, err := net.DialTimeout("tcp", c.addr, c.timeout)
-	if err != nil {
-		return fmt.Errorf("failed to dial Cassandra at %s: %w", c.addr, err)
-	}
-	c.conn = conn
-	if err := c.startup(); err != nil {
-		c.conn.Close()
-		c.conn = nil
-		return fmt.Errorf("CQL STARTUP failed: %w", err)
-	}
-	return nil
+	return lastErr
 }
 
 func (c *CQLClient) startup() error {

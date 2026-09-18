@@ -63,6 +63,18 @@ func (h *StationHandler) fetchStations(r *http.Request) (*model.GeoJSONFeatureCo
 		return mock.GenerateMockStationsForPath(dataPath), nil
 	}
 
+	if file == "" || file == "latest" {
+		latest, err := db.GetLatestCycle(h.Client, dataPath, "")
+		if err == nil && latest != "" {
+			file = latest
+		} else {
+			files, fErr := db.GetFileList(h.Client, dataPath, 1)
+			if fErr == nil && len(files) > 0 {
+				file = files[0].Name
+			}
+		}
+	}
+
 	rawBlob, err := db.GetBlob(h.Client, dataPath, file)
 	if err != nil {
 		return nil, err
