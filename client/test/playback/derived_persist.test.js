@@ -71,4 +71,14 @@ describe("derived layer persistence (isolated subprocess scenarios)", () => {
     expect(doc.chip.legendCalls).toBeGreaterThan(0);
     expect(doc.chip.legendColormap).toBe("palette:rh");
   });
+
+  test("RH built-in reset persists across NWP time chip", () => {
+    const doc = runScenario("rh_palette_scenario.js");
+    expect(doc.resetChip.palettePath).toBeNull();
+    expect(doc.resetChip.colormap).toBe("RH");
+    expect(doc.resetChip.rasterCalls).toBeGreaterThan(0);
+    expect(doc.resetChip.rasterColormap).toBe("RH");
+    expect(doc.resetChip.legendCalls).toBeGreaterThan(0);
+    expect(doc.resetChip.legendColormap).toBe("RH");
+  });
 });

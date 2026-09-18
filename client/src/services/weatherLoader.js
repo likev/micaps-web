@@ -57,7 +57,16 @@ export async function loadWeatherField(map, model, element, level, period, custo
   }
   const defaultBoldValues = isVOR ? [0, 10] : (isDIV ? [0] : customOptions?.boldValues);
   const boldValues = exCfg.boldValues ?? customOptions?.boldValues ?? defaultBoldValues;
-  const savedPalettePath = exCfg.palettePath || customOptions?.palettePath || snap?.config?.palettePath || null;
+  // null = explicit "built-in default" reset from the palette picker and must
+  // win over the preset default; only fall through while the key is absent.
+  const pickPalettePath = (...holders) => {
+    for (const h of holders) {
+      if (h && Object.prototype.hasOwnProperty.call(h, "palettePath")) return h.palettePath;
+    }
+    return undefined;
+  };
+  const pickedPalette = pickPalettePath(exCfg, customOptions, snap?.config);
+  const savedPalettePath = pickedPalette === undefined ? null : pickedPalette;
   const isVisible = existingLayer ? (existingLayer.visible !== false) : (snap ? snap.visible !== false : true);
   const smooth = exCfg.smooth ?? customOptions?.smooth ?? true;
   const smoothIterations = exCfg.smoothIterations ?? customOptions?.smoothIterations ?? 2;

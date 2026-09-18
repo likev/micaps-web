@@ -257,6 +257,43 @@ try {
     legendCalls: legendCalls.length,
     legendColormap: legendCalls.at(-1)?.[1],
   };
+
+  // Reset to built-in default (as the palette picker + handleConfigAction do).
+  after.config.palettePath = null;
+  after.colormap = null;
+
+  // Chip again to +36h: built-in must persist, not revert to preset default.
+  activeWin.period = 36;
+  activeWin.loadSeq = (activeWin.loadSeq || 0) + 1;
+  const seq2 = activeWin.loadSeq;
+  if (!activeWin.layerSnapshots) {
+    const prevLayers = getLayersForWindow(activeWin);
+    if (prevLayers && prevLayers.length > 0) {
+      activeWin.layerSnapshots = prevLayers.map((l) => ({
+        id: l.id,
+        type: l.type,
+        model: l.model,
+        element: l.element,
+        visible: l.visible !== false,
+        config: { ...(l.config || {}) },
+        color: l.color,
+        colormap: l.colormap,
+      }));
+    }
+  }
+  rasterCalls.length = 0;
+  legendCalls.length = 0;
+  await loadPresetGroup(map, activeWin.activeGroup, 36, 500, activeWin, true, seq2);
+
+  const afterReset = getLayerById("rh", activeWin);
+  out.resetChip = {
+    palettePath: afterReset?.config?.palettePath,
+    colormap: afterReset?.colormap,
+    rasterCalls: rasterCalls.length,
+    rasterColormap: rasterCalls.at(-1)?.[3],
+    legendCalls: legendCalls.length,
+    legendColormap: legendCalls.at(-1)?.[1],
+  };
   out.ok = true;
 } catch (e) {
   out.ok = false;

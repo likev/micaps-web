@@ -111,7 +111,7 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
       ...prevLayer.config,
       ...layerDef.config,
     };
-    if (prevLayer.config?.palettePath && (layerDef.config?.palettePath === undefined || layerDef.config?.palettePath === null)) {
+    if (prevLayer.config?.palettePath && layerDef.config?.palettePath === undefined) {
       mergedConfig.palettePath = prevLayer.config.palettePath;
     }
     const mergedColormap = layerDef.colormap || (mergedConfig.palettePath ? `palette:${prevLayer.id}` : prevLayer.colormap);
