@@ -11,6 +11,7 @@ import { removeRasterLayer } from "../layers/rasterLayer.js";
 import { syncLegendForWindow } from "../ui/legend.js";
 import { initKeyboardShortcuts } from "../ui/keyboardShortcuts.js";
 import { initConfigEditor, openConfigTab } from "../ui/configEditor.js";
+import { initFullscreenControl } from "../ui/fullscreenControl.js";
 import { appState } from "../store/appState.js";
 import { loadPresetGroups } from "../config/presets.js";
 import { resolveForecastCycles, syncObservationTimeline } from "../utils/timelineSync.js";
@@ -215,6 +216,7 @@ export async function bootstrap() {
 
   initConfigEditor(reloadConfiguration);
   initTooltip("tooltip");
+  initFullscreenControl("btn-fullscreen-toggle");
   initKeyboardShortcuts({
     onPeriodStep: (dir) => timeSliderStep(dir, { source: dir < 0 ? "btn-prev" : "btn-next", directions: dir < 0 ? ["prev"] : ["next"] }),
     onLevelStep: async (dir) => {

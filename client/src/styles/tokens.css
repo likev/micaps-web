@@ -126,3 +126,73 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
 .tooltip { position: absolute; pointer-events: none; background: rgba(10, 14, 22, 0.95); border: 1px solid var(--accent-blue); border-radius: 6px; padding: 8px 12px; font-size: 12px; font-family: var(--font-mono); box-shadow: 0 4px 16px rgba(0,0,0,0.6); z-index: 2000; transition: opacity 0.1s ease; max-width: min(280px, 80vw); overflow-wrap: break-word; }
 .tooltip.hidden { opacity: 0; pointer-events: none; }
 .station-glyph { transform: translate(-50%, -50%); }
+
+/* Fullscreen toggle button control (left middle floating above map) */
+.btn-fullscreen-toggle {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 520;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-panel);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.btn-fullscreen-toggle:hover {
+  background: rgba(30, 41, 59, 0.95);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+
+.btn-fullscreen-toggle:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.btn-fullscreen-toggle:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent-blue), 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.btn-fullscreen-toggle svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  pointer-events: none;
+  stroke: currentColor;
+}
+
+/* TLogP Subwindow Resize Handles */
+.tlogp-resize-handle {
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  transition: background 0.15s ease;
+}
+
+.tlogp-resize-handle:hover svg line {
+  stroke: #58a6ff;
+}
+
+.tlogp-resize-handle.tlogp-resize-e:hover,
+.tlogp-resize-handle.tlogp-resize-s:hover {
+  background: rgba(88, 166, 255, 0.25);
+}
+
+

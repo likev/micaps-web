@@ -5,6 +5,7 @@ import { clearAllWeatherLayersFromMap, loadPresetGroup, reloadConfiguration } fr
 import { loadWeatherField } from "./services/weatherLoader.js";
 import { changeVerticalLevel } from "./services/levelController.js";
 import { loadUpperAirComposite, loadObservationProduct } from "./services/derivedContours.js";
+import { initFullscreenControl } from "./ui/fullscreenControl.js";
 
 export {
   bootstrap,
@@ -16,6 +17,7 @@ export {
   loadUpperAirComposite,
   loadObservationProduct,
   reloadConfiguration,
+  initFullscreenControl,
 };
 
 if (typeof window !== "undefined" && typeof document !== "undefined" && typeof Bun === "undefined") {
