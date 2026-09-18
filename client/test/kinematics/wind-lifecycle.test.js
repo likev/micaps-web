@@ -307,8 +307,11 @@ function createMockMap() {
       removeLayer("wind", mockWin);
       handleLayerAction(map, "remove", "wind", null, windLayer, mockWin);
 
-      // Verify removed from activeGroup.layers
-      expect(presetGroup.layers.find((l) => l.id === "wind")).toBeUndefined();
+      // Base preset layers survive ✕ in activeGroup.layers (per-window view
+      // removal only) so a fresh Load Data restores them. Regression: deleted
+      // ECMWF-HR base layers could never be loaded again because ✕ spliced the
+      // shared preset definition.
+      expect(presetGroup.layers.find((l) => l.id === "wind")).toBeDefined();
       expect(presetGroup.layers.find((l) => l.id === "contour-ECMWF_HR-div-850")).toBeDefined();
 
       const remaining = getLayersForWindow(mockWin);

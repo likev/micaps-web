@@ -29,6 +29,13 @@ export async function renderSoundingDerivedContoursForStation(map, stations, cur
         cfg.visible = isVisible;
         if (snap?.config) Object.assign(cfg, snap.config);
         if (existingDerived?.config) Object.assign(cfg, existingDerived.config);
+        // Re-assert identity/visibility AFTER the merges: snapshots embed the
+        // previous level's layerId/visible inside config (buildContourLayerMeta
+        // bakes them into renderOptions), which would otherwise resurrect stale
+        // ids and un-hide eye-hidden layers on level steps and fresh reloads.
+        cfg.layerId = targetId;
+        cfg.visible = isVisible;
+        cfg.derivedFrom = cLayer.derivedFrom || stationLayerId;
         if (existingDerived?.colormap) cfg.colormap = existingDerived.colormap;
         else if (snap?.colormap) cfg.colormap = snap.colormap;
         if (existingDerived?.color) cfg.lineColor = existingDerived.color;
@@ -80,6 +87,10 @@ export async function renderSoundingDerivedContoursForStation(map, stations, cur
           const cfg = { ...(cLayer.config || {}), visible: isVisible, layerId: targetId };
           if (snap?.config) Object.assign(cfg, snap.config);
           if (existingDerived?.config) Object.assign(cfg, existingDerived.config);
+          // Re-assert: win-layer/snapshot configs embed a stale layerId/visible
+          // (baked into renderOptions at creation); keep this level's values.
+          cfg.layerId = targetId;
+          cfg.visible = isVisible;
           if (existingDerived?.colormap) cfg.colormap = existingDerived.colormap;
           else if (snap?.colormap) cfg.colormap = snap.colormap;
           if (existingDerived?.color) cfg.lineColor = existingDerived.color;
@@ -137,6 +148,13 @@ export async function renderSurfaceDerivedContoursForStation(map, stations, acti
         cfg.visible = isVisible;
         if (snap?.config) Object.assign(cfg, snap.config);
         if (existingDerived?.config) Object.assign(cfg, existingDerived.config);
+        // Re-assert identity/visibility AFTER the merges: snapshots embed the
+        // previous level's layerId/visible inside config (buildContourLayerMeta
+        // bakes them into renderOptions), which would otherwise resurrect stale
+        // ids and un-hide eye-hidden layers on level steps and fresh reloads.
+        cfg.layerId = targetId;
+        cfg.visible = isVisible;
+        cfg.derivedFrom = cLayer.derivedFrom || stationLayerId;
         if (existingDerived?.colormap) cfg.colormap = existingDerived.colormap;
         else if (snap?.colormap) cfg.colormap = snap.colormap;
         if (existingDerived?.color) cfg.lineColor = existingDerived.color;
@@ -188,6 +206,10 @@ export async function renderSurfaceDerivedContoursForStation(map, stations, acti
           const cfg = { ...(cLayer.config || {}), visible: isVisible, layerId: targetId };
           if (snap?.config) Object.assign(cfg, snap.config);
           if (existingDerived?.config) Object.assign(cfg, existingDerived.config);
+          // Re-assert: win-layer/snapshot configs embed a stale layerId/visible
+          // (baked into renderOptions at creation); keep this level's values.
+          cfg.layerId = targetId;
+          cfg.visible = isVisible;
           if (existingDerived?.colormap) cfg.colormap = existingDerived.colormap;
           else if (snap?.colormap) cfg.colormap = snap.colormap;
           if (existingDerived?.color) cfg.lineColor = existingDerived.color;
