@@ -285,11 +285,14 @@ export async function loadObservationProduct(map, model, element, level, file, w
     appState.set("stationData", stations);
     const activeGroup = win?.activeGroup;
     const groupStationLayer = activeGroup?.layers?.find((l) => l.id === customStationLayerId || l.type === "station");
-    const layerId = customStationLayerId || groupStationLayer?.id || (model === "UPPER_AIR" ? "station-upper" : `station-${model.toLowerCase()}`);
+    const isTLogP = element === "TLOGP" || (path && path.includes("TLOGP"));
+    const layerId = customStationLayerId || groupStationLayer?.id || (isTLogP ? "upperair-tlogp-stations" : (model === "UPPER_AIR" ? "station-upper" : `station-${model.toLowerCase()}`));
     const existingStn = getLayerById(layerId, win);
     const snapStn = win?.layerSnapshots?.find((s) => s.id === layerId || (s.type === "station" && s.model === model));
     const isVisible = existingStn ? (existingStn.visible !== false) : (snapStn ? snapStn.visible !== false : (appState.state.layers.station !== false));
-    const name = model === "UPPER_AIR" ? `${level || 500} hPa Sounding Station Plots` : `${model === "SURFACE" ? "Surface" : "Upper Air"} Station Observations`;
+    const name = isTLogP
+      ? "Sounding Station Network"
+      : (model === "UPPER_AIR" ? `${level || 500} hPa Sounding Station Plots` : `${model === "SURFACE" ? "Surface" : "Upper Air"} Station Observations`);
     const isRainProduct = /rain/i.test(element || "") || /rain/i.test(path || "");
     const stnConfig = {
       ...(isRainProduct ? { showRain6: true } : {}),
@@ -305,7 +308,7 @@ export async function loadObservationProduct(map, model, element, level, file, w
     if (model === "SURFACE" && stations?.features?.length >= 3) {
       await renderSurfaceDerivedContoursForStation(map, stations, activeGroup, win, layerId);
     }
-    if (model === "UPPER_AIR" && stations?.features?.length >= 3) {
+    if (model === "UPPER_AIR" && !isTLogP && stations?.features?.length >= 3) {
       const curLevel = level || 500;
       await renderSoundingDerivedContoursForStation(map, stations, curLevel, activeGroup, win, layerId);
     }

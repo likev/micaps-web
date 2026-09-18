@@ -70,7 +70,76 @@ func parseHeaderTime(line string) (string, error) {
 	m, _ := strconv.Atoi(fields[1])
 	d, _ := strconv.Atoi(fields[2])
 	h, _ := strconv.Atoi(fields[3])
+	if y < 100 {
+		if y < 50 {
+			y += 2000
+		} else {
+			y += 1900
+		}
+	}
 	return fmt.Sprintf("%04d-%02d-%02d %02d:00", y, m, d, h), nil
+}
+
+func isDateHeaderLine(fields []string) bool {
+	if len(fields) < 4 {
+		return false
+	}
+	y, err1 := strconv.Atoi(fields[0])
+	m, err2 := strconv.Atoi(fields[1])
+	d, err3 := strconv.Atoi(fields[2])
+	h, err4 := strconv.Atoi(fields[3])
+	if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
+		return false
+	}
+	if (y < 0 || (y > 99 && y < 1970) || y > 2100) {
+		return false
+	}
+	if m < 1 || m > 12 {
+		return false
+	}
+	if d < 1 || d > 31 {
+		return false
+	}
+	if h < 0 || h > 23 {
+		return false
+	}
+	return true
+}
+
+func isStationHeader(fields []string) bool {
+	if len(fields) != 5 {
+		return false
+	}
+	if isDateHeaderLine(fields) {
+		return false
+	}
+	if strings.Contains(fields[0], ".") {
+		return false
+	}
+	lon, err1 := strconv.ParseFloat(fields[1], 64)
+	lat, err2 := strconv.ParseFloat(fields[2], 64)
+	elev, err3 := strconv.ParseFloat(fields[3], 64)
+	_, err4 := strconv.ParseFloat(fields[4], 64)
+	if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
+		return false
+	}
+	if lon < -180 || lon > 360 || lat < -90 || lat > 90 || elev < -1000 || elev > 10000 {
+		return false
+	}
+	return true
+}
+
+func parseSoundingLevels(fields []string) []model.SoundingLevel {
+	if len(fields) < 6 {
+		return nil
+	}
+	var res []model.SoundingLevel
+	for i := 0; i+6 <= len(fields); i += 6 {
+		if lvl, ok := parseSoundingLevel(fields[i : i+6]); ok {
+			res = append(res, lvl)
+		}
+	}
+	return res
 }
 
 func parseSoundingLevel(fields []string) (model.SoundingLevel, bool) {
@@ -130,16 +199,12 @@ func ExtractStationsGeoJSON(data []byte) (*model.GeoJSONFeatureCollection, error
 	buf := make([]byte, 64*1024)
 	scanner.Buffer(buf, 1024*1024)
 
-	// Line 0: "diamond 5 ..."
-	if !scanner.Scan() {
-		return nil, fmt.Errorf("empty diamond 5 data")
-	}
-	// Line 1: "<year> <month> <day> <hour> <station_count>"
-	if !scanner.Scan() {
-		return nil, fmt.Errorf("missing diamond 5 header line")
-	}
+	foundDiamond5 := false
+	var obsTime string
 
 	features := make([]model.GeoJSONFeature, 0, 600)
+	var curFeature *model.GeoJSONFeature
+	var levelCount int
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -147,67 +212,95 @@ func ExtractStationsGeoJSON(data []byte) (*model.GeoJSONFeatureCollection, error
 			continue
 		}
 		fields := strings.Fields(line)
-		if len(fields) < 5 {
+		if len(fields) == 0 {
 			continue
 		}
 
-		stnID := fields[0]
-		lon, err1 := strconv.ParseFloat(fields[1], 64)
-		lat, err2 := strconv.ParseFloat(fields[2], 64)
-		elev, err3 := strconv.ParseFloat(fields[3], 64)
-		numLevels, err4 := strconv.Atoi(fields[4])
-		if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
+		if !foundDiamond5 {
+			lower := strings.ToLower(line)
+			if strings.HasPrefix(lower, "diamond 5") {
+				foundDiamond5 = true
+				if len(fields) >= 6 && isDateHeaderLine(fields[2:]) {
+					obsTime, _ = parseHeaderTime(strings.Join(fields[2:], " "))
+				}
+			}
 			continue
 		}
 
-		var sTemp, sDew, sWS, sWD, sPres, sHgt float64 = -9999, -9999, -9999, -9999, -9999, -9999
-		foundSurface := false
+		if obsTime == "" && isDateHeaderLine(fields) {
+			obsTime, _ = parseHeaderTime(line)
+			continue
+		}
 
-		// Read numLevels lines
-		for i := 0; i < numLevels && scanner.Scan(); i++ {
-			lvlLine := strings.TrimSpace(scanner.Text())
-			if !foundSurface {
-				lvlFields := strings.Fields(lvlLine)
-				if lvl, ok := parseSoundingLevel(lvlFields); ok {
-					sPres = lvl.Pressure
-					sHgt = lvl.Height
-					sTemp = lvl.Temp
-					sDew = lvl.DewPoint
-					sWD = lvl.WindDir
-					sWS = lvl.WindSpeed
-					foundSurface = true
+		if isStationHeader(fields) {
+			if curFeature != nil {
+				curFeature.Properties["num_levels"] = levelCount
+				features = append(features, *curFeature)
+				curFeature = nil
+			}
+
+			stnID := fields[0]
+			lon, _ := strconv.ParseFloat(fields[1], 64)
+			lat, _ := strconv.ParseFloat(fields[2], 64)
+			elev, _ := strconv.ParseFloat(fields[3], 64)
+			levelCount = 0
+
+			props := map[string]interface{}{
+				"station_id":         stnID,
+				"id":                 stnID,
+				"name":               GetStationName(stnID),
+				"lon":                lon,
+				"lat":                lat,
+				"elevation":          elev,
+				"num_levels":         0,
+				"obs_time":           obsTime,
+				"surface_temp":       -9999.0,
+				"surface_dewpoint":   -9999.0,
+				"surface_wind_speed": -9999.0,
+				"surface_wind_dir":   -9999.0,
+				"temperature":        -9999.0,
+				"dewpoint":           -9999.0,
+				"wind_speed":         -9999.0,
+				"wind_dir":           -9999.0,
+				"slp":                -9999.0,
+				"height":             -9999.0,
+			}
+
+			curFeature = &model.GeoJSONFeature{
+				Type: "Feature",
+				Geometry: model.GeoJSONGeometry{
+					Type:        "Point",
+					Coordinates: []float64{lon, lat},
+				},
+				Properties: props,
+			}
+			continue
+		}
+
+		if curFeature != nil {
+			lvls := parseSoundingLevels(fields)
+			for _, lvl := range lvls {
+				levelCount++
+				if levelCount == 1 {
+					props := curFeature.Properties
+					props["surface_temp"] = lvl.Temp
+					props["surface_dewpoint"] = lvl.DewPoint
+					props["surface_wind_speed"] = lvl.WindSpeed
+					props["surface_wind_dir"] = lvl.WindDir
+					props["temperature"] = lvl.Temp
+					props["dewpoint"] = lvl.DewPoint
+					props["wind_speed"] = lvl.WindSpeed
+					props["wind_dir"] = lvl.WindDir
+					props["slp"] = lvl.Pressure
+					props["height"] = lvl.Height
 				}
 			}
 		}
+	}
 
-		props := map[string]interface{}{
-			"station_id":         stnID,
-			"id":                 stnID,
-			"name":               GetStationName(stnID),
-			"lon":                lon,
-			"lat":                lat,
-			"elevation":          elev,
-			"num_levels":         numLevels,
-			"surface_temp":       sTemp,
-			"surface_dewpoint":   sDew,
-			"surface_wind_speed": sWS,
-			"surface_wind_dir":   sWD,
-			"temperature":        sTemp,
-			"dewpoint":           sDew,
-			"wind_speed":         sWS,
-			"wind_dir":           sWD,
-			"slp":                sPres,
-			"height":             sHgt,
-		}
-
-		features = append(features, model.GeoJSONFeature{
-			Type: "Feature",
-			Geometry: model.GeoJSONGeometry{
-				Type:        "Point",
-				Coordinates: []float64{lon, lat},
-			},
-			Properties: props,
-		})
+	if curFeature != nil {
+		curFeature.Properties["num_levels"] = levelCount
+		features = append(features, *curFeature)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -231,18 +324,12 @@ func ExtractStationProfile(data []byte, targetStationID string) (*model.StationS
 	buf := make([]byte, 64*1024)
 	scanner.Buffer(buf, 1024*1024)
 
-	// Line 0: "diamond 5 ..."
-	if !scanner.Scan() {
-		return nil, fmt.Errorf("empty diamond 5 data")
-	}
-	// Line 1: "<year> <month> <day> <hour> <station_count>"
-	if !scanner.Scan() {
-		return nil, fmt.Errorf("missing diamond 5 header line")
-	}
-	obsTime, err := parseHeaderTime(scanner.Text())
-	if err != nil {
-		obsTime = ""
-	}
+	foundDiamond5 := false
+	var obsTime string
+
+	var targetFound bool
+	var sounding *model.StationSounding
+	var levels []model.SoundingLevel
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -250,43 +337,55 @@ func ExtractStationProfile(data []byte, targetStationID string) (*model.StationS
 			continue
 		}
 		fields := strings.Fields(line)
-		if len(fields) < 5 {
+		if len(fields) == 0 {
 			continue
 		}
 
-		stnID := fields[0]
-		lon, _ := strconv.ParseFloat(fields[1], 64)
-		lat, _ := strconv.ParseFloat(fields[2], 64)
-		elev, _ := strconv.ParseFloat(fields[3], 64)
-		numLevels, err := strconv.Atoi(fields[4])
-		if err != nil || numLevels < 0 {
-			continue
-		}
-
-		if stnID == targetStationID {
-			levels := make([]model.SoundingLevel, 0, numLevels)
-			for i := 0; i < numLevels && scanner.Scan(); i++ {
-				lvlLine := strings.TrimSpace(scanner.Text())
-				lvlFields := strings.Fields(lvlLine)
-				if lvl, ok := parseSoundingLevel(lvlFields); ok {
-					levels = append(levels, lvl)
+		if !foundDiamond5 {
+			lower := strings.ToLower(line)
+			if strings.HasPrefix(lower, "diamond 5") {
+				foundDiamond5 = true
+				if len(fields) >= 6 && isDateHeaderLine(fields[2:]) {
+					obsTime, _ = parseHeaderTime(strings.Join(fields[2:], " "))
 				}
 			}
-
-			return &model.StationSounding{
-				StationID:   targetStationID,
-				StationName: GetStationName(targetStationID),
-				Lon:         lon,
-				Lat:         lat,
-				Elevation:   elev,
-				ObsTime:     obsTime,
-				NumLevels:   len(levels),
-				Levels:      levels,
-			}, nil
+			continue
 		}
 
-		// Skip numLevels lines for non-target station
-		for i := 0; i < numLevels && scanner.Scan(); i++ {
+		if obsTime == "" && isDateHeaderLine(fields) {
+			obsTime, _ = parseHeaderTime(line)
+			continue
+		}
+
+		if isStationHeader(fields) {
+			if targetFound {
+				// We already collected all levels for targetStationID
+				break
+			}
+			stnID := fields[0]
+			if stnID == targetStationID || strings.TrimLeft(stnID, "0") == strings.TrimLeft(targetStationID, "0") {
+				targetFound = true
+				lon, _ := strconv.ParseFloat(fields[1], 64)
+				lat, _ := strconv.ParseFloat(fields[2], 64)
+				elev, _ := strconv.ParseFloat(fields[3], 64)
+				levels = make([]model.SoundingLevel, 0, 1024)
+				sounding = &model.StationSounding{
+					StationID:   targetStationID,
+					StationName: GetStationName(targetStationID),
+					Lon:         lon,
+					Lat:         lat,
+					Elevation:   elev,
+					ObsTime:     obsTime,
+				}
+			}
+			continue
+		}
+
+		if targetFound {
+			lvls := parseSoundingLevels(fields)
+			for _, lvl := range lvls {
+				levels = append(levels, lvl)
+			}
 		}
 	}
 
@@ -294,5 +393,11 @@ func ExtractStationProfile(data []byte, targetStationID string) (*model.StationS
 		return nil, fmt.Errorf("scanner error while locating station %s: %w", targetStationID, err)
 	}
 
-	return nil, fmt.Errorf("station %s not found in sounding data", targetStationID)
+	if !targetFound || sounding == nil {
+		return nil, fmt.Errorf("station %s not found in sounding data", targetStationID)
+	}
+
+	sounding.NumLevels = len(levels)
+	sounding.Levels = levels
+	return sounding, nil
 }

@@ -117,7 +117,10 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
   const results = await Promise.allSettled(
     group.layers.map(async (layer) => {
       let targetLevel = null;
-      if (level !== null) {
+      const isTLogPLayer = layer.element === "TLOGP" || (layer.path && layer.path.includes("TLOGP")) || layer.type === "tlogp";
+      if (group.hasLevel === false || isTLogPLayer) {
+        targetLevel = null;
+      } else if (level !== null) {
         targetLevel = (layer.model === "SURFACE" || layer.level === 0) ? null : level;
       } else {
         targetLevel = layer.level || (group.hasLevel ? group.defaultLevel : null);
@@ -137,11 +140,14 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
           colormap: resolveColormap(group, render, targetLevel),
         }, win, isTimeStep, expectedSeq);
       } else if (layer.type === "station") {
-        const obsPath = (layer.model === "UPPER_AIR" && targetLevel)
-          ? `UPPER_AIR/${layer.element || "PLOT"}/${targetLevel}`
-          : (layer.path || (layer.model === "UPPER_AIR"
-            ? `UPPER_AIR/${layer.element || "PLOT"}/${targetLevel || 500}`
-            : `${layer.model}/${layer.element}`));
+        const isTLogP = layer.element === "TLOGP" || (layer.path && layer.path.includes("TLOGP"));
+        const obsPath = isTLogP
+          ? (layer.path || "UPPER_AIR/TLOGP")
+          : (layer.model === "UPPER_AIR" && targetLevel)
+            ? `UPPER_AIR/${layer.element || "PLOT"}/${targetLevel}`
+            : (layer.path || (layer.model === "UPPER_AIR"
+              ? `UPPER_AIR/${layer.element || "PLOT"}/${targetLevel || 500}`
+              : `${layer.model}/${layer.element}`));
         let file = win?.obsTime;
         if (!file || (!isTimeStep && group.isObservation && level !== null)) {
           file = await syncObservationTimeline(obsPath, win?.obsTime, winTitle, win);
@@ -150,7 +156,7 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
             updateWindowTitle(win);
           }
         }
-        const stationLayerId = (layer.model === "UPPER_AIR" && targetLevel) ? `upperair-obs-${targetLevel}` : layer.id;
+        const stationLayerId = (!isTLogP && layer.model === "UPPER_AIR" && targetLevel) ? `upperair-obs-${targetLevel}` : layer.id;
         await loadObservationProduct(map, layer.model, layer.element, targetLevel, file, win, obsPath, expectedSeq, stationLayerId);
       } else if (layer.type === "tlogp") {
         let file = win?.obsTime;

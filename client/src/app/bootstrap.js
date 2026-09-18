@@ -76,9 +76,12 @@ export async function bootstrap() {
 
       const isObs = Boolean(win.isObservation || win.activeGroup?.isObservation || win.model === "SURFACE" || win.model === "UPPER_AIR");
       if (isObs) {
-        const obsPath = win.model === "UPPER_AIR"
-          ? `UPPER_AIR/${win.element || "PLOT"}/${win.level || 500}`
-          : (win.model === "SURFACE" ? `SURFACE/${win.element || "PLOT_GLOBAL_3H"}` : "SURFACE/PLOT_GLOBAL_3H");
+        const isTLogP = win.activeGroup?.id === "composite-tlogp" || win.activeGroup?.layers?.some((l) => l.element === "TLOGP") || win.element === "TLOGP";
+        const obsPath = isTLogP
+          ? "UPPER_AIR/TLOGP"
+          : win.model === "UPPER_AIR"
+            ? `UPPER_AIR/${win.element || "PLOT"}/${win.level || 500}`
+            : (win.model === "SURFACE" ? `SURFACE/${win.element || "PLOT_GLOBAL_3H"}` : "SURFACE/PLOT_GLOBAL_3H");
         syncObservationTimeline(obsPath, win.obsTime, winTitle, win).then((latestFile) => {
           if (getActiveWindow() === win) {
             win.obsTime = latestFile;
@@ -108,8 +111,11 @@ export async function bootstrap() {
       updateWindowTitle(win, group.name);
       setWindowHeaderPreset(win, group.id);
       if (win.isObservation) {
+        const isTLogP = group.id === "composite-tlogp" || group.layers?.some((l) => l.element === "TLOGP");
         const effectiveLevel = win.level || group.defaultLevel || 500;
-        const obsPath = group.id?.includes("upper") ? `UPPER_AIR/PLOT/${effectiveLevel}` : "SURFACE/PLOT_GLOBAL_3H";
+        const obsPath = isTLogP
+          ? "UPPER_AIR/TLOGP"
+          : (group.id?.includes("upper") ? `UPPER_AIR/PLOT/${effectiveLevel}` : "SURFACE/PLOT_GLOBAL_3H");
         const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle, win);
         win.obsTime = latestFile;
         updateWindowTitle(win);
@@ -175,7 +181,10 @@ export async function bootstrap() {
       updateWindowTitle(win, group.name);
       setWindowHeaderPreset(win, group.id);
       if (win.isObservation) {
-        const obsPath = group.id?.includes("upper") ? `UPPER_AIR/PLOT/${effectiveLevel}` : "SURFACE/PLOT_GLOBAL_3H";
+        const isTLogP = group.id === "composite-tlogp" || group.layers?.some((l) => l.element === "TLOGP");
+        const obsPath = isTLogP
+          ? "UPPER_AIR/TLOGP"
+          : (group.id?.includes("upper") ? `UPPER_AIR/PLOT/${effectiveLevel}` : "SURFACE/PLOT_GLOBAL_3H");
         const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle, win);
         win.obsTime = latestFile;
         updateWindowTitle(win);
@@ -230,7 +239,10 @@ export async function bootstrap() {
     clearAllWeatherLayersFromMap(map, win);
 
     if (isObservation) {
-      const obsPath = model === "SURFACE" ? `SURFACE/${element}` : (model === "UPPER_AIR" ? `UPPER_AIR/${element}/${win.level || 500}` : `${model}/${element}`);
+      const isTLogP = element === "TLOGP";
+      const obsPath = isTLogP
+        ? "UPPER_AIR/TLOGP"
+        : (model === "SURFACE" ? `SURFACE/${element}` : (model === "UPPER_AIR" ? `UPPER_AIR/${element}/${win.level || 500}` : `${model}/${element}`));
       const latestFile = await syncObservationTimeline(obsPath, obsTime || win.obsTime, winBannerTitle);
       win.obsTime = latestFile;
       updateWindowTitle(win);

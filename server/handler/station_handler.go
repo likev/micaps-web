@@ -45,8 +45,12 @@ func (h *StationHandler) StationGeoJSONHandler(w http.ResponseWriter, r *http.Re
 }
 
 func (h *StationHandler) fetchStations(r *http.Request) (*model.GeoJSONFeatureCollection, error) {
-	dataPath := r.URL.Query().Get("path")
-	file := r.URL.Query().Get("file")
+	dataPath := strings.Trim(r.URL.Query().Get("path"), "/")
+	file := strings.TrimSpace(r.URL.Query().Get("file"))
+
+	if strings.Contains(dataPath, "TLOGP") {
+		dataPath = "UPPER_AIR/TLOGP"
+	}
 
 	if h.Client == nil || dataPath == "" || file == "" {
 		if h.MockMode {

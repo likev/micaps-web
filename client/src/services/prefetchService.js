@@ -252,10 +252,12 @@ function collectObsItems(win, targetObsFile, direction, overrideLevel = null) {
       if (layer.type === "station") {
         const model = layer.model || win.model || "SURFACE";
         const element = layer.element || win.element || "PLOT";
-        let lvl = overrideLevel !== null ? overrideLevel : (win.level || layer.level);
+        const isTLogP = element === "TLOGP" || (layer.path && layer.path.includes("TLOGP"));
+        let lvl = isTLogP ? null : (overrideLevel !== null ? overrideLevel : (win.level || layer.level));
 
-        const obsPath =
-          model === "UPPER_AIR" && lvl
+        const obsPath = isTLogP
+          ? (layer.path || "UPPER_AIR/TLOGP")
+          : model === "UPPER_AIR" && lvl
             ? `UPPER_AIR/${element}/${lvl}`
             : (layer.path || (model === "UPPER_AIR" ? `UPPER_AIR/${element}/${lvl || 500}` : `${model}/${element}`));
 

@@ -17,15 +17,21 @@ func GetBlob(client *CQLClient, fullDirectory string, fileName string) ([]byte, 
 	}
 
 	table := parts[0]
-	if !validTableRegex.MatchString(table) {
-		return nil, fmt.Errorf("invalid table name: %s", table)
-	}
-
 	var dataPath string
 	if len(parts) > 1 {
 		dataPath = strings.Join(parts[1:], "/")
 	} else {
 		dataPath = ""
+	}
+
+	// Defensive normalization: TLOGP sounding data is stored in table UPPER_AIR under dataPath 'TLOGP'
+	if strings.Contains(fullDirectory, "TLOGP") {
+		table = "UPPER_AIR"
+		dataPath = "TLOGP"
+	}
+
+	if !validTableRegex.MatchString(table) {
+		return nil, fmt.Errorf("invalid table name: %s", table)
 	}
 
 	query := fmt.Sprintf(`SELECT value FROM micapsdataserver."%s" WHERE "dataPath" = '%s' AND column1 = '%s' LIMIT 1`, table, dataPath, fileName)

@@ -61,6 +61,11 @@ func candidateDataPaths(dataPath string) []string {
 	}
 	add(dataPath)
 
+	if strings.Contains(dataPath, "TLOGP") {
+		add("UPPER_AIR/TLOGP")
+		add("TLOGP")
+	}
+
 	parts := strings.Split(dataPath, "/")
 	if len(parts) == 3 {
 		add(parts[1] + "/" + parts[2])
