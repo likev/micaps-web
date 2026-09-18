@@ -42,6 +42,41 @@ export function getMaxEffectiveCells(overrideValue) {
 
 let autoSaveTimer = null;
 
+export function isDivider(entry) {
+  return Boolean(entry && entry.divider === true);
+}
+
+export function formatDividerOption(entry) {
+  const label = entry?.label ? String(entry.label).trim() : "";
+  return label ? `───── ${label} ─────` : "────────";
+}
+
+export function getLoadableGroups(groups = PRESET_GROUPS) {
+  if (!Array.isArray(groups)) return [];
+  return groups.filter((g) => !isDivider(g));
+}
+
+/**
+ * Renders HTML string of <option> elements for preset groups,
+ * properly formatting dividers as disabled separator options.
+ * @param {Array} [groups=PRESET_GROUPS]
+ * @param {string|null} [selectedId=null]
+ * @returns {string}
+ */
+export function renderPresetOptions(groups = PRESET_GROUPS, selectedId = null) {
+  if (!Array.isArray(groups)) return "";
+  return groups
+    .map((g) => {
+      if (!g) return "";
+      if (isDivider(g)) {
+        return `<option value="" disabled class="preset-divider-option">${formatDividerOption(g)}</option>`;
+      }
+      const isSelected = selectedId && g.id === selectedId ? " selected" : "";
+      return `<option value="${g.id}"${isSelected}>${g.name || g.id}</option>`;
+    })
+    .join("");
+}
+
 export async function loadPresetGroups() {
   let response = await fetch(new URL(CONFIG_URL.href + "?_t=" + Date.now()), { cache: "no-store" });
   if (!response.ok) {
@@ -57,7 +92,11 @@ export async function loadPresetGroups() {
   // expose for mapInstance resolveInitialBasemapScheme
   try { if (typeof window !== "undefined") window.__MICAPS_CONFIG__ = config; } catch {}
   const groups = Array.isArray(config) ? config : config?.presets;
-  if (!Array.isArray(groups) || groups.some((group) => !group || !group.id || !Array.isArray(group.layers))) {
+  if (!Array.isArray(groups) || groups.some((group) => {
+    if (!group || !group.id) return true;
+    if (isDivider(group)) return false;
+    return !Array.isArray(group.layers);
+  })) {
     throw new Error("Config must be an array of groups with id and layers");
   }
 
@@ -123,7 +162,7 @@ export function autoSaveLayerConfig(layer) {
   // 2. Preset Layers configuration
   if (Array.isArray(CURRENT_CONFIG.presets)) {
     for (const preset of CURRENT_CONFIG.presets) {
-      if (!Array.isArray(preset.layers)) continue;
+      if (isDivider(preset) || !Array.isArray(preset.layers)) continue;
       for (const pLayer of preset.layers) {
         const isDerivedMatch = Boolean(
           pLayer.derivedFrom &&
@@ -151,7 +190,13 @@ export function autoSaveLayerConfig(layer) {
             if (layer.config.showBarbs !== undefined) pLayer.render.showBarbs = layer.config.showBarbs;
             if (layer.config.palettePath !== undefined) pLayer.render.palettePath = layer.config.palettePath;
             if (layer.config.interval !== undefined) pLayer.render.interval = layer.config.interval;
-            if (layer.config.levels !== undefined) pLayer.render.levels = layer.config.levels;
+            if (layer.config.levels !== undefined) {
+              if (Array.isArray(layer.config.levels) && layer.config.levels.length >= 2) {
+                pLayer.render.levels = layer.config.levels;
+              } else {
+                delete pLayer.render.levels;
+              }
+            }
 
             // Station plot field visibility
             if (layer.config.showTemp !== undefined) pLayer.render.showTemp = layer.config.showTemp;
@@ -195,7 +240,7 @@ export function upsertDerivedLayerToPreset(presetId, layerEntry) {
   if (!layerEntry || !CURRENT_CONFIG) return;
   const groups = Array.isArray(CURRENT_CONFIG) ? CURRENT_CONFIG : CURRENT_CONFIG.presets;
   if (!Array.isArray(groups)) return;
-  const preset = groups.find((p) => p.id === presetId);
+  const preset = groups.find((p) => !isDivider(p) && p.id === presetId);
   if (!preset || !Array.isArray(preset.layers)) return;
 
   const elem = layerEntry.element;
@@ -229,7 +274,7 @@ export function removeDerivedLayerFromPreset(presetId, layerMatcher) {
   if (!layerMatcher || !CURRENT_CONFIG) return;
   const groups = Array.isArray(CURRENT_CONFIG) ? CURRENT_CONFIG : CURRENT_CONFIG.presets;
   if (!Array.isArray(groups)) return;
-  const preset = groups.find((p) => p.id === presetId);
+  const preset = groups.find((p) => !isDivider(p) && p.id === presetId);
   if (!preset || !Array.isArray(preset.layers)) return;
 
   const idx = preset.layers.findIndex((l) => {

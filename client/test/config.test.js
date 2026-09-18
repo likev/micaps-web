@@ -16,6 +16,7 @@ describe("Configuration File Validation & Auto-Save (config.json)", () => {
     expect(parsed.presets.length).toBeGreaterThan(0);
 
     for (const group of parsed.presets) {
+      if (group.divider) continue;
       expect(group).toHaveProperty("id");
       expect(group).toHaveProperty("name");
       expect(Array.isArray(group.layers)).toBe(true);

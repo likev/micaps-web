@@ -168,7 +168,7 @@ export async function bootstrap() {
       win.level = level;
       if (win.activeGroup) {
         await changeVerticalLevel(win.map, 0, level, win);
-      } else {
+      } else if (win.model && win.element) {
         await loadWeatherField(win.map, win.model, win.element, level, win.period, null, win);
       }
     },
@@ -404,7 +404,7 @@ export async function bootstrap() {
       const activeGroup = win.activeGroup;
       if (activeGroup) {
         await loadPresetGroup(map, activeGroup, period, win.level, win, false);
-      } else {
+      } else if (win.model && win.element) {
         await loadWeatherField(map, win.model, win.element, win.level, period, null, win, false);
         if (win?.layerSnapshots) win.layerSnapshots = null;
       }
@@ -451,7 +451,7 @@ export async function bootstrap() {
       const activeGroup = win.activeGroup;
       if (activeGroup) {
         await loadPresetGroup(map, activeGroup, period, win.level, win, true, expectedSeq);
-      } else {
+      } else if (win.model && win.element) {
         await loadWeatherField(map, win.model, win.element, win.level, period, null, win, true, expectedSeq);
         if (win && expectedSeq !== null && expectedSeq !== undefined && win.loadSeq !== expectedSeq) {
           return;

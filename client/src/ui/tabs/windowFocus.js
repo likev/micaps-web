@@ -1,6 +1,6 @@
 // windowFocus.js - Window focus management, header controls, and timeline sync wiring
 import { setActiveMap } from "../../map/mapInstance.js";
-import { PRESET_GROUPS } from "../../config/presets.js";
+import { PRESET_GROUPS, isDivider, renderPresetOptions } from "../../config/presets.js";
 import { appState } from "../../store/appState.js";
 import { tabsState, getActiveTab, getActiveWindow, getCallbacks } from "./tabsStore.js";
 import { initWindowMap } from "./windowMaps.js";
@@ -183,7 +183,7 @@ export function refreshPresetControls() {
   tabsState.tabs.forEach((tab) => {
     tab.windows.forEach((win) => {
       const currentGroupId = win.activeGroup?.id;
-      const group = PRESET_GROUPS.find((candidate) => candidate.id === currentGroupId) || null;
+      const group = PRESET_GROUPS.find((candidate) => !isDivider(candidate) && candidate.id === currentGroupId) || null;
       // Per-window copy so later ✕-removes don't mutate the shared preset.
       try {
         win.activeGroup = group
@@ -197,7 +197,7 @@ export function refreshPresetControls() {
       if (select) {
         select.innerHTML = `
           <option value="">-- Group --</option>
-          ${PRESET_GROUPS.map((g) => `<option value="${g.id}">${g.name}</option>`).join("")}
+          ${renderPresetOptions(PRESET_GROUPS)}
         `;
         select.value = group?.id || "";
       }

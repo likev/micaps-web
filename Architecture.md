@@ -294,6 +294,7 @@ Composite presets and named colormaps are loaded from `client/config.json` at st
 - `render.colormap` overrides the group setting, and `colormapByLevel` provides a level-specific override.
 - Colormaps use sorted numeric `val` stops and RGB/RGBA channel arrays from 0–255.
 - `performance.maxEffectiveCells` (default `50000`) caps the Marching Squares input budget (§11.5); never hardcoded — read via `getMaxEffectiveCells()` in `client/src/config/presets.js`.
+- **Guided Configuration UI**: Workstation operators manage presets, layers, colormaps, basemap schemes, and performance budgets via a form-based UI (`client/src/ui/configEditor.js`) equipped with a 20-color meteorological swatch picker, visual colormap editor with live CSS gradient preview, layer cloning, and horizontal dividers (`{ "id": "div-obs", "divider": true, "label": "Observations" }`) rendered as unselectable separators in dropdowns and sidebars via the shared `renderPresetOptions()` helper. Standard raw JSON editing is preserved via an advanced fallback sub-tab.
 
 ---
 

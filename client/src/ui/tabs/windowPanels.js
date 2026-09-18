@@ -1,5 +1,4 @@
-// windowPanels.js - Window panel creation, grid layout, split modes, and tab window addition/removal
-import { PRESET_GROUPS } from "../../config/presets.js";
+import { PRESET_GROUPS, isDivider, renderPresetOptions } from "../../config/presets.js";
 import { disarmAllContourReRenders } from "../../services/contourReRender.js";
 import { cleanupWindLayer } from "../../layers/windLayer.js";
 import { DEFAULT_LEVELS, tabsState, getActiveTab, getCallbacks } from "./tabsStore.js";
@@ -46,7 +45,7 @@ export function createWindowPanel(tab, gridEl, wIdx) {
       <div class="win-actions">
         <select class="win-preset-select" id="${winObj.presetSelectId}">
           <option value="">-- Group --</option>
-          ${PRESET_GROUPS.map((g) => `<option value="${g.id}">${g.name}</option>`).join("")}
+          ${renderPresetOptions(PRESET_GROUPS)}
         </select>
         <select class="win-level-select" id="${winObj.levelSelectId}">
           ${DEFAULT_LEVELS.map((l) => `<option value="${l}" ${l === winObj.level ? "selected" : ""}>${l} hPa</option>`).join("")}

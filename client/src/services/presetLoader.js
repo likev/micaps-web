@@ -245,8 +245,12 @@ export async function reloadConfiguration() {
     win.forecastCycle = null;
     if (win.activeGroup) {
       await loadPresetGroup(win.map, win.activeGroup, win.period, win.level, win);
-    } else if (!win.isObservation) {
+    } else if (!win.isObservation && win.model && win.element) {
       await loadWeatherField(win.map, win.model, win.element, win.level, win.period, null, win);
+    } else {
+      clearAllWeatherLayersFromMap(win.map, win, { resetVisibility: true });
+      clearLegends(win);
+      updateWindowTitle(win);
     }
   }
 }

@@ -1,7 +1,7 @@
 // navBar.js - Top header bar and connection health indicator
 import { appState } from "../store/appState.js";
 import { fetchStatus } from "../api/catalogApi.js";
-import { PRESET_GROUPS } from "../config/presets.js";
+import { PRESET_GROUPS, isDivider, renderPresetOptions } from "../config/presets.js";
 
 let onPresetSelectCallback = null;
 let onLevelSelectCallback = null;
@@ -38,7 +38,7 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
         <label for="select-preset">Group:</label>
         <select id="select-preset" class="nav-select">
           <option value="">-- Presets / 组合图 --</option>
-          ${PRESET_GROUPS.map((g) => `<option value="${g.id}">${g.name}</option>`).join("")}
+          ${renderPresetOptions(PRESET_GROUPS)}
         </select>
         <button id="btn-load-data" class="btn btn-primary nav-load-btn" title="Load selected preset group data">
           <span>Load Data</span>
@@ -92,7 +92,7 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
 
   selectPreset.addEventListener("change", (e) => {
     const groupId = e.target.value;
-    const group = PRESET_GROUPS.find((g) => g.id === groupId) || null;
+    const group = PRESET_GROUPS.find((g) => !isDivider(g) && g.id === groupId) || null;
     const levelSelect = document.getElementById("select-nav-level");
 
     // Conditional level handling: preserve defaultLevel if group declares it
@@ -119,7 +119,7 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
     const select = document.getElementById("select-preset");
     const groupId = select ? select.value : "";
     if (!groupId) return;
-    const group = PRESET_GROUPS.find((g) => g.id === groupId) || null;
+    const group = PRESET_GROUPS.find((g) => !isDivider(g) && g.id === groupId) || null;
     if (!group) return;
     const navLevelVal = document.getElementById("select-nav-level")?.value;
     const overrideLevel = navLevelVal ? parseInt(navLevelVal, 10) : null;
@@ -192,6 +192,7 @@ export function setNavBarLevel(level) {
 }
 
 export function setNavBarPreset(groupId) {
+  if (typeof document === "undefined") return;
   const select = document.getElementById("select-preset");
   if (select) {
     select.value = groupId || "";
@@ -201,15 +202,16 @@ export function setNavBarPreset(groupId) {
 }
 
 export function refreshNavBarPresets() {
+  if (typeof document === "undefined") return;
   const select = document.getElementById("select-preset");
   if (!select) return;
 
   const currentGroupId = select.value || appState.get("activeGroup")?.id || "";
   select.innerHTML = `
     <option value="">-- Presets / 组合图 --</option>
-    ${PRESET_GROUPS.map((g) => `<option value="${g.id}">${g.name}</option>`).join("")}
+    ${renderPresetOptions(PRESET_GROUPS)}
   `;
-  select.value = PRESET_GROUPS.some((g) => g.id === currentGroupId) ? currentGroupId : "";
+  select.value = PRESET_GROUPS.some((g) => !isDivider(g) && g.id === currentGroupId) ? currentGroupId : "";
   const btn = document.getElementById("btn-load-data");
   if (btn) btn.disabled = !select.value;
 }

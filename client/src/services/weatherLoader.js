@@ -13,6 +13,10 @@ import { armContourReRender } from "./contourReRender.js";
 import { showErrorToast } from "../ui/toast.js";
 
 export async function loadWeatherField(map, model, element, level, period, customOptions = null, win = null, isTimeStep = false, expectedSeq = null) {
+  if (!map || !model || !element || typeof model !== "string" || typeof element !== "string" || model.toLowerCase() === "null" || model.toLowerCase() === "undefined" || element.toLowerCase() === "null" || element.toLowerCase() === "undefined") {
+    console.warn(`[weatherLoader] Aborting loadWeatherField: invalid map (${Boolean(map)}), model (${model}), or element (${element})`);
+    return;
+  }
   const isVOR = element === "VOR";
   const isDIV = element === "DIV";
   const isDerivedWind = element === "WIND" && (customOptions?.type === "contour" || (customOptions?.id && customOptions.id.startsWith("contour-")) || customOptions?.derivedFrom);
