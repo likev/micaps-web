@@ -15,14 +15,19 @@ import { resolveColormap } from "../utils/colormaps.js";
 import { loadWeatherField } from "./weatherLoader.js";
 import { loadObservationProduct } from "./derivedContours.js";
 import { schedulePrefetch } from "./prefetchService.js";
-import { loadPresetGroups } from "../config/presets.js";
+import { loadPresetGroups, PRESET_GROUPS } from "../config/presets.js";
 
-export function clearAllWeatherLayersFromMap(map, win = null) {
+export function clearAllWeatherLayersFromMap(map, win = null, { resetVisibility = false } = {}) {
   if (!map) return;
   // Snapshot visibility/config before wiping so every clear path (preset reload,
   // init-cycle change, catalog load, level change) can restore operator state.
   // Only snapshot once per cycle — changeVerticalLevel pre-snapshots before
   // delegating here, so never overwrite a fresher snapshot with an emptied list.
+  //
+  // resetVisibility=true: fresh user-initiated group reload — preserve colors/configs
+  // but reset all layers to visible so previously-hidden layers come back on reload.
+  // resetVisibility=false (default): level change / init-cycle change — preserve
+  // exact visible state so operator-hidden layers stay hidden across level steps.
   if (win && !win.layerSnapshots) {
     try {
       const prev = getLayersForWindow(win);
@@ -32,7 +37,7 @@ export function clearAllWeatherLayersFromMap(map, win = null) {
           type: l.type,
           model: l.model,
           element: l.element,
-          visible: l.visible !== false,
+          visible: resetVisibility ? true : (l.visible !== false),
           config: { ...(l.config || {}) },
           color: l.color,
           colormap: l.colormap,
@@ -56,13 +61,34 @@ export function clearAllWeatherLayersFromMap(map, win = null) {
   }
 }
 
+
 export async function loadPresetGroup(map, group, period = null, level = null, win = null, isTimeStep = false, expectedSeq = null) {
   if (!group || !group.layers) return;
+  if (!isTimeStep && group?.id) {
+    // Self-heal: if a base preset layer was ✕-removed from this window copy,
+    // restore it from the pristine global definition so fresh Load Data always
+    // iterates the full preset (eye-hide is handled via resetVisibility below).
+    try {
+      const pristine = PRESET_GROUPS?.find((g) => g.id === group.id);
+      if (pristine && Array.isArray(pristine.layers)) {
+        for (const pl of pristine.layers) {
+          if (pl?.derivedFrom) continue;
+          const exists = group.layers.some(
+            (l) => (pl.id && l.id === pl.id) || (l.model === pl.model && l.element === pl.element)
+          );
+          if (!exists) {
+            group.layers.push(JSON.parse(JSON.stringify(pl)));
+          }
+        }
+      }
+    } catch { /* self-heal is best-effort */ }
+  }
   if (map && win) {
     map._micapsWindow = win;
   }
   if (!isTimeStep) {
-    clearAllWeatherLayersFromMap(map, win);
+    // resetVisibility=true: fresh reload → previously-hidden layers come back visible
+    clearAllWeatherLayersFromMap(map, win, { resetVisibility: true });
   }
 
   const curPeriod = period !== null ? period : (win?.period ?? 24);

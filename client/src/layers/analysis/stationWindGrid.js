@@ -94,10 +94,11 @@ export function generateStationWindGrid(stationsGeoJSON, level = null) {
     if (py > rawMaxLat) rawMaxLat = py;
   }
 
-  const minLon = Math.max(60, rawMinLon - 2.0);
-  const maxLon = Math.min(145, rawMaxLon + 2.0);
-  const minLat = Math.max(10, rawMinLat - 2.0);
-  const maxLat = Math.min(60, rawMaxLat + 2.0);
+  const margin = 1.0;
+  const minLon = Math.max(60, rawMinLon - margin);
+  const maxLon = Math.min(145, rawMaxLon + margin);
+  const minLat = Math.max(10, rawMinLat - margin);
+  const maxLat = Math.min(60, rawMaxLat + margin);
 
   const dDeg = 1.0;
   const x = [];

@@ -20,6 +20,7 @@ import {
   evaluateCropAndLOD,
 } from "./contourCompute.js";
 import { resolveRenderLevels } from "./contourLevels.js";
+import { clipFeatureCollectionToBBox } from "../../utils/geometry/clip.js";
 
 export function updateMapLibreContour(map, isobands, isolines, options = {}) {
   const layerId = options.layerId || "default";
@@ -208,6 +209,9 @@ export function renderCustomContourGeoJSON(map, isobands, isolines, options = {}
   if (options.smooth !== false && isolines && Array.isArray(isolines.features) && isolines.features.length > 0) {
     const it = typeof options.smoothIterations === "number" ? options.smoothIterations : 2;
     smoothLinesResult = smoothLines(isolines, it, options.step || 1);
+  }
+  if (options.clipBounds && smoothLinesResult && Array.isArray(smoothLinesResult.features)) {
+    smoothLinesResult = clipFeatureCollectionToBBox(smoothLinesResult, options.clipBounds);
   }
   updateMapLibreContour(map, isobands, smoothLinesResult, options);
   smoothLinesResult = null;

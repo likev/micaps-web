@@ -127,6 +127,9 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
     if (onLoadDataCallback) {
       onLoadDataCallback(group, safeOverride);
     }
+    // Release keyboard focus from the select so Arrow key shortcuts aren't blocked
+    select?.blur();
+    btnLoadData?.blur();
   });
 
   document.getElementById("select-nav-level").addEventListener("change", (e) => {

@@ -114,13 +114,23 @@ export function setupWindowControlsForWin(tab, win, onToggleTabsAndSplit) {
       const g = PRESET_GROUPS.find((grp) => grp.id === gid) || null;
       if (callbacks.onWindowGroupChange && g) {
         callbacks.onWindowGroupChange(win, g);
+      } else if (g) {
+        try {
+          win.activeGroup = typeof structuredClone === "function" ? structuredClone(g) : JSON.parse(JSON.stringify(g));
+        } catch {
+          win.activeGroup = g;
+        }
+        updateWindowTitle(win, g ? g.name : "");
       } else {
         win.activeGroup = g;
         updateWindowTitle(win, g ? g.name : "");
       }
+      // Release keyboard focus so Arrow key shortcuts aren't blocked by the SELECT element
+      presetSelect.blur();
       focusWindow(win.tabId, win.winIdx);
     });
   }
+
 
   if (levelSelect) {
     levelSelect.addEventListener("change", (e) => {
@@ -174,7 +184,14 @@ export function refreshPresetControls() {
     tab.windows.forEach((win) => {
       const currentGroupId = win.activeGroup?.id;
       const group = PRESET_GROUPS.find((candidate) => candidate.id === currentGroupId) || null;
-      win.activeGroup = group;
+      // Per-window copy so later ✕-removes don't mutate the shared preset.
+      try {
+        win.activeGroup = group
+          ? (typeof structuredClone === "function" ? structuredClone(group) : JSON.parse(JSON.stringify(group)))
+          : group;
+      } catch {
+        win.activeGroup = group;
+      }
 
       const select = document.getElementById(win.presetSelectId);
       if (select) {

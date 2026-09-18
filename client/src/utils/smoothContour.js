@@ -19,3 +19,12 @@ export {
   simplifyPolyline,
   simplifyFeatureCollection,
 } from "./geometry/simplify.js";
+
+export {
+  computeOutCode,
+  clipSegment,
+  clipPolyline,
+  clipLineFeature,
+  clipLineFeatures,
+  clipFeatureCollectionToBBox,
+} from "./geometry/clip.js";

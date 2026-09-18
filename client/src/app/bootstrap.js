@@ -30,6 +30,18 @@ import { loadPresetGroup, clearAllWeatherLayersFromMap, reloadConfiguration } fr
 import { changeVerticalLevel } from "../services/levelController.js";
 import { loadTLogPLayer, tlogpController } from "../layers/tlogp/tlogpLayer.js";
 
+// Deep-clone a preset group so per-window ✕/visibility edits never mutate the
+// global PRESET_GROUPS entry (navBar/windowFocus pass live references via find()).
+// Without this, handleRemoveAction-style splices permanently shrink the shared
+// preset and later Load Data iterates a mutated array → "load not working".
+function clonePresetGroup(group) {
+  if (!group) return group;
+  try {
+    if (typeof structuredClone === "function") return structuredClone(group);
+  } catch { /* fall through to JSON clone */ }
+  return JSON.parse(JSON.stringify(group));
+}
+
 export function getMap() {
   const win = getActiveWindow();
   return (win && win.map) || getActiveMap();
@@ -76,7 +88,10 @@ export async function bootstrap() {
         return;
       }
 
-      const isObs = Boolean(win.isObservation || win.activeGroup?.isObservation || win.model === "SURFACE" || win.model === "UPPER_AIR");
+      // When a non-observation preset group is active, never treat the window as obs
+      // even if win.model is stale ("SURFACE" / "UPPER_AIR" from a prior catalog load).
+      const hasNwpGroup = Boolean(win.activeGroup && !win.activeGroup.isObservation);
+      const isObs = !hasNwpGroup && Boolean(win.isObservation || win.activeGroup?.isObservation || win.model === "SURFACE" || win.model === "UPPER_AIR");
       if (isObs) {
         const isTLogP = win.activeGroup?.id === "composite-tlogp" || win.activeGroup?.layers?.some((l) => l.element === "TLOGP") || win.element === "TLOGP";
         const obsPath = isTLogP
@@ -105,14 +120,23 @@ export async function bootstrap() {
     },
     onWindowGroupChange: async (win, group) => {
       if (!win.map || !group) return;
+      // Per-window copy: never hold the live PRESET_GROUPS reference.
+      group = clonePresetGroup(group);
       win.activeGroup = group;
       win.isObservation = Boolean(group.isObservation);
       win.forecastCycle = null;
+      // Clear stale catalog-mode model/obsTime so onWindowFocus does not misdetect as obs
+      if (!group.isObservation) {
+        win.model = null;
+        win.element = null;
+        win.obsTime = null;
+      }
       if (group.hasLevel === false) {
         win.level = null;
       } else if (group.defaultLevel) {
         win.level = group.defaultLevel;
       }
+
       const winTitle = `W${win.winIdx + 1}: ${group.name}`;
       updateWindowTitle(win, group.name);
       setWindowHeaderPreset(win, group.id);
@@ -178,14 +202,24 @@ export async function bootstrap() {
       const win = getActiveWindow();
       const map = win?.map || getActiveMap();
       if (!win || !map || !group) return;
+      // Per-window copy: Load Data must start from a pristine definition so a
+      // previously ✕-removed base layer (e.g. ECMWF-HR HGT) comes back.
+      group = clonePresetGroup(group);
       win.activeGroup = group;
       win.isObservation = Boolean(group.isObservation);
       win.forecastCycle = null;
+      // Clear stale catalog-mode model/obsTime so onWindowFocus does not misdetect as obs
+      if (!group.isObservation) {
+        win.model = null;
+        win.element = null;
+        win.obsTime = null;
+      }
       if (group.hasLevel === false) {
         win.level = null;
       } else if (overrideLevel !== null) {
         win.level = overrideLevel;
       }
+
       const effectiveLevel = overrideLevel || win.level || group.defaultLevel || 500;
       const winTitle = `W${win.winIdx + 1}: ${group.name}`;
       updateWindowTitle(win, group.name);
@@ -247,7 +281,7 @@ export async function bootstrap() {
     if (win.level) { setWindowHeaderLevel(win, win.level); setNavBarLevel(win.level); }
 
     const winBannerTitle = `W${win.winIdx + 1}: ${catalogTitle}`;
-    clearAllWeatherLayersFromMap(map, win);
+    clearAllWeatherLayersFromMap(map, win, { resetVisibility: true });
 
     if (isObservation) {
       const isTLogP = element === "TLOGP";
@@ -366,7 +400,7 @@ export async function bootstrap() {
       const period = typeof data.period === "number" ? data.period : (win.period ?? 24);
       win.period = period;
       updateWindowTitle(win);
-      clearAllWeatherLayersFromMap(map, win);
+      clearAllWeatherLayersFromMap(map, win, { resetVisibility: true });
       const activeGroup = win.activeGroup;
       if (activeGroup) {
         await loadPresetGroup(map, activeGroup, period, win.level, win, false);

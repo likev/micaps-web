@@ -27,18 +27,23 @@ export function handleRemoveAction(map, layerId, layer, win) {
       removeGridWindBarbs(map);
     }
 
-    // Persist deletion of layer from preset configuration
+    // ✕ removes the layer from the current window view only (map + layer store).
+    // Do NOT splice base preset layers from activeGroup.layers — otherwise Load Data
+    // can never restore them because loadPresetGroup iterates the mutated array.
+    // Only derived overlays (added at runtime) are removed from the per-window copy;
+    // their global persistence is handled by removeDerivedLayerFromPreset (+ autosave).
     const activeGroup = win?.activeGroup || appState.get("activeGroup");
     if (activeGroup?.id) {
-      if (layer.derivedFrom || layer.id?.startsWith("contour-surface-") || layer.id?.startsWith("contour-sounding-")) {
+      const isDerivedOverlay = Boolean(layer.derivedFrom || layer.id?.startsWith("contour-surface-") || layer.id?.startsWith("contour-sounding-"));
+      if (isDerivedOverlay) {
         removeDerivedLayerFromPreset(activeGroup.id, layer);
-      }
-      if (Array.isArray(activeGroup.layers)) {
-        const aIdx = activeGroup.layers.findIndex(
-          (l) => l.id === layerId || (l.model === layer.model && l.element === layer.element)
-        );
-        if (aIdx >= 0) {
-          activeGroup.layers.splice(aIdx, 1);
+        if (Array.isArray(activeGroup.layers)) {
+          const aIdx = activeGroup.layers.findIndex(
+            (l) => l.id === layerId || (l.model === layer.model && l.element === layer.element)
+          );
+          if (aIdx >= 0) {
+            activeGroup.layers.splice(aIdx, 1);
+          }
         }
       }
     }

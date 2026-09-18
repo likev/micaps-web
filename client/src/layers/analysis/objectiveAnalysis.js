@@ -27,7 +27,7 @@ export function extractPointsAndValues(features, extractFn, level = null) {
   return { points, values };
 }
 
-export function computeDomain(points, padding = 2.5, dDeg = 0.5) {
+export function computeDomain(points, padding = 2.5, dDeg = 0.5, regionBounds = null) {
   let stnMinLon = Infinity, stnMaxLon = -Infinity;
   let stnMinLat = Infinity, stnMaxLat = -Infinity;
   for (let i = 0; i < points.length; i++) {
@@ -43,20 +43,27 @@ export function computeDomain(points, padding = 2.5, dDeg = 0.5) {
   let minLat = Math.floor(stnMinLat - padding);
   let maxLat = Math.ceil(stnMaxLat + padding);
 
-  if (minLon < 145 && maxLon > 60) {
-    minLon = Math.max(60, minLon);
-    maxLon = Math.min(145, maxLon);
+  if (regionBounds && Array.isArray(regionBounds) && regionBounds.length >= 4) {
+    minLon = Math.max(regionBounds[0], minLon);
+    minLat = Math.max(regionBounds[1], minLat);
+    maxLon = Math.min(regionBounds[2], maxLon);
+    maxLat = Math.min(regionBounds[3], maxLat);
   } else {
-    minLon = Math.max(-180, minLon);
-    maxLon = Math.min(180, maxLon);
-  }
+    if (minLon < 145 && maxLon > 60) {
+      minLon = Math.max(60, minLon);
+      maxLon = Math.min(145, maxLon);
+    } else {
+      minLon = Math.max(-180, minLon);
+      maxLon = Math.min(180, maxLon);
+    }
 
-  if (minLat < 60 && maxLat > 10) {
-    minLat = Math.max(10, minLat);
-    maxLat = Math.min(60, maxLat);
-  } else {
-    minLat = Math.max(-85, minLat);
-    maxLat = Math.min(85, maxLat);
+    if (minLat < 60 && maxLat > 10) {
+      minLat = Math.max(10, minLat);
+      maxLat = Math.min(60, maxLat);
+    } else {
+      minLat = Math.max(-85, minLat);
+      maxLat = Math.min(85, maxLat);
+    }
   }
 
   if (maxLon - minLon < 1.0) maxLon = minLon + 1.0;
@@ -67,7 +74,17 @@ export function computeDomain(points, padding = 2.5, dDeg = 0.5) {
   const y = [];
   for (let lat = minLat; lat <= maxLat + 1e-6; lat += dDeg) y.push(Math.round(lat * 100) / 100);
 
-  return { x, y, minLon, maxLon, minLat, maxLat, dDeg };
+  return {
+    x,
+    y,
+    minLon,
+    maxLon,
+    minLat,
+    maxLat,
+    dDeg,
+    bounds: [minLon, minLat, maxLon, maxLat],
+    rawBounds: [stnMinLon, stnMinLat, stnMaxLon, stnMaxLat],
+  };
 }
 
 export function interpolateAndSmoothGrid(points, values, x, y, smoothIterations = 1, smoothWeight = 0.45) {

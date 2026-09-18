@@ -15,6 +15,7 @@ import {
   SOUNDING_CONTOUR_CONFIGS,
   normalizeSoundingElementKey,
 } from "./analysis/contourConfigsSounding.js";
+import { clipLineFeatures } from "../utils/geometry/clip.js";
 import {
   extractPointsAndValues,
   computeDomain,
@@ -45,7 +46,9 @@ export function calculateFieldContours(stationsGeoJSON, valueExtractor, config =
   const { points, values } = extractPointsAndValues(stationsGeoJSON.features, valueExtractor, level);
   if (points.length < 3) return null;
 
-  const { x, y, dDeg } = computeDomain(points, 2.5, 0.5);
+  // Tighten padding for sounding region (default to 1.0 deg margin, or config.padding)
+  const padding = typeof config.padding === "number" ? config.padding : 1.0;
+  const { x, y, dDeg, bounds, rawBounds } = computeDomain(points, padding, 0.5, config.regionBounds || config.clipBounds);
   if (x.length < 2 || y.length < 2) return null;
 
   const interpolated = interpolateAndSmoothGrid(points, values, x, y, 1, 0.45);
@@ -76,12 +79,18 @@ export function calculateFieldContours(stationsGeoJSON, valueExtractor, config =
     isCustomLevels
   );
 
+  // Clip isolines strictly to sounding region bounding box (with tight margin)
+  const clipBBox = config.clipBounds || bounds || [x[0], y[0], x[x.length - 1], y[y.length - 1]];
+  const clippedLines = clipLineFeatures(lines, clipBBox);
+
   return {
-    lines,
+    lines: clippedLines,
     fills,
     levels: actualLevels,
     pointsCount: points.length,
     element: config.element,
+    bounds: clipBBox,
+    rawBounds,
     gridData: {
       header: {
         start_lon: x[0],
@@ -119,6 +128,9 @@ export function analyzeAndRenderSoundingElementContour(map, stationsGeoJSON, lev
       colormap: cfg.colormap || undefined,
       levels: isCustomLevels ? resolveRenderLevels(options) : cfg.getLevels(numLevel, -100, 100000),
       isCustomLevels,
+      padding: options.padding,
+      clipBounds: options.clipBounds,
+      regionBounds: options.regionBounds,
     }, numLevel);
 
     if (!result || !result.lines || result.lines.length === 0) {
@@ -143,7 +155,8 @@ export function analyzeAndRenderSoundingElementContour(map, stationsGeoJSON, lev
     const isobandFC = result.fills ? { type: "FeatureCollection", features: result.fills } : null;
 
     const renderOptions = buildContourRenderOptions({
-      layerId, element: cfg.element, colormap, lineColor, boldValues, showFill, showLine, options,
+      layerId, element: cfg.element, colormap, lineColor, boldValues, showFill, showLine,
+      options: { ...options, clipBounds: result.bounds },
     });
 
     const layerMeta = buildContourLayerMeta({
@@ -156,7 +169,8 @@ export function analyzeAndRenderSoundingElementContour(map, stationsGeoJSON, lev
       colormap,
       lineColor,
       gridData: result.gridData,
-      renderOptions, showRaster, palettePath, options,
+      renderOptions, showRaster, palettePath,
+      options: { ...options, clipBounds: result.bounds, bounds: result.bounds },
     });
 
     registerContourLayer(map, isobandFC, isolineFC, renderOptions, layerMeta, win);

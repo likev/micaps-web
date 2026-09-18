@@ -5,6 +5,7 @@ import { SURFACE_CONTOUR_CONFIGS, normalizeSurfaceElementKey } from "./contourCo
 import { SOUNDING_CONTOUR_CONFIGS, normalizeSoundingElementKey } from "./contourConfigsSounding.js";
 import { tagLinesAndFills, resolveShowFlags, registerContourLayer } from "./objectiveAnalysis.js";
 import { resolveRenderLevels } from "../contour/contourLevels.js";
+import { clipLineFeatures } from "../../utils/geometry/clip.js";
 
 export function analyzeKinematicContours({
   map,
@@ -95,7 +96,10 @@ export function analyzeKinematicContours({
       Boolean(customLevels)
     );
 
-    const isolineFC = { type: "FeatureCollection", features: lines || [] };
+    const clipBBox = options.clipBounds || [x[0], y[0], x[x.length - 1], y[y.length - 1]];
+    const clippedLines = clipLineFeatures(lines, clipBBox);
+
+    const isolineFC = { type: "FeatureCollection", features: clippedLines };
     const isobandFC = { type: "FeatureCollection", features: fills || [] };
 
     const numLvl = isSounding ? (Number(level) || 500) : null;
@@ -122,12 +126,14 @@ export function analyzeKinematicContours({
       smooth: options.smooth !== false,
       smoothIterations: options.smoothIterations ?? 2,
       labelSize: options.labelSize,
+      clipBounds: clipBBox,
     };
 
     const layerMeta = {
       id: layerId,
       name: isSounding ? `${numLvl} hPa Sounding ${cfg.name}` : `${cfg.name} (Surface Analysis)`,
       type: "contour",
+      clipBounds: clipBBox,
       element: cfg.element,
       model: isSounding ? "UPPER_AIR" : "SURFACE",
       level: numLvl,

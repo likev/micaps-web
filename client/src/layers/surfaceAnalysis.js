@@ -3,6 +3,7 @@ import {
   SURFACE_CONTOUR_CONFIGS,
   normalizeSurfaceElementKey,
 } from "./analysis/contourConfigsSurface.js";
+import { clipLineFeatures } from "../utils/geometry/clip.js";
 import {
   extractPointsAndValues,
   computeDomain,
@@ -40,7 +41,8 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
       return null;
     }
 
-    const { x, y, dDeg } = computeDomain(points, 2.5, 0.5);
+    const padding = typeof options.padding === "number" ? options.padding : 1.0;
+    const { x, y, dDeg, bounds, rawBounds } = computeDomain(points, padding, 0.5, options.regionBounds || options.clipBounds);
     if (x.length < 2 || y.length < 2) {
       console.warn(`[SurfaceAnalysis] Grid resolution too small (${x.length}x${y.length}) for ${cfg.name} contour calculation`);
       return null;
@@ -70,7 +72,11 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
       Boolean(customLevels)
     );
 
-    const isolineFC = { type: "FeatureCollection", features: lines || [] };
+    // Clip isolines strictly to the surface station region bounding box
+    const clipBBox = options.clipBounds || bounds || [x[0], y[0], x[x.length - 1], y[y.length - 1]];
+    const clippedLines = clipLineFeatures(lines, clipBBox);
+
+    const isolineFC = { type: "FeatureCollection", features: clippedLines };
     const isobandFC = { type: "FeatureCollection", features: fills || [] };
 
     const layerId = options.layerId || `contour-surface-${elementKey.toLowerCase()}`;
@@ -80,7 +86,8 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
     const { palettePath, colormap } = resolveContourColormap(options, cfg, layerId);
 
     const renderOptions = buildContourRenderOptions({
-      layerId, element: cfg.element, colormap, lineColor, boldValues, showFill, showLine, options,
+      layerId, element: cfg.element, colormap, lineColor, boldValues, showFill, showLine,
+      options: { ...options, clipBounds: clipBBox },
     });
 
     const layerMeta = buildContourLayerMeta({
@@ -93,17 +100,20 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
       colormap,
       lineColor,
       x, y, dDeg, interpolated,
-      renderOptions, showRaster, palettePath, options,
+      renderOptions, showRaster, palettePath,
+      options: { ...options, clipBounds: clipBBox, bounds: clipBBox },
     });
 
     registerContourLayer(map, isobandFC, isolineFC, renderOptions, layerMeta, win);
 
     return {
-      lines,
+      lines: clippedLines,
       levels: actualLevels,
       pointsCount: points.length,
       element: elementKey,
       layerId,
+      bounds: clipBBox,
+      rawBounds,
       isolineFC,
       isobandFC,
       gridData: layerMeta.gridData,
