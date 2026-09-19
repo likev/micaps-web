@@ -247,7 +247,7 @@ describe("Should-Fix: Negative Caching for 404 Grids", () => {
       fetchCounts++;
       const u = new URL(String(url), "http://localhost:8088");
       const path = u.searchParams.get("path") || "";
-      if (path.includes("VVEL/100")) {
+      if (path.includes("VVEL/200")) {
         return { ok: false, status: 404, json: async () => ({ error: "Not found" }) };
       }
       return { ok: true, status: 200, json: async () => createSyntheticGrid("TMP", 500, 0) };
@@ -262,7 +262,7 @@ describe("Should-Fix: Negative Caching for 404 Grids", () => {
   it("negative-caches 404 grids so subsequent load does not re-request them", async () => {
     const win = { id: "win-neg-cache", loadSeq: 0 };
     const leads = [0];
-    const levels = [100]; // VVEL/100 will 404
+    const levels = [200]; // VVEL/200 will 404
 
     // First load attempts fetch and encounters 404
     await loadTimeHeightMatrix({

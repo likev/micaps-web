@@ -148,7 +148,7 @@ describe("V1: Preset Configuration in client/config.json", () => {
     expect(c.endHour).toBe(144);
     expect(c.stepHours).toBe(12);
     expect(c.timeDirection).toBe("ltr");
-    expect(c.levels).toEqual([1000, 925, 850, 700, 500, 400, 300, 250, 200, 100]);
+    expect(c.levels).toEqual([1000, 925, 850, 700, 600, 500, 400, 300, 250, 200]);
     expect(c.showRH).toBe(true);
     expect(c.showTemp).toBe(true);
     expect(c.showVVel).toBe(true);
@@ -194,7 +194,7 @@ describe("V2 & V3: Cold Load Default Matrix, Progress & Zero-Fetch Node Resample
     const leads = buildLeads(0, 144, 12);
     expect(leads.length).toBe(13);
 
-    const levels = [1000, 925, 850, 700, 500, 400, 300, 250, 200, 100];
+    const levels = [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200];
     const progressReports = [];
 
     const onProgress = (p) => {
@@ -457,8 +457,8 @@ describe("V7: Graceful Partial 404 Degradation", () => {
     global.fetch = async (url) => {
       const u = new URL(String(url), "http://localhost:8088");
       const path = u.searchParams.get("path") || "";
-      // Fail VVEL at level 100
-      if (path.includes("VVEL/100")) {
+      // Fail VVEL at level 200
+      if (path.includes("VVEL/200")) {
         return { ok: false, status: 404, json: async () => ({ error: "Not found" }) };
       }
       return {
@@ -477,7 +477,7 @@ describe("V7: Graceful Partial 404 Degradation", () => {
   it("handles missing level with NaN row and increments failedCount without throwing", async () => {
     const win = { id: "test-v7-win", loadSeq: 0 };
     const leads = [0];
-    const levels = [500, 100];
+    const levels = [500, 200];
 
     const res = await loadTimeHeightMatrix({
       win,
@@ -491,7 +491,7 @@ describe("V7: Graceful Partial 404 Degradation", () => {
     expect(res).not.toBeNull();
     expect(res.matrix).not.toBeNull();
     expect(res.stats.failed).toBeGreaterThan(0);
-    // VVEL at index 1 (level 100) should have NaN value
+    // VVEL at index 1 (level 200) should have NaN value
     expect(Number.isNaN(res.matrix.vvel[1][0])).toBe(true);
   });
 });

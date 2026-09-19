@@ -11,14 +11,14 @@ import {
 } from "./timeHeightIsolines.js";
 
 export { getTempLevels, getVVelLevels };
-export const P_TOP = 100;
+export const P_TOP = 200;
 export const P_BOTTOM = 1000;
 const LN_P_TOP = Math.log(P_TOP);
 const LN_P_BOT = Math.log(P_BOTTOM);
-const LN_RANGE = LN_P_BOT - LN_P_TOP; // ln(1000) - ln(100) = ln(10)
+const LN_RANGE = LN_P_BOT - LN_P_TOP; // ln(1000) - ln(200) = ln(5)
 
 /**
- * Maps pressure in hPa to normalized vertical fraction fy in [0, 1] (0 = 100hPa top, 1 = 1000hPa bottom)
+ * Maps pressure in hPa to normalized vertical fraction fy in [0, 1] (0 = 200hPa top, 1 = 1000hPa bottom)
  */
 export function pressureToFy(p) {
   const clampedP = Math.max(P_TOP, Math.min(P_BOTTOM, p));

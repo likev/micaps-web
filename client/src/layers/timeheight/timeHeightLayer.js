@@ -32,7 +32,7 @@ export async function loadTimeHeightLayer(map, layer = {}, win = null) {
       endHour: config.endHour !== undefined ? config.endHour : 144,
       stepHours: config.stepHours !== undefined ? config.stepHours : 12,
       timeDirection: config.timeDirection || "ltr",
-      levels: config.levels || [1000, 925, 850, 700, 500, 400, 300, 250, 200, 100],
+      levels: config.levels || [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200],
       showRH: config.showRH !== false,
       showTemp: config.showTemp !== false,
       showVVel: config.showVVel !== false,

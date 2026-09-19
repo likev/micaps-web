@@ -142,7 +142,7 @@ export class TimeHeightPanel {
         <!-- Footer Meta -->
         <div class="th-footer" style="padding: 6px 12px; background: #161b22; border-top: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #8b949e; flex-shrink: 0;">
           <div class="th-footer-meta">Click on map to select cross-section point</div>
-          <div style="color: #6e7681; font-size: 10px;">VVEL: 10⁻² Pa/s (ω&lt;0 ascent) | Fixed 10 levels (1000–100 hPa)</div>
+          <div style="color: #6e7681; font-size: 10px;">VVEL: 10⁻² Pa/s (ω&lt;0 ascent) | Fixed 10 levels (1000–200 hPa)</div>
         </div>
       </div>
 

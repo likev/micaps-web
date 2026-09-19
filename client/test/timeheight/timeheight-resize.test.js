@@ -297,7 +297,7 @@ describe("Time-Height Window Resizeable with Aspect Ratio Lock & Axis Label Clea
     const zero7 = [0, 0, 0, 0, 0, 0, 0];
     renderer.matrix = {
       leads: [0, 24, 48, 72, 96, 120, 144],
-      levels: [1000, 500, 100],
+      levels: [1000, 500, 200],
       rh: [row7, row7, row7],
       tmp: [zero7, zero7, zero7],
       vvel: [zero7, zero7, zero7],

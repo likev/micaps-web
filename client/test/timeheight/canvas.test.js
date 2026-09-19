@@ -15,12 +15,12 @@ describe("Time-Height Canvas Mathematics & Logic", () => {
     expect(pressureToFy(P_TOP)).toBeCloseTo(0.0, 5);
     expect(pressureToFy(P_BOTTOM)).toBeCloseTo(1.0, 5);
 
-    // 500 hPa should be log10(5) ~ 0.69897
+    // 500 hPa should be ln(500/200) / ln(1000/200) = ln(2.5)/ln(5) ~ 0.56932
     const fy500 = pressureToFy(500);
-    expect(fy500).toBeCloseTo(Math.log10(5), 4);
+    expect(fy500).toBeCloseTo(Math.log(2.5) / Math.log(5), 4);
 
-    // Test invertibility across standard isobars
-    for (const p of [1000, 925, 850, 700, 500, 400, 300, 250, 200, 100]) {
+    // Test invertibility across standard isobars (1000 down to 200 hPa, including 600 hPa)
+    for (const p of [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200]) {
       const fy = pressureToFy(p);
       const restoredP = fyToPressure(fy);
       expect(restoredP).toBeCloseTo(p, 2);
@@ -55,7 +55,7 @@ describe("Time-Height Canvas Mathematics & Logic", () => {
     renderer.layout.plotRect = { x: 50, y: 30, width: 700, height: 500 };
 
     const leads = [0, 24, 48, 72, 96, 120, 144];
-    renderer.matrix = { leads, levels: [1000, 500, 100] };
+    renderer.matrix = { leads, levels: [1000, 500, 200] };
 
     // 1. LTR Mode (default: 0h left, 144h right)
     renderer.options.timeDirection = "ltr";

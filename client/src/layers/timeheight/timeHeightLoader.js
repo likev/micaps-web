@@ -2,7 +2,7 @@
 import { fetchJson } from "../../api/apiClient.js";
 import { createScalarSampler, createWindSampler, snapToGridNode } from "./timeHeightSampling.js";
 
-export const PROFILE_LEVELS = [1000, 925, 850, 700, 500, 400, 300, 250, 200, 100];
+export const PROFILE_LEVELS = [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200];
 export const TH_GRID_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 export const TH_GRID_CACHE_MAX_ENTRIES = 600;
 export const TH_CONCURRENCY = 6;

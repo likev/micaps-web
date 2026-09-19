@@ -52,10 +52,22 @@ This document provides in-depth technical documentation for the architecture, da
   - [12.1. 3-Minute TTL In-Memory Cache & Network Deduplication (`apiClient.js`)](#121-3-minute-ttl-in-memory-cache--network-deduplication-apiclientjs)
   - [12.2. Orthogonal Target Resolution (`prefetchService.js`)](#122-orthogonal-target-resolution-prefetchservicejs)
   - [12.3. Non-Blocking Execution & Multi-Window Scheduling](#123-non-blocking-execution--multi-window-scheduling)
-- [13. Meteorological Unit Testing & Automated Verification (Bun Test & Go Test)](#13-meteorological-unit-testing--automated-verification-bun-test--go-test)
-  - [13.1. Client Meteorological Test Suite (Bun Test)](#131-client-meteorological-test-suite-bun-test)
-  - [13.2. Server Binary Parser Test Suite (Go Test)](#132-server-binary-parser-test-suite-go-test)
-- [14. Standards & References](#14-standards--references)
+- [13. Sounding & Vertical Profile Analysis Subsystems (T-lnP & EC Time-Height Profile)](#13-sounding--vertical-profile-analysis-subsystems-t-lnp--ec-time-height-profile)
+  - [13.1. Upper-Air T-lnP Sounding Diagram Architecture (`tlogp`)](#131-upper-air-t-lnp-sounding-diagram-architecture-tlogp)
+    - [13.1.1. Skew-T Thermodynamic Coordinates & Transformations](#1311-skew-t-thermodynamic-coordinates--transformations)
+    - [13.1.2. Thermodynamic Background Curves & Runge-Kutta 4 (RK4) Parcel Ascent](#1312-thermodynamic-background-curves--runge-kutta-4-rk4-parcel-ascent)
+    - [13.1.3. Convective Instability Indices Formulation](#1313-convective-instability-indices-formulation)
+    - [13.1.4. MapLibre Station Integration, Sounding Extraction & Panel UI](#1314-maplibre-station-integration-sounding-extraction--panel-ui)
+  - [13.2. ECMWF Time-Height Cross-Section Architecture (`ec-time-height-profile`)](#132-ecmwf-time-height-cross-section-architecture-ec-time-height-profile)
+    - [13.2.1. Multi-Dimensional Grid Slicing ($t \times \ln p$) & Lower-Tropospheric Focus (1000–200 hPa)](#1321-multi-dimensional-grid-slicing-t-times-ln-p--lower-tropospheric-focus-1000200-hpa)
+    - [13.2.2. Multi-Element Composite Rendering Pipeline](#1322-multi-element-composite-rendering-pipeline)
+    - [13.2.3. Asynchronous Concurrency, Window-Scoped Grid Caching & Fast-Path Resampling](#1323-asynchronous-concurrency-window-scoped-grid-caching--fast-path-resampling)
+    - [13.2.4. Zero-Fetch Time Direction Inversion & Canvas Buffer Clearing](#1324-zero-fetch-time-direction-inversion--canvas-buffer-clearing)
+    - [13.2.5. Aspect-Ratio Locked Subwindow Resizing & Viewport Clamping](#1325-aspect-ratio-locked-subwindow-resizing--viewport-clamping)
+- [14. Meteorological Unit Testing & Automated Verification (Bun Test & Go Test)](#14-meteorological-unit-testing--automated-verification-bun-test--go-test)
+  - [14.1. Client Meteorological Test Suite (Bun Test)](#141-client-meteorological-test-suite-bun-test)
+  - [14.2. Server Binary Parser Test Suite (Go Test)](#142-server-binary-parser-test-suite-go-test)
+- [15. Standards & References](#15-standards--references)
 
 
 ---
@@ -97,6 +109,8 @@ graph TD
         ContourL["Isoband (Polygon) & Isoline (Line) Vector Overlays"]
         WindL["Vector Wind & Wind Barb Engine (Canvas Streamlines & 110° Metric Barbs)"]
         StationL["WMO / NOAA 9-Point Station Plot Model (LoD Culling)"]
+        TLogPL["T-lnP Sounding Diagram (RK4 Parcel Ascent, CAPE/CIN/LCL/LFC)"]
+        TimeHeightL["EC Time-Height Profile (1000-200 hPa, RH/TMP/VVEL/Wind Cross-Section)"]
         UI["Workstation UI (Catalog Drawer, Layer Controls, Time Slider)"]
 
         KeyboardNav["Keyboard Shortcuts Engine (Arrow Keys: Time & Level)"]
@@ -109,13 +123,15 @@ graph TD
         DataCache -->|Cache Hits| ContourL
         DataCache -->|Cache Hits| RasterL
         DataCache -->|Cache Hits| StationL
+        DataCache -->|Sounding Obs| TLogPL
+        DataCache -->|NWP Grids & Fast Resample| TimeHeightL
     end
 
     subgraph Testing ["Automated Verification Test Suites"]
         GoTest["Go Test Suite (Parser QC, MDFS Headers, Config)"]
-        BunTest["Bun Test Runner (201 Tests: QC, Contours, Palettes, Prefetch, Barbs, Memory)"]
+        BunTest["Bun Test Runner (486 Tests: QC, Contours, Prefetch, T-lnP, Time-Height)"]
         GoTest -->|Validate Parser & Normalization| Backend
-        BunTest -->|Test QC, Interpolation, Contours, Prefetch, Shortcuts| Frontend
+        BunTest -->|Test QC, Interpolation, Contours, Prefetch, Soundings| Frontend
     end
 
     StationQC -->|GeoJSON Station Collections| DataCache
@@ -175,12 +191,19 @@ micaps-web/
 │   │   ├── tabs.css                  # Multi-window tabs & layout styling
 │   │   ├── api/                      # REST & binary stream fetchers (3-minute TTL cache & inflight deduplication)
 │   │   ├── layers/                   # MapLibre, Deck.gl, Canvas, Kinematics, Sounding & Surface analysis layers
+│   │   │   ├── tlogp/                # Upper-air T-lnP sounding diagram, RK4 parcel ascent & convective indices
+│   │   │   ├── timeheight/           # ECMWF time-height cross-section (1000-200 hPa multi-element composite)
+│   │   │   ├── kinematics/           # Relative vorticity, horizontal divergence & finite differencing
+│   │   │   ├── station/              # Surface & upper-air station plots and WMO/CMA symbology
+│   │   │   └── dtd/                  # Dew-point depression (DTD) analysis & moisture contours
 │   │   ├── map/                      # MapLibre GL setup, PMTiles protocol, graticule lines
 │   │   ├── services/                 # Intelligent background data prefetch engine (Left/Right/Up/Down)
 │   │   ├── store/                    # Reactive workstation state manager
 │   │   ├── ui/                       # Navbar, catalog drawer, layer control, time slider, tooltip
 │   │   └── utils/                    # CMA palettes, weather symbols, griddata-js adapter
-│   └── test/                         # Meteorological Unit Test Suite (274 bun tests across 24 files)
+│   └── test/                         # Meteorological Unit Test Suite (486 bun tests across 68 files)
+│       ├── tlogp/                    # T-lnP thermodynamics, parcel ascent & aspect-ratio resize tests
+│       ├── timeheight/               # Time-height loading, canvas math, sampling, resize & integration tests
 │       ├── colormaps.test.js         # Dynamic colormaps & level scaling tests
 │       ├── weather_symbols.test.js   # WMO symbols & CMA/MICAPS 110° wind barbs tests
 │       ├── contour_logic.test.js     # Characteristic bold contour tests
@@ -1385,13 +1408,213 @@ The prefetch service determines exact data requirements along all 4 compass dire
 
 ---
 
-## 13. Meteorological Unit Testing & Automated Verification (Bun Test & Go Test)
+## 13. Sounding & Vertical Profile Analysis Subsystems (T-lnP & EC Time-Height Profile)
+
+Vertical atmospheric thermodynamic profiling and time-height evolution analysis are essential tools in modern synoptic forecasting, mesoscale convective analysis, and aviation weather prediction. MICAPS-Web implements two dedicated vertical analysis subsystems:
+1. **Upper-Air T-lnP Sounding Diagram (`client/src/layers/tlogp/`)**: Interactive skew-T $\ln p$ thermodynamic sounding analysis for radiosonde stations, integrating full Bolton (1980) moisture equations, Runge-Kutta 4th-order (RK4) moist pseudoadiabatic parcel ascent, multi-level buoyant energy integration (CAPE/CIN), and classic convective instability indices.
+2. **ECMWF Time-Height Cross-Section (`client/src/layers/timeheight/`)**: Multi-dimensional NWP temporal-vertical cross-section ($t \times \ln p$) focusing on the lower-to-middle troposphere ($1000\text{--}200\text{ hPa}$), rendering composite Relative Humidity fills, vertical velocity ascent/descent contours, temperature isotherms with a prominent $0^\circ\text{C}$ freezing line, and horizontal vector wind barbs over any clicked geographical point.
+
+```mermaid
+flowchart TD
+    subgraph StationPipeline ["Radiosonde Observation Pipeline (T-lnP)"]
+        StationClick["MapLibre Station Click / Layer Init"] --> FetchObs["Fetch Upper-Air Obs (apiClient)"]
+        FetchObs --> ParseLevels["Extract Isobaric Levels (T, Td, H, Wind)"]
+        ParseLevels --> TLogPMath["tlogpMath.js (Thermodynamics & Indices)"]
+        TLogPMath --> LCL["Bolton LCL (p_LCL, T_LCL)"]
+        LCL --> RK4["RK4 Moist Adiabatic Parcel Ascent"]
+        RK4 --> CAPECIN["CAPE & CIN Numerical Integration"]
+        RK4 --> IndicesCalc["Convective Indices (K, SI, LI, TT, PWAT)"]
+        CAPECIN --> TLogPCanvas["tlogpCanvas.js (Canvas 2D Renderer)"]
+        IndicesCalc --> TLogPPanel["tlogpPanel.js (Draggable Floating Window)"]
+    end
+
+    subgraph NWPPipeline ["ECMWF NWP Grid Pipeline (Time-Height Profile)"]
+        MapClick["MapLibre Viewport Click / Point Resample"] --> WindowCheck{"Window-Scoped Grid Cache Hit?"}
+        WindowCheck -->|Cache Hit (0ms)| FastResample["Fast-Path Bilinear Node Resampling (<5ms)"]
+        WindowCheck -->|Cache Miss| ConcurQueue["Concurrent Grid Fetcher (Concurrency=6)"]
+        ConcurQueue --> FetchGrids["Fetch NWP Grids (RH, TMP, VVEL, U, V) across Leads & 10 Levels"]
+        FetchGrids --> CacheRaw["Store Grids in Window Cache (10-min TTL)"]
+        CacheRaw --> FastResample
+        FastResample --> Matrix["Build 10xN Profile Matrix (1000–200 hPa)"]
+        Matrix --> THCanvas["timeHeightCanvas.js (Clear + 5-Layer Composite)"]
+        THCanvas --> THPanel["timeHeightPanel.js (Aspect-Ratio Locked Window)"]
+    end
+```
+
+### 13.1. Upper-Air T-lnP Sounding Diagram Architecture (`tlogp`)
+
+#### 13.1.1. Skew-T Thermodynamic Coordinates & Transformations
+
+The Skew-T $\ln p$ diagram is an equal-area thermodynamic chart where the vertical coordinate is proportional to $-\ln p$ and the isotherms are tilted at an acute angle ($\approx 45^\circ$) up and to the right. This transformation expands the temperature-dewpoint difference in the vertical, making convective instability and inversion layers readily discernible.
+
+In `tlogpMath.js`, the coordinate bounding space is defined by:
+- $P_{\text{bottom}} = 1050\text{ hPa}$, $P_{\text{top}} = 100\text{ hPa}$
+- $T_{\text{min}} = -45^\circ\text{C}$, $T_{\text{max}} = 45^\circ\text{C}$ (at diagram base)
+- $\text{Skew Factor} = 0.85$ (corresponding to a $\approx 45^\circ$ isotherm tilt)
+
+The normalized vertical coordinate $y_{\text{norm}} \in [0, 1]$ and pixel coordinates on canvas bounding rectangle $\text{rect}$ are computed as:
+
+$$y_{\text{norm}}(p) = \frac{\ln(P_{\text{bottom}}) - \ln(p)}{\ln(P_{\text{bottom}}) - \ln(P_{\text{top}})}$$
+
+$$y(p) = \text{rect.y} + (1 - y_{\text{norm}}(p)) \times \text{rect.height}$$
+
+Because isotherms tilt to the right with decreasing pressure (increasing $y_{\text{norm}}$), the horizontal position $x(T, p)$ incorporates a linear skew offset:
+
+$$x_{\text{norm\_base}} = \frac{T - T_{\text{min}}}{T_{\text{max}} - T_{\text{min}}}$$
+
+$$x_{\text{norm}} = x_{\text{norm\_base}} + \text{SkewFactor} \times y_{\text{norm}}(p)$$
+
+$$x(T, p) = \text{rect.x} + x_{\text{norm}} \times \text{rect.width}$$
+
+The exact inverse transformations (`yToPressure(y)` and `xAndYToTemp(x, y)`) provide interactive hover readouts and crosshair sampling with millibar and tenth-of-a-degree precision.
+
+#### 13.1.2. Thermodynamic Background Curves & Runge-Kutta 4 (RK4) Parcel Ascent
+
+`tlogpCanvas.js` renders five sets of thermodynamic reference isopleths directly on the canvas background:
+1. **Isobars**: Horizontal light-gray lines at standard levels ($1000, 925, 850, 700, 500, 400, 300, 250, 200, 150, 100\text{ hPa}$).
+2. **Isotherms**: Diagonally tilted lines ($\approx 45^\circ$) every $10^\circ\text{C}$, with the $0^\circ\text{C}$ isotherm accentuated in solid cyan.
+3. **Dry Adiabats ($\theta$)**: Isopleths of constant potential temperature computed via Poisson's equation:
+   $$\theta = T \left( \frac{1000}{p} \right)^\kappa, \quad \kappa = \frac{R_d}{C_{pd}} \approx 0.2854$$
+4. **Moist Pseudoadiabats ($\theta_e$)**: Curves of saturated expansion where latent heat release reduces the lapse rate. In `tlogpMath.js`, the saturated adiabatic lapse rate $\Gamma_m = \frac{dT}{dp}$ is formulated as:
+   $$\frac{dT}{dp} = \frac{R_d T_K + L_v w_s}{p \left( C_{pd} + \frac{L_v^2 w_s \epsilon}{R_d T_K^2} \right)}$$
+   where $\epsilon = 0.622$, $L_v(T) = 2.501 \times 10^6 - 2370 T\text{ J/kg}$, and saturation mixing ratio $w_s(T, p) = 622 \frac{e_s(T)}{p - e_s(T)}$ using Bolton's empirical saturation vapor pressure:
+   $$e_s(T) = 6.112 \exp\left( \frac{17.67 T}{T + 243.5} \right) \quad (\text{hPa})$$
+   Moist pseudoadiabats are integrated from initial $(T, p)$ up to $100\text{ hPa}$ using a 4th-order Runge-Kutta (RK4) numerical integrator with adaptive $dp = -5\text{ hPa}$ step size.
+5. **Saturation Mixing Ratio Isopleths ($w_s$)**: Dashed emerald-green lines indicating constant saturation water vapor content ($0.4, 1, 2, 4, 7, 10, 16, 24\text{ g/kg}$).
+
+#### 13.1.3. Convective Instability Indices Formulation
+
+When lifting an air parcel from a chosen initial level (surface, $925, 850, 700\text{ hPa}$, or Most Unstable), the engine computes:
+- **Lifting Condensation Level (LCL)** using Bolton (1980):
+  $$T_{\text{LCL}} = \frac{1}{\frac{1}{T_{d,K} - 56} + \frac{\ln(T_K / T_{d,K})}{800}} + 56 - 273.15$$
+  $$p_{\text{LCL}} = p_{\text{init}} \left( \frac{T_{\text{LCL}} + 273.15}{T_K} \right)^{1/\kappa}$$
+- **Level of Free Convection (LFC)** and **Equilibrium Level (EL)**: Located by finding the pressure levels where the parcel's virtual temperature $T_{v,\text{parcel}}$ crosses the environmental sounding $T_{v,\text{env}}$.
+- **Convective Available Potential Energy (CAPE)** and **Convective Inhibition (CIN)**:
+  $$\text{CAPE} = -R_d \int_{p_{\text{LFC}}}^{p_{\text{EL}}} \left( T_{v,\text{parcel}} - T_{v,\text{env}} \right) d\ln p \quad (\text{J/kg})$$
+  $$\text{CIN} = -R_d \int_{p_{\text{init}}}^{p_{\text{LFC}}} \left( T_{v,\text{parcel}} - T_{v,\text{env}} \right) d\ln p \quad (\text{J/kg})$$
+  Positive buoyant area is shaded in translucent red on the canvas; negative inhibition area is shaded in translucent blue.
+- **Synoptic & Convective Indices Table**:
+  - **K-Index**: $K = (T_{850} - T_{500}) + T_{d,850} - (T_{700} - T_{d,700})$
+  - **Showalter Index (SI)**: $SI = T_{500} - T_{\text{parcel, 850}\to 500}$
+  - **Lifted Index (LI)**: $LI = T_{500} - T_{\text{parcel, sfc}\to 500}$
+  - **Total Totals (TT)**: $TT = (T_{850} - T_{500}) + (T_{d,850} - T_{500})$
+  - **Precipitable Water (PWAT)**: $\text{PWAT} = \frac{1}{g} \sum \bar{w} \Delta p \quad (\text{mm})$
+
+#### 13.1.4. MapLibre Station Integration, Sounding Extraction & Panel UI
+
+- **Map Interaction**: Clicking any upper-air radiosonde station on the MapLibre viewport triggers `tlogpController.setStation(stationId, stationName)`. The station is highlighted on the map with an orange pulsing bullseye marker.
+- **Vertical Wind Profile**: In the right-hand margin of the diagram, wind barbs are rendered vertically at each standard level using CMA standard metric symbology ($20\text{ m/s}$ pennant flag, $4\text{ m/s}$ full barb, $2\text{ m/s}$ half barb, $110^\circ$ barb angle).
+- **Aspect-Ratio Resizing**: Built inside a draggable floating container (`TLogPPanel`) with default dimensions $680 \times 520\text{ px}$ ($\text{aspect ratio} \approx 1.3077$). Resize handles maintain locked aspect ratio to prevent distorting slope angles. Double-clicking the bottom-right corner resets to default dimensions.
+
+---
+
+### 13.2. ECMWF Time-Height Cross-Section Architecture (`ec-time-height-profile`)
+
+#### 13.2.1. Multi-Dimensional Grid Slicing ($t \times \ln p$) & Lower-Tropospheric Focus (1000–200 hPa)
+
+Operational weather forecasters require high-resolution temporal-vertical cross-sections over specific points of interest (e.g. airports, river basins, severe convective target zones) to analyze frontal passages, thermal inversions, low-level jets (LLJ), upward vertical velocities, and moisture convergence across NWP forecast horizons.
+
+In synoptic and mesoscale forecasting, **weather-producing clouds, precipitation, boundary layer inversions, and jet dynamics occur predominantly between the surface and the tropopause ($1000\text{--}200\text{ hPa}$)**. The stratospheric $100\text{ hPa}$ level provides minimal day-to-day operational value while consuming vertical chart space. Furthermore, the large vertical step between $700\text{ hPa}$ and $500\text{ hPa}$ obscures critical frontal baroclinic zones, zero-degree melting layers, and mid-tropospheric dry intrusions.
+
+To maximize operational meteorological fidelity, the ECMWF Time-Height Profile adopts a **fixed 10-level lower-to-middle tropospheric focus**:
+
+$$\text{Levels} = [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200]\text{ hPa}$$
+
+- **$P_{\text{bottom}} = 1000\text{ hPa}$**, **$P_{\text{top}} = 200\text{ hPa}$**.
+- The vertical coordinate is logarithmic:
+  $$f_y(p) = \frac{\ln(p) - \ln(P_{\text{top}})}{\ln(P_{\text{bottom}}) - \ln(P_{\text{top}})} = \frac{\ln(p) - \ln(200)}{\ln(5)}$$
+  where $f_y(200) = 0$ (diagram top) and $f_y(1000) = 1$ (diagram bottom).
+- **Operational Value of $600\text{ hPa}$**: Adding $600\text{ hPa}$ bisects the vast $700\text{--}500\text{ hPa}$ layer, providing accurate vertical resolution for warm conveyor belts, conditional symmetric instability (CSI), and freezing rain melting layer profiling.
+- **Removing $100\text{ hPa}$**: Eliminates uninformative stratospheric dead-space, expanding boundary-layer and lower-tropospheric visual resolution by $\approx 30\%$.
+
+#### 13.2.2. Multi-Element Composite Rendering Pipeline
+
+`TimeHeightCanvasRenderer` composites five distinct meteorological elements on a single high-DPI HTML5 Canvas:
+
+```mermaid
+graph TD
+    subgraph CompositePipeline ["Canvas Composite Rendering (Bottom to Top)"]
+        Layer0["0. Buffer Clearing: ctx.clearRect(0,0,w,h) & fillRect(#0d1117)"]
+        Layer1["1. RH Filled Raster: Bilinear Interpolation with CMA Moisture Colormap"]
+        Layer2["2. Axes & Isobar Grids: Horizontal Isobars & Vertical Lead Lines"]
+        Layer3["3. Temperature Contours: Red Isotherms (Step 4°C, Bold 0°C Freezing Level)"]
+        Layer4["4. Vertical Velocity Contours: Signed ω (Dashed Blue Ascent, Solid Purple Descent)"]
+        Layer5["5. Wind Barbs: CMA Metric Barbs at Isobaric Grid Nodes"]
+        Layer6["6. Interactive Overlays: Yellow Timeline Cursor & Hover Crosshair"]
+        
+        Layer0 --> Layer1 --> Layer2 --> Layer3 --> Layer4 --> Layer5 --> Layer6
+    end
+```
+
+1. **Relative Humidity (RH) Fill**:
+   - Continuous 2D scalar field sampled across leads and pressure levels.
+   - Values are mapped to color stops using `createColorResolver("RH")` from standard CMA operational palettes.
+   - Ice-supersaturated values (e.g. $130\%$ at cold levels) are accepted physically and clamped to $[0, 100]\%$ for visual rendering.
+2. **Temperature (TMP) Isolines**:
+   - Rendered using Marching Squares over the $n_{\text{levels}} \times n_{\text{leads}}$ grid.
+   - Levels span $-92^\circ\text{C}$ to $+48^\circ\text{C}$ at $4^\circ\text{C}$ intervals.
+   - The $0^\circ\text{C}$ isotherm is rendered in bold red ($2.2\text{ px}$ line width) to clearly mark the freezing level and freezing rain/sleet melting zones.
+3. **Vertical Velocity ($\omega$ / VVEL) Contours**:
+   - ECMWF vertical velocity $\omega = dp/dt$ is ingested in $10^{-2}\text{ Pa/s}$ ($\text{cPa/s}$).
+   - **Upward Ascent ($\omega < 0$)**: Mapped to dashed bright blue isolines (`#58a6ff`, `setLineDash([4, 2])`), highlighting active convective updrafts and synoptic lifting.
+   - **Downward Subsidence ($\omega > 0$)**: Mapped to solid magenta/purple isolines (`#d2a8ff`).
+   - The zero line is omitted or suppressed to avoid clutter.
+4. **Vector Wind Barbs**:
+   - Drawn at each valid $(t, p)$ grid node using `drawWindBarbCanvas`.
+   - Direction and speed are derived from horizontal components $u$ and $v$ with CMA $110^\circ$ metric barbs.
+5. **Interactive Timeline Cursor**:
+   - A vertical dashed amber line (`#e3b341`) indicates the workstation's currently selected forecast lead hour.
+   - Updates synchronously during timeline playback or arrow-key navigation without triggering any network or re-sampling operations.
+
+#### 13.2.3. Asynchronous Concurrency, Window-Scoped Grid Caching & Fast-Path Resampling
+
+- **Asynchronous Concurrent Queue**:
+  - Loading a full cross-section (13 leads $\times$ 10 levels $\times$ 4 elements: RH, TMP, VVEL, WIND) involves up to 520 individual grid lookups.
+  - `timeHeightLoader.js` manages an asynchronous worker pool with concurrency limit `TH_CONCURRENCY = 6`.
+  - Monotonic progress callbacks fire smoothly from $0\%$ to $100\%$ with `pct = Math.round((loaded / total) * 100)`.
+- **Window-Scoped Grid Cache (`TH_GRID_CACHE_TTL_MS = 600000`)**:
+  - Raw 2D gridded fields are cached per multi-window instance for $10\text{ minutes}$ (up to 600 entries).
+  - Isolates multi-window workspaces: Window 1 and Window 2 can inspect different cycles, periods, or models without cross-contamination.
+- **Fast-Path Node Resampling (< 5 ms)**:
+  - When the user clicks a different geographical location on the map, `timeHeightController.setPoint(lon, lat)` checks whether raw grids for all requested leads and levels exist in the window cache.
+  - If cached, the controller performs bilinear interpolation across the existing cached grids locally, regenerating the entire 10-level cross-section in $<5\text{ ms}$ with **0 network requests**.
+- **Cancellation Tokens & Negative Caching**:
+  - If the user changes point or cycle while a load is in progress, the active load sequence counter (`win.loadSeq`) increments, and in-flight workers abort safely via `cancelLoad()`.
+  - HTTP 404 grids (e.g., missing lead times at boundary ends) are negatively cached with `__404__: true` for 30 seconds, preventing redundant HTTP requests during timeline scrubbing.
+
+#### 13.2.4. Zero-Fetch Time Direction Inversion & Canvas Buffer Clearing
+
+- **Fast-Path Direction Toggle**:
+  - Forecasters can toggle the time axis between **Left-to-Right (LTR, $0\text{h} \to 144\text{h}$)** and **Right-to-Left (RTL, $144\text{h} \to 0\text{h}$)** via `.th-btn-direction`.
+  - Toggling direction alters the mathematical mapping $x(\text{lead})$ and $x\text{ToLead}(x)$ with zero network fetches:
+    $$x_{\text{LTR}}(\text{lead}) = x_{\text{plot}} + \frac{\text{lead} - \text{lead}_{\text{min}}}{\text{lead}_{\text{max}} - \text{lead}_{\text{min}}} \times w_{\text{plot}}$$
+    $$x_{\text{RTL}}(\text{lead}) = x_{\text{plot}} + \left( 1 - \frac{\text{lead} - \text{lead}_{\text{min}}}{\text{lead}_{\text{max}} - \text{lead}_{\text{min}}} \right) \times w_{\text{plot}}$$
+- **Canvas Buffer Clearing**:
+  - Because canvas 2D contexts retain painted pixel state across renders, toggling direction requires an unconditional `ctx.clearRect(0, 0, width, height)` followed by `ctx.fillRect(0, 0, width, height)` prior to redrawing.
+  - This ensures all previous time-axis ticks, labels, and contours are completely purged, preventing visual ghosting or label collisions.
+
+#### 13.2.5. Aspect-Ratio Locked Subwindow Resizing & Viewport Clamping
+
+- **Locked Aspect Ratio**:
+  - The floating window (`TimeHeightPanel`) defaults to $680 \times 520\text{ px}$, enforcing an aspect ratio:
+    $$\text{Ratio} = \frac{680}{520} \approx 1.3077$$
+  - Handles (`.th-resize-se`, `.th-resize-e`, `.th-resize-s`, `.th-resize-sw`) continuously clamp dimensions:
+    $$h = \text{round}\left( \frac{w}{\text{Ratio}} \right), \quad w = \text{round}(h \times \text{Ratio})$$
+  - Preserves vertical-to-horizontal meteorological slope gradients and prevents squishing isotherms or wind barbs.
+- **Viewport Boundary Clamping**:
+  - The window is clamped to a minimum size of $480 \times 367\text{ px}$ and cannot be dragged or resized beyond viewport margins ($10\text{ px}$ boundary padding).
+- **Double-Click Reset**:
+  - Double-clicking the bottom-right corner resize handle (`.th-resize-se`) immediately resets the window to default $680 \times 520\text{ px}$.
+
+---
+
+## 14. Meteorological Unit Testing & Automated Verification (Bun Test & Go Test)
 
 Comprehensive automated testing is maintained across both frontend meteorological algorithms and backend binary parsers.
 
-### 13.1. Client Meteorological Test Suite (Bun Test)
+### 14.1. Client Meteorological Test Suite (Bun Test)
 
-Run all 274 client-side unit tests across 24 test suites covering meteorological objective analysis, kinematics, contouring, symbology, quality control, data prefetching, and keyboard shortcuts:
+Run all 486 client-side unit tests across 68 test suites covering meteorological objective analysis, kinematics, contouring, symbology, quality control, data prefetching, sounding diagrams, time-height cross-sections, and keyboard shortcuts:
 
 ```bash
 cd client
@@ -1399,6 +1622,18 @@ bun test
 ```
 
 Individual test suites:
+- **`tlogp/` (Upper-Air T-lnP Sounding Diagram Test Suite)**:
+  - `tlogp-math.test.js`: Skew-T coordinate transformations, saturation vapor pressure (Bolton 1980), Bolton LCL, RK4 moist pseudoadiabatic ascent, CAPE/CIN numerical integration, and convective instability indices (K, SI, LI, TT, PWAT).
+  - `tlogp-integration.test.js`: MapLibre sounding station click detection, multi-level radiosonde observation extraction, parcel launch level selection, and UI panel rendering.
+  - `tlogp-resize.test.js`: Aspect-ratio preservation during dragging, resize handle positioning, double-click dimension reset, and minimize/restore persistence.
+- **`timeheight/` (ECMWF Time-Height Cross-Section Test Suite)**:
+  - `loader.test.js`: Forecast lead calculation, column limit (41), file path formatting, window-scoped caching, matrix construction, and cancellation aborts.
+  - `canvas.test.js`: Logarithmic pressure mapping ($P_{\text{top}} = 200\text{ hPa}$, $P_{\text{bottom}} = 1000\text{ hPa}$), invertibility across 10 levels ($1000\text{--}200\text{ hPa}$), VVEL/TMP contour ranges, and LTR/RTL horizontal coordinate mirroring.
+  - `sampling.test.js`: Scalar bilinear interpolation, out-of-domain clamping, grid node snapping, wind vector interpolation, and RH validity bounds.
+  - `integration.test.js`: Preset configuration in `config.json`, cold loading 13 leads $\times$ 10 levels, monotonic progress reporting, zero-fetch cached lead reuse, fast-path node resample, partial 404 level degradation with NaN rows, layer lifecycle cleanup, and multi-window isolation.
+  - `timeheight-resize.test.js`: Aspect-ratio locked subwindow resizing ($680 \times 520\text{ px}$), corner/edge handle dragging, minimize/restore persistence, double-click reset, and canvas buffer clearing on direction toggle.
+  - `controller.test.js`: Map click interaction, highlight marker positioning, direction switching, and teardown.
+  - `review-fixes.test.js`: In-flight request cancellation token, contour level extremes coverage, upper-tropospheric supersaturation acceptance, cursor-only timeline stepping, multi-window cache partitioning, and 404 negative caching.
 - **`derived_layers.test.js`**: Sounding Height, Temperature, and Wind QC bounds filtering, ground elevation rejection, calm wind vector handling, streamline vector grid generation, and preset layer persistence.
 - **`station_contour_analysis.test.js`**: Delaunay triangulation, natural neighbor / IDW objective analysis interpolation, surface sea-level pressure (SLP) contouring, and multi-element extractor verification.
 - **`smooth_contour.test.js`**: Chaikin B-spline corner smoothing and Douglas-Peucker simplification for smooth meteorological isolines.
@@ -1423,7 +1658,7 @@ Individual test suites:
 - **`vorticity_divergence.test.js`**: Relative vertical vorticity ($\zeta$) and horizontal divergence ($D$) kinematics acceptance test suite verifying mathematical finite differencing (solid-body rotation, pure divergence, uniform flow, N-to-S and S-to-N orientations, anticyclonic shear), spherical metric scaling ($1/\cos\phi$), Southern Hemisphere coordinate invariance, non-physical outlier clipping ($\pm 100 \times 10^{-5}\text{ s}^{-1} \to \text{NaN}$), surface observation kinematic gridding ($\ge 3$ station requirement), upper-air sounding level QC bounds rejection, isobaric vertical level step layer renaming with eye state preservation, NWP derived grid synthesis with 3-tier caching, background prefetch parent `WIND` resolution, and UI integration (station drawers, formatters, colormaps, XML palettes, and `config.json`).
 
 
-### 13.2. Server Binary Parser Test Suite (Go Test)
+### 14.2. Server Binary Parser Test Suite (Go Test)
 
 Run backend binary parser tests covering MDFS Diamond 1/2 station observation decoding, precipitation parsing, elevation/height separation, and upper-air wind quality control:
 
@@ -1441,7 +1676,7 @@ Key Go test coverage:
 
 ---
 
-## 14. Standards & References
+## 15. Standards & References
 
 - **CMA MICAPS 4 Cassandra Architecture**: `../help/micaps4-cassandra.md`
 - **MICAPS 4 File Format**: [nmcdev/nmc_met_io](https://github.com/nmcdev/nmc_met_io/blob/master/nmc_met_io/retrieve_cassandraDB.py)
