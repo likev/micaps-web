@@ -29,6 +29,7 @@ import { loadUpperAirComposite, loadObservationProduct } from "../services/deriv
 import { loadPresetGroup, clearAllWeatherLayersFromMap, reloadConfiguration } from "../services/presetLoader.js";
 import { changeVerticalLevel } from "../services/levelController.js";
 import { loadTLogPLayer, tlogpController } from "../layers/tlogp/tlogpLayer.js";
+import { timeHeightController } from "../layers/timeheight/timeHeightLayer.js";
 
 // Deep-clone a preset group so per-window ✕/visibility edits never mutate the
 // global PRESET_GROUPS entry (navBar/windowFocus pass live references via find()).
@@ -85,7 +86,46 @@ export async function bootstrap() {
       const hasData = Boolean(win.activeGroup || win.model || win.isObservation || win.gridData || win.obsTime);
       if (!hasData) {
         setTimeSliderVisible(false);
+        try { timeHeightController.hide(win.map, win); } catch {}
+        try { tlogpController.hide(win.map, win); } catch {}
         return;
+      }
+
+      const thLayer = timeHeightController._findLayer(win);
+      const isTimeHeight = Boolean(
+        win.activeGroup?.id === "composite-ec-timeheight" ||
+        thLayer ||
+        win.activeGroup?.layers?.some((l) => l.type === "timeheight" || l.id === "ec-timeheight-diagram") ||
+        win.layers?.some((l) => l.type === "timeheight" || l.id === "ec-timeheight-diagram")
+      );
+      const hasTimeHeight = isTimeHeight && (thLayer ? thLayer.visible !== false : true);
+
+      const tlogpLayer = tlogpController._findTLogPLayer(win);
+      const isTLogP = Boolean(
+        win.activeGroup?.id === "composite-tlogp" ||
+        tlogpLayer ||
+        win.activeGroup?.layers?.some((l) => l.element === "TLOGP" || l.type === "tlogp") ||
+        win.element === "TLOGP"
+      );
+      const hasTLogP = isTLogP && (tlogpLayer ? tlogpLayer.visible !== false : true);
+
+      if (isTimeHeight) {
+        if (hasTimeHeight) {
+          timeHeightController.show(win.map, win);
+        } else {
+          timeHeightController.hide(win.map, win);
+        }
+        tlogpController.hide(win.map, win);
+        setTimeSliderVisible(false);
+        return;
+      }
+
+      if (hasTLogP) {
+        timeHeightController.hide();
+        tlogpController.show(win.map, win);
+      } else {
+        timeHeightController.hide();
+        tlogpController.hide(win.map, win);
       }
 
       // When a non-observation preset group is active, never treat the window as obs
@@ -140,6 +180,7 @@ export async function bootstrap() {
       const winTitle = `W${win.winIdx + 1}: ${group.name}`;
       updateWindowTitle(win, group.name);
       setWindowHeaderPreset(win, group.id);
+      const isTimeHeight = group.id === "composite-ec-timeheight" || group.layers?.some((l) => l.type === "timeheight");
       if (win.isObservation) {
         const isTLogP = group.id === "composite-tlogp" || group.layers?.some((l) => l.element === "TLOGP");
         const effectiveLevel = win.level || group.defaultLevel || 500;
@@ -149,6 +190,10 @@ export async function bootstrap() {
         const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle, win);
         win.obsTime = latestFile;
         updateWindowTitle(win);
+      } else if (isTimeHeight) {
+        if (getActiveWindow() === win) {
+          setTimeSliderVisible(false);
+        }
       } else {
         const pLayer = group.layers?.find((l) => l.type === "contour" || l.type === "wind");
         const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", win.level || 500);
@@ -224,6 +269,7 @@ export async function bootstrap() {
       const winTitle = `W${win.winIdx + 1}: ${group.name}`;
       updateWindowTitle(win, group.name);
       setWindowHeaderPreset(win, group.id);
+      const isTimeHeight = group.id === "composite-ec-timeheight" || group.layers?.some((l) => l.type === "timeheight");
       if (win.isObservation) {
         const isTLogP = group.id === "composite-tlogp" || group.layers?.some((l) => l.element === "TLOGP");
         const obsPath = isTLogP
@@ -232,6 +278,10 @@ export async function bootstrap() {
         const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle, win);
         win.obsTime = latestFile;
         updateWindowTitle(win);
+      } else if (isTimeHeight) {
+        if (getActiveWindow() === win) {
+          setTimeSliderVisible(false);
+        }
       } else {
         const pLayer = group.layers?.find((l) => l.type === "contour" || l.type === "wind");
         const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", win.level || 500);

@@ -6,7 +6,7 @@ import { tabsState, getActiveTab, getActiveWindow, getCallbacks } from "./tabsSt
 import { initWindowMap } from "./windowMaps.js";
 import { updateWindowTitle } from "./windowTitles.js";
 import { pausePlayback } from "../timeline/playbackController.js";
-import { setTimelineMode } from "../timeline/timeSliderView.js";
+import { setTimelineMode, setTimeSliderVisible } from "../timeline/timeSliderView.js";
 
 export function focusWindow(tabId, winIdx) {
   const tab = tabsState.tabs.find((t) => t.id === tabId) || getActiveTab();
@@ -14,6 +14,17 @@ export function focusWindow(tabId, winIdx) {
 
   const activeWin = tab.windows[winIdx];
   if (!activeWin) return;
+
+  // Deactivate config editor tab if it was open
+  const cfgPill = document.getElementById("tab-item-config");
+  if (cfgPill) {
+    cfgPill.classList.remove("active");
+    cfgPill.setAttribute("aria-selected", "false");
+  }
+  const cfgPanel = document.getElementById("config-editor-panel");
+  if (cfgPanel) {
+    cfgPanel.style.display = "none";
+  }
 
   // Ensure workspace container for this tab is marked active
   const ws = document.getElementById(`tab-workspace-${tab.id}`);
@@ -75,28 +86,38 @@ export function focusWindow(tabId, winIdx) {
   // Pause any running playback when switching windows (L1)
   try { pausePlayback(); } catch {}
 
-  // Apply pending or cached observation timeline for active window
-  if (activeWin._pendingTimeline) {
-    const pt = activeWin._pendingTimeline;
-    if (activeWin.obsTime) pt.file = activeWin.obsTime;
-    delete activeWin._pendingTimeline;
-    try { setTimelineMode("obs", pt); } catch {}
-  } else if (activeWin.isObservation && activeWin._obsTimeline) {
-    const ot = activeWin._obsTimeline;
-    if (activeWin.obsTime) ot.file = activeWin.obsTime;
-    try { setTimelineMode("obs", ot); } catch {}
-  }
+  const isTimeHeight = Boolean(
+    activeWin.activeGroup?.id === "composite-ec-timeheight" ||
+    activeWin.activeGroup?.layers?.some((l) => l.type === "timeheight" || l.id === "ec-timeheight-diagram") ||
+    activeWin.layers?.some((l) => l.type === "timeheight" || l.id === "ec-timeheight-diagram")
+  );
 
-  // Apply pending or cached NWP timeline for active window
-  if (activeWin._pendingNwp) {
-    const pn = activeWin._pendingNwp;
-    if (activeWin.period !== undefined) pn.period = activeWin.period;
-    delete activeWin._pendingNwp;
-    try { setTimelineMode("nwp", pn); } catch {}
-  } else if (!activeWin.isObservation && activeWin._nwpTimeline) {
-    const nt = activeWin._nwpTimeline;
-    if (activeWin.period !== undefined) nt.period = activeWin.period;
-    try { setTimelineMode("nwp", nt); } catch {}
+  if (isTimeHeight) {
+    try { setTimeSliderVisible(false); } catch {}
+  } else {
+    // Apply pending or cached observation timeline for active window
+    if (activeWin._pendingTimeline) {
+      const pt = activeWin._pendingTimeline;
+      if (activeWin.obsTime) pt.file = activeWin.obsTime;
+      delete activeWin._pendingTimeline;
+      try { setTimelineMode("obs", pt); } catch {}
+    } else if (activeWin.isObservation && activeWin._obsTimeline) {
+      const ot = activeWin._obsTimeline;
+      if (activeWin.obsTime) ot.file = activeWin.obsTime;
+      try { setTimelineMode("obs", ot); } catch {}
+    }
+
+    // Apply pending or cached NWP timeline for active window
+    if (activeWin._pendingNwp) {
+      const pn = activeWin._pendingNwp;
+      if (activeWin.period !== undefined) pn.period = activeWin.period;
+      delete activeWin._pendingNwp;
+      try { setTimelineMode("nwp", pn); } catch {}
+    } else if (!activeWin.isObservation && activeWin._nwpTimeline) {
+      const nt = activeWin._nwpTimeline;
+      if (activeWin.period !== undefined) nt.period = activeWin.period;
+      try { setTimelineMode("nwp", nt); } catch {}
+    }
   }
 
   callbacks.onWindowFocus?.(activeWin);

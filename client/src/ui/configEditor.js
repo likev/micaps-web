@@ -7,6 +7,9 @@ import { mountPresetForm } from "./config/presetForm.js";
 import { mountColormapForm } from "./config/colormapForm.js";
 import { mountSettingsForm } from "./config/settingsForm.js";
 import { mountJSONFallback } from "./config/jsonFallback.js";
+import { setTimeSliderVisible } from "./timeSlider.js";
+import { tlogpController } from "../layers/tlogp/tlogpLayer.js";
+import { timeHeightController } from "../layers/timeheight/timeHeightLayer.js";
 
 let isConfigTabOpen = false;
 let onConfigChangedCallback = null;
@@ -163,6 +166,33 @@ export function activateConfigTab() {
   }
   const legendPanel = document.getElementById("legend-panel");
   if (legendPanel) legendPanel.classList.add("hidden");
+
+  // Hide timeslider and subwindows when config tab is active
+  try { setTimeSliderVisible(false); } catch {}
+  try { tlogpController.hide(); } catch {}
+  try { timeHeightController.hide(); } catch {}
+  try {
+    const tlogpPanel = document.getElementById("tlogp-panel");
+    if (tlogpPanel) tlogpPanel.style.display = "none";
+  } catch {}
+  try {
+    document.querySelectorAll(".timeheight-subwindow").forEach((el) => {
+      el.style.display = "none";
+    });
+  } catch {}
+}
+
+export function deactivateConfigTab() {
+  isConfigTabOpen = false;
+  const cfgPill = document.getElementById("tab-item-config");
+  if (cfgPill) {
+    cfgPill.classList.remove("active");
+    cfgPill.setAttribute("aria-selected", "false");
+  }
+  const panel = document.getElementById("config-editor-panel");
+  if (panel) {
+    panel.style.display = "none";
+  }
 }
 
 export function closeConfigTab() {

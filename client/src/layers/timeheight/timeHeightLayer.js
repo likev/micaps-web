@@ -57,9 +57,9 @@ export function removeTimeHeightLayer(map, win = null) {
 
 export function setTimeHeightVisibility(map, visible, win = null) {
   if (visible) {
-    timeHeightController.show();
+    timeHeightController.show(map, win);
   } else {
-    timeHeightController.hide();
+    timeHeightController.hide(map, win);
   }
   addOrUpdateLayer({ id: "ec-timeheight-diagram", visible: Boolean(visible) }, win);
   if (win && typeof getActiveWindow === "function" && getActiveWindow() === win) {

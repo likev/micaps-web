@@ -5,6 +5,7 @@ import {
   loadTimeHeightMatrix,
 } from "./timeHeightLoader.js";
 import { snapToGridNode, clampToGridDomain } from "./timeHeightSampling.js";
+import { highlightPointOnMap, removePointHighlight, setHighlightVisible } from "./timeHeightHighlight.js";
 import { TimeHeightPanel } from "./timeHeightPanel.js";
 import { resolveForecastCycles } from "../../utils/timelineSync.js";
 import { autoSaveLayerConfig } from "../../config/presets.js";
@@ -414,85 +415,46 @@ class TimeHeightController {
   }
 
   highlightPointOnMap(map, lon, lat) {
-    if (!map || typeof map.getSource !== "function") return;
-
-    const sourceId = "th-active-point-source";
-    const haloLayerId = "th-active-point-halo";
-    const centerLayerId = "th-active-point-center";
-
-    const featureCollection = {
-      type: "FeatureCollection",
-      features: [
-        {
-          type: "Feature",
-          geometry: { type: "Point", coordinates: [lon, lat] },
-          properties: { model: "ECMWF_HR" },
-        },
-      ],
-    };
-
-    const existing = map.getSource(sourceId);
-    if (existing && typeof existing.setData === "function") {
-      existing.setData(featureCollection);
-    } else {
-      map.addSource(sourceId, { type: "geojson", data: featureCollection });
-
-      map.addLayer({
-        id: haloLayerId,
-        type: "circle",
-        source: sourceId,
-        paint: {
-          "circle-radius": 14,
-          "circle-color": "rgba(31, 111, 235, 0.25)",
-          "circle-stroke-width": 2,
-          "circle-stroke-color": "#58a6ff",
-        },
-      });
-
-      map.addLayer({
-        id: centerLayerId,
-        type: "circle",
-        source: sourceId,
-        paint: {
-          "circle-radius": 5,
-          "circle-color": "#1f6feb",
-          "circle-stroke-width": 2,
-          "circle-stroke-color": "#ffffff",
-        },
-      });
-    }
+    highlightPointOnMap(map, lon, lat);
   }
 
   removePointHighlight(map = null) {
-    const targetMap = map || this.activeMap;
-    if (!targetMap || typeof targetMap.removeLayer !== "function") return;
-    const haloLayerId = "th-active-point-halo";
-    const centerLayerId = "th-active-point-center";
-    const sourceId = "th-active-point-source";
-
-    if (targetMap.getLayer(haloLayerId)) targetMap.removeLayer(haloLayerId);
-    if (targetMap.getLayer(centerLayerId)) targetMap.removeLayer(centerLayerId);
-    if (targetMap.getSource(sourceId)) targetMap.removeSource(sourceId);
+    removePointHighlight(map || this.activeMap);
   }
 
   setHighlightVisible(map = null, visible = true) {
-    const targetMap = map || this.activeMap;
-    if (!targetMap || typeof targetMap.getLayer !== "function") return;
-    const val = visible ? "visible" : "none";
-    if (targetMap.getLayer("th-active-point-halo")) targetMap.setLayoutProperty("th-active-point-halo", "visibility", val);
-    if (targetMap.getLayer("th-active-point-center")) targetMap.setLayoutProperty("th-active-point-center", "visibility", val);
+    setHighlightVisible(map || this.activeMap, visible);
   }
 
   show(map = null, win = null) {
-    const state = this._getState(win);
+    const targetWin = win || this._activeWin;
+    const targetWinId = this._getWinId(targetWin);
+    for (const [winId, s] of this.windows) {
+      if (winId !== targetWinId) {
+        s.panel?.hide();
+        this.setHighlightVisible(s.activeMap, false);
+      }
+    }
+    const state = this._getState(targetWin);
+    if (map) state.activeMap = map;
+    if (win) this._activeWin = win;
     state.panel?.show();
     this.setHighlightVisible(map || state.activeMap, true);
   }
 
   hide(map = null, win = null) {
-    const state = this._getState(win);
-    state.panel?.hide();
-    this.setHighlightVisible(map || state.activeMap, false);
+    if (win) {
+      const state = this._getState(win);
+      state.panel?.hide();
+      this.setHighlightVisible(map || state.activeMap, false);
+      return;
+    }
+    this._defaultState.panel?.hide();
+    this.setHighlightVisible(map || this._defaultState.activeMap, false);
+    for (const [_, s] of this.windows) {
+      s.panel?.hide();
+      this.setHighlightVisible(s.activeMap, false);
+    }
   }
 
   toggle(map = null, win = null) {
@@ -507,8 +469,19 @@ class TimeHeightController {
 
   _findLayer(win = this.activeWin) {
     if (!win) return null;
-    const layers = getLayersForWindow(win);
-    return layers?.find((l) => l.type === "timeheight" || l.id === "ec-timeheight-diagram");
+    try {
+      const layers = getLayersForWindow(win);
+      const l = layers?.find((lyr) => lyr.type === "timeheight" || lyr.id === "ec-timeheight-diagram");
+      if (l) return l;
+    } catch {}
+    if (win.layers) {
+      const l = win.layers.find((lyr) => lyr.type === "timeheight" || lyr.id === "ec-timeheight-diagram");
+      if (l) return l;
+    }
+    if (win.activeGroup?.layers) {
+      return win.activeGroup.layers.find((lyr) => lyr.type === "timeheight" || lyr.id === "ec-timeheight-diagram");
+    }
+    return null;
   }
 
   _persistConfig(patch = {}, win = this.activeWin) {

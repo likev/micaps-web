@@ -11,7 +11,7 @@ import { getActiveWindow, updateWindowTitle, setWindowHeaderPreset, refreshPrese
 import { setNavBarPreset, refreshNavBarPresets } from "../ui/navBar.js";
 import { appState } from "../store/appState.js";
 import { resolveForecastCycles, syncObservationTimeline, invalidateForecastCyclesCache } from "../utils/timelineSync.js";
-import { setTimelineMode } from "../ui/timeSlider.js";
+import { setTimelineMode, setTimeSliderVisible } from "../ui/timeSlider.js";
 import { resolveColormap } from "../utils/colormaps.js";
 import { loadWeatherField } from "./weatherLoader.js";
 import { loadObservationProduct } from "./derivedContours.js";
@@ -145,11 +145,16 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
       win.forecastCycle = cycles[0];
     }
     updateWindowTitle(win);
-    const defaultStep = group.layers.some((l) => l.type === "timeheight") ? 12 : 6;
+    const isTimeHeight = group.id === "composite-ec-timeheight" || group.layers.some((l) => l.type === "timeheight");
+    const defaultStep = isTimeHeight ? 12 : 6;
     const nwpPayload = { period: curPeriod, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || defaultStep };
     win._nwpTimeline = nwpPayload;
     if (getActiveWindow() === win) {
-      setTimelineMode("nwp", nwpPayload);
+      if (isTimeHeight) {
+        setTimeSliderVisible(false);
+      } else {
+        setTimelineMode("nwp", nwpPayload);
+      }
     } else {
       win._pendingNwp = nwpPayload;
     }

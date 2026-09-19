@@ -313,14 +313,16 @@ class TLogPController {
     }
   }
 
-  show() {
+  show(map = this.activeMap, win = this.activeWin) {
+    if (map) this.activeMap = map;
+    if (win) this.activeWin = win;
     if (this.panel) this.panel.show();
     this.setHighlightVisible(this.activeMap, true);
   }
 
-  hide() {
+  hide(map = this.activeMap, win = this.activeWin) {
     if (this.panel) this.panel.hide();
-    this.setHighlightVisible(this.activeMap, false);
+    this.setHighlightVisible(map || this.activeMap, false);
   }
 
   toggle() {

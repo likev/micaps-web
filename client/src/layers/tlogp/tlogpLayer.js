@@ -57,10 +57,10 @@ export function removeTLogPLayer(map, win = null) {
 
 export function setTLogPVisibility(map, visible, win = null) {
   if (visible) {
-    tlogpController.show();
+    tlogpController.show(map, win);
     if (map) tlogpController.setHighlightVisible(map, true);
   } else {
-    tlogpController.hide();
+    tlogpController.hide(map, win);
     if (map) tlogpController.setHighlightVisible(map, false);
   }
   addOrUpdateLayer({ id: "upperair-tlogp-diagram", visible: Boolean(visible) }, win);
