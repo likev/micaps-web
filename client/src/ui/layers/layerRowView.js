@@ -179,6 +179,140 @@ export function renderTimeHeightDrawerHTML(layer) {
   `;
 }
 
+export function renderLineHeightDrawerHTML(layer) {
+  const cfg = layer.config || {};
+  const fmt = (v, d) => (v !== undefined && v !== null && Number.isFinite(Number(v)) ? Number(v).toFixed(2) : d);
+  const n = cfg.npoints ?? 41;
+  const flip = Boolean(cfg.flipDirection);
+  return `
+    <div class="config-row" style="flex-direction: column; align-items: flex-start; gap: 6px; width: 100%;">
+      <label style="color: var(--text-secondary, #8b949e); font-size: 11px; font-weight: 600;">
+        📏 Transect Line A → B (Click Map or Draw):
+      </label>
+      <div style="display: flex; gap: 6px; width: 100%; align-items: center;">
+        <span style="font-size: 11px; color: #e3b341; font-weight: 600;">A:</span>
+        <input type="number" class="input-lh-alon" value="${fmt(cfg.lon0, "115.00")}" step="0.25" style="width: 60px; height: 22px; background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 0 4px; font-size: 11px;" />
+        <input type="number" class="input-lh-alat" value="${fmt(cfg.lat0, "28.00")}" step="0.25" style="width: 60px; height: 22px; background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 0 4px; font-size: 11px;" />
+        <span style="font-size: 11px; color: #e3b341; font-weight: 600;">B:</span>
+        <input type="number" class="input-lh-blon" value="${fmt(cfg.lon1, "125.00")}" step="0.25" style="width: 60px; height: 22px; background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 0 4px; font-size: 11px;" />
+        <input type="number" class="input-lh-blat" value="${fmt(cfg.lat1, "38.00")}" step="0.25" style="width: 60px; height: 22px; background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 0 4px; font-size: 11px;" />
+      </div>
+      <div style="display: flex; gap: 6px; width: 100%; align-items: center;">
+        <select class="sel-lh-n" style="height: 22px; background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; font-size: 11px; padding: 0 4px;">
+          ${[11, 21, 41, 61, 81].map((v) => `<option value="${v}" ${v === n ? "selected" : ""}>N=${v}</option>`).join("")}
+        </select>
+        <button class="btn-lh-apply" style="height: 22px; padding: 0 8px; font-size: 11px; background: #238636; color: #fff; border: 1px solid #2ea043; border-radius: 4px; cursor: pointer;">Apply</button>
+        <button class="btn-lh-draw" title="Two-click draw: click map for A, again for B" style="height: 22px; padding: 0 6px; font-size: 11px; background: #21262d; border: 1px solid #30363d; color: #e3b341; border-radius: 4px; cursor: pointer;">✏ Draw line</button>
+      </div>
+      <div style="display: flex; gap: 6px; width: 100%; align-items: center;">
+        <button class="btn-lh-seta" title="Next map click sets A" style="height: 22px; padding: 0 6px; font-size: 11px; background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; cursor: pointer;">Set A from map</button>
+        <button class="btn-lh-setb" title="Next map click sets B" style="height: 22px; padding: 0 6px; font-size: 11px; background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; cursor: pointer;">Set B from map</button>
+        <button class="btn-lh-flip" title="Mirror A<->B display only (no refetch)" style="height: 22px; padding: 0 6px; font-size: 11px; background: #21262d; border: 1px solid #30363d; color: #e3b341; border-radius: 4px; cursor: pointer;">${flip ? "⇄ B→A" : "⇄ A→B"}</button>
+      </div>
+      <div style="font-size: 10px; color: #6e7681;">One lead from global timeline (chip / ◀ ▶ / ← → / play). Fixed 10 levels.</div>
+    </div>
+
+    <div class="config-grid-2col" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #30363d;">
+      <label class="config-checkbox-item">
+        <input type="checkbox" class="chk-lh-rh" ${cfg.showRH !== false ? "checked" : ""} />
+        <span style="color: #56d4dd;">RH Fill</span>
+      </label>
+      <label class="config-checkbox-item">
+        <input type="checkbox" class="chk-lh-temp" ${cfg.showTemp !== false ? "checked" : ""} />
+        <span style="color: #f85149;">Temperature Lines</span>
+      </label>
+      <label class="config-checkbox-item">
+        <input type="checkbox" class="chk-lh-vvel" ${cfg.showVVel !== false ? "checked" : ""} />
+        <span style="color: #39c5bb;">VVEL Lines</span>
+      </label>
+      <label class="config-checkbox-item">
+        <input type="checkbox" class="chk-lh-wind" ${cfg.showWind !== false ? "checked" : ""} />
+        <span style="color: #58a6ff;">Wind Barbs</span>
+      </label>
+    </div>
+  `;
+}
+
+export function renderHovmollerDrawerHTML(layer) {
+  const cfg = layer.config || {};
+  const fmt = (v, d) => (v !== undefined && v !== null && Number.isFinite(Number(v)) ? Number(v).toFixed(2) : d);
+  const n = cfg.npoints ?? 41;
+  const level = cfg.level ?? 850;
+  const start = cfg.startHour ?? 0;
+  const end = cfg.endHour ?? 144;
+  const step = cfg.stepHours ?? 12;
+  const swap = cfg.axisSwap || "dist-x";
+  const tdir = cfg.timeDir || "fwd";
+  return `
+    <div class="config-row" style="flex-direction: column; align-items: flex-start; gap: 6px; width: 100%;">
+      <label style="color: var(--text-secondary, #8b949e); font-size: 11px; font-weight: 600;">
+        📏 Transect Line A → B (Click Map or Draw):
+      </label>
+      <div style="display: flex; gap: 6px; width: 100%; align-items: center;">
+        <span style="font-size: 11px; color: #e3b341; font-weight: 600;">A:</span>
+        <input type="number" class="input-hov-alon" value="${fmt(cfg.lon0, "115.00")}" step="0.25" style="width: 60px; height: 22px; background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 0 4px; font-size: 11px;" />
+        <input type="number" class="input-hov-alat" value="${fmt(cfg.lat0, "28.00")}" step="0.25" style="width: 60px; height: 22px; background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 0 4px; font-size: 11px;" />
+        <span style="font-size: 11px; color: #e3b341; font-weight: 600;">B:</span>
+        <input type="number" class="input-hov-blon" value="${fmt(cfg.lon1, "125.00")}" step="0.25" style="width: 60px; height: 22px; background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 0 4px; font-size: 11px;" />
+        <input type="number" class="input-hov-blat" value="${fmt(cfg.lat1, "38.00")}" step="0.25" style="width: 60px; height: 22px; background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 0 4px; font-size: 11px;" />
+      </div>
+      <div style="display: flex; gap: 6px; width: 100%; align-items: center;">
+        <select class="sel-hov-n" style="height: 22px; background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; font-size: 11px; padding: 0 4px;">
+          ${[11, 21, 41, 61, 81].map((v) => `<option value="${v}" ${v === n ? "selected" : ""}>N=${v}</option>`).join("")}
+        </select>
+        <button class="btn-hov-apply" style="height: 22px; padding: 0 8px; font-size: 11px; background: #238636; color: #fff; border: 1px solid #2ea043; border-radius: 4px; cursor: pointer;">Apply</button>
+        <button class="btn-hov-draw" title="Two-click draw: click map for A, again for B" style="height: 22px; padding: 0 6px; font-size: 11px; background: #21262d; border: 1px solid #30363d; color: #e3b341; border-radius: 4px; cursor: pointer;">✏ Draw line</button>
+      </div>
+      <div style="display: flex; gap: 6px; width: 100%; align-items: center;">
+        <button class="btn-hov-seta" title="Next map click sets A" style="height: 22px; padding: 0 6px; font-size: 11px; background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; cursor: pointer;">Set A from map</button>
+        <button class="btn-hov-setb" title="Next map click sets B" style="height: 22px; padding: 0 6px; font-size: 11px; background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; cursor: pointer;">Set B from map</button>
+      </div>
+    </div>
+
+    <div class="config-row" style="flex-direction: column; align-items: flex-start; gap: 4px; width: 100%; margin-top: 6px; padding-top: 6px; border-top: 1px solid #30363d;">
+      <label style="color: var(--text-secondary, #8b949e); font-size: 11px; font-weight: 600;">
+        ⏱ Panel-Local Time Span & Level (timeline parked):
+      </label>
+      <div style="display: flex; gap: 6px; width: 100%; align-items: center;">
+        <select class="sel-hov-level" style="height: 22px; background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; font-size: 11px; padding: 0 4px;">
+          ${[1000, 925, 850, 700, 600, 500, 400, 300, 250, 200].map((l) => `<option value="${l}" ${l === level ? "selected" : ""}>${l} hPa</option>`).join("")}
+        </select>
+        <input type="number" class="input-hov-start" value="${start}" min="0" max="240" step="12" style="width: 44px; height: 22px; background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; text-align: center; font-size: 11px;" />
+        <span style="font-size: 11px;">–</span>
+        <input type="number" class="input-hov-end" value="${end}" min="12" max="240" step="12" style="width: 44px; height: 22px; background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; text-align: center; font-size: 11px;" />
+        <span style="font-size: 11px;">h</span>
+        <select class="sel-hov-step" style="height: 22px; background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; font-size: 11px; padding: 0 4px;">
+          ${[1, 3, 6, 12, 24].map((s) => `<option value="${s}" ${s === step ? "selected" : ""}>@${s}h</option>`).join("")}
+        </select>
+        <button class="btn-hov-span" style="height: 22px; padding: 0 6px; font-size: 11px; background: #238636; color: #fff; border: 1px solid #2ea043; border-radius: 4px; cursor: pointer;">Apply</button>
+      </div>
+      <div style="display: flex; gap: 6px; width: 100%; align-items: center;">
+        <button class="btn-hov-swap" title="Swap axes (display-only, no refetch)" style="height: 22px; padding: 0 6px; font-size: 11px; background: #21262d; border: 1px solid #30363d; color: #e3b341; border-radius: 4px; cursor: pointer;">${swap === "time-x" ? "⇄ X:time · Y:dist" : "⇄ X:dist · Y:time"}</button>
+        <button class="btn-hov-rev" title="Reverse time axis (display-only)" style="height: 22px; padding: 0 6px; font-size: 11px; background: #21262d; border: 1px solid #30363d; color: #e3b341; border-radius: 4px; cursor: pointer;">${tdir === "rev" ? `⇄ ${end}→${start}h` : `⇄ ${start}→${end}h`}</button>
+      </div>
+    </div>
+
+    <div class="config-grid-2col" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #30363d;">
+      <label class="config-checkbox-item">
+        <input type="checkbox" class="chk-hov-rh" ${cfg.showRH !== false ? "checked" : ""} />
+        <span style="color: #56d4dd;">RH Fill</span>
+      </label>
+      <label class="config-checkbox-item">
+        <input type="checkbox" class="chk-hov-temp" ${cfg.showTemp !== false ? "checked" : ""} />
+        <span style="color: #f85149;">Temperature Lines</span>
+      </label>
+      <label class="config-checkbox-item">
+        <input type="checkbox" class="chk-hov-vvel" ${cfg.showVVel !== false ? "checked" : ""} />
+        <span style="color: #39c5bb;">VVEL Lines</span>
+      </label>
+      <label class="config-checkbox-item">
+        <input type="checkbox" class="chk-hov-wind" ${cfg.showWind !== false ? "checked" : ""} />
+        <span style="color: #58a6ff;">Wind Barbs</span>
+      </label>
+    </div>
+  `;
+}
+
 export function renderStationDrawerHTML(layer) {
   const isTLogP = layer.element === "TLOGP" || (layer.path && layer.path.includes("TLOGP")) || layer.id?.includes("tlogp");
   const upper = isUpperAirStationLayer(layer);
@@ -391,6 +525,10 @@ export function renderLayerRow(layer) {
             ? renderTLogPDrawerHTML(layer)
             : (layer.type === "timeheight"
             ? renderTimeHeightDrawerHTML(layer)
+            : (layer.type === "lineheight"
+            ? renderLineHeightDrawerHTML(layer)
+            : (layer.type === "hovmoller"
+            ? renderHovmollerDrawerHTML(layer)
             : `
             <div class="config-row">
               <label>
@@ -432,7 +570,7 @@ export function renderLayerRow(layer) {
                 <option value="vertical-perspective" ${layer.config?.projection === "vertical-perspective" ? "selected" : ""}>🪐 Perspective (3D)</option>
               </select>
             </div>
-            `))))
+            `))))))
         }
       </div>
     </div>

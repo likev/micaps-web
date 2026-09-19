@@ -16,6 +16,8 @@ export async function changeVerticalLevel(map, direction, explicitLevel = null, 
     console.warn(`[Level] Current preset "${activeGroup.name}" does not have vertical levels.`);
     return;
   }
+  // Note: line-profile Up/Down protection comes from hasLevel:false above + the
+  // bootstrap onLevelStep swallow, not from a layer-type check here.
   if (win && (win.model === "SURFACE" || win.level === 0) && !activeGroup?.hasLevel) {
     console.warn("[Level] Surface observations do not have vertical levels.");
     return;

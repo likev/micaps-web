@@ -91,6 +91,14 @@ export function handleRemoveAction(map, layerId, layer, win) {
     import("../../layers/timeheight/timeHeightLayer.js").then(({ removeTimeHeightLayer }) => {
       removeTimeHeightLayer(map, win);
     });
+  } else if (layer.type === "lineheight") {
+    import("../../layers/lineprofile/lineProfileLayer.js").then(({ removeLineHeightLayer }) => {
+      removeLineHeightLayer(map, win);
+    });
+  } else if (layer.type === "hovmoller") {
+    import("../../layers/lineprofile/lineProfileLayer.js").then(({ removeHovmollerLayer }) => {
+      removeHovmollerLayer(map, win);
+    });
   }
 }
 

@@ -1,5 +1,6 @@
 // layerRowBindings.js - Event bindings for layer controls, drawer toggles, and property updates
 import { appState } from "../../store/appState.js";
+import { getWindowById } from "../tabs/tabsStore.js";
 import { autoSaveLayerConfig } from "../../config/presets.js";
 import { parseBoldValues } from "../../layers/contourLayer.js";
 import { buildLevelsFromInterval, validateInterval } from "../../layers/contour/contourLevels.js";
@@ -547,6 +548,16 @@ export function bindLayerRowEvents(panel, layers, currentActiveWinId, onLayerAct
     if (layer.type === "timeheight" && configDrawer) {
       import("./timeHeightDrawerBindings.js").then(({ bindTimeHeightDrawerEvents }) => {
         bindTimeHeightDrawerEvents(layer, configDrawer);
+      });
+    }
+
+    if ((layer.type === "lineheight" || layer.type === "hovmoller") && configDrawer) {
+      import("./lineProfileDrawerBindings.js").then(({ bindLineProfileDrawerEvents }) => {
+        // Thread the owning window so drawer edits hit this window's state, not "default"
+        const ownWin = (typeof currentActiveWinId === "object" && currentActiveWinId !== null)
+          ? currentActiveWinId
+          : getWindowById(currentActiveWinId);
+        bindLineProfileDrawerEvents(layer, configDrawer, ownWin);
       });
     }
   });

@@ -724,6 +724,81 @@
           }
         }
       ]
+    },
+    {
+      "id": "composite-ec-lineheight",
+      "name": "EC Line-Height Cross-Section (RH+T+VVEL+Wind)",
+      "category": "NWP Line-Height Profile",
+      "isObservation": false,
+      "hasLevel": false,
+      "defaultLevel": null,
+      "colormap": "RH",
+      "layers": [
+        {
+          "id": "ec-lineheight-diagram",
+          "name": "EC Line-Height Cross-Section (draw line on map)",
+          "type": "lineheight",
+          "model": "ECMWF_HR",
+          "element": "RH",
+          "visible": true,
+          "removable": true,
+          "config": {
+            "lon0": 115.0,
+            "lat0": 28.0,
+            "lon1": 125.0,
+            "lat1": 38.0,
+            "npoints": 41,
+            "lead": null,
+            "initCycle": null,
+            "levels": [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200],
+            "flipDirection": false,
+            "showRH": true,
+            "showTemp": true,
+            "showVVel": true,
+            "showWind": true,
+            "showTransectMarker": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "composite-ec-hovmoller",
+      "name": "EC Time-Line Hovmoller (RH+T+VVEL+Wind @ level)",
+      "category": "NWP Time-Distance Profile",
+      "isObservation": false,
+      "hasLevel": false,
+      "defaultLevel": null,
+      "colormap": "RH",
+      "layers": [
+        {
+          "id": "ec-hovmoller-diagram",
+          "name": "EC Time-Line Hovmoller (draw line on map)",
+          "type": "hovmoller",
+          "model": "ECMWF_HR",
+          "element": "RH",
+          "visible": true,
+          "removable": true,
+          "config": {
+            "lon0": 115.0,
+            "lat0": 28.0,
+            "lon1": 125.0,
+            "lat1": 38.0,
+            "npoints": 41,
+            "initCycle": null,
+            "startHour": 0,
+            "endHour": 144,
+            "stepHours": 12,
+            "level": 850,
+            "axisSwap": "dist-x",
+            "timeDir": "fwd",
+            "showRH": true,
+            "showTemp": true,
+            "showVVel": true,
+            "showWind": true,
+            "showTransectMarker": true
+          }
+        }
+      ]
     }
   ]
 }

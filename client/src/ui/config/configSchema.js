@@ -3,7 +3,9 @@ import { MIN_MAX_EFFECTIVE_CELLS, MAX_MAX_EFFECTIVE_CELLS } from "../../config/p
 import { validateInterval } from "../../layers/contour/contourLevels.js";
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-_]*$/i;
-const ALLOWED_LAYER_TYPES = new Set(["contour", "wind", "station", "tlogp", "timeheight"]);
+const ALLOWED_LAYER_TYPES = new Set(["contour", "wind", "station", "tlogp", "timeheight", "lineheight", "hovmoller"]);
+export const PROFILE_LEVELS_SET = new Set([1000, 925, 850, 700, 600, 500, 400, 300, 250, 200]);
+export const SUPPORTED_LINE_STEPS = new Set([1, 3, 6, 12, 24]);
 const ALLOWED_BASEMAP_SCHEMES = new Set(["light", "dark", "micaps"]);
 const ALLOWED_BASEMAP_PROJECTIONS = new Set(["mercator", "globe", "vertical-perspective"]);
 
@@ -214,6 +216,8 @@ export function validateConfig(draft) {
                 addError(`presets[${idx}].layers[${lIdx}].render.levels`, `Layer "${lId || lIdx}" levels must be an array of >= 2 numbers`, "preset", id);
               }
             }
+
+            validateLineProfileLayerConfig(layer, entry, idx, lIdx, addError);
           });
 
           // Check derivedFrom references match sibling layer ids
@@ -304,4 +308,54 @@ export function validateConfig(draft) {
     colormapErrors,
     globalErrors,
   };
+}
+
+function validateLineProfileLayerConfig(layer, entry, idx, lIdx, addError) {
+  const id = entry.id;
+  const lId = layer.id;
+  const cfg = layer.config || {};
+  const base = `presets[${idx}].layers[${lIdx}].config`;
+  if (layer.type !== "lineheight" && layer.type !== "hovmoller") return;
+  for (const [k, lo, hi] of [["lon0", -180, 360], ["lon1", -180, 360]]) {
+    if (cfg[k] !== undefined && cfg[k] !== null && (!Number.isFinite(cfg[k]) || cfg[k] < lo || cfg[k] > hi)) {
+      addError(`${base}.${k}`, `Layer "${lId}" ${k} must be in [${lo}, ${hi}]`, "preset", id);
+    }
+  }
+  for (const k of ["lat0", "lat1"]) {
+    if (cfg[k] !== undefined && cfg[k] !== null && (!Number.isFinite(cfg[k]) || cfg[k] < -90 || cfg[k] > 90)) {
+      addError(`${base}.${k}`, `Layer "${lId}" ${k} must be in [-90, 90]`, "preset", id);
+    }
+  }
+  if (cfg.npoints !== undefined && (!Number.isInteger(cfg.npoints) || cfg.npoints < 2 || cfg.npoints > 81)) {
+    addError(`${base}.npoints`, `Layer "${lId}" npoints must be an integer 2..81`, "preset", id);
+  }
+  if (layer.type === "lineheight") {
+    if (cfg.levels !== undefined) {
+      if (!Array.isArray(cfg.levels) || cfg.levels.length < 1 || cfg.levels.length > 10 || cfg.levels.some((v) => !PROFILE_LEVELS_SET.has(v))) {
+        addError(`${base}.levels`, `Layer "${lId}" levels must be a non-empty subset of ${[...PROFILE_LEVELS_SET].join(",")}`, "preset", id);
+      }
+    }
+    if (cfg.flipDirection !== undefined && typeof cfg.flipDirection !== "boolean") {
+      addError(`${base}.flipDirection`, `Layer "${lId}" flipDirection must be boolean`, "preset", id);
+    }
+  }
+  if (layer.type === "hovmoller") {
+    if (cfg.level !== undefined && !PROFILE_LEVELS_SET.has(cfg.level)) {
+      addError(`${base}.level`, `Layer "${lId}" level must be one of ${[...PROFILE_LEVELS_SET].join(",")}`, "preset", id);
+    }
+    for (const k of ["startHour", "endHour", "stepHours"]) {
+      if (cfg[k] !== undefined && !Number.isFinite(cfg[k])) {
+        addError(`${base}.${k}`, `Layer "${lId}" ${k} must be a number`, "preset", id);
+      }
+    }
+    if (cfg.stepHours !== undefined && !SUPPORTED_LINE_STEPS.has(cfg.stepHours)) {
+      addError(`${base}.stepHours`, `Layer "${lId}" stepHours must be one of 1,3,6,12,24`, "preset", id);
+    }
+    if (cfg.axisSwap !== undefined && cfg.axisSwap !== "dist-x" && cfg.axisSwap !== "time-x") {
+      addError(`${base}.axisSwap`, `Layer "${lId}" axisSwap must be dist-x|time-x`, "preset", id);
+    }
+    if (cfg.timeDir !== undefined && cfg.timeDir !== "fwd" && cfg.timeDir !== "rev") {
+      addError(`${base}.timeDir`, `Layer "${lId}" timeDir must be fwd|rev`, "preset", id);
+    }
+  }
 }

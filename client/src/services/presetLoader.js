@@ -6,6 +6,7 @@ import { removeStationLayer } from "../layers/stationLayer.js";
 import { removeRasterLayer } from "../layers/rasterLayer.js";
 import { loadTLogPLayer, removeTLogPLayer, tlogpController } from "../layers/tlogp/tlogpLayer.js";
 import { loadTimeHeightLayer, removeTimeHeightLayer, timeHeightController } from "../layers/timeheight/timeHeightLayer.js";
+import { loadLineHeightLayer, removeLineHeightLayer, lineHeightController, loadHovmollerLayer, removeHovmollerLayer, hovmollerController } from "../layers/lineprofile/lineProfileLayer.js";
 import { clearLegends } from "../ui/legend.js";
 import { getActiveWindow, updateWindowTitle, setWindowHeaderPreset, refreshPresetControls } from "../ui/tabWindowManager.js";
 import { setNavBarPreset, refreshNavBarPresets } from "../ui/navBar.js";
@@ -54,6 +55,8 @@ export function clearAllWeatherLayersFromMap(map, win = null, { resetVisibility 
     removeRasterLayer(map);
     removeTLogPLayer(map, win);
     removeTimeHeightLayer(map, win);
+    removeLineHeightLayer(map, win);
+    removeHovmollerLayer(map, win);
     clearLegends(win);
   } catch (err) {
     console.warn("[Main] Error cleaning up weather layers:", err);
@@ -139,18 +142,19 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
 
   const winTitle = `W${(win?.winIdx ?? 0) + 1}: ${group.name}`;
   if (!isTimeStep && !group.isObservation && win) {
-    const pLayer = group.layers.find((l) => l.type === "contour" || l.type === "wind" || l.type === "timeheight");
+    const pLayer = group.layers.find((l) => l.type === "contour" || l.type === "wind" || l.type === "timeheight" || l.type === "lineheight" || l.type === "hovmoller");
     const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", curLevel);
     if (!win.forecastCycle || !cycles.includes(win.forecastCycle)) {
       win.forecastCycle = cycles[0];
     }
     updateWindowTitle(win);
     const isTimeHeight = group.id === "composite-ec-timeheight" || group.layers.some((l) => l.type === "timeheight");
-    const defaultStep = isTimeHeight ? 12 : 6;
+    const isHovmoller = group.id === "composite-ec-hovmoller" || group.layers.some((l) => l.type === "hovmoller");
+    const defaultStep = (isTimeHeight || isHovmoller) ? 12 : 6;
     const nwpPayload = { period: curPeriod, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || defaultStep };
     win._nwpTimeline = nwpPayload;
     if (getActiveWindow() === win) {
-      if (isTimeHeight) {
+      if (isTimeHeight || isHovmoller) {
         setTimeSliderVisible(false);
       } else {
         setTimelineMode("nwp", nwpPayload);
@@ -225,6 +229,18 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
           timeHeightController.updateCursorLead(curPeriod, win);
         } else {
           await loadTimeHeightLayer(map, layer, win);
+        }
+      } else if (layer.type === "lineheight") {
+        if (isTimeStep && lineHeightController.isActive(win)) {
+          lineHeightController.setLead(curPeriod, win);
+        } else {
+          await loadLineHeightLayer(map, layer, win);
+        }
+      } else if (layer.type === "hovmoller") {
+        if (isTimeStep && hovmollerController.isActive(win)) {
+          // Panel owns its time: global steps are no-ops (swallowed)
+        } else {
+          await loadHovmollerLayer(map, layer, win);
         }
       }
     })

@@ -186,7 +186,7 @@ function collectNwpItems(win, targetPeriod, cycle, hasRasterActive, direction, o
 
   if (activeGroup && Array.isArray(activeGroup.layers) && activeGroup.layers.length > 0) {
     for (const layer of activeGroup.layers) {
-      if (layer.type === "timeheight") {
+      if (layer.type === "timeheight" || layer.type === "lineheight" || layer.type === "hovmoller") {
         continue;
       }
       if (layer.derivedFrom) {

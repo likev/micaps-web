@@ -79,6 +79,8 @@ func main() {
 	catH := &handler.CatalogHandler{Client: cqlClient, MockMode: cfg.MockMode}
 	gridH := &handler.GridHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode}
 	profileH := &handler.ProfileHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode}
+	lineH := &handler.LineHeightHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode}
+	hovH := &handler.HovmollerHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode}
 	statH := &handler.StationHandler{Client: cqlClient, MockMode: cfg.MockMode}
 	tlogpH := &handler.TLogPHandler{Client: cqlClient, MockMode: cfg.MockMode}
 	staticH := &handler.StaticHandler{Cfg: cfg, FileCache: fc}
@@ -96,6 +98,8 @@ func main() {
 	mux.HandleFunc("/api/data/grid/binary", gridH.BinaryHandler)
 	// Time-Height profile streaming endpoint (WriteTimeout: 60s exempted inside handler via http.ResponseController)
 	mux.HandleFunc("/api/data/timeheight/profile", profileH.Handler)
+	mux.HandleFunc("/api/data/lineheight/profile", lineH.Handler)
+	mux.HandleFunc("/api/data/hovmoller/profile", hovH.Handler)
 	mux.HandleFunc("/api/data/station", statH.StationGeoJSONHandler)
 	mux.HandleFunc("/api/data/tlogp", tlogpH.Handler)
 

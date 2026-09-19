@@ -10,6 +10,7 @@ import { mountJSONFallback } from "./config/jsonFallback.js";
 import { setTimeSliderVisible } from "./timeSlider.js";
 import { tlogpController } from "../layers/tlogp/tlogpLayer.js";
 import { timeHeightController } from "../layers/timeheight/timeHeightLayer.js";
+import { lineHeightController, hovmollerController } from "../layers/lineprofile/lineProfileLayer.js";
 
 let isConfigTabOpen = false;
 let onConfigChangedCallback = null;
@@ -173,12 +174,17 @@ export function activateConfigTab() {
   try { setTimeSliderVisible(false); } catch {}
   try { tlogpController.hide(); } catch {}
   try { timeHeightController.hide(); } catch {}
+  try { lineHeightController.hide(); } catch {}
+  try { hovmollerController.hide(); } catch {}
   try {
     const tlogpPanel = document.getElementById("tlogp-panel");
     if (tlogpPanel) tlogpPanel.style.display = "none";
   } catch {}
   try {
     document.querySelectorAll(".timeheight-subwindow").forEach((el) => {
+      el.style.display = "none";
+    });
+    document.querySelectorAll(".lineheight-subwindow, .hovmoller-subwindow").forEach((el) => {
       el.style.display = "none";
     });
   } catch {}

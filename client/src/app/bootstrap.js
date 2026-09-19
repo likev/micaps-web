@@ -30,6 +30,7 @@ import { loadPresetGroup, clearAllWeatherLayersFromMap, reloadConfiguration } fr
 import { changeVerticalLevel } from "../services/levelController.js";
 import { loadTLogPLayer, tlogpController } from "../layers/tlogp/tlogpLayer.js";
 import { timeHeightController } from "../layers/timeheight/timeHeightLayer.js";
+import { lineHeightController, hovmollerController } from "../layers/lineprofile/lineProfileLayer.js";
 
 // Deep-clone a preset group so per-window ✕/visibility edits never mutate the
 // global PRESET_GROUPS entry (navBar/windowFocus pass live references via find()).
@@ -87,6 +88,8 @@ export async function bootstrap() {
       if (!hasData) {
         setTimeSliderVisible(false);
         try { timeHeightController.hide(win.map, win); } catch {}
+        try { lineHeightController.hide(win.map, win); } catch {}
+        try { hovmollerController.hide(win.map, win); } catch {}
         try { tlogpController.hide(win.map, win); } catch {}
         return;
       }
@@ -99,6 +102,24 @@ export async function bootstrap() {
         win.layers?.some((l) => l.type === "timeheight" || l.id === "ec-timeheight-diagram")
       );
       const hasTimeHeight = isTimeHeight && (thLayer ? thLayer.visible !== false : true);
+
+      const lhLayer = lineHeightController._findLayer(win);
+      const isLineHeight = Boolean(
+        win.activeGroup?.id === "composite-ec-lineheight" ||
+        lhLayer ||
+        win.activeGroup?.layers?.some((l) => l.type === "lineheight" || l.id === "ec-lineheight-diagram") ||
+        win.layers?.some((l) => l.type === "lineheight" || l.id === "ec-lineheight-diagram")
+      );
+      const hasLineHeight = isLineHeight && (lhLayer ? lhLayer.visible !== false : true);
+
+      const hovLayer = hovmollerController._findLayer(win);
+      const isHovmoller = Boolean(
+        win.activeGroup?.id === "composite-ec-hovmoller" ||
+        hovLayer ||
+        win.activeGroup?.layers?.some((l) => l.type === "hovmoller" || l.id === "ec-hovmoller-diagram") ||
+        win.layers?.some((l) => l.type === "hovmoller" || l.id === "ec-hovmoller-diagram")
+      );
+      const hasHovmoller = isHovmoller && (hovLayer ? hovLayer.visible !== false : true);
 
       const tlogpLayer = tlogpController._findTLogPLayer(win);
       const isTLogP = Boolean(
@@ -115,16 +136,45 @@ export async function bootstrap() {
         } else {
           timeHeightController.hide(win.map, win);
         }
+        try { lineHeightController.hide(win.map, win); } catch {}
+        try { hovmollerController.hide(win.map, win); } catch {}
         tlogpController.hide(win.map, win);
         setTimeSliderVisible(false);
         return;
       }
 
-      if (hasTLogP) {
-        timeHeightController.hide();
+      if (isHovmoller) {
+        if (hasHovmoller) {
+          hovmollerController.show(win.map, win);
+        } else {
+          hovmollerController.hide(win.map, win);
+        }
+        try { timeHeightController.hide(win.map, win); } catch {}
+        try { lineHeightController.hide(win.map, win); } catch {}
+        tlogpController.hide(win.map, win);
+        setTimeSliderVisible(false);
+        return;
+      }
+
+      if (isLineHeight) {
+        if (hasLineHeight) {
+          lineHeightController.show(win.map, win);
+        } else {
+          lineHeightController.hide(win.map, win);
+        }
+        try { timeHeightController.hide(win.map, win); } catch {}
+        try { hovmollerController.hide(win.map, win); } catch {}
+        tlogpController.hide(win.map, win);
+        // Slider stays VISIBLE: fall through to NWP timeline setup below
+      } else if (hasTLogP) {
+        try { timeHeightController.hide(); } catch {}
+        try { lineHeightController.hide(); } catch {}
+        try { hovmollerController.hide(); } catch {}
         tlogpController.show(win.map, win);
       } else {
-        timeHeightController.hide();
+        try { timeHeightController.hide(); } catch {}
+        try { lineHeightController.hide(); } catch {}
+        try { hovmollerController.hide(); } catch {}
         tlogpController.hide(win.map, win);
       }
 
@@ -146,13 +196,15 @@ export async function bootstrap() {
           }
         });
       } else {
-        const pLayer = win.activeGroup?.layers?.find((l) => l.type === "contour" || l.type === "wind");
+        const pLayer = win.activeGroup?.layers?.find((l) => l.type === "contour" || l.type === "wind" || l.type === "lineheight" || l.type === "hovmoller");
+        // Line-profile groups step 12h (each G1 chip = a 40-blob reload; matches presetLoader)
+        const isLineProfile = pLayer?.type === "lineheight" || pLayer?.type === "hovmoller";
         resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", win.level || 500).then((cycles) => {
           if (getActiveWindow() === win) {
             if (!win.forecastCycle || !cycles.includes(win.forecastCycle)) {
               win.forecastCycle = cycles[0];
             }
-            setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 });
+            setTimelineMode("nwp", { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || (isLineProfile ? 12 : 6) });
             updateWindowTitle(win);
           }
         });
@@ -181,6 +233,7 @@ export async function bootstrap() {
       updateWindowTitle(win, group.name);
       setWindowHeaderPreset(win, group.id);
       const isTimeHeight = group.id === "composite-ec-timeheight" || group.layers?.some((l) => l.type === "timeheight");
+      const isHovmoller = group.id === "composite-ec-hovmoller" || group.layers?.some((l) => l.type === "hovmoller");
       if (win.isObservation) {
         const isTLogP = group.id === "composite-tlogp" || group.layers?.some((l) => l.element === "TLOGP");
         const effectiveLevel = win.level || group.defaultLevel || 500;
@@ -190,7 +243,7 @@ export async function bootstrap() {
         const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle, win);
         win.obsTime = latestFile;
         updateWindowTitle(win);
-      } else if (isTimeHeight) {
+      } else if (isTimeHeight || isHovmoller) {
         if (getActiveWindow() === win) {
           setTimeSliderVisible(false);
         }
@@ -270,6 +323,7 @@ export async function bootstrap() {
       updateWindowTitle(win, group.name);
       setWindowHeaderPreset(win, group.id);
       const isTimeHeight = group.id === "composite-ec-timeheight" || group.layers?.some((l) => l.type === "timeheight");
+      const isHovmoller = group.id === "composite-ec-hovmoller" || group.layers?.some((l) => l.type === "hovmoller");
       if (win.isObservation) {
         const isTLogP = group.id === "composite-tlogp" || group.layers?.some((l) => l.element === "TLOGP");
         const obsPath = isTLogP
@@ -278,7 +332,7 @@ export async function bootstrap() {
         const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle, win);
         win.obsTime = latestFile;
         updateWindowTitle(win);
-      } else if (isTimeHeight) {
+      } else if (isTimeHeight || isHovmoller) {
         if (getActiveWindow() === win) {
           setTimeSliderVisible(false);
         }
@@ -302,8 +356,19 @@ export async function bootstrap() {
   initTooltip("tooltip");
   initFullscreenControl("btn-fullscreen-toggle");
   initKeyboardShortcuts({
-    onPeriodStep: (dir) => timeSliderStep(dir, { source: dir < 0 ? "btn-prev" : "btn-next", directions: dir < 0 ? ["prev"] : ["next"] }),
+    onPeriodStep: (dir) => {
+      try {
+        const win = getActiveWindow();
+        if (win && hovmollerController.isActive(win)) return; // Group 2 swallows ←/→
+      } catch {}
+      return timeSliderStep(dir, { source: dir < 0 ? "btn-prev" : "btn-next", directions: dir < 0 ? ["prev"] : ["next"] });
+    },
     onLevelStep: async (dir) => {
+      try {
+        const win = getActiveWindow();
+        // Both line-profile diagrams own their vertical axis; Up/Down never touch win.level here
+        if (win && (lineHeightController.isActive(win) || hovmollerController.isActive(win))) return;
+      } catch {}
       const m = getMap();
       if (!m) return;
       await changeVerticalLevel(m, dir);

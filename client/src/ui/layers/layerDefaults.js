@@ -169,6 +169,49 @@ export function buildBaseConfig(layerDef) {
     };
   }
 
+  if (layerDef.type === "lineheight") {
+    return {
+      lon0: layerDef.config?.lon0 !== undefined ? layerDef.config.lon0 : 115.0,
+      lat0: layerDef.config?.lat0 !== undefined ? layerDef.config.lat0 : 28.0,
+      lon1: layerDef.config?.lon1 !== undefined ? layerDef.config.lon1 : 125.0,
+      lat1: layerDef.config?.lat1 !== undefined ? layerDef.config.lat1 : 38.0,
+      npoints: layerDef.config?.npoints !== undefined ? layerDef.config.npoints : 41,
+      lead: layerDef.config?.lead !== undefined ? layerDef.config.lead : null,
+      initCycle: layerDef.config?.initCycle || null,
+      levels: layerDef.config?.levels || [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200],
+      flipDirection: layerDef.config?.flipDirection || false,
+      showRH: layerDef.config?.showRH !== false,
+      showTemp: layerDef.config?.showTemp !== false,
+      showVVel: layerDef.config?.showVVel !== false,
+      showWind: layerDef.config?.showWind !== false,
+      showTransectMarker: layerDef.config?.showTransectMarker !== false,
+      ...(layerDef.config || {}),
+    };
+  }
+
+  if (layerDef.type === "hovmoller") {
+    return {
+      lon0: layerDef.config?.lon0 !== undefined ? layerDef.config.lon0 : 115.0,
+      lat0: layerDef.config?.lat0 !== undefined ? layerDef.config.lat0 : 28.0,
+      lon1: layerDef.config?.lon1 !== undefined ? layerDef.config.lon1 : 125.0,
+      lat1: layerDef.config?.lat1 !== undefined ? layerDef.config.lat1 : 38.0,
+      npoints: layerDef.config?.npoints !== undefined ? layerDef.config.npoints : 41,
+      initCycle: layerDef.config?.initCycle || null,
+      startHour: layerDef.config?.startHour !== undefined ? layerDef.config.startHour : 0,
+      endHour: layerDef.config?.endHour !== undefined ? layerDef.config.endHour : 144,
+      stepHours: layerDef.config?.stepHours !== undefined ? layerDef.config.stepHours : 12,
+      level: layerDef.config?.level !== undefined ? layerDef.config.level : 850,
+      axisSwap: layerDef.config?.axisSwap || "dist-x",
+      timeDir: layerDef.config?.timeDir || "fwd",
+      showRH: layerDef.config?.showRH !== false,
+      showTemp: layerDef.config?.showTemp !== false,
+      showVVel: layerDef.config?.showVVel !== false,
+      showWind: layerDef.config?.showWind !== false,
+      showTransectMarker: layerDef.config?.showTransectMarker !== false,
+      ...(layerDef.config || {}),
+    };
+  }
+
   return {
     showFill:
       layerDef.config?.showFill !== undefined

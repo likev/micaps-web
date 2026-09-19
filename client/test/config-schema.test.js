@@ -272,4 +272,34 @@ describe("Config Schema Validator (configSchema.js)", () => {
       expect(res.warnings.some((w) => w.message.includes("uses label, not name"))).toBe(true);
     });
   });
+
+  describe("Line-Profile Layer Rules", () => {
+    test("lineheight rejects levels outside the fixed 10-level set", () => {
+      const config = {
+        presets: [
+          {
+            id: "composite-ec-lineheight", name: "LH",
+            layers: [{ id: "ec-lineheight-diagram", type: "lineheight", model: "ECMWF_HR", element: "RH", config: { levels: [999] } }],
+          },
+        ],
+      };
+      const res = validateConfig(config);
+      expect(res.isValid).toBe(false);
+      expect(res.errors.some((e) => e.message.includes("non-empty subset"))).toBe(true);
+    });
+
+    test("hovmoller rejects a level outside the fixed 10-level set", () => {
+      const config = {
+        presets: [
+          {
+            id: "composite-ec-hovmoller", name: "HOV",
+            layers: [{ id: "ec-hovmoller-diagram", type: "hovmoller", model: "ECMWF_HR", element: "RH", config: { level: 999 } }],
+          },
+        ],
+      };
+      const res = validateConfig(config);
+      expect(res.isValid).toBe(false);
+      expect(res.errors.some((e) => e.message.includes("must be one of"))).toBe(true);
+    });
+  });
 });

@@ -11,6 +11,8 @@
 - **Standard WMO / NOAA Station Weather Plot**: Implements standard 9-position synoptic station model (CIMSS / NOAA WPC) with 110° angled wind barbs, sky cover octas, sea-level pressure, temperature, dewpoint, weather glyphs, and LoD decluttering.
 - **High-Density Raster & Wind Streamlines**: Zero-copy Float32 binary streaming rendered to offscreen canvas with CMA palettes, plus animated wind streamline particle simulator.
 - **Multi-Tab & Multi-Window Workstation**: Full 1×1, 1×2, 2×2 split layouts with synchronized pan/zoom/cursor, independent layer controls, time slider with step-length selection, and init-cycle switching.
+- **EC Time-Height Profile**: Point time–height cross-section (RH+T+VVEL+Wind, 1000–200 hPa) with global-timeline cursor follow.
+- **EC Line-Height & Time-Line Transects**: A→B line–height section (one timeline lead, distance × pressure) and Time–Line Hovmoller (panel-local span @ single level, swappable axes, revertible time) sharing the EC time–height sampling stack.
 - **Auto-Discovery of Cassandra Clusters**: Automatically discovers `MICAPS.exe.config` in the server directory and randomly balances connections across `ClusterIPAddress` nodes.
 - **Strict Modularity**: Every source file across the entire repository adheres strictly to **< 600 lines**.
 

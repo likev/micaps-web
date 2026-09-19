@@ -64,6 +64,10 @@ This document provides in-depth technical documentation for the architecture, da
     - [13.2.3. Asynchronous Concurrency, Window-Scoped Grid Caching & Fast-Path Resampling](#1323-asynchronous-concurrency-window-scoped-grid-caching--fast-path-resampling)
     - [13.2.4. Zero-Fetch Time Direction Inversion & Canvas Buffer Clearing](#1324-zero-fetch-time-direction-inversion--canvas-buffer-clearing)
     - [13.2.5. Aspect-Ratio Locked Subwindow Resizing & Viewport Clamping](#1325-aspect-ratio-locked-subwindow-resizing--viewport-clamping)
+  - [13.3. ECMWF Transect Profiles: Line–Height Section & Time–Line Hovmoller (`ec-line-profile`)](#133-ecmwf-transect-profiles-lineheight-section--timeline-hovmoller-ec-line-profile)
+    - [13.3.1. Transect Endpoints](#1331-transect-endpoints)
+    - [13.3.2. Matrices & Timeline Ownership](#1332-matrices--timeline-ownership)
+    - [13.3.3. Response & Heap Budget](#1333-response--heap-budget)
 - [14. Meteorological Unit Testing & Automated Verification (Bun Test & Go Test)](#14-meteorological-unit-testing--automated-verification-bun-test--go-test)
   - [14.1. Client Meteorological Test Suite (Bun Test)](#141-client-meteorological-test-suite-bun-test)
   - [14.2. Server Binary Parser Test Suite (Go Test)](#142-server-binary-parser-test-suite-go-test)
@@ -201,7 +205,7 @@ micaps-web/
 │   │   ├── store/                    # Reactive workstation state manager
 │   │   ├── ui/                       # Navbar, catalog drawer, layer control, time slider, tooltip
 │   │   └── utils/                    # CMA palettes, weather symbols, griddata-js adapter
-│   └── test/                         # Meteorological Unit Test Suite (486 bun tests across 68 files)
+│   └── test/                         # Meteorological Unit Test Suite (514 bun tests across 73 files)
 │       ├── tlogp/                    # T-lnP thermodynamics, parcel ascent & aspect-ratio resize tests
 │       ├── timeheight/               # Time-height loading, canvas math, sampling, resize & integration tests
 │       ├── colormaps.test.js         # Dynamic colormaps & level scaling tests
@@ -1614,6 +1618,69 @@ graph TD
   - The window is clamped to a minimum size of $480 \times 367\text{ px}$ and cannot be dragged or resized beyond viewport margins ($10\text{ px}$ boundary padding).
 - **Double-Click Reset**:
   - Double-clicking the bottom-right corner resize handle (`.th-resize-se`) immediately resets the window to default $680 \times 520\text{ px}$.
+
+### 13.3. ECMWF Transect Profiles: Line–Height Section & Time–Line Hovmoller (`ec-line-profile`)
+
+Two preset groups reuse the EC time–height stack (`composite-ec-timeheight`, `GET /api/data/timeheight/profile`,
+`client/src/layers/timeheight/`, `server/handler/profile_handler.go` + `server/parser/sample_point.go` + `server/filecache/`)
+for A→B transect diagrams. Both sample 4 elements (`RH,TMP,VVEL,WIND`) from `ECMWF_HR/<ELEM>/<level>`, render RH fill +
+red T lines + cyan VVEL (bold `ω=0`) + barbs, and stream NDJSON progress→result behind the 2000 MB server file cache.
+
+| # | Preset id | Axes | Time source | Level source |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | `composite-ec-lineheight` | X = along-line distance (km), Y = pressure log | One lead from global NWP timeline (chip / ◀ ▶ / ← → / play) | Fixed 10 levels (1000–200 hPa) |
+| 2 | `composite-ec-hovmoller` | Swappable: default X = distance, Y = forecast lead (0 top → end bottom); swapped X = lead, Y = distance. Time axis revertible (`fwd/rev`, display-only) | Panel-local span (`start–end @ step`, default `0–144 @ 12`); global timeline hidden + ignored | User single level (default 850) |
+
+#### 13.3.1. Transect Endpoints (`GET /api/data/lineheight/profile`, `GET /api/data/hovmoller/profile`)
+
+```
+GET /api/data/lineheight/profile?model=ECMWF_HR&cycle=<YYMMDDHH>&lead=<0..240>
+  &levels=1000,925,850,700,600,500,400,300,250,200&lon0=&lat0=&lon1=&lat1=&npoints=<2..81>
+GET /api/data/hovmoller/profile?model=ECMWF_HR&cycle=<8 digits>&leads=0,12,...,144
+  &level=<single>&lon0=&lat0=&lon1=&lat1=&npoints=<2..81>
+```
+
+- **Shared transect math** (`server/handler/lineprofile_common.go`): geodesic slerp nodes
+  (`buildTransectNodes`; equirect lerp differs <0.5% under 2000 km), haversine distances,
+  angular-separation degenerate guard (`>= ~0.1°`), per-task blob fetch (file cache → singleflight →
+  Cassandra → mock) then `SampleGridPoint` per node. `null` = gap (client → NaN; never fabricated).
+- **Line–Height tasks**: `len(levels) × 4` (default 40); result matrices `[level][pt]`
+  (`rh/tmp/vvel/u/v`) + `{pointA, pointB, distKm, lead, cycle, levels, missing, stats}`.
+  Cost ≈ 40 blobs/lead (≈ 30–60 KB); timeline stepping stays interactive, repeats served from file cache.
+- **Hovmoller tasks**: `len(leads) × 4` (default 52); result matrices `[lead][pt]` + `{pointA, pointB,
+  distKm, cycle, leads, level, missing, stats}` (≈ 40–80 KB per span load).
+- **Validation 400s**: bad cycle/lead(s)/level(s), non-numeric or out-of-range lonlat, `npoints` range,
+  `..`/`%00` traversal, degenerate A≈B, whole-segment-out-of-domain (partially-out returns
+  edge-clamped samples + missing counts, never extrapolates). Both routes share the time–height
+  `ResponseController` write-deadline exemption.
+
+#### 13.3.2. Matrices & Timeline Ownership (`client/src/layers/lineprofile/`)
+
+- **Shared client core**: `lineUtils.js` (slerp nodes, haversine, validation, `buildLeads`,
+  `decimateStride`), `lineHighlight.js` (amber `lp-line-*` overlay + pending-A marker + rubber-band
+  preview), `lineHeightLoader.js` / `hovmollerLoader.js` (single-fetch NDJSON, monotonic `onProgress`,
+  Abort + per-window seq cancel, `null→NaN`), `lineIsolines.js` (generic `(u,v)` RH fill / T / VVEL /
+  barb renderers shared by both diagrams).
+- **Group 1 follows the global NWP timeline** (slider visible): chip / prev-next / arrows / play tick →
+  `loadPresetGroup(isTimeStep=true)` → `lineHeightController.setLead(period)` = full section reload
+  (debounced 150 ms + abort-in-flight; `matrixCache<=20`). Init-cycle select reloads the same lead.
+- **Group 2 owns its time** (global timeline hidden + ignored): `isTimeStep` is a no-op for hovmoller
+  layers; `setSpan`/`setLevel`/`setCycle`/`setLine` drive `hovmollerController.loadMatrix`.
+  `changeVerticalLevel` (Up/Down, level selects) never touches hovmoller state; arrows are swallowed
+  while a Hovmoller window is focused (panel hint badge: "Time controlled here — timeline parked").
+- **Display-only view state** (zero fetch, persisted): Group 1 `flipDirection` (A→B / B→A mirror);
+  Group 2 `axisSwap` (`dist-x` ⇄ `time-x`, coordinate remap only, no wire transpose) composed with
+  `timeDir` (`fwd` 0→end ⇄ `rev` end→0, mirrors time–height `ltr/rtl`) → 4 views.
+- **Line editing** (both groups, click — no drag in v1): drawer + panel numeric A/B + N (2–81),
+  two-click `Draw line` (rubber-band preview, `Esc`/right-click cancels), single-endpoint `Set A/B
+  from map` fix-up; disarmed map clicks are no-ops. Endpoints snap via `snapToGridNode`, clamp via
+  `clampToGridDomain` + toast (one max per gesture); A==B rejected.
+
+#### 13.3.3. Response & Heap Budget
+
+- Per-load wire targets `<= 100 KB` (10×41×6 floats ≈ 30–60 KB section; 13×41×6 ≈ 40–80 KB hovmoller).
+- Browser holds matrices only — no grids (same posture as time–height); per-window `matrixCache<=20`.
+- Measured suites: `go test ./...` + `bun test` (514 tests: 492 existing + 22 line-profile).
 
 ---
 

@@ -111,6 +111,14 @@ export function handleVisibilityAction(map, layerId, value, layer, winObj) {
     import("../../layers/timeheight/timeHeightLayer.js").then(({ setTimeHeightVisibility }) => {
       setTimeHeightVisibility(map, value, winObj);
     });
+  } else if (layer.type === "lineheight") {
+    import("../../layers/lineprofile/lineProfileLayer.js").then(({ setLineHeightVisibility }) => {
+      setLineHeightVisibility(map, value, winObj);
+    });
+  } else if (layer.type === "hovmoller") {
+    import("../../layers/lineprofile/lineProfileLayer.js").then(({ setHovmollerVisibility }) => {
+      setHovmollerVisibility(map, value, winObj);
+    });
   }
 
   // Synchronize legend lifecycle on layer visibility change (contour/wind only)

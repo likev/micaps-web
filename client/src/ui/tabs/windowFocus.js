@@ -111,7 +111,13 @@ export function focusWindow(tabId, winIdx) {
     activeWin.layers?.some((l) => l.type === "timeheight" || l.id === "ec-timeheight-diagram")
   );
 
-  if (isTimeHeight) {
+  const isHovmoller = Boolean(
+    activeWin.activeGroup?.id === "composite-ec-hovmoller" ||
+    activeWin.activeGroup?.layers?.some((l) => l.type === "hovmoller" || l.id === "ec-hovmoller-diagram") ||
+    activeWin.layers?.some((l) => l.type === "hovmoller" || l.id === "ec-hovmoller-diagram")
+  );
+
+  if (isTimeHeight || isHovmoller) {
     try { setTimeSliderVisible(false); } catch {}
   } else {
     // Apply pending or cached observation timeline for active window
