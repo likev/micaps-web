@@ -312,6 +312,8 @@ class TimeHeightController {
       stepHours: state.stepHours,
     }, win);
 
+    state.panel?.setRange(state.startHour, state.endHour, state.stepHours);
+
     return this.loadMatrix(win);
   }
 

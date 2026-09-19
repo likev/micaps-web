@@ -49,6 +49,8 @@ export class TimeHeightCanvasRenderer {
     this.matrix = null;
     this.cursorLead = null;
     this.hoverInfo = null;
+    this.width = 640;
+    this.height = 480;
 
     this.layout = {
       paddingLeft: 52,
@@ -87,23 +89,34 @@ export class TimeHeightCanvasRenderer {
   resize() {
     if (!this.canvas) return;
     const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
-    const rect = this.canvas.getBoundingClientRect();
-    const w = rect.width > 0 ? rect.width : (this.canvas.width || 640);
-    const h = rect.height > 0 ? rect.height : (this.canvas.height || 480);
+    const rect = this.canvas.getBoundingClientRect ? this.canvas.getBoundingClientRect() : null;
+    const w = this.canvas.clientWidth || (rect ? rect.width : 0) || (this.canvas.width ? this.canvas.width / dpr : this.width);
+    const h = this.canvas.clientHeight || (rect ? rect.height : 0) || (this.canvas.height ? this.canvas.height / dpr : this.height);
 
-    this.canvas.width = Math.round(w * dpr);
-    this.canvas.height = Math.round(h * dpr);
+    this.width = Math.round(w);
+    this.height = Math.round(h);
+
+    const targetWidth = Math.round(w * dpr);
+    const targetHeight = Math.round(h * dpr);
+    if (this.canvas.width !== targetWidth || this.canvas.height !== targetHeight) {
+      this.canvas.width = targetWidth;
+      this.canvas.height = targetHeight;
+    }
 
     if (this.ctx) {
-      this.ctx.resetTransform?.();
-      this.ctx.scale(dpr, dpr);
+      if (typeof this.ctx.setTransform === "function") {
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      } else if (typeof this.ctx.scale === "function") {
+        this.ctx.resetTransform?.();
+        this.ctx.scale(dpr, dpr);
+      }
     }
 
     this.layout.plotRect = {
       x: this.layout.paddingLeft,
       y: this.layout.paddingTop,
-      width: Math.max(10, w - this.layout.paddingLeft - this.layout.paddingRight),
-      height: Math.max(10, h - this.layout.paddingTop - this.layout.paddingBottom),
+      width: Math.max(10, this.width - this.layout.paddingLeft - this.layout.paddingRight),
+      height: Math.max(10, this.height - this.layout.paddingTop - this.layout.paddingBottom),
     };
 
     this.render();
@@ -178,12 +191,20 @@ export class TimeHeightCanvasRenderer {
   render() {
     const ctx = this.ctx;
     if (!ctx) return;
+    const width = this.canvas?.clientWidth || this.width || 640;
+    const height = this.canvas?.clientHeight || this.height || 480;
+    this.width = width;
+    this.height = height;
+
     const pRect = this.layout.plotRect;
     if (pRect.width <= 0 || pRect.height <= 0) return;
 
+    // 0. Completely clear canvas buffer to wipe previous axes, labels, and plots
+    ctx.clearRect(0, 0, width, height);
+
     // Clear canvas background
     ctx.fillStyle = "#0d1117";
-    ctx.fillRect(0, 0, this.width, this.height);
+    ctx.fillRect(0, 0, width, height);
 
     if (!this.matrix) {
       ctx.fillStyle = "#8b949e";
