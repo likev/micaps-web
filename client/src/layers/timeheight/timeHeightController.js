@@ -1,0 +1,569 @@
+// timeHeightController.js - Cross-section state orchestration, MapLibre interaction, and data lifecycle
+import {
+  PROFILE_LEVELS,
+  buildLeads,
+  loadTimeHeightMatrix,
+  buildProfileMatrix,
+  getThGridCache,
+  formatGridFileName,
+} from "./timeHeightLoader.js";
+import { snapToGridNode, clampToGridDomain } from "./timeHeightSampling.js";
+import { TimeHeightPanel } from "./timeHeightPanel.js";
+import { resolveForecastCycles } from "../../utils/timelineSync.js";
+import { autoSaveLayerConfig } from "../../config/presets.js";
+import { showErrorToast } from "../../ui/toast.js";
+import { addOrUpdateLayer, getLayersForWindow, syncLayerControlForWindow } from "../../ui/layers/layerStore.js";
+import { getActiveWindow } from "../../ui/tabs/tabsStore.js";
+
+class WindowState {
+  constructor(winId) {
+    this.winId = winId;
+    this.activePoint = { lon: 121.5, lat: 31.4, i: 0, j: 0 };
+    this.cycle = null;
+    this.availableCycles = [];
+    this.startHour = 0;
+    this.endHour = 144;
+    this.stepHours = 12;
+    this.leads = buildLeads(0, 144, 12);
+    this.levels = [...PROFILE_LEVELS];
+    this.timeDirection = "ltr";
+    this.matrix = null;
+    this.matrixCache = new Map();
+    this.loadingSeq = 0;
+    this.panel = null;
+    this.activeMap = null;
+    this.activeWin = null;
+    this.isLayerActive = false;
+    this.mapClickListener = null;
+    this.firstGridSample = null;
+  }
+}
+
+class TimeHeightController {
+  constructor() {
+    this.windows = new Map(); // winId -> WindowState
+    this._activeWin = null;
+    this._defaultState = new WindowState("default");
+  }
+
+  _getWinId(win = null) {
+    return win?.id || this._activeWin?.id || "default";
+  }
+
+  _getState(win = null) {
+    const winId = this._getWinId(win);
+    if (winId === "default") {
+      return this._defaultState;
+    }
+    let state = this.windows.get(winId);
+    if (!state) {
+      state = new WindowState(winId);
+      if (this._defaultState.cycle) state.cycle = this._defaultState.cycle;
+      if (this._defaultState.leads) state.leads = [...this._defaultState.leads];
+      if (this._defaultState.levels) state.levels = [...this._defaultState.levels];
+      if (this._defaultState.timeDirection) state.timeDirection = this._defaultState.timeDirection;
+      this.windows.set(winId, state);
+    }
+    return state;
+  }
+
+  get activePoint() { return this._getState().activePoint; }
+  set activePoint(pt) { this._getState().activePoint = pt; }
+  get cycle() { return this._getState().cycle; }
+  set cycle(c) { this._getState().cycle = c; }
+  get availableCycles() { return this._getState().availableCycles; }
+  set availableCycles(ac) { this._getState().availableCycles = ac; }
+  get startHour() { return this._getState().startHour; }
+  set startHour(h) { this._getState().startHour = h; }
+  get endHour() { return this._getState().endHour; }
+  set endHour(h) { this._getState().endHour = h; }
+  get stepHours() { return this._getState().stepHours; }
+  set stepHours(s) { this._getState().stepHours = s; }
+  get leads() { return this._getState().leads; }
+  set leads(l) { this._getState().leads = l; }
+  get levels() { return this._getState().levels; }
+  set levels(l) { this._getState().levels = l; }
+  get timeDirection() { return this._getState().timeDirection; }
+  set timeDirection(d) { this._getState().timeDirection = d; }
+  get matrix() { return this._getState().matrix; }
+  set matrix(m) { this._getState().matrix = m; }
+  get matrixCache() { return this._getState().matrixCache; }
+  set matrixCache(mc) { this._getState().matrixCache = mc; }
+  get loadingSeq() { return this._getState().loadingSeq; }
+  set loadingSeq(s) { this._getState().loadingSeq = s; }
+  get panel() { return this._getState().panel; }
+  set panel(p) { this._getState().panel = p; }
+  get activeMap() { return this._getState().activeMap; }
+  set activeMap(m) { this._getState().activeMap = m; }
+  get activeWin() { return this._activeWin; }
+  set activeWin(w) {
+    this._activeWin = w || null;
+    if (w) {
+      const state = this._getState(w);
+      state.activeWin = w;
+    }
+  }
+  get isLayerActive() { return this._getState().isLayerActive; }
+  set isLayerActive(a) { this._getState().isLayerActive = a; }
+  get mapClickListener() { return this._getState().mapClickListener; }
+  set mapClickListener(l) { this._getState().mapClickListener = l; }
+  get firstGridSample() { return this._getState().firstGridSample; }
+  set firstGridSample(s) { this._getState().firstGridSample = s; }
+
+  isActive(win = null) {
+    if (win) {
+      const winId = this._getWinId(win);
+      const state = winId === "default" ? this._defaultState : this.windows.get(winId);
+      return Boolean(state?.isLayerActive);
+    }
+    if (this._defaultState.isLayerActive) return true;
+    for (const state of this.windows.values()) {
+      if (state.isLayerActive) return true;
+    }
+    return false;
+  }
+
+  async init(map, win, layerDef = {}) {
+    const state = this._getState(win);
+    state.activeMap = map;
+    state.activeWin = win;
+    state.isLayerActive = true;
+    this.activeWin = win;
+
+    const config = layerDef.config || {};
+    if (config.lon !== undefined && config.lat !== undefined) {
+      state.activePoint = { lon: config.lon, lat: config.lat, i: 0, j: 0 };
+    }
+    state.startHour = config.startHour !== undefined ? config.startHour : 0;
+    state.endHour = config.endHour !== undefined ? config.endHour : 144;
+    state.stepHours = config.stepHours !== undefined ? config.stepHours : 12;
+    state.leads = buildLeads(state.startHour, state.endHour, state.stepHours);
+    state.timeDirection = config.timeDirection || "ltr";
+    state.levels = config.levels || [...PROFILE_LEVELS];
+
+    // Resolve available forecast cycles
+    try {
+      const cycles = await resolveForecastCycles("ECMWF_HR", "TMP", 500);
+      if (cycles && cycles.length > 0) {
+        state.availableCycles = cycles;
+        state.cycle = config.initCycle || win?.initCycle || cycles[0];
+      }
+    } catch {
+      state.cycle = config.initCycle || "latest";
+    }
+
+    if (!state.cycle) {
+      state.cycle = "latest";
+    }
+
+    // Initialize floating panel for this window
+    if (!state.panel) {
+      state.panel = new TimeHeightPanel({
+        windowId: state.winId,
+        defaultPoint: state.activePoint,
+        startHour: state.startHour,
+        endHour: state.endHour,
+        stepHours: state.stepHours,
+        timeDirection: state.timeDirection,
+        onRangeChange: (start, end, step) => this.setRange(start, end, step, win),
+        onCycleChange: (cycle) => this.setCycle(cycle, win),
+        onDirectionChange: (dir) => this.setTimeDirection(dir, win),
+        onToggleElement: (element, checked) => this.syncDrawerCheckbox(element, checked, win),
+        onCancel: () => this.cancelLoad(win),
+        onClose: () => {
+          this.hide(map, win);
+          if (win) {
+            const l = this._findLayer(win);
+            if (l) l.visible = false;
+          }
+        },
+      });
+    }
+
+    state.panel.setCycle(state.cycle, state.availableCycles);
+    state.panel.setPoint(state.activePoint.lon, state.activePoint.lat);
+    state.panel.setTimeDirection(state.timeDirection);
+
+    if (layerDef.visible === false) {
+      this.hide(map, win);
+    } else {
+      this.show(map, win);
+    }
+
+    // Register Map click listener
+    this._setupMapClick(map, win);
+
+    // Initial highlight marker
+    this.highlightPointOnMap(map, state.activePoint.lon, state.activePoint.lat);
+
+    // Initial bulk or cached matrix load
+    return this.loadMatrix(win);
+  }
+
+  _setupMapClick(map, win = null) {
+    if (!map || typeof map.on !== "function") return;
+    const state = this._getState(win);
+    if (state.mapClickListener) {
+      map.off("click", state.mapClickListener);
+    }
+    state.mapClickListener = (e) => {
+      if (!this.isActive(win)) return;
+      if (e.originalEvent) {
+        const target = e.originalEvent.target;
+        if (target && (target.closest?.(".timeheight-subwindow") || target.closest?.(".layer-drawer") || target.closest?.(".navbar"))) {
+          return;
+        }
+      }
+      const lng = e.lngLat ? e.lngLat.lng : map.unproject(e.point).lng;
+      const lat = e.lngLat ? e.lngLat.lat : map.unproject(e.point).lat;
+      this.setPoint(lng, lat, win, map);
+    };
+    map.on("click", state.mapClickListener);
+  }
+
+  async setPoint(lon, lat, win = this.activeWin, map = null) {
+    const state = this._getState(win);
+    const targetMap = map || state.activeMap;
+
+    const clamped = clampToGridDomain(state.firstGridSample, lon, lat);
+    if (clamped.clamped) {
+      showErrorToast?.(`Selected point (${lon.toFixed(2)}°, ${lat.toFixed(2)}°) clamped to model domain.`);
+    }
+
+    const snapped = snapToGridNode(state.firstGridSample, clamped.lon, clamped.lat);
+    state.activePoint = snapped;
+
+    // Move map marker
+    this.highlightPointOnMap(targetMap, snapped.lon, snapped.lat);
+
+    // Update panel header and drawer
+    state.panel?.setPoint(snapped.lon, snapped.lat, snapped.i, snapped.j);
+    this._persistConfig({ lon: snapped.lon, lat: snapped.lat }, win);
+
+    // Check fast-path resample
+    const leadsKey = state.leads.join(",");
+    const levelsKey = state.levels.join(",");
+    const matrixKey = `${state.cycle}|${leadsKey}|${levelsKey}|${snapped.i},${snapped.j}`;
+
+    if (state.matrixCache.has(matrixKey)) {
+      state.matrix = state.matrixCache.get(matrixKey);
+      state.panel?.setData(state.matrix);
+      return state.matrix;
+    }
+
+    // Check if raw grids are all cached in window cache
+    const gridCache = getThGridCache(win);
+    const elements = ["RH", "TMP", "VVEL", "WIND"];
+    let allCached = true;
+    for (const lead of state.leads) {
+      const file = formatGridFileName(state.cycle, lead);
+      for (const level of state.levels) {
+        for (const el of elements) {
+          const key = `ECMWF_HR/${el}/${level}|${file}`;
+          if (!gridCache.has(key)) {
+            allCached = false;
+            break;
+          }
+        }
+        if (!allCached) break;
+      }
+      if (!allCached) break;
+    }
+
+    if (allCached) {
+      // Instant zero-network synchronous resample pass
+      const gridMap = new Map();
+      for (const [k, v] of gridCache.entries()) {
+        if (v && v.data) gridMap.set(k, v.data);
+      }
+      state.matrix = buildProfileMatrix({
+        cycle: state.cycle,
+        leads: state.leads,
+        levels: state.levels,
+        point: snapped,
+        model: "ECMWF_HR",
+        gridMap,
+      });
+      state.matrixCache.set(matrixKey, state.matrix);
+      state.panel?.setData(state.matrix);
+      return state.matrix;
+    }
+
+    // Cold path: bulk load with progress
+    return this.loadMatrix(win);
+  }
+
+  setRange(start, end, step, win = this.activeWin) {
+    const state = this._getState(win);
+    const validLeads = buildLeads(start, end, step);
+    if (!validLeads || validLeads.length === 0) {
+      showErrorToast?.("Invalid forecast range or step interval.");
+      return;
+    }
+
+    state.startHour = validLeads[0];
+    state.endHour = validLeads[validLeads.length - 1];
+    state.stepHours = step;
+    state.leads = validLeads;
+
+    this._persistConfig({
+      startHour: state.startHour,
+      endHour: state.endHour,
+      stepHours: state.stepHours,
+    }, win);
+
+    return this.loadMatrix(win);
+  }
+
+  setCycle(cycle, win = this.activeWin) {
+    const state = this._getState(win);
+    if (!cycle || cycle === state.cycle) return;
+    state.cycle = cycle;
+    state.panel?.setCycle(state.cycle, state.availableCycles);
+    this._persistConfig({ initCycle: cycle }, win);
+    return this.loadMatrix(win);
+  }
+
+  setTimeDirection(dir, win = this.activeWin) {
+    if (dir !== "ltr" && dir !== "rtl") return;
+    const state = this._getState(win);
+    state.timeDirection = dir;
+    state.panel?.setTimeDirection(dir);
+    this._persistConfig({ timeDirection: dir }, win);
+  }
+
+  updateCursorLead(lead, win = null) {
+    const state = this._getState(win);
+    state.panel?.setCursorLead(lead);
+  }
+
+  cancelLoad(win = null) {
+    const state = this._getState(win);
+    state.loadingSeq++;
+    state.panel?.hideProgress();
+  }
+
+  syncDrawerCheckbox(element, checked, win = null) {
+    const targetWin = win || this.activeWin;
+    if (typeof document !== "undefined") {
+      const drawer = document.querySelector?.(`.layer-config[data-layer-id="ec-timeheight-diagram"]`);
+      if (drawer) {
+        const map = {
+          RH: ".chk-th-rh",
+          TMP: ".chk-th-temp",
+          VVEL: ".chk-th-vvel",
+          WIND: ".chk-th-wind",
+        };
+        const cb = drawer.querySelector?.(map[element]);
+        if (cb) cb.checked = Boolean(checked);
+      }
+    }
+    const propMap = { RH: "showRH", TMP: "showTemp", VVEL: "showVVel", WIND: "showWind" };
+    if (propMap[element]) {
+      this._persistConfig({ [propMap[element]]: Boolean(checked) }, targetWin);
+    }
+  }
+
+  async loadMatrix(win = this.activeWin) {
+    const state = this._getState(win);
+    const seq = ++state.loadingSeq;
+    state.panel?.setProgress({ loaded: 0, total: state.leads.length * state.levels.length * 4, pct: 0 });
+
+    try {
+      const res = await loadTimeHeightMatrix({
+        win,
+        model: "ECMWF_HR",
+        cycle: state.cycle,
+        leads: state.leads,
+        levels: state.levels,
+        point: state.activePoint,
+        signalSeq: seq,
+        isCancelled: () => state.loadingSeq !== seq,
+        onProgress: (prog) => {
+          if (state.loadingSeq === seq) {
+            state.panel?.setProgress(prog);
+          }
+        },
+      });
+
+      if (state.loadingSeq !== seq || !res || res.cancelled) {
+        return null;
+      }
+
+      state.panel?.hideProgress();
+      if (res.matrix) {
+        state.matrix = res.matrix;
+        state.activePoint = res.matrix.point;
+        if (!state.firstGridSample && win?._thGridCache) {
+          const first = win._thGridCache.values().next().value;
+          if (first && first.data) state.firstGridSample = first.data;
+        }
+
+        const leadsKey = state.leads.join(",");
+        const levelsKey = state.levels.join(",");
+        const matrixKey = `${state.cycle}|${leadsKey}|${levelsKey}|${state.activePoint.i},${state.activePoint.j}`;
+        state.matrixCache.set(matrixKey, state.matrix);
+
+        state.panel?.setData(state.matrix);
+        state.panel?.setPoint(state.activePoint.lon, state.activePoint.lat, state.activePoint.i, state.activePoint.j);
+      }
+
+      if (res.stats.failed > 0 && res.stats.failed === res.stats.total) {
+        showErrorToast?.(`Failed to load profile grids for cycle ${state.cycle}.`);
+      }
+
+      return state.matrix;
+    } catch (err) {
+      if (state.loadingSeq === seq) {
+        state.panel?.hideProgress();
+        showErrorToast?.(`Time-height matrix load error: ${err?.message || err}`);
+      }
+      return null;
+    }
+  }
+
+  highlightPointOnMap(map, lon, lat) {
+    if (!map || typeof map.getSource !== "function") return;
+
+    const sourceId = "th-active-point-source";
+    const haloLayerId = "th-active-point-halo";
+    const centerLayerId = "th-active-point-center";
+
+    const featureCollection = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [lon, lat] },
+          properties: { model: "ECMWF_HR" },
+        },
+      ],
+    };
+
+    const existing = map.getSource(sourceId);
+    if (existing && typeof existing.setData === "function") {
+      existing.setData(featureCollection);
+    } else {
+      map.addSource(sourceId, { type: "geojson", data: featureCollection });
+
+      map.addLayer({
+        id: haloLayerId,
+        type: "circle",
+        source: sourceId,
+        paint: {
+          "circle-radius": 14,
+          "circle-color": "rgba(31, 111, 235, 0.25)",
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#58a6ff",
+        },
+      });
+
+      map.addLayer({
+        id: centerLayerId,
+        type: "circle",
+        source: sourceId,
+        paint: {
+          "circle-radius": 5,
+          "circle-color": "#1f6feb",
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#ffffff",
+        },
+      });
+    }
+  }
+
+  removePointHighlight(map = null) {
+    const targetMap = map || this.activeMap;
+    if (!targetMap || typeof targetMap.removeLayer !== "function") return;
+    const haloLayerId = "th-active-point-halo";
+    const centerLayerId = "th-active-point-center";
+    const sourceId = "th-active-point-source";
+
+    if (targetMap.getLayer(haloLayerId)) targetMap.removeLayer(haloLayerId);
+    if (targetMap.getLayer(centerLayerId)) targetMap.removeLayer(centerLayerId);
+    if (targetMap.getSource(sourceId)) targetMap.removeSource(sourceId);
+  }
+
+  setHighlightVisible(map = null, visible = true) {
+    const targetMap = map || this.activeMap;
+    if (!targetMap || typeof targetMap.getLayer !== "function") return;
+    const val = visible ? "visible" : "none";
+    if (targetMap.getLayer("th-active-point-halo")) targetMap.setLayoutProperty("th-active-point-halo", "visibility", val);
+    if (targetMap.getLayer("th-active-point-center")) targetMap.setLayoutProperty("th-active-point-center", "visibility", val);
+  }
+
+  show(map = null, win = null) {
+    const state = this._getState(win);
+    state.panel?.show();
+    this.setHighlightVisible(map || state.activeMap, true);
+  }
+
+  hide(map = null, win = null) {
+    const state = this._getState(win);
+    state.panel?.hide();
+    this.setHighlightVisible(map || state.activeMap, false);
+  }
+
+  toggle(map = null, win = null) {
+    const state = this._getState(win);
+    if (!state.panel) return;
+    if (state.panel.container && state.panel.container.style.display === "none") {
+      this.show(map, win);
+    } else {
+      this.hide(map, win);
+    }
+  }
+
+  _findLayer(win = this.activeWin) {
+    if (!win) return null;
+    const layers = getLayersForWindow(win);
+    return layers?.find((l) => l.type === "timeheight" || l.id === "ec-timeheight-diagram");
+  }
+
+  _persistConfig(patch = {}, win = this.activeWin) {
+    const targetWin = win || this.activeWin;
+    if (!targetWin) return;
+    const layer = this._findLayer(targetWin);
+    if (layer) {
+      layer.config = { ...(layer.config || {}), ...patch };
+      addOrUpdateLayer(layer, targetWin);
+      autoSaveLayerConfig();
+      if (typeof getActiveWindow === "function" && getActiveWindow() === targetWin) {
+        syncLayerControlForWindow(targetWin);
+      }
+    }
+  }
+
+  destroy(map = null, win = null) {
+    const targetWin = win || this._activeWin;
+    const winId = this._getWinId(targetWin);
+    const state = winId === "default" ? this._defaultState : this.windows.get(winId);
+
+    if (state) {
+      state.isLayerActive = false;
+      const targetMap = map || state.activeMap;
+      if (targetMap && state.mapClickListener) {
+        targetMap.off("click", state.mapClickListener);
+        state.mapClickListener = null;
+      }
+      this.removePointHighlight(targetMap);
+      if (state.panel) {
+        state.panel.destroy();
+        state.panel = null;
+      }
+      state.matrix = null;
+      state.matrixCache.clear();
+      state.activeMap = null;
+      state.activeWin = null;
+      if (winId !== "default") {
+        this.windows.delete(winId);
+      }
+    }
+
+    if (this._activeWin && this._getWinId(this._activeWin) === winId) {
+      this._activeWin = null;
+    }
+  }
+}
+
+export const timeHeightController = new TimeHeightController();

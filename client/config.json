@@ -689,6 +689,41 @@
           }
         }
       ]
+    },
+    {
+      "id": "composite-ec-timeheight",
+      "name": "EC Time-Height Profile (RH+T+VVEL+Wind)",
+      "category": "NWP Time-Height Profile",
+      "isObservation": false,
+      "hasLevel": false,
+      "defaultLevel": null,
+      "colormap": "RH",
+      "layers": [
+        {
+          "id": "ec-timeheight-diagram",
+          "name": "EC Time-Height Profile (click map for point)",
+          "type": "timeheight",
+          "model": "ECMWF_HR",
+          "element": "RH",
+          "visible": true,
+          "removable": true,
+          "config": {
+            "lon": 121.5,
+            "lat": 31.4,
+            "initCycle": null,
+            "startHour": 0,
+            "endHour": 144,
+            "stepHours": 12,
+            "timeDirection": "ltr",
+            "levels": [1000, 925, 850, 700, 500, 400, 300, 250, 200, 100],
+            "showRH": true,
+            "showTemp": true,
+            "showVVel": true,
+            "showWind": true,
+            "showGridPointMarker": true
+          }
+        }
+      ]
     }
   ]
 }

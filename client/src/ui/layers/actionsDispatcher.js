@@ -87,6 +87,10 @@ export function handleRemoveAction(map, layerId, layer, win) {
     import("../../layers/tlogp/tlogpLayer.js").then(({ removeTLogPLayer }) => {
       removeTLogPLayer(map, win);
     });
+  } else if (layer.type === "timeheight") {
+    import("../../layers/timeheight/timeHeightLayer.js").then(({ removeTimeHeightLayer }) => {
+      removeTimeHeightLayer(map, win);
+    });
   }
 }
 

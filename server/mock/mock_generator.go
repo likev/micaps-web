@@ -24,13 +24,30 @@ func GenerateMockGrid(element string, level float32, period int32) *model.GridRe
 	total := int(nLon * nLat)
 	now := time.Now().UTC().Truncate(time.Hour)
 
+	desc := fmt.Sprintf("Synthetic %s field at %0.0f hPa", element, level)
+	isoStart := float32(-30.0)
+	isoEnd := float32(40.0)
+	isoSpace := float32(4.0)
+
+	if element == "VVEL" {
+		desc = "10e-2.Pa.s-1"
+		isoStart = -100.0
+		isoEnd = 100.0
+		isoSpace = 10.0
+	} else if element == "RH" {
+		desc = "%"
+		isoStart = 50.0
+		isoEnd = 100.0
+		isoSpace = 10.0
+	}
+
 	resp := &model.GridResponse{
 		Header: model.GridHeader{
 			Discriminator:       "mdfs",
 			DataType:            4,
 			ModelName:           "MOCK_SYNTHETIC",
 			Element:             element,
-			Description:         fmt.Sprintf("Synthetic %s field at %0.0f hPa", element, level),
+			Description:         desc,
 			Level:               level,
 			Year:                int32(now.Year()),
 			Month:               int32(now.Month()),
@@ -45,9 +62,9 @@ func GenerateMockGrid(element string, level float32, period int32) *model.GridRe
 			EndLatitude:         endLat,
 			LatitudeGridSpace:   dLat,
 			LatitudeGridNumber:  nLat,
-			IsolineStartValue:   -30.0,
-			IsolineEndValue:     40.0,
-			IsolineSpace:        4.0,
+			IsolineStartValue:   isoStart,
+			IsolineEndValue:     isoEnd,
+			IsolineSpace:        isoSpace,
 			InitTime:            now,
 			ValidTime:           now.Add(time.Duration(period) * time.Hour),
 		},
@@ -123,6 +140,21 @@ func GenerateMockGrid(element string, level float32, period int32) *model.GridRe
 				} else if element == "RAIN" {
 					rain := float32(math.Max(0, float64(15.0-dist*2.0)))
 					val = rain
+				} else if element == "VVEL" {
+					// Synthetic omega wave: centipascals/s (10e-2.Pa.s-1)
+					// Negative values (<0) = upward motion (ascent) over cyclone center; positive (>0) = subsidence
+					omega := float32(-90.0*math.Exp(-dist*dist/120.0) + 35.0*math.Sin((lon-centerLon)*0.25) + 15.0)
+					val = omega
+				} else if element == "RH" {
+					// Relative humidity (0-100%) advected with cyclone wave
+					rh := float32(45.0 + 45.0*math.Exp(-dist*dist/140.0) + 12.0*math.Cos((lat-centerLat)*0.25))
+					if rh < 5.0 {
+						rh = 5.0
+					}
+					if rh > 98.0 {
+						rh = 98.0
+					}
+					val = rh
 				}
 
 				resp.Values[idx] = val

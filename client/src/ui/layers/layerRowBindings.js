@@ -541,12 +541,13 @@ export function bindLayerRowEvents(panel, layers, currentActiveWinId, onLayerAct
         }
       };
 
-      [
-        [".chk-tlogp-temp", "showTemp"],
-        [".chk-tlogp-dewpoint", "showDewpoint"],
-        [".chk-tlogp-wind", "showWind"],
-        [".chk-tlogp-parcel", "showParcel"],
-      ].forEach(([sel, key]) => bindTLogPCheckbox(sel, key));
+      [[".chk-tlogp-temp", "showTemp"], [".chk-tlogp-dewpoint", "showDewpoint"], [".chk-tlogp-wind", "showWind"], [".chk-tlogp-parcel", "showParcel"]].forEach(([sel, key]) => bindTLogPCheckbox(sel, key));
+    }
+
+    if (layer.type === "timeheight" && configDrawer) {
+      import("./timeHeightDrawerBindings.js").then(({ bindTimeHeightDrawerEvents }) => {
+        bindTimeHeightDrawerEvents(layer, configDrawer);
+      });
     }
   });
 }
@@ -570,14 +571,10 @@ export function bindAuxCheckboxes(currentActiveWinId, onLayerActionCallback) {
       if (e.target.checked && chkContourf) {
         chkContourf.checked = false;
         appState.setLayer("contourf", false);
-        if (onLayerActionCallback) {
-          onLayerActionCallback("aux", "contourf", false, null, currentActiveWinId);
-        }
+        onLayerActionCallback?.("aux", "contourf", false, null, currentActiveWinId);
       }
       appState.setLayer("raster", e.target.checked);
-      if (onLayerActionCallback) {
-        onLayerActionCallback("aux", "raster", e.target.checked, null, currentActiveWinId);
-      }
+      onLayerActionCallback?.("aux", "raster", e.target.checked, null, currentActiveWinId);
     });
   }
   if (chkContourf) {
@@ -585,14 +582,10 @@ export function bindAuxCheckboxes(currentActiveWinId, onLayerActionCallback) {
       if (e.target.checked && chkRaster) {
         chkRaster.checked = false;
         appState.setLayer("raster", false);
-        if (onLayerActionCallback) {
-          onLayerActionCallback("aux", "raster", false, null, currentActiveWinId);
-        }
+        onLayerActionCallback?.("aux", "raster", false, null, currentActiveWinId);
       }
       appState.setLayer("contourf", e.target.checked);
-      if (onLayerActionCallback) {
-        onLayerActionCallback("aux", "contourf", e.target.checked, null, currentActiveWinId);
-      }
+      onLayerActionCallback?.("aux", "contourf", e.target.checked, null, currentActiveWinId);
     });
   }
   bindAuxCheckbox("chk-wind", "wind", currentActiveWinId, onLayerActionCallback);

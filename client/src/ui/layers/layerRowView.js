@@ -113,6 +113,72 @@ export function renderTLogPDrawerHTML(layer) {
   `;
 }
 
+export function renderTimeHeightDrawerHTML(layer) {
+  const cfg = layer.config || {};
+  const lon = cfg.lon !== undefined ? Number(cfg.lon).toFixed(2) : "121.50";
+  const lat = cfg.lat !== undefined ? Number(cfg.lat).toFixed(2) : "31.40";
+  const start = cfg.startHour !== undefined ? cfg.startHour : 0;
+  const end = cfg.endHour !== undefined ? cfg.endHour : 144;
+  const step = cfg.stepHours !== undefined ? cfg.stepHours : 12;
+  const dir = cfg.timeDirection || "ltr";
+
+  return `
+    <div class="config-row" style="flex-direction: column; align-items: flex-start; gap: 6px; width: 100%;">
+      <label style="color: var(--text-secondary, #8b949e); font-size: 11px; font-weight: 600;">
+        📍 Cross-Section Grid Point (Click Map):
+      </label>
+      <div style="display: flex; gap: 6px; width: 100%; align-items: center;">
+        <span style="font-size: 11px; color: #58a6ff; font-weight: 600;">Lon:</span>
+        <input type="number" class="input-th-lon" value="${lon}" step="0.25" style="width: 65px; height: 22px; background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 0 4px; font-size: 11px;" />
+        <span style="font-size: 11px; color: #58a6ff; font-weight: 600;">Lat:</span>
+        <input type="number" class="input-th-lat" value="${lat}" step="0.25" style="width: 65px; height: 22px; background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 0 4px; font-size: 11px;" />
+        <button class="btn-th-point-apply" style="height: 22px; padding: 0 8px; font-size: 11px; background: #238636; color: #fff; border: 1px solid #2ea043; border-radius: 4px; cursor: pointer;">Apply</button>
+      </div>
+    </div>
+
+    <div class="config-row" style="flex-direction: column; align-items: flex-start; gap: 4px; width: 100%; margin-top: 6px; padding-top: 6px; border-top: 1px solid #30363d;">
+      <label style="color: var(--text-secondary, #8b949e); font-size: 11px; font-weight: 600;">
+        ⏱ Forecast Lead Span & Direction:
+      </label>
+      <div style="display: flex; gap: 6px; width: 100%; align-items: center;">
+        <input type="number" class="input-th-start" value="${start}" min="0" max="240" step="12" style="width: 44px; height: 22px; background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; text-align: center; font-size: 11px;" />
+        <span style="font-size: 11px;">–</span>
+        <input type="number" class="input-th-end" value="${end}" min="12" max="240" step="12" style="width: 44px; height: 22px; background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; text-align: center; font-size: 11px;" />
+        <span style="font-size: 11px;">h</span>
+        <select class="sel-th-step" style="height: 22px; background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; font-size: 11px; padding: 0 4px;">
+          ${[1, 3, 6, 12, 24].map((s) => `<option value="${s}" ${s === step ? "selected" : ""}>@${s}h</option>`).join("")}
+        </select>
+        <button class="btn-th-direction" style="height: 22px; padding: 0 6px; font-size: 11px; background: #21262d; border: 1px solid #30363d; color: #e3b341; border-radius: 4px; cursor: pointer;">
+          ${dir === "rtl" ? "⇄ 144→0h" : "⇄ 0→144h"}
+        </button>
+      </div>
+    </div>
+
+    <div class="config-grid-2col" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #30363d;">
+      <label class="config-checkbox-item">
+        <input type="checkbox" class="chk-th-rh" ${cfg.showRH !== false ? "checked" : ""} />
+        <span style="color: #56d4dd;">RH Fill</span>
+      </label>
+      <label class="config-checkbox-item">
+        <input type="checkbox" class="chk-th-temp" ${cfg.showTemp !== false ? "checked" : ""} />
+        <span style="color: #f85149;">Temperature Lines</span>
+      </label>
+      <label class="config-checkbox-item">
+        <input type="checkbox" class="chk-th-vvel" ${cfg.showVVel !== false ? "checked" : ""} />
+        <span style="color: #39c5bb;">VVEL Lines</span>
+      </label>
+      <label class="config-checkbox-item">
+        <input type="checkbox" class="chk-th-wind" ${cfg.showWind !== false ? "checked" : ""} />
+        <span style="color: #58a6ff;">Wind Barbs</span>
+      </label>
+      <label class="config-checkbox-item">
+        <input type="checkbox" class="chk-th-marker" ${cfg.showGridPointMarker !== false ? "checked" : ""} />
+        <span>Map Point Marker</span>
+      </label>
+    </div>
+  `;
+}
+
 export function renderStationDrawerHTML(layer) {
   const isTLogP = layer.element === "TLOGP" || (layer.path && layer.path.includes("TLOGP")) || layer.id?.includes("tlogp");
   const upper = isUpperAirStationLayer(layer);
@@ -323,6 +389,8 @@ export function renderLayerRow(layer) {
             ? renderStationDrawerHTML(layer)
             : (layer.type === "tlogp"
             ? renderTLogPDrawerHTML(layer)
+            : (layer.type === "timeheight"
+            ? renderTimeHeightDrawerHTML(layer)
             : `
             <div class="config-row">
               <label>
@@ -364,7 +432,7 @@ export function renderLayerRow(layer) {
                 <option value="vertical-perspective" ${layer.config?.projection === "vertical-perspective" ? "selected" : ""}>🪐 Perspective (3D)</option>
               </select>
             </div>
-            `)))
+            `))))
         }
       </div>
     </div>

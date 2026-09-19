@@ -150,6 +150,25 @@ export function buildBaseConfig(layerDef) {
     };
   }
 
+  if (layerDef.type === "timeheight") {
+    return {
+      lon: layerDef.config?.lon !== undefined ? layerDef.config.lon : 121.5,
+      lat: layerDef.config?.lat !== undefined ? layerDef.config.lat : 31.4,
+      initCycle: layerDef.config?.initCycle || null,
+      startHour: layerDef.config?.startHour !== undefined ? layerDef.config.startHour : 0,
+      endHour: layerDef.config?.endHour !== undefined ? layerDef.config.endHour : 144,
+      stepHours: layerDef.config?.stepHours !== undefined ? layerDef.config.stepHours : 12,
+      timeDirection: layerDef.config?.timeDirection || "ltr",
+      levels: layerDef.config?.levels || [1000, 925, 850, 700, 500, 400, 300, 250, 200, 100],
+      showRH: layerDef.config?.showRH !== false,
+      showTemp: layerDef.config?.showTemp !== false,
+      showVVel: layerDef.config?.showVVel !== false,
+      showWind: layerDef.config?.showWind !== false,
+      showGridPointMarker: layerDef.config?.showGridPointMarker !== false,
+      ...(layerDef.config || {}),
+    };
+  }
+
   return {
     showFill:
       layerDef.config?.showFill !== undefined

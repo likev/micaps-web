@@ -5,6 +5,7 @@ import { stopWindAnimation, removeGridWindBarbs } from "../layers/windLayer.js";
 import { removeStationLayer } from "../layers/stationLayer.js";
 import { removeRasterLayer } from "../layers/rasterLayer.js";
 import { loadTLogPLayer, removeTLogPLayer, tlogpController } from "../layers/tlogp/tlogpLayer.js";
+import { loadTimeHeightLayer, removeTimeHeightLayer, timeHeightController } from "../layers/timeheight/timeHeightLayer.js";
 import { clearLegends } from "../ui/legend.js";
 import { getActiveWindow, updateWindowTitle, setWindowHeaderPreset, refreshPresetControls } from "../ui/tabWindowManager.js";
 import { setNavBarPreset, refreshNavBarPresets } from "../ui/navBar.js";
@@ -52,6 +53,7 @@ export function clearAllWeatherLayersFromMap(map, win = null, { resetVisibility 
     removeStationLayer(map);
     removeRasterLayer(map);
     removeTLogPLayer(map, win);
+    removeTimeHeightLayer(map, win);
     clearLegends(win);
   } catch (err) {
     console.warn("[Main] Error cleaning up weather layers:", err);
@@ -137,13 +139,14 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
 
   const winTitle = `W${(win?.winIdx ?? 0) + 1}: ${group.name}`;
   if (!isTimeStep && !group.isObservation && win) {
-    const pLayer = group.layers.find((l) => l.type === "contour" || l.type === "wind");
+    const pLayer = group.layers.find((l) => l.type === "contour" || l.type === "wind" || l.type === "timeheight");
     const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", curLevel);
     if (!win.forecastCycle || !cycles.includes(win.forecastCycle)) {
       win.forecastCycle = cycles[0];
     }
     updateWindowTitle(win);
-    const nwpPayload = { period: curPeriod, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 };
+    const defaultStep = group.layers.some((l) => l.type === "timeheight") ? 12 : 6;
+    const nwpPayload = { period: curPeriod, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || defaultStep };
     win._nwpTimeline = nwpPayload;
     if (getActiveWindow() === win) {
       setTimelineMode("nwp", nwpPayload);
@@ -211,6 +214,12 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
           await tlogpController.updateCycle(file, win, map);
         } else {
           await loadTLogPLayer(map, layer, curPeriod, targetLevel, win);
+        }
+      } else if (layer.type === "timeheight") {
+        if (isTimeStep && timeHeightController.isActive(win)) {
+          timeHeightController.updateCursorLead(curPeriod, win);
+        } else {
+          await loadTimeHeightLayer(map, layer, win);
         }
       }
     })

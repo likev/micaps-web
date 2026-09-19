@@ -3,7 +3,7 @@ import { MIN_MAX_EFFECTIVE_CELLS, MAX_MAX_EFFECTIVE_CELLS } from "../../config/p
 import { validateInterval } from "../../layers/contour/contourLevels.js";
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-_]*$/i;
-const ALLOWED_LAYER_TYPES = new Set(["contour", "wind", "station", "tlogp"]);
+const ALLOWED_LAYER_TYPES = new Set(["contour", "wind", "station", "tlogp", "timeheight"]);
 const ALLOWED_BASEMAP_SCHEMES = new Set(["light", "dark", "micaps"]);
 const ALLOWED_BASEMAP_PROJECTIONS = new Set(["mercator", "globe", "vertical-perspective"]);
 

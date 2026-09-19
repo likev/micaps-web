@@ -186,6 +186,9 @@ function collectNwpItems(win, targetPeriod, cycle, hasRasterActive, direction, o
 
   if (activeGroup && Array.isArray(activeGroup.layers) && activeGroup.layers.length > 0) {
     for (const layer of activeGroup.layers) {
+      if (layer.type === "timeheight") {
+        continue;
+      }
       if (layer.derivedFrom) {
         // Skip derived contour layers computed from station observations
         if (layer.model === "SURFACE" || layer.model === "UPPER_AIR") {

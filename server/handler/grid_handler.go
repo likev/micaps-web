@@ -92,24 +92,55 @@ func (h *GridHandler) fetchGrid(r *http.Request) (*model.GridResponse, error) {
 
 func (h *GridHandler) getFallbackGrid(r *http.Request) *model.GridResponse {
 	dataPath := r.URL.Query().Get("path")
+	file := r.URL.Query().Get("file")
 	element := "TMP"
 	var level float32 = 850
 	var period int32 = 24
 
+	parts := strings.Split(dataPath, "/")
+	if len(parts) >= 3 {
+		if l, err := strconv.ParseFloat(parts[2], 32); err == nil {
+			level = float32(l)
+		}
+	}
+
 	if strings.Contains(dataPath, "HGT") {
 		element = "HGT"
-		level = 500
+		if len(parts) < 3 {
+			level = 500
+		}
 	} else if strings.Contains(dataPath, "RAIN") {
 		element = "RAIN"
-		level = 0
+		if len(parts) < 3 {
+			level = 0
+		}
 	} else if strings.Contains(dataPath, "WIND") || strings.Contains(dataPath, "UV") {
 		element = "WIND"
-		level = 850
+		if len(parts) < 3 {
+			level = 850
+		}
+	} else if strings.Contains(dataPath, "VVEL") {
+		element = "VVEL"
+		if len(parts) < 3 {
+			level = 500
+		}
+	} else if strings.Contains(dataPath, "RH") {
+		element = "RH"
+		if len(parts) < 3 {
+			level = 850
+		}
 	}
 
 	if pStr := r.URL.Query().Get("period"); pStr != "" {
 		if p, err := strconv.Atoi(pStr); err == nil {
 			period = int32(p)
+		}
+	} else if file != "" {
+		fileParts := strings.Split(file, ".")
+		if len(fileParts) >= 2 {
+			if p, err := strconv.Atoi(fileParts[len(fileParts)-1]); err == nil {
+				period = int32(p)
+			}
 		}
 	}
 

@@ -45,7 +45,7 @@ func main() {
 		} else {
 			addr := fmt.Sprintf("%s:%d", cfg.CassandraHost, cfg.CassandraPort)
 			log.Printf("[MICAPS-Web] Connecting to Cassandra CQL v4 at %s (Tunnel=%t)...", addr, cfg.EnableTunnel)
-			cqlClient, err = db.NewCQLClient(addr, 10*time.Second)
+			cqlClient, err = db.NewCQLClient(addr, 30*time.Second)
 			if err != nil {
 				config.ExitWithError("Could not connect to Cassandra cluster at %s: %v", addr, err)
 			} else {
