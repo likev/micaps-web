@@ -526,18 +526,34 @@ class TimeHeightController {
   }
 
   destroy(map = null, win = null) {
-    const targetWin = win || this._activeWin;
+    let targetMap = map;
+    let targetWin = win;
+    if (map && !win && (map.id || map.layers || map._thGridCache || !map.getLayer)) {
+      targetWin = map;
+      targetMap = null;
+    } else if (map && win && (map.id || map.layers) && typeof win.getLayer === "function") {
+      targetWin = map;
+      targetMap = win;
+    }
+    targetWin = targetWin || this._activeWin;
     const winId = this._getWinId(targetWin);
     const state = winId === "default" ? this._defaultState : this.windows.get(winId);
 
     if (state) {
+      state.loadingSeq++;
+      if (state.abortController) {
+        try {
+          state.abortController.abort();
+        } catch {}
+        state.abortController = null;
+      }
       state.isLayerActive = false;
-      const targetMap = map || state.activeMap;
-      if (targetMap && state.mapClickListener) {
-        targetMap.off("click", state.mapClickListener);
+      const actualMap = targetMap || state.activeMap;
+      if (actualMap && state.mapClickListener) {
+        actualMap.off("click", state.mapClickListener);
         state.mapClickListener = null;
       }
-      this.removePointHighlight(targetMap);
+      this.removePointHighlight(actualMap);
       if (state.panel) {
         state.panel.destroy();
         state.panel = null;

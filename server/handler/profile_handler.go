@@ -188,7 +188,6 @@ func (h *ProfileHandler) Handler(w http.ResponseWriter, r *http.Request) {
 	flusher, _ := w.(http.Flusher)
 
 	w.Header().Set("Content-Type", "application/x-ndjson")
-	w.Header().Set("Transfer-Encoding", "chunked")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusOK)
@@ -447,13 +446,14 @@ func (h *ProfileHandler) processTask(ctx context.Context, task profileTask, lon,
 		return profileTaskResult{task: task, err: ctx.Err(), source: "cancelled"}
 	}
 
+	subPath := ""
+	parts := strings.Split(task.dataPath, "/")
+	if len(parts) > 1 {
+		subPath = strings.Join(parts[1:], "/")
+	}
+
 	// 1. Check file cache
 	if h.Cache != nil {
-		parts := strings.Split(task.dataPath, "/")
-		subPath := ""
-		if len(parts) > 1 {
-			subPath = strings.Join(parts[1:], "/")
-		}
 		if cachedBlob, _, ok := h.Cache.Get(task.table, subPath, task.file); ok {
 			decompressed, err := parser.DecompressGzip(cachedBlob)
 			if err == nil {
@@ -482,18 +482,33 @@ func (h *ProfileHandler) processTask(ctx context.Context, task profileTask, lon,
 		return profileTaskResult{task: task, sampled: sampled, source: "mock"}
 	}
 
-	rawBlob, err := db.GetBlob(h.Client, task.dataPath, task.file)
-	if err != nil {
-		return profileTaskResult{task: task, err: err, source: "cassandra"}
-	}
-
-	if h.Cache != nil {
-		parts := strings.Split(task.dataPath, "/")
-		subPath := ""
-		if len(parts) > 1 {
-			subPath = strings.Join(parts[1:], "/")
+	var rawBlob []byte
+	if h.Cache != nil && h.Cache.Singleflight() != nil {
+		cacheKey := filecache.Key(task.table, subPath, task.file)
+		b, err := h.Cache.Singleflight().Do(cacheKey, func() ([]byte, error) {
+			if cachedBlob, _, ok := h.Cache.Get(task.table, subPath, task.file); ok {
+				return cachedBlob, nil
+			}
+			blob, err := db.GetBlob(h.Client, task.dataPath, task.file)
+			if err != nil {
+				return nil, err
+			}
+			_ = h.Cache.Put(task.table, subPath, task.file, blob, nil)
+			return blob, nil
+		})
+		if err != nil {
+			return profileTaskResult{task: task, err: err, source: "cassandra"}
 		}
-		_ = h.Cache.Put(task.table, subPath, task.file, rawBlob, nil)
+		rawBlob = b
+	} else {
+		blob, err := db.GetBlob(h.Client, task.dataPath, task.file)
+		if err != nil {
+			return profileTaskResult{task: task, err: err, source: "cassandra"}
+		}
+		if h.Cache != nil {
+			_ = h.Cache.Put(task.table, subPath, task.file, blob, nil)
+		}
+		rawBlob = blob
 	}
 
 	decompressed, err := parser.DecompressGzip(rawBlob)

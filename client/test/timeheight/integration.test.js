@@ -111,6 +111,7 @@ describe("V1: Preset Configuration in client/config.json", () => {
     expect(c.showTemp).toBe(true);
     expect(c.showVVel).toBe(true);
     expect(c.showWind).toBe(true);
+    expect(c.showGridPointMarker).toBe(true);
   });
 });
 

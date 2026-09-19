@@ -409,3 +409,93 @@ describe("Domain Edge Snap & Clamp", () => {
     expect(snapped.j).toBe(0);
   });
 });
+
+describe("Review 2 Fixes: destroy() abort and fallback progress", () => {
+  let originalFetch;
+
+  beforeEach(() => {
+    originalFetch = global.fetch;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it("destroy() aborts in-flight request and cleans up window state", async () => {
+    const mockMap = createMockMap();
+    const mockWin = { id: "win-destroy-test" };
+    let aborted = false;
+
+    global.fetch = async (url, opts) => {
+      if (opts?.signal) {
+        opts.signal.addEventListener("abort", () => {
+          aborted = true;
+        });
+      }
+      await new Promise((r) => setTimeout(r, 60));
+      return {
+        ok: true,
+        body: null,
+        async text() {
+          return JSON.stringify({ type: "result", RH: [[50]], TMP: [[10]], VVEL: [[0]], U: [[2]], V: [[3]], stats: {} });
+        },
+      };
+    };
+
+    await timeHeightController.init(mockMap, mockWin);
+    const loadPromise = timeHeightController.loadMatrix(mockWin);
+
+    // Call destroy while load is in-flight
+    timeHeightController.destroy(mockMap, mockWin);
+    await loadPromise;
+
+    expect(aborted).toBe(true);
+    expect(timeHeightController.isActive(mockWin)).toBe(false);
+  });
+
+  it("non-streaming response.text fallback fires onProgress callbacks", async () => {
+    const progressCalls = [];
+    const mockResponseText = [
+      JSON.stringify({ type: "progress", loaded: 1, total: 2, ok: 1, failed: 0, cacheHits: 1, lastSource: "cache" }),
+      JSON.stringify({ type: "progress", loaded: 2, total: 2, ok: 2, failed: 0, cacheHits: 1, lastSource: "cassandra" }),
+      JSON.stringify({
+        type: "result",
+        point: { lon: 121.5, lat: 31.4 },
+        leads: [0, 12],
+        levels: [1000],
+        RH: [[80, 85]],
+        TMP: [[15, 14]],
+        VVEL: [[-10, -20]],
+        U: [[5, 6]],
+        V: [[2, 3]],
+        stats: { total: 2, cacheHits: 1 },
+      }),
+    ].join("\n");
+
+    global.fetch = async () => ({
+      ok: true,
+      body: null,
+      async text() {
+        return mockResponseText;
+      },
+    });
+
+    const res = await loadTimeHeightMatrix({
+      win: { id: "win-fallback-test", loadSeq: 1 },
+      leads: [0, 12],
+      levels: [1000],
+      onProgress: (p) => {
+        progressCalls.push(p);
+      },
+    });
+
+    expect(res.cancelled).toBe(false);
+    expect(res.matrix).toBeDefined();
+    expect(progressCalls.length).toBe(2);
+    expect(progressCalls[0].loaded).toBe(1);
+    expect(progressCalls[0].pct).toBe(50);
+    expect(progressCalls[1].loaded).toBe(2);
+    expect(progressCalls[1].pct).toBe(100);
+    expect(progressCalls[1].cacheHits).toBe(1);
+  });
+});

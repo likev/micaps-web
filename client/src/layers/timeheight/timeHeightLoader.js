@@ -216,6 +216,20 @@ export async function loadTimeHeightMatrix({
           failed = evt.failed ?? failed;
           cacheHits = evt.cacheHits ?? cacheHits;
           lastSource = evt.lastSource ?? lastSource;
+
+          if (typeof onProgress === "function") {
+            const pct = total > 0 ? Math.round((loaded / total) * 100) : 100;
+            onProgress({
+              loaded,
+              total,
+              ok,
+              failed,
+              pct,
+              cacheHits,
+              lastSource,
+              cancelled: shouldCancel(),
+            });
+          }
         } else if (evt.type === "result") {
           resultObj = evt;
         }

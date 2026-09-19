@@ -211,6 +211,12 @@ func (c *Cache) rebuildIndex() {
 			continue
 		}
 
+		if c.ttl > 0 && ((!meta.StoredAt.IsZero() && time.Since(meta.StoredAt) > c.ttl) || time.Since(info.ModTime()) > c.ttl) {
+			_ = os.Remove(binPath)
+			_ = os.Remove(metaPath)
+			continue
+		}
+
 		totalBytes += info.Size()
 		count++
 	}
@@ -245,6 +251,31 @@ func (c *Cache) Get(table, dataPath, file string) ([]byte, *Meta, bool) {
 
 	var meta Meta
 	if err := json.Unmarshal(metaData, &meta); err != nil {
+		return nil, nil, false
+	}
+
+	// Check TTL expiration
+	expired := false
+	if c.ttl > 0 {
+		if !meta.StoredAt.IsZero() && time.Since(meta.StoredAt) > c.ttl {
+			expired = true
+		} else if fi, err := os.Stat(binPath); err == nil && time.Since(fi.ModTime()) > c.ttl {
+			expired = true
+		}
+	}
+	if expired {
+		c.mu.Lock()
+		_ = os.Remove(binPath)
+		_ = os.Remove(metaPath)
+		c.currentBytes.Add(-int64(len(data)))
+		c.entries.Add(-1)
+		if c.currentBytes.Load() < 0 {
+			c.currentBytes.Store(0)
+		}
+		if c.entries.Load() < 0 {
+			c.entries.Store(0)
+		}
+		c.mu.Unlock()
 		return nil, nil, false
 	}
 
@@ -286,6 +317,16 @@ func (c *Cache) Put(table, dataPath, file string, data []byte, isSpeedDir *bool)
 	}
 	f.Close()
 
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	var oldSize int64
+	isNew := true
+	if oldInfo, err := os.Stat(binPath); err == nil {
+		isNew = false
+		oldSize = oldInfo.Size()
+	}
+
 	// Atomic rename
 	if err := os.Rename(tmpPath, binPath); err != nil {
 		_ = os.Remove(tmpPath)
@@ -305,12 +346,20 @@ func (c *Cache) Put(table, dataPath, file string, data []byte, isSpeedDir *bool)
 	metaBytes, _ := json.Marshal(meta)
 	_ = os.WriteFile(metaPath, metaBytes, 0644)
 
-	// Update counters and enforce cap under lock
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	// Update counters
+	if isNew {
+		c.currentBytes.Add(int64(len(data)))
+		c.entries.Add(1)
+	} else {
+		c.currentBytes.Add(int64(len(data)) - oldSize)
+	}
 
-	c.currentBytes.Add(int64(len(data)))
-	c.entries.Add(1)
+	if c.currentBytes.Load() < 0 {
+		c.currentBytes.Store(0)
+	}
+	if c.entries.Load() < 0 {
+		c.entries.Store(0)
+	}
 
 	if c.currentBytes.Load() > c.capBytes {
 		c.evictUnderLock(c.capBytes)
@@ -365,6 +414,13 @@ func (c *Cache) evictUnderLock(targetCap int64) {
 		c.currentBytes.Add(-item.size)
 		c.entries.Add(-1)
 	}
+
+	if c.currentBytes.Load() < 0 {
+		c.currentBytes.Store(0)
+	}
+	if c.entries.Load() < 0 {
+		c.entries.Store(0)
+	}
 }
 
 func (c *Cache) sweeper() {
@@ -400,13 +456,35 @@ func (c *Cache) sweep() {
 		if err != nil {
 			continue
 		}
-		if now.Sub(info.ModTime()) > c.ttl {
-			base := strings.TrimSuffix(entry.Name(), ".bin")
+
+		base := strings.TrimSuffix(entry.Name(), ".bin")
+		metaPath := filepath.Join(c.dir, base+".meta")
+
+		expired := false
+		if c.ttl > 0 {
+			if now.Sub(info.ModTime()) > c.ttl {
+				expired = true
+			} else if metaBytes, err := os.ReadFile(metaPath); err == nil {
+				var meta Meta
+				if err := json.Unmarshal(metaBytes, &meta); err == nil && !meta.StoredAt.IsZero() && now.Sub(meta.StoredAt) > c.ttl {
+					expired = true
+				}
+			}
+		}
+
+		if expired {
 			_ = os.Remove(filepath.Join(c.dir, entry.Name()))
-			_ = os.Remove(filepath.Join(c.dir, base+".meta"))
+			_ = os.Remove(metaPath)
 			c.currentBytes.Add(-info.Size())
 			c.entries.Add(-1)
 		}
+	}
+
+	if c.currentBytes.Load() < 0 {
+		c.currentBytes.Store(0)
+	}
+	if c.entries.Load() < 0 {
+		c.entries.Store(0)
 	}
 
 	if c.currentBytes.Load() > c.capBytes {

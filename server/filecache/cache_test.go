@@ -227,3 +227,127 @@ func TestFileCacheDisabledMode(t *testing.T) {
 		t.Errorf("disabled cache should always miss")
 	}
 }
+
+func TestFileCacheOverwriteExactCounters(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "th_cache_overwrite_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	c, err := New(Config{
+		Dir:      tempDir,
+		CapBytes: 10 * 1024 * 1024,
+		TTL:      1 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("failed to init cache: %v", err)
+	}
+	defer c.Close()
+
+	table := "ECMWF_HR"
+	path := "TMP/500"
+	file := "26091808.024"
+
+	// 1. Initial Put of 30 bytes
+	data30 := bytes.Repeat([]byte("A"), 30)
+	if err := c.Put(table, path, file, data30, nil); err != nil {
+		t.Fatalf("put failed: %v", err)
+	}
+	if stats := c.Stats(); stats["entries"].(int64) != 1 || stats["bytes"].(int64) != 30 {
+		t.Fatalf("expected entries=1, bytes=30, got entries=%v, bytes=%v", stats["entries"], stats["bytes"])
+	}
+
+	// 2. Overwrite with 50 bytes (larger)
+	data50 := bytes.Repeat([]byte("B"), 50)
+	if err := c.Put(table, path, file, data50, nil); err != nil {
+		t.Fatalf("overwrite failed: %v", err)
+	}
+	if stats := c.Stats(); stats["entries"].(int64) != 1 || stats["bytes"].(int64) != 50 {
+		t.Fatalf("after larger overwrite: expected entries=1, bytes=50, got entries=%v, bytes=%v", stats["entries"], stats["bytes"])
+	}
+	got50, _, ok := c.Get(table, path, file)
+	if !ok || !bytes.Equal(got50, data50) {
+		t.Fatalf("get after 50-byte overwrite failed")
+	}
+
+	// 3. Overwrite with 20 bytes (smaller)
+	data20 := bytes.Repeat([]byte("C"), 20)
+	if err := c.Put(table, path, file, data20, nil); err != nil {
+		t.Fatalf("overwrite failed: %v", err)
+	}
+	if stats := c.Stats(); stats["entries"].(int64) != 1 || stats["bytes"].(int64) != 20 {
+		t.Fatalf("after smaller overwrite: expected entries=1, bytes=20, got entries=%v, bytes=%v", stats["entries"], stats["bytes"])
+	}
+	got20, _, ok := c.Get(table, path, file)
+	if !ok || !bytes.Equal(got20, data20) {
+		t.Fatalf("get after 20-byte overwrite failed")
+	}
+
+	// 4. Put a different file
+	file2 := "26091808.036"
+	data15 := bytes.Repeat([]byte("D"), 15)
+	if err := c.Put(table, path, file2, data15, nil); err != nil {
+		t.Fatalf("put 2nd file failed: %v", err)
+	}
+	if stats := c.Stats(); stats["entries"].(int64) != 2 || stats["bytes"].(int64) != 35 {
+		t.Fatalf("after 2nd file: expected entries=2, bytes=35, got entries=%v, bytes=%v", stats["entries"], stats["bytes"])
+	}
+}
+
+func TestFileCacheGetTTLExpiry(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "th_cache_ttl_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	c, err := New(Config{
+		Dir:      tempDir,
+		CapBytes: 10 * 1024 * 1024,
+		TTL:      60 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("failed to init cache: %v", err)
+	}
+	defer c.Close()
+
+	table := "ECMWF_HR"
+	path := "TMP/850"
+	file := "26091808.012"
+	data := []byte("temporary-ttl-test-data")
+
+	if err := c.Put(table, path, file, data, nil); err != nil {
+		t.Fatalf("put failed: %v", err)
+	}
+
+	// Immediate Get should hit
+	if _, _, ok := c.Get(table, path, file); !ok {
+		t.Fatalf("immediate get expected hit")
+	}
+	if stats := c.Stats(); stats["entries"].(int64) != 1 || stats["bytes"].(int64) != int64(len(data)) {
+		t.Fatalf("expected entries=1, bytes=%d, got %+v", len(data), stats)
+	}
+
+	// Wait for TTL expiry
+	time.Sleep(100 * time.Millisecond)
+
+	// Get should detect expiration, evict file, and return miss
+	if _, _, ok := c.Get(table, path, file); ok {
+		t.Errorf("expected get after TTL to return miss")
+	}
+
+	// Counters should be back to 0
+	if stats := c.Stats(); stats["entries"].(int64) != 0 || stats["bytes"].(int64) != 0 {
+		t.Errorf("expected entries=0, bytes=0 after TTL eviction, got entries=%v, bytes=%v", stats["entries"], stats["bytes"])
+	}
+
+	// Files should be removed from disk
+	key := Key(table, path, file)
+	if _, err := os.Stat(filepath.Join(tempDir, key+".bin")); !os.IsNotExist(err) {
+		t.Errorf("expected .bin to be deleted after TTL expiry")
+	}
+	if _, err := os.Stat(filepath.Join(tempDir, key+".meta")); !os.IsNotExist(err) {
+		t.Errorf("expected .meta to be deleted after TTL expiry")
+	}
+}

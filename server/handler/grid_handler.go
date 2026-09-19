@@ -101,13 +101,33 @@ func (h *GridHandler) fetchGrid(r *http.Request) (*model.GridResponse, error) {
 		}
 	}
 
-	rawBlob, err := db.GetBlob(h.Client, dataPath, file)
-	if err != nil {
-		return nil, err
-	}
-
-	if h.Cache != nil {
-		_ = h.Cache.Put(table, subDataPath, file, rawBlob, nil)
+	var rawBlob []byte
+	if h.Cache != nil && h.Cache.Singleflight() != nil {
+		cacheKey := filecache.Key(table, subDataPath, file)
+		b, err := h.Cache.Singleflight().Do(cacheKey, func() ([]byte, error) {
+			if cachedBlob, _, ok := h.Cache.Get(table, subDataPath, file); ok {
+				return cachedBlob, nil
+			}
+			blob, err := db.GetBlob(h.Client, dataPath, file)
+			if err != nil {
+				return nil, err
+			}
+			_ = h.Cache.Put(table, subDataPath, file, blob, nil)
+			return blob, nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		rawBlob = b
+	} else {
+		blob, err := db.GetBlob(h.Client, dataPath, file)
+		if err != nil {
+			return nil, err
+		}
+		if h.Cache != nil {
+			_ = h.Cache.Put(table, subDataPath, file, blob, nil)
+		}
+		rawBlob = blob
 	}
 
 	decompressed, err := parser.DecompressGzip(rawBlob)

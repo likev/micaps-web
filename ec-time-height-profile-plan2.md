@@ -83,11 +83,11 @@ Why required: without it the browser still holds 520 grids. With it the browser 
 Request (all validated, all bounded):
 
 ```text
-GET /api/data/timeheight/profile?model=ECMWF_HR&cycle=26091808&leads=0,12,...,144&levels=1000,...,100&lon=121.5&lat=31.4
+GET /api/data/timeheight/profile?model=ECMWF_HR&cycle=26091808&leads=0,12,...,144&levels=1000,925,850,700,600,500,400,300,250,200&lon=121.5&lat=31.4
 ```
 
 - `model`: allowlist `^ECMWF_HR$` for Plan 2 (extend later).
-- `cycle`: `^\d{8}$`; `leads`: ≤41 integers in `[0,240]` (same caps as `buildLeads`); `levels`: subset of the fixed 10 (`[1000,925,850,700,500,400,300,250,200,100]`, ≤10); `lon/lat`: floats, must fall inside the first resolved grid's domain (else 400, no extrapolation).
+- `cycle`: `^\d{8}$`; `leads`: ≤41 integers in `[0,240]` (same caps as `buildLeads`); `levels`: up to 10 integers in `[10, 1050]`, standard set `[1000,925,850,700,600,500,400,300,250,200]`; `lon/lat`: floats, must fall inside the first resolved grid's domain (else 400, no extrapolation).
 - Elements are fixed server-side (`RH,TMP,VVEL,WIND`) — not client-choosable, mirrors the loader's hardcoded list.
 
 Server behavior per request (streaming — see §5.1):

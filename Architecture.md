@@ -1583,7 +1583,7 @@ graph TD
   - Eliminates allocating 101,441-point 2D float arrays on the profile path.
   - Evaluates header geometry, performs domain validation, reads a 4-float stencil per grid directly from the byte payload, converts wind vectors with strided detector, applies validity bounds/RH clamping, and executes bilinear interpolation.
 - **Client Memory Collapse (~2000 MB → < 5 MB)**:
-  - The browser no longer downloads or caches full 2D grid arrays for profiles (`win._thGridCache` eliminated).
+  - The browser no longer downloads or caches full 2D grid arrays for profiles (full grid downloading bypassed; deprecated `win._thGridCache` shims maintained only for test compatibility).
   - Browser memory consumption attributable to time-height profiles drops from ~2000 MB to < 5 MB.
   - Fast-path switching between recently inspected points utilizes a lightweight `matrixCache` (bounded to 20 profiles, KBs).
 - **AbortController Real-Time Cancellation**:
