@@ -3,9 +3,6 @@ import {
   PROFILE_LEVELS,
   buildLeads,
   loadTimeHeightMatrix,
-  buildProfileMatrix,
-  getThGridCache,
-  formatGridFileName,
 } from "./timeHeightLoader.js";
 import { snapToGridNode, clampToGridDomain } from "./timeHeightSampling.js";
 import { TimeHeightPanel } from "./timeHeightPanel.js";
@@ -36,6 +33,7 @@ class WindowState {
     this.isLayerActive = false;
     this.mapClickListener = null;
     this.firstGridSample = null;
+    this.abortController = null;
   }
 }
 
@@ -240,7 +238,7 @@ class TimeHeightController {
     state.panel?.setPoint(snapped.lon, snapped.lat, snapped.i, snapped.j);
     this._persistConfig({ lon: snapped.lon, lat: snapped.lat }, win);
 
-    // Check fast-path resample
+    // Check fast-path resample from per-point matrixCache
     const leadsKey = state.leads.join(",");
     const levelsKey = state.levels.join(",");
     const matrixKey = `${state.cycle}|${leadsKey}|${levelsKey}|${snapped.i},${snapped.j}`;
@@ -251,45 +249,7 @@ class TimeHeightController {
       return state.matrix;
     }
 
-    // Check if raw grids are all cached in window cache
-    const gridCache = getThGridCache(win);
-    const elements = ["RH", "TMP", "VVEL", "WIND"];
-    let allCached = true;
-    for (const lead of state.leads) {
-      const file = formatGridFileName(state.cycle, lead);
-      for (const level of state.levels) {
-        for (const el of elements) {
-          const key = `ECMWF_HR/${el}/${level}|${file}`;
-          if (!gridCache.has(key)) {
-            allCached = false;
-            break;
-          }
-        }
-        if (!allCached) break;
-      }
-      if (!allCached) break;
-    }
-
-    if (allCached) {
-      // Instant zero-network synchronous resample pass
-      const gridMap = new Map();
-      for (const [k, v] of gridCache.entries()) {
-        if (v && v.data) gridMap.set(k, v.data);
-      }
-      state.matrix = buildProfileMatrix({
-        cycle: state.cycle,
-        leads: state.leads,
-        levels: state.levels,
-        point: snapped,
-        model: "ECMWF_HR",
-        gridMap,
-      });
-      state.matrixCache.set(matrixKey, state.matrix);
-      state.panel?.setData(state.matrix);
-      return state.matrix;
-    }
-
-    // Cold path: bulk load with progress
+    // Cold/repeat path: profile endpoint with server-side file cache acceleration
     return this.loadMatrix(win);
   }
 
@@ -339,9 +299,30 @@ class TimeHeightController {
     state.panel?.setCursorLead(lead);
   }
 
+  _setMatrixCache(state, matrixKey, matrix) {
+    if (state.matrixCache.has(matrixKey)) {
+      state.matrixCache.delete(matrixKey);
+    }
+    state.matrixCache.set(matrixKey, matrix);
+    while (state.matrixCache.size > 20) {
+      const oldestKey = state.matrixCache.keys().next().value;
+      if (oldestKey !== undefined) {
+        state.matrixCache.delete(oldestKey);
+      } else {
+        break;
+      }
+    }
+  }
+
   cancelLoad(win = null) {
     const state = this._getState(win);
     state.loadingSeq++;
+    if (state.abortController) {
+      try {
+        state.abortController.abort();
+      } catch {}
+      state.abortController = null;
+    }
     state.panel?.hideProgress();
   }
 
@@ -369,6 +350,13 @@ class TimeHeightController {
   async loadMatrix(win = this.activeWin) {
     const state = this._getState(win);
     const seq = ++state.loadingSeq;
+    if (state.abortController) {
+      try {
+        state.abortController.abort();
+      } catch {}
+    }
+    state.abortController = new AbortController();
+
     state.panel?.setProgress({ loaded: 0, total: state.leads.length * state.levels.length * 4, pct: 0 });
 
     try {
@@ -380,6 +368,7 @@ class TimeHeightController {
         levels: state.levels,
         point: state.activePoint,
         signalSeq: seq,
+        abortController: state.abortController,
         isCancelled: () => state.loadingSeq !== seq,
         onProgress: (prog) => {
           if (state.loadingSeq === seq) {
@@ -396,15 +385,11 @@ class TimeHeightController {
       if (res.matrix) {
         state.matrix = res.matrix;
         state.activePoint = res.matrix.point;
-        if (!state.firstGridSample && win?._thGridCache) {
-          const first = win._thGridCache.values().next().value;
-          if (first && first.data) state.firstGridSample = first.data;
-        }
 
         const leadsKey = state.leads.join(",");
         const levelsKey = state.levels.join(",");
         const matrixKey = `${state.cycle}|${leadsKey}|${levelsKey}|${state.activePoint.i},${state.activePoint.j}`;
-        state.matrixCache.set(matrixKey, state.matrix);
+        this._setMatrixCache(state, matrixKey, state.matrix);
 
         state.panel?.setData(state.matrix);
         state.panel?.setPoint(state.activePoint.lon, state.activePoint.lat, state.activePoint.i, state.activePoint.j);
@@ -421,6 +406,10 @@ class TimeHeightController {
         showErrorToast?.(`Time-height matrix load error: ${err?.message || err}`);
       }
       return null;
+    } finally {
+      if (state.loadingSeq === seq) {
+        state.abortController = null;
+      }
     }
   }
 

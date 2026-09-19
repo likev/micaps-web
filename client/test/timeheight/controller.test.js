@@ -112,26 +112,30 @@ describe("Time-Height Controller & Map Interactions", () => {
     expect(src.data.features[0].geometry.coordinates[1]).toBeCloseTo(32.75, 2);
   });
 
-  test("fast-path resample succeeds when raw grids are cached in window", async () => {
-    const win = { id: "cached-win", _thGridCache: new Map() };
-    const cache = getThGridCache(win);
+  test("fast-path resample succeeds when point matrix is cached in matrixCache", async () => {
+    const win = { id: "cached-win" };
+    const state = timeHeightController._getState(win);
 
-    timeHeightController.cycle = "26091808";
-    timeHeightController.leads = [0];
-    timeHeightController.levels = [850];
+    state.cycle = "26091808";
+    state.leads = [0];
+    state.levels = [850];
 
-    // Seed window cache with all required grids for this lead/level
-    for (const el of ["RH", "TMP", "VVEL", "WIND"]) {
-      cache.set(`ECMWF_HR/${el}/850|26091808.000`, {
-        data: {
-          header: { n_lon: 2, n_lat: 2, start_lon: 110, end_lon: 130, d_lon: 20, start_lat: 40, end_lat: 20, d_lat: -20, element: el },
-          values: [50, 50, 50, 50],
-          u: [10, 10, 10, 10],
-          v: [5, 5, 5, 5],
-        },
-        ts: Date.now(),
-      });
-    }
+    const mockMatrix = {
+      point: { lon: 120.0, lat: 30.0, i: 240, j: 120 },
+      cycle: "26091808",
+      leads: [0],
+      levels: [850],
+      rh: [new Float32Array([50])],
+      u: [new Float32Array([10])],
+      v: [new Float32Array([5])],
+      tmp: [new Float32Array([20])],
+      vvel: [new Float32Array([0])],
+      missing: { rh: 0, tmp: 0, vvel: 0, wind: 0 },
+      stats: {},
+    };
+
+    const matrixKey = `26091808|0|850|240,120`;
+    state.matrixCache.set(matrixKey, mockMatrix);
 
     const matrix = await timeHeightController.setPoint(120.0, 30.0, win, mockMap);
     expect(matrix).not.toBeNull();

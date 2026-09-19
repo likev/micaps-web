@@ -58,6 +58,9 @@ func TestTLogPHandlerMockMode(t *testing.T) {
 }
 
 func TestTLogPHandlerLiveCassandra(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping live Cassandra test in short mode")
+	}
 	cqlClient, err := db.NewCQLClient("bore.pub:59042", 15*time.Second)
 	if err != nil {
 		t.Skipf("Live Cassandra bore.pub:59042 not reachable: %v", err)

@@ -1,9 +1,8 @@
-// timeHeightLoader.js - Bulk NWP grid data fetcher, queue concurrency, window cache, and profile matrix builder
-import { fetchJson } from "../../api/apiClient.js";
+// timeHeightLoader.js - Single streaming NWP time-height profile fetcher & matrix builder
 import { createScalarSampler, createWindSampler, snapToGridNode } from "./timeHeightSampling.js";
 
 export const PROFILE_LEVELS = [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200];
-export const TH_GRID_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+export const TH_GRID_CACHE_TTL_MS = 10 * 60 * 1000;
 export const TH_GRID_CACHE_MAX_ENTRIES = 600;
 export const TH_CONCURRENCY = 6;
 export const SUPPORTED_STEPS = [1, 3, 6, 12, 24];
@@ -32,7 +31,7 @@ export function buildLeads(startHour = 0, endHour = 144, stepHours = 12) {
 }
 
 /**
- * Retrieves or initializes window-scoped grid cache
+ * Deprecated cache accessors (kept for migration & test compatibility)
  */
 export function getThGridCache(win) {
   if (!win) {
@@ -47,32 +46,9 @@ export function getThGridCache(win) {
   return win._thGridCache;
 }
 
-/**
- * Clears window-scoped grid cache
- */
 export function clearThGridCache(win) {
   const cache = getThGridCache(win);
   cache.clear();
-}
-
-/**
- * Prunes expired or over-capacity entries from cache (LRU)
- */
-function pruneThGridCache(cache) {
-  const now = Date.now();
-  for (const [k, v] of cache.entries()) {
-    if (now - v.ts > TH_GRID_CACHE_TTL_MS) {
-      cache.delete(k);
-    }
-  }
-  while (cache.size > TH_GRID_CACHE_MAX_ENTRIES) {
-    const oldestKey = cache.keys().next().value;
-    if (oldestKey !== undefined) {
-      cache.delete(oldestKey);
-    } else {
-      break;
-    }
-  }
 }
 
 /**
@@ -83,36 +59,7 @@ export function formatGridFileName(cycle, leadHour) {
 }
 
 /**
- * Fetches a single grid from window cache or API, updating cache on success
- */
-async function fetchGridWithCache(win, path, file) {
-  const cache = getThGridCache(win);
-  const cacheKey = `${path}|${file}`;
-
-  const cached = cache.get(cacheKey);
-  if (cached && (Date.now() - cached.ts <= TH_GRID_CACHE_TTL_MS)) {
-    return cached.data;
-  }
-
-  try {
-    const data = await fetchJson("/api/data/grid", { path, file });
-    if (data && (data.values || data.u)) {
-      cache.set(cacheKey, { data, ts: Date.now() });
-      pruneThGridCache(cache);
-      return data;
-    }
-    cache.set(cacheKey, { data: null, ts: Date.now() });
-    pruneThGridCache(cache);
-    return null;
-  } catch {
-    cache.set(cacheKey, { data: null, ts: Date.now() });
-    pruneThGridCache(cache);
-    return null;
-  }
-}
-
-/**
- * Bulk loads grid data for the profile matrix with concurrency cap, progress reporting, and cancellation
+ * Fetches time-height cross-section profile as a single NDJSON stream
  */
 export async function loadTimeHeightMatrix({
   win = null,
@@ -124,29 +71,20 @@ export async function loadTimeHeightMatrix({
   onProgress = null,
   signalSeq = null,
   isCancelled = null,
+  abortController = null,
 } = {}) {
-  const elements = ["RH", "TMP", "VVEL", "WIND"];
-  const gridMap = new Map(); // key -> gridData
-
-  // Build task list: leads x levels x elements
-  const tasks = [];
-  for (const lead of leads) {
-    const file = formatGridFileName(cycle, lead);
-    for (const level of levels) {
-      for (const element of elements) {
-        const path = `${model}/${element}/${level}`;
-        const key = `${path}|${file}`;
-        tasks.push({ element, level, lead, path, file, key });
-      }
-    }
-  }
-
-  const total = tasks.length;
+  let total = leads.length * levels.length * 4;
   let loaded = 0;
   let ok = 0;
   let failed = 0;
+  let cacheHits = 0;
+  let lastSource = "cache";
+
+  const controller = abortController || new AbortController();
+  const signal = controller.signal;
 
   const shouldCancel = () => {
+    if (signal.aborted) return true;
     if (typeof isCancelled === "function" && isCancelled()) return true;
     if (signalSeq !== null && win && win._thLoadSeq !== undefined && win._thLoadSeq !== signalSeq) {
       return true;
@@ -157,71 +95,200 @@ export async function loadTimeHeightMatrix({
     return false;
   };
 
-  const reportProgress = () => {
-    if (typeof onProgress === "function") {
-      const pct = total > 0 ? Math.round((loaded / total) * 100) : 100;
-      onProgress({ loaded, total, ok, failed, pct, cancelled: shouldCancel() });
-    }
-  };
+  if (shouldCancel()) {
+    return { cancelled: true, matrix: null, stats: { total, loaded: 0, ok: 0, failed: 0 } };
+  }
 
-  // Process in batches of TH_CONCURRENCY
-  for (let i = 0; i < tasks.length; i += TH_CONCURRENCY) {
+  const query = new URLSearchParams({
+    model,
+    cycle,
+    leads: leads.join(","),
+    levels: levels.join(","),
+    lon: String(point.lon),
+    lat: String(point.lat),
+  });
+
+  const url = `/api/data/timeheight/profile?${query.toString()}`;
+
+  let response;
+  try {
+    response = await fetch(url, { signal });
+  } catch (err) {
     if (shouldCancel()) {
-      break;
+      return { cancelled: true, matrix: null, stats: { total, loaded, ok, failed } };
     }
-    const chunk = tasks.slice(i, i + TH_CONCURRENCY);
-    const results = await Promise.allSettled(
-      chunk.map(async (task) => {
-        const grid = await fetchGridWithCache(win, task.path, task.file);
-        return { task, grid };
-      })
-    );
+    throw err;
+  }
 
-    for (const res of results) {
-      loaded++;
-      if (res.status === "fulfilled" && res.value.grid) {
-        ok++;
-        gridMap.set(res.value.task.key, res.value.grid);
-      } else {
-        failed++;
+  if (!response.ok) {
+    throw new Error(`Profile fetch failed: ${response.status} ${response.statusText}`);
+  }
+
+  const reader = response.body ? response.body.getReader() : null;
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+  let resultObj = null;
+
+  if (reader) {
+    try {
+      while (true) {
+        if (shouldCancel()) {
+          try {
+            await reader.cancel();
+          } catch {
+            // ignore
+          }
+          return { cancelled: true, matrix: null, stats: { total, loaded, ok, failed, cacheHits } };
+        }
+
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop(); // keep partial chunk
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          let evt;
+          try {
+            evt = JSON.parse(trimmed);
+          } catch {
+            continue;
+          }
+
+          if (evt.type === "progress") {
+            loaded = evt.loaded ?? loaded;
+            total = evt.total ?? total;
+            ok = evt.ok ?? ok;
+            failed = evt.failed ?? failed;
+            cacheHits = evt.cacheHits ?? cacheHits;
+            lastSource = evt.lastSource ?? lastSource;
+
+            if (typeof onProgress === "function") {
+              const pct = total > 0 ? Math.round((loaded / total) * 100) : 100;
+              onProgress({
+                loaded,
+                total,
+                ok,
+                failed,
+                pct,
+                cacheHits,
+                lastSource,
+                cancelled: shouldCancel(),
+              });
+            }
+          } else if (evt.type === "result") {
+            resultObj = evt;
+          }
+        }
+      }
+
+      if (buffer.trim()) {
+        try {
+          const evt = JSON.parse(buffer.trim());
+          if (evt.type === "result") {
+            resultObj = evt;
+          }
+        } catch {
+          // ignore
+        }
+      }
+    } catch (err) {
+      if (shouldCancel()) {
+        return { cancelled: true, matrix: null, stats: { total, loaded, ok, failed, cacheHits } };
+      }
+      throw err;
+    }
+  } else if (typeof response.text === "function") {
+    // Non-streaming fallback for testing/mock fetch environments
+    const fullText = await response.text();
+    for (const line of fullText.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const evt = JSON.parse(trimmed);
+        if (evt.type === "progress") {
+          loaded = evt.loaded ?? loaded;
+          total = evt.total ?? total;
+          ok = evt.ok ?? ok;
+          failed = evt.failed ?? failed;
+          cacheHits = evt.cacheHits ?? cacheHits;
+          lastSource = evt.lastSource ?? lastSource;
+        } else if (evt.type === "result") {
+          resultObj = evt;
+        }
+      } catch {
+        // ignore
       }
     }
-    reportProgress();
+  } else if (typeof response.json === "function") {
+    const data = await response.json();
+    if (data && data.type === "result") {
+      resultObj = data;
+    }
   }
 
   if (shouldCancel()) {
-    return { cancelled: true, matrix: null, stats: { total, loaded, ok, failed } };
+    return { cancelled: true, matrix: null, stats: { total, loaded, ok, failed, cacheHits } };
   }
 
-  // Snap the point to the nearest grid node using the first available grid
-  let firstGrid = null;
-  for (const g of gridMap.values()) {
-    if (g && (g.x || g.header)) {
-      firstGrid = g;
-      break;
-    }
+  if (!resultObj) {
+    return { cancelled: false, matrix: null, stats: { total, loaded, ok, failed, cacheHits } };
   }
-  const snappedPoint = snapToGridNode(firstGrid, point.lon, point.lat);
 
-  // Build and sample the 2D matrices [nLevels][nLeads]
-  const matrix = buildProfileMatrix({
-    cycle,
-    leads,
-    levels,
-    point: snappedPoint,
-    model,
-    gridMap,
-  });
+  const nLevels = resultObj.levels ? resultObj.levels.length : levels.length;
+  const nLeads = resultObj.leads ? resultObj.leads.length : leads.length;
+
+  const toFloat32Array = (mat2D) => {
+    return Array.from({ length: nLevels }, (_, li) => {
+      const row = (mat2D && mat2D[li]) || [];
+      const arr = new Float32Array(nLeads);
+      for (let ti = 0; ti < nLeads; ti++) {
+        const val = row[ti];
+        arr[ti] = (val === null || val === undefined || Number.isNaN(val)) ? NaN : val;
+      }
+      return arr;
+    });
+  };
+
+  const matrix = {
+    point: resultObj.point || point,
+    cycle: resultObj.cycle || cycle,
+    leads: [...(resultObj.leads || leads)],
+    levels: [...(resultObj.levels || levels)],
+    rh: toFloat32Array(resultObj.rh),
+    tmp: toFloat32Array(resultObj.tmp),
+    vvel: toFloat32Array(resultObj.vvel),
+    u: toFloat32Array(resultObj.u),
+    v: toFloat32Array(resultObj.v),
+    missing: resultObj.missing || { rh: 0, tmp: 0, vvel: 0, wind: 0 },
+    stats: {
+      rhMin: resultObj.stats?.rhMin ?? 0,
+      rhMax: resultObj.stats?.rhMax ?? 100,
+      tmpMin: resultObj.stats?.tmpMin ?? -40,
+      tmpMax: resultObj.stats?.tmpMax ?? 40,
+      vvelMin: resultObj.stats?.vvelMin ?? -100,
+      vvelMax: resultObj.stats?.vvelMax ?? 100,
+    },
+  };
 
   return {
     cancelled: false,
     matrix,
-    stats: { total, loaded, ok, failed },
+    stats: {
+      total: resultObj.stats?.total ?? total,
+      loaded: loaded || total,
+      ok: ok || total - (resultObj.stats?.failed || 0),
+      failed: resultObj.stats?.failed ?? failed,
+      cacheHits: resultObj.stats?.cacheHits ?? cacheHits,
+    },
   };
 }
 
 /**
- * Builds and samples the meteorological matrices from cached gridData
+ * Test-oracle matrix builder (kept client-side for numeric parity testing with synthetic grids)
  */
 export function buildProfileMatrix({
   cycle,
@@ -273,7 +340,6 @@ export function buildProfileMatrix({
       const lead = leads[ti];
       const file = formatGridFileName(cycle, lead);
 
-      // RH
       const rhGrid = gridMap.get(`${model}/RH/${level}|${file}`);
       const sRH = getScalarSampler(rhGrid);
       if (sRH) {
@@ -289,7 +355,6 @@ export function buildProfileMatrix({
         missing.rh++;
       }
 
-      // TMP
       const tmpGrid = gridMap.get(`${model}/TMP/${level}|${file}`);
       const sTMP = getScalarSampler(tmpGrid);
       if (sTMP) {
@@ -305,7 +370,6 @@ export function buildProfileMatrix({
         missing.tmp++;
       }
 
-      // VVEL
       const vvelGrid = gridMap.get(`${model}/VVEL/${level}|${file}`);
       const sVVEL = getScalarSampler(vvelGrid);
       if (sVVEL) {
@@ -321,7 +385,6 @@ export function buildProfileMatrix({
         missing.vvel++;
       }
 
-      // WIND
       const windGrid = gridMap.get(`${model}/WIND/${level}|${file}`);
       const sWind = getWindSampler(windGrid);
       if (sWind) {

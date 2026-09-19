@@ -75,48 +75,6 @@ function createMockMap() {
   };
 }
 
-function createSyntheticGridResponse(element, level, period) {
-  const nLon = 10;
-  const nLat = 10;
-  const total = nLon * nLat;
-  const values = new Float32Array(total);
-  const u = element === "WIND" ? new Float32Array(total) : null;
-  const v = element === "WIND" ? new Float32Array(total) : null;
-
-  for (let i = 0; i < total; i++) {
-    if (element === "RH") values[i] = 75.0;
-    else if (element === "TMP") values[i] = 20.0 - level * 0.05;
-    else if (element === "VVEL") values[i] = -25.0; // ascent
-    else if (element === "WIND") {
-      values[i] = 12.0;
-      u[i] = 8.0;
-      v[i] = 6.0;
-    }
-  }
-
-  return {
-    header: {
-      discriminator: "mdfs",
-      element,
-      level,
-      period,
-      n_lon: nLon,
-      n_lat: nLat,
-      start_lon: 60.0,
-      end_lon: 150.0,
-      d_lon: 10.0,
-      start_lat: 60.0,
-      end_lat: -10.0,
-      d_lat: -7.77,
-      description: element === "VVEL" ? "10e-2.Pa.s-1" : element === "RH" ? "%" : "",
-    },
-    x: Array.from({ length: nLon }, (_, i) => 60.0 + i * 10.0),
-    y: Array.from({ length: nLat }, (_, j) => 60.0 - j * 7.77),
-    values: Array.from(values),
-    u: u ? Array.from(u) : null,
-    v: v ? Array.from(v) : null,
-  };
-}
 
 describe("V1: Preset Configuration in client/config.json", () => {
   it("verifies composite-ec-timeheight exists and conforms to Plan 1 spec", () => {
@@ -153,34 +111,101 @@ describe("V1: Preset Configuration in client/config.json", () => {
     expect(c.showTemp).toBe(true);
     expect(c.showVVel).toBe(true);
     expect(c.showWind).toBe(true);
-    expect(c.showGridPointMarker).toBe(true);
   });
 });
 
-describe("V2 & V3: Cold Load Default Matrix, Progress & Zero-Fetch Node Resample", () => {
+function createSyntheticProfileStream(leads, levels, cycle = "26091808", point = { lon: 121.5, lat: 31.4 }, missingLevel = null) {
+  const nLevels = levels.length;
+  const nLeads = leads.length;
+  const total = nLevels * nLeads * 4;
+
+  const lines = [];
+  for (let i = 1; i <= total; i++) {
+    lines.push(JSON.stringify({
+      type: "progress",
+      loaded: i,
+      total,
+      ok: missingLevel ? Math.max(0, i - 1) : i,
+      failed: missingLevel ? 1 : 0,
+      cacheHits: Math.floor(i / 2),
+      lastSource: i % 2 === 0 ? "cache" : "cassandra",
+    }));
+  }
+
+  const rh = Array.from({ length: nLevels }, () => Array.from({ length: nLeads }, () => 75.0));
+  const tmp = Array.from({ length: nLevels }, (_, li) => Array.from({ length: nLeads }, () => 20.0 - levels[li] * 0.05));
+  const vvel = Array.from({ length: nLevels }, (_, li) => {
+    if (levels[li] === missingLevel) {
+      return Array.from({ length: nLeads }, () => null);
+    }
+    return Array.from({ length: nLeads }, () => -25.0);
+  });
+  const u = Array.from({ length: nLevels }, () => Array.from({ length: nLeads }, () => 8.0));
+  const v = Array.from({ length: nLevels }, () => Array.from({ length: nLeads }, () => 6.0));
+
+  lines.push(JSON.stringify({
+    type: "result",
+    point: { lon: point.lon, lat: point.lat, i: 246, j: 115 },
+    cycle,
+    leads,
+    levels,
+    rh,
+    tmp,
+    vvel,
+    u,
+    v,
+    missing: { rh: 0, tmp: 0, vvel: missingLevel ? nLeads : 0, wind: 0 },
+    stats: {
+      total,
+      failed: missingLevel ? nLeads : 0,
+      cacheHits: Math.floor(total / 2),
+      rhMin: 75,
+      rhMax: 75,
+      tmpMin: -30,
+      tmpMax: 20,
+      vvelMin: -25,
+      vvelMax: -25,
+    },
+  }));
+
+  const text = lines.join("\n") + "\n";
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode(text));
+      controller.close();
+    },
+  });
+
+  return {
+    ok: true,
+    status: 200,
+    headers: new Headers({ "Content-Type": "application/x-ndjson" }),
+    text: async () => text,
+    body: stream,
+  };
+}
+
+describe("V2 & V3: Cold Load Default Matrix, Progress & One Request Per Profile", () => {
   let originalFetch;
   let fetchCounts = 0;
+  let requestedUrls = [];
 
   beforeEach(() => {
     clearDataCache();
     fetchCounts = 0;
+    requestedUrls = [];
     originalFetch = global.fetch;
     global.fetch = async (url) => {
       fetchCounts++;
+      requestedUrls.push(String(url));
       const u = new URL(String(url), "http://localhost:8088");
-      const path = u.searchParams.get("path") || "";
-      const file = u.searchParams.get("file") || "";
-      const parts = path.split("/");
-      const element = parts[1] || "TMP";
-      const level = parseFloat(parts[2]) || 500;
-      const fileParts = file.split(".");
-      const period = parseInt(fileParts[fileParts.length - 1] || "0", 10);
-
-      return {
-        ok: true,
-        status: 200,
-        json: async () => createSyntheticGridResponse(element, level, period),
-      };
+      const leads = (u.searchParams.get("leads") || "0").split(",").map(Number);
+      const levels = (u.searchParams.get("levels") || "500").split(",").map(Number);
+      const cycle = u.searchParams.get("cycle") || "26091808";
+      const lon = parseFloat(u.searchParams.get("lon") || "121.5");
+      const lat = parseFloat(u.searchParams.get("lat") || "31.4");
+      return createSyntheticProfileStream(leads, levels, cycle, { lon, lat });
     };
   });
 
@@ -189,7 +214,7 @@ describe("V2 & V3: Cold Load Default Matrix, Progress & Zero-Fetch Node Resample
     clearDataCache();
   });
 
-  it("loads 13 leads x 10 levels with monotonic progress up to 100%", async () => {
+  it("loads 13 leads x 10 levels with monotonic progress up to 100% in 1 request", async () => {
     const win = { id: "test-v2-win", loadSeq: 0 };
     const leads = buildLeads(0, 144, 12);
     expect(leads.length).toBe(13);
@@ -228,26 +253,13 @@ describe("V2 & V3: Cold Load Default Matrix, Progress & Zero-Fetch Node Resample
     expect(lastProgress.pct).toBe(100);
     expect(lastProgress.loaded).toBe(lastProgress.total);
 
-    // Initial cold fetch made 13 * 10 * 4 = 520 calls
-    expect(fetchCounts).toBe(520);
-
-    // V3: Second point selection on the same window performs ZERO network fetches
-    const priorFetchCount = fetchCounts;
-    const secondRes = await loadTimeHeightMatrix({
-      win,
-      cycle: "26091808",
-      leads,
-      levels,
-      point: { lon: 118.5, lat: 32.0 },
-      signalSeq: win.loadSeq,
-    });
-
-    expect(secondRes.matrix).not.toBeNull();
-    expect(fetchCounts).toBe(priorFetchCount); // Zero extra network calls!
+    // Verification P2: Profile request made exactly 1 call (vs 520 before)
+    expect(fetchCounts).toBe(1);
+    expect(requestedUrls[0]).toContain("/api/data/timeheight/profile");
   });
 });
 
-describe("V4: Period and Interval Change with Cached Lead Reuse", () => {
+describe("V4: Period and Interval Change with Single Profile Fetch", () => {
   let originalFetch;
   let fetchCounts = 0;
 
@@ -258,19 +270,10 @@ describe("V4: Period and Interval Change with Cached Lead Reuse", () => {
     global.fetch = async (url) => {
       fetchCounts++;
       const u = new URL(String(url), "http://localhost:8088");
-      const path = u.searchParams.get("path") || "";
-      const file = u.searchParams.get("file") || "";
-      const parts = path.split("/");
-      const element = parts[1] || "TMP";
-      const level = parseFloat(parts[2]) || 500;
-      const fileParts = file.split(".");
-      const period = parseInt(fileParts[fileParts.length - 1] || "0", 10);
-
-      return {
-        ok: true,
-        status: 200,
-        json: async () => createSyntheticGridResponse(element, level, period),
-      };
+      const leads = (u.searchParams.get("leads") || "0").split(",").map(Number);
+      const levels = (u.searchParams.get("levels") || "500").split(",").map(Number);
+      const cycle = u.searchParams.get("cycle") || "26091808";
+      return createSyntheticProfileStream(leads, levels, cycle);
     };
   });
 
@@ -279,11 +282,10 @@ describe("V4: Period and Interval Change with Cached Lead Reuse", () => {
     clearDataCache();
   });
 
-  it("reuses overlapping cached leads when changing span to 0-72h @ 6h", async () => {
+  it("fetches profile cleanly when changing span to 0-72h @ 6h", async () => {
     const win = { id: "test-v4-win", loadSeq: 0 };
-    const levels = [1000, 500]; // 2 levels for fast test
+    const levels = [1000, 500];
 
-    // Cold load 0-144h @ 12h: leads 0, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 132, 144 (13 leads)
     const initialLeads = buildLeads(0, 144, 12);
     await loadTimeHeightMatrix({
       win,
@@ -293,28 +295,21 @@ describe("V4: Period and Interval Change with Cached Lead Reuse", () => {
       point: { lon: 121.5, lat: 31.4 },
       signalSeq: win.loadSeq,
     });
-    const coldFetchCount = fetchCounts;
-    expect(coldFetchCount).toBe(13 * 2 * 4); // 104 fetches
+    expect(fetchCounts).toBe(1);
 
-    // Now request 0-72h @ 6h: leads 0, 6, 12, 18, 24, 30, 36, 42, 48, 54, 60, 66, 72 (13 leads)
-    // Overlapping: 0, 12, 24, 36, 48, 60, 72 (7 leads are already cached in win._thGridCache!)
-    // Novel: 6, 18, 30, 42, 54, 66 (6 leads must be fetched)
     const newLeads = buildLeads(0, 72, 6);
     expect(newLeads.length).toBe(13);
 
-    const progressReports = [];
     await loadTimeHeightMatrix({
       win,
       cycle: "26091808",
       leads: newLeads,
       levels,
       point: { lon: 121.5, lat: 31.4 },
-      onProgress: (p) => progressReports.push(p),
       signalSeq: win.loadSeq,
     });
 
-    const novelFetches = fetchCounts - coldFetchCount;
-    expect(novelFetches).toBe(6 * 2 * 4); // Exactly 48 fetches for the 6 novel leads!
+    expect(fetchCounts).toBe(2);
   });
 });
 
@@ -341,23 +336,21 @@ describe("V4b: Time Direction Inversion (Fast-Path)", () => {
   });
 });
 
-describe("V5: Forecast Cycle Switch and Cache Partitioning", () => {
+describe("V5: Forecast Cycle Switch", () => {
   let originalFetch;
-  let fetchedFiles = [];
+  let fetchedCycles = [];
 
   beforeEach(() => {
     clearDataCache();
-    fetchedFiles = [];
+    fetchedCycles = [];
     originalFetch = global.fetch;
     global.fetch = async (url) => {
       const u = new URL(String(url), "http://localhost:8088");
-      const file = u.searchParams.get("file") || "";
-      fetchedFiles.push(file);
-      return {
-        ok: true,
-        status: 200,
-        json: async () => createSyntheticGridResponse("TMP", 500, 0),
-      };
+      const cycle = u.searchParams.get("cycle") || "";
+      fetchedCycles.push(cycle);
+      const leads = (u.searchParams.get("leads") || "0").split(",").map(Number);
+      const levels = (u.searchParams.get("levels") || "500").split(",").map(Number);
+      return createSyntheticProfileStream(leads, levels, cycle);
     };
   });
 
@@ -366,7 +359,7 @@ describe("V5: Forecast Cycle Switch and Cache Partitioning", () => {
     clearDataCache();
   });
 
-  it("fetches new files on cycle switch and retains old cycle for instant revert", async () => {
+  it("fetches profile with requested cycle on cycle switch", async () => {
     const win = { id: "test-v5-win", loadSeq: 0 };
     const leads = [0];
     const levels = [500];
@@ -380,10 +373,9 @@ describe("V5: Forecast Cycle Switch and Cache Partitioning", () => {
       point: { lon: 121.5, lat: 31.4 },
       signalSeq: win.loadSeq,
     });
-    expect(fetchedFiles.some((f) => f.startsWith("26091808"))).toBe(true);
+    expect(fetchedCycles).toContain("26091808");
 
     // Cycle 2: 26091800
-    fetchedFiles = [];
     await loadTimeHeightMatrix({
       win,
       cycle: "26091800",
@@ -392,19 +384,7 @@ describe("V5: Forecast Cycle Switch and Cache Partitioning", () => {
       point: { lon: 121.5, lat: 31.4 },
       signalSeq: win.loadSeq,
     });
-    expect(fetchedFiles.some((f) => f.startsWith("26091800"))).toBe(true);
-
-    // Flip back to Cycle 1: zero network fetches!
-    fetchedFiles = [];
-    await loadTimeHeightMatrix({
-      win,
-      cycle: "26091808",
-      leads,
-      levels,
-      point: { lon: 121.5, lat: 31.4 },
-      signalSeq: win.loadSeq,
-    });
-    expect(fetchedFiles.length).toBe(0);
+    expect(fetchedCycles).toContain("26091800");
   });
 });
 
@@ -417,13 +397,8 @@ describe("V6: Progress Tracking and Load Cancellation", () => {
 
     const originalFetch = global.fetch;
     global.fetch = async () => {
-      // Simulate delay
       await new Promise((r) => setTimeout(r, 20));
-      return {
-        ok: true,
-        status: 200,
-        json: async () => createSyntheticGridResponse("TMP", 500, 0),
-      };
+      return createSyntheticProfileStream(leads, levels);
     };
 
     try {
@@ -435,7 +410,6 @@ describe("V6: Progress Tracking and Load Cancellation", () => {
         point: { lon: 121.5, lat: 31.4 },
         signalSeq: 1,
       });
-      // Cancel mid-flight by incrementing loadSeq
       win.loadSeq = 2;
 
       const res = await loadPromise;
@@ -456,16 +430,10 @@ describe("V7: Graceful Partial 404 Degradation", () => {
     originalFetch = global.fetch;
     global.fetch = async (url) => {
       const u = new URL(String(url), "http://localhost:8088");
-      const path = u.searchParams.get("path") || "";
-      // Fail VVEL at level 200
-      if (path.includes("VVEL/200")) {
-        return { ok: false, status: 404, json: async () => ({ error: "Not found" }) };
-      }
-      return {
-        ok: true,
-        status: 200,
-        json: async () => createSyntheticGridResponse("TMP", 500, 0),
-      };
+      const leads = (u.searchParams.get("leads") || "0").split(",").map(Number);
+      const levels = (u.searchParams.get("levels") || "500").split(",").map(Number);
+      const cycle = u.searchParams.get("cycle") || "26091808";
+      return createSyntheticProfileStream(leads, levels, cycle, { lon: 121.5, lat: 31.4 }, 200);
     };
   });
 

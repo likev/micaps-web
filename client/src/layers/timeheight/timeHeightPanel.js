@@ -481,7 +481,7 @@ export class TimeHeightPanel {
     }
   }
 
-  setProgress({ loaded, total, pct, cancelled = false } = {}) {
+  setProgress({ loaded, total, pct, cacheHits = 0, cancelled = false } = {}) {
     if (!this.container) return;
     const wrap = this.container.querySelector(".th-progress-wrap");
     const bar = this.container.querySelector(".th-progress-bar");
@@ -495,7 +495,8 @@ export class TimeHeightPanel {
 
     wrap.style.display = "flex";
     bar.style.width = `${pct}%`;
-    label.textContent = `Loading ${loaded}/${total} grids… (${pct}%)`;
+    const cachePart = cacheHits > 0 ? ` · ${cacheHits} from cache` : "";
+    label.textContent = `Loading ${loaded}/${total} grids… (${pct}%)${cachePart}`;
   }
 
   hideProgress() {

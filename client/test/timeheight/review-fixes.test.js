@@ -235,7 +235,7 @@ describe("Must-Fix 5: Multi-Window Isolation", () => {
   });
 });
 
-describe("Should-Fix: Negative Caching for 404 Grids", () => {
+describe("Partial Failure Contract: Graceful Missing Grid Handling", () => {
   let fetchCounts = 0;
   let originalFetch;
 
@@ -243,14 +243,28 @@ describe("Should-Fix: Negative Caching for 404 Grids", () => {
     clearDataCache();
     fetchCounts = 0;
     originalFetch = global.fetch;
-    global.fetch = async (url) => {
+    global.fetch = async () => {
       fetchCounts++;
-      const u = new URL(String(url), "http://localhost:8088");
-      const path = u.searchParams.get("path") || "";
-      if (path.includes("VVEL/200")) {
-        return { ok: false, status: 404, json: async () => ({ error: "Not found" }) };
-      }
-      return { ok: true, status: 200, json: async () => createSyntheticGrid("TMP", 500, 0) };
+      const resultObj = {
+        type: "result",
+        point: { lon: 120.0, lat: 30.0, i: 240, j: 120 },
+        cycle: "26091808",
+        leads: [0],
+        levels: [200],
+        rh: [[75.0]],
+        tmp: [[-50.0]],
+        vvel: [[null]], // Missing 404 grid
+        u: [[8.0]],
+        v: [[6.0]],
+        missing: { rh: 0, tmp: 0, vvel: 1, wind: 0 },
+        stats: { total: 4, failed: 1, cacheHits: 0 },
+      };
+      const text = JSON.stringify(resultObj) + "\n";
+      return {
+        ok: true,
+        status: 200,
+        text: async () => text,
+      };
     };
   });
 
@@ -259,13 +273,12 @@ describe("Should-Fix: Negative Caching for 404 Grids", () => {
     clearDataCache();
   });
 
-  it("negative-caches 404 grids so subsequent load does not re-request them", async () => {
+  it("handles missing 404 grid gracefully mapping to NaN without whole-request failure", async () => {
     const win = { id: "win-neg-cache", loadSeq: 0 };
     const leads = [0];
-    const levels = [200]; // VVEL/200 will 404
+    const levels = [200];
 
-    // First load attempts fetch and encounters 404
-    await loadTimeHeightMatrix({
+    const res = await loadTimeHeightMatrix({
       win,
       cycle: "26091808",
       leads,
@@ -274,21 +287,12 @@ describe("Should-Fix: Negative Caching for 404 Grids", () => {
       signalSeq: win.loadSeq,
     });
 
-    const firstFetchCount = fetchCounts;
-    expect(firstFetchCount).toBeGreaterThan(0);
-
-    // Second point load on same window re-evaluates matrix with cached null tombstone
-    await loadTimeHeightMatrix({
-      win,
-      cycle: "26091808",
-      leads,
-      levels,
-      point: { lon: 121.0, lat: 31.0 },
-      signalSeq: win.loadSeq,
-    });
-
-    // Fetches should not have increased for negative-cached 404 grids
-    expect(fetchCounts).toBe(firstFetchCount);
+    expect(fetchCounts).toBe(1);
+    expect(res).not.toBeNull();
+    expect(res.matrix).not.toBeNull();
+    expect(res.stats.failed).toBe(1);
+    expect(Number.isNaN(res.matrix.vvel[0][0])).toBe(true);
+    expect(res.matrix.missing.vvel).toBe(1);
   });
 });
 

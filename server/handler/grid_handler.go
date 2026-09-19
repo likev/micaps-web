@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"micaps-web/db"
+	"micaps-web/filecache"
 	"micaps-web/mock"
 	"micaps-web/model"
 	"micaps-web/parser"
@@ -17,6 +18,7 @@ import (
 // GridHandler processes gridded data requests
 type GridHandler struct {
 	Client   *db.CQLClient
+	Cache    *filecache.Cache
 	MockMode bool
 }
 
@@ -77,9 +79,35 @@ func (h *GridHandler) fetchGrid(r *http.Request) (*model.GridResponse, error) {
 		return h.getFallbackGrid(r), nil
 	}
 
+	cleanDir := strings.Trim(dataPath, "/")
+	parts := strings.Split(cleanDir, "/")
+	table := parts[0]
+	var subDataPath string
+	if len(parts) > 1 {
+		subDataPath = strings.Join(parts[1:], "/")
+	}
+	if strings.Contains(cleanDir, "TLOGP") {
+		table = "UPPER_AIR"
+		subDataPath = "TLOGP"
+	}
+
+	// Check file cache
+	if h.Cache != nil {
+		if cachedBlob, _, ok := h.Cache.Get(table, subDataPath, file); ok {
+			decompressed, err := parser.DecompressGzip(cachedBlob)
+			if err == nil {
+				return parser.ParseGridData(decompressed)
+			}
+		}
+	}
+
 	rawBlob, err := db.GetBlob(h.Client, dataPath, file)
 	if err != nil {
 		return nil, err
+	}
+
+	if h.Cache != nil {
+		_ = h.Cache.Put(table, subDataPath, file, rawBlob, nil)
 	}
 
 	decompressed, err := parser.DecompressGzip(rawBlob)

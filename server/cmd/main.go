@@ -12,6 +12,7 @@ import (
 
 	"micaps-web/config"
 	"micaps-web/db"
+	"micaps-web/filecache"
 	"micaps-web/handler"
 )
 
@@ -55,11 +56,32 @@ func main() {
 		}
 	}
 
+	var fc *filecache.Cache
+	if !cfg.MockMode {
+		ttl, err := time.ParseDuration(cfg.THCacheTTL)
+		if err != nil {
+			ttl = 6 * time.Hour
+		}
+		var fcErr error
+		fc, fcErr = filecache.New(filecache.Config{
+			Dir:      cfg.THCacheDir,
+			CapBytes: cfg.THCacheMB * 1024 * 1024,
+			TTL:      ttl,
+			Disabled: false,
+		})
+		if fcErr != nil {
+			log.Printf("[Main] Warning: filecache.New failed: %v", fcErr)
+		} else {
+			defer fc.Close()
+		}
+	}
+
 	catH := &handler.CatalogHandler{Client: cqlClient, MockMode: cfg.MockMode}
-	gridH := &handler.GridHandler{Client: cqlClient, MockMode: cfg.MockMode}
+	gridH := &handler.GridHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode}
+	profileH := &handler.ProfileHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode}
 	statH := &handler.StationHandler{Client: cqlClient, MockMode: cfg.MockMode}
 	tlogpH := &handler.TLogPHandler{Client: cqlClient, MockMode: cfg.MockMode}
-	staticH := &handler.StaticHandler{Cfg: cfg}
+	staticH := &handler.StaticHandler{Cfg: cfg, FileCache: fc}
 
 	mux := http.NewServeMux()
 
@@ -72,6 +94,8 @@ func main() {
 	mux.HandleFunc("/api/catalog/latest", catH.LatestHandler)
 	mux.HandleFunc("/api/data/grid", gridH.JSONHandler)
 	mux.HandleFunc("/api/data/grid/binary", gridH.BinaryHandler)
+	// Time-Height profile streaming endpoint (WriteTimeout: 60s exempted inside handler via http.ResponseController)
+	mux.HandleFunc("/api/data/timeheight/profile", profileH.Handler)
 	mux.HandleFunc("/api/data/station", statH.StationGeoJSONHandler)
 	mux.HandleFunc("/api/data/tlogp", tlogpH.Handler)
 

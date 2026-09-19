@@ -10,13 +10,15 @@ import (
 	"time"
 
 	"micaps-web/config"
+	"micaps-web/filecache"
 )
 
 var startTime = time.Now()
 
 // StaticHandler serves the client SPA and PMTiles files
 type StaticHandler struct {
-	Cfg *config.Config
+	Cfg       *config.Config
+	FileCache *filecache.Cache
 }
 
 // PMTilesHandler serves PMTiles files (*.pmtiles) supporting HTTP 206 Range requests
@@ -81,14 +83,24 @@ func (h *StaticHandler) PMTilesHandler(w http.ResponseWriter, r *http.Request) {
 // StatusHandler returns API health, connection details, and uptime
 func (h *StaticHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	status := map[string]interface{}{
 		"status":         "ok",
 		"cassandra_host": h.Cfg.CassandraHost,
 		"cassandra_port": h.Cfg.CassandraPort,
 		"tunnel_mode":    h.Cfg.EnableTunnel,
 		"mock_mode":      h.Cfg.MockMode,
 		"uptime_seconds": int(time.Since(startTime).Seconds()),
-	})
+	}
+	if h.FileCache != nil {
+		status["thCache"] = h.FileCache.Stats()
+	} else {
+		status["thCache"] = map[string]interface{}{
+			"entries":  int64(0),
+			"bytes":    int64(0),
+			"capBytes": int64(0),
+		}
+	}
+	json.NewEncoder(w).Encode(status)
 }
 
 // ConfigHandler reads or updates config.json

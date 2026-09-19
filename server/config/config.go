@@ -25,6 +25,9 @@ type Config struct {
 	MockMode      bool   `json:"mock_mode"`
 	StaticDir     string `json:"static_dir"`
 	PMTilesPath   string `json:"pmtiles_path"`
+	THCacheDir    string `json:"th_cache_dir"`
+	THCacheMB     int64  `json:"th_cache_mb"`
+	THCacheTTL    string `json:"th_cache_ttl"`
 }
 
 type xmlAddEntry struct {
@@ -129,6 +132,9 @@ func LoadConfig() *Config {
 		MockMode:      getEnvBool("MOCK_MODE", false),
 		StaticDir:     getEnv("STATIC_DIR", "../client/dist"),
 		PMTilesPath:   getEnv("PMTILES_PATH", "../client/map/map-china.pmtiles"),
+		THCacheDir:    getEnv("TH_CACHE_DIR", "./th-cache"),
+		THCacheMB:     int64(getEnvInt("TH_CACHE_MB", 2000)),
+		THCacheTTL:    getEnv("TH_CACHE_TTL", "6h"),
 	}
 
 	fs := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
@@ -139,6 +145,9 @@ func LoadConfig() *Config {
 	mockFlag := fs.Bool("mock", cfg.MockMode, "Enable offline mock data generator (default: false, product mode)")
 	staticDirFlag := fs.String("static", cfg.StaticDir, "Path to static frontend dist directory")
 	pmtilesFlag := fs.String("pmtiles", cfg.PMTilesPath, "Path to local map-china.pmtiles file")
+	thCacheDirFlag := fs.String("th-cache-dir", cfg.THCacheDir, "Path to server file cache directory (default: ./th-cache)")
+	thCacheMBFlag := fs.Int64("th-cache-mb", cfg.THCacheMB, "Maximum disk cache size in MB (default: 2000)")
+	thCacheTTLFlag := fs.String("th-cache-ttl", cfg.THCacheTTL, "Disk cache retention TTL (default: 6h)")
 
 	if err := fs.Parse(os.Args[1:]); err != nil {
 		if err == flag.ErrHelp {
@@ -169,6 +178,9 @@ func LoadConfig() *Config {
 	cfg.MockMode = *mockFlag
 	cfg.StaticDir = *staticDirFlag
 	cfg.PMTilesPath = *pmtilesFlag
+	cfg.THCacheDir = *thCacheDirFlag
+	cfg.THCacheMB = *thCacheMBFlag
+	cfg.THCacheTTL = *thCacheTTLFlag
 
 	// Validate HTTP port
 	portNum, err := strconv.Atoi(cfg.HTTPPort)

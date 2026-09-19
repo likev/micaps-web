@@ -1566,21 +1566,30 @@ graph TD
    - A vertical dashed amber line (`#e3b341`) indicates the workstation's currently selected forecast lead hour.
    - Updates synchronously during timeline playback or arrow-key navigation without triggering any network or re-sampling operations.
 
-#### 13.2.3. Asynchronous Concurrency, Window-Scoped Grid Caching & Fast-Path Resampling
+#### 13.2.3. Streaming Profile Endpoint, Server-Side File Cache & Zero-Grid Browser Footprint
 
-- **Asynchronous Concurrent Queue**:
-  - Loading a full cross-section (13 leads $\times$ 10 levels $\times$ 4 elements: RH, TMP, VVEL, WIND) involves up to 520 individual grid lookups.
-  - `timeHeightLoader.js` manages an asynchronous worker pool with concurrency limit `TH_CONCURRENCY = 6`.
-  - Monotonic progress callbacks fire smoothly from $0\%$ to $100\%$ with `pct = Math.round((loaded / total) * 100)`.
-- **Window-Scoped Grid Cache (`TH_GRID_CACHE_TTL_MS = 600000`)**:
-  - Raw 2D gridded fields are cached per multi-window instance for $10\text{ minutes}$ (up to 600 entries).
-  - Isolates multi-window workspaces: Window 1 and Window 2 can inspect different cycles, periods, or models without cross-contamination.
-- **Fast-Path Node Resampling (< 5 ms)**:
-  - When the user clicks a different geographical location on the map, `timeHeightController.setPoint(lon, lat)` checks whether raw grids for all requested leads and levels exist in the window cache.
-  - If cached, the controller performs bilinear interpolation across the existing cached grids locally, regenerating the entire 10-level cross-section in $<5\text{ ms}$ with **0 network requests**.
-- **Cancellation Tokens & Negative Caching**:
-  - If the user changes point or cycle while a load is in progress, the active load sequence counter (`win.loadSeq`) increments, and in-flight workers abort safely via `cancelLoad()`.
-  - HTTP 404 grids (e.g., missing lead times at boundary ends) are negatively cached with `__404__: true` for 30 seconds, preventing redundant HTTP requests during timeline scrubbing.
+- **Single Streaming Profile Endpoint (`GET /api/data/timeheight/profile`)**:
+  - Instead of client-side fan-out across 520 separate 2D grid requests, the client issues **1 single streaming request** (`ReadableStream`) requesting the exact coordinates $(lon, lat)$, model, forecast cycle, leads, and vertical levels.
+  - The endpoint streams chunked NDJSON lines (`application/x-ndjson`):
+    - Progress events: `{"type":"progress","loaded":N,"total":520,"ok":N,"failed":0,"cacheHits":N,"lastSource":"cache"}`
+    - Result event: `{"type":"result","point":{...},"cycle":"...","leads":[...],"levels":[...],"rh":[[...],...],"tmp":[[...],...],"vvel":[[...],...],"u":[[...],...],"v":[[...],...],"missing":{...},"stats":{...}}`
+  - The handler is exempted from the server's global 60-second write timeout deadline via Go 1.26 `http.NewResponseController(w).SetWriteDeadline(time.Time{})`.
+- **Server On-Disk File Cache (`server/filecache`, capped at ≤ 2000 MB)**:
+  - Compressed raw Cassandra blobs are cached on the server host in `th-cache/` (`-th-cache-dir`) under a strict byte cap (`-th-cache-mb=2000`, default 2000 MB) with LRU eviction and TTL (`-th-cache-ttl=6h`).
+  - Cache hits decompress raw blobs on the fly; repeat cross-section requests complete in ~100 ms with 0 Cassandra queries.
+  - Fail-open resilience: if disk write fails or is read-only, Cassandra continues serving without 500 errors.
+  - Atomic `.tmp` writes and crash-safe startup directory scans rebuild accurate byte tallies after ungraceful restarts.
+- **Point-Targeted Server Parsing (`parser.SampleGridPoint`)**:
+  - Eliminates allocating 101,441-point 2D float arrays on the profile path.
+  - Evaluates header geometry, performs domain validation, reads a 4-float stencil per grid directly from the byte payload, converts wind vectors with strided detector, applies validity bounds/RH clamping, and executes bilinear interpolation.
+- **Client Memory Collapse (~2000 MB → < 5 MB)**:
+  - The browser no longer downloads or caches full 2D grid arrays for profiles (`win._thGridCache` eliminated).
+  - Browser memory consumption attributable to time-height profiles drops from ~2000 MB to < 5 MB.
+  - Fast-path switching between recently inspected points utilizes a lightweight `matrixCache` (bounded to 20 profiles, KBs).
+- **AbortController Real-Time Cancellation**:
+  - User interactions that advance sequence (window close, clicking Cancel, switching points) immediately trigger `AbortController.abort()`, closing the HTTP reader.
+  - The Go server detects `r.Context().Done()` in its 6-worker pool and terminates Cassandra fetching promptly without wasted cycles.
+
 
 #### 13.2.4. Zero-Fetch Time Direction Inversion & Canvas Buffer Clearing
 
