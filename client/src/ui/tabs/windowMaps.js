@@ -1,6 +1,6 @@
 // windowMaps.js - Window MapLibre instance lifecycle and camera synchronization
 import { createMapInstance, setActiveMap } from "../../map/mapInstance.js";
-import { tabsState } from "./tabsStore.js";
+import { tabsState, getVisibleWindows, isWindowVisible } from "./tabsStore.js";
 
 export function initWindowMap(win) {
   if (win.map) return;
@@ -38,8 +38,7 @@ export function initWindowMap(win) {
     const tab = tabsState.tabs.find((t) => t.id === win.tabId);
     if (!tab || !tab.syncMap || tab.layout === "1x1" || tabsState.syncingTabs.has(tab.id)) return;
 
-    const numVisible = tab.layout === "1x2" ? 2 : 4;
-    if (win.winIdx >= numVisible) return;
+    if (!isWindowVisible(tab, win)) return;
 
     if (syncAnimId) return;
     const schedule = typeof requestAnimationFrame === "function" ? requestAnimationFrame : (cb) => setTimeout(cb, 16);
@@ -53,7 +52,7 @@ export function initWindowMap(win) {
         const pitch = map.getPitch();
         const bearing = map.getBearing();
 
-        tab.windows.slice(0, numVisible).forEach((otherWin) => {
+        getVisibleWindows(tab).forEach((otherWin) => {
           if (otherWin !== win && otherWin.map && (otherWin.map.isStyleLoaded() || otherWin.map.loaded())) {
             otherWin.map.jumpTo({ center, zoom, pitch, bearing });
           }
@@ -70,7 +69,6 @@ export function syncTabCameras(tab) {
   const activeWin = tab.windows[tab.activeWinIdx] || tab.windows[0];
   if (!activeWin || !activeWin.map) return;
 
-  const numVisible = tab.layout === "1x2" ? 2 : 4;
   const map = activeWin.map;
   tabsState.syncingTabs.add(tab.id);
   try {
@@ -79,7 +77,7 @@ export function syncTabCameras(tab) {
     const pitch = map.getPitch();
     const bearing = map.getBearing();
 
-    tab.windows.slice(0, numVisible).forEach((otherWin) => {
+    getVisibleWindows(tab).forEach((otherWin) => {
       if (otherWin !== activeWin && otherWin.map && (otherWin.map.isStyleLoaded() || otherWin.map.loaded())) {
         otherWin.map.jumpTo({ center, zoom, pitch, bearing });
       }

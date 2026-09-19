@@ -52,6 +52,13 @@ function renderLegendPanel(winId, panelId = "legend-panel") {
   }
 
   panel.classList.remove("hidden");
+  // Recompute the Wn prefix from the live window position so drag-reorder
+  // keeps legend attribution correct (stored prefix goes stale after moves).
+  let livePrefix = null;
+  try {
+    const liveWin = getWindowById(winId);
+    if (liveWin && typeof liveWin.winIdx === "number") livePrefix = `W${liveWin.winIdx + 1}`;
+  } catch {}
   const itemsHTML = Array.from(elMap.values()).map((item) => {
     const { element, colormap, zMin, zMax } = item;
     const palette = getColormap(colormap, element);
@@ -81,7 +88,7 @@ function renderLegendPanel(winId, panelId = "legend-panel") {
       }
     }
 
-    const displayTitle = item.winPrefix ? `[${item.winPrefix}] ${element}` : element;
+    const displayTitle = (livePrefix || item.winPrefix) ? `[${livePrefix || item.winPrefix}] ${element}` : element;
 
     return `
       <div class="legend-item">

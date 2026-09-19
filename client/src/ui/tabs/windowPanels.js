@@ -1,28 +1,37 @@
 import { PRESET_GROUPS, isDivider, renderPresetOptions } from "../../config/presets.js";
 import { disarmAllContourReRenders } from "../../services/contourReRender.js";
 import { cleanupWindLayer } from "../../layers/windLayer.js";
-import { DEFAULT_LEVELS, tabsState, getActiveTab, getCallbacks } from "./tabsStore.js";
+import { DEFAULT_LEVELS, tabsState, getActiveTab } from "./tabsStore.js";
 import { renderTabPillForWindow, updateLayoutButtons } from "./tabsBarView.js";
-import { initWindowMap, syncTabCameras } from "./windowMaps.js";
 import { focusWindow, setupWindowControlsForWin } from "./windowFocus.js";
+import { reindexWindowPositions, applySplitVisibility, reorderWindows } from "./windowReorder.js";
 
-export function createWindowPanel(tab, gridEl, wIdx) {
+export { reorderWindows };
+
+export function createWindowPanel(tab, gridEl) {
   const tabId = tab.id;
+  if (tab._nextWinSeq == null) tab._nextWinSeq = tab.windows.length;
+  const uid = tab._nextWinSeq++;
+  const posIdx = tab.windows.length;
   const winObj = {
     tabId,
-    winIdx: wIdx,
-    id: `tab-${tabId}-win-${wIdx}`,
-    panelId: `win-panel-${tabId}-${wIdx}`,
-    headerId: `win-header-${tabId}-${wIdx}`,
-    badgeId: `win-badge-${tabId}-${wIdx}`,
-    titleId: `win-title-${tabId}-${wIdx}`,
-    presetSelectId: `win-preset-${tabId}-${wIdx}`,
-    levelSelectId: `win-level-${tabId}-${wIdx}`,
-    maxBtnId: `win-max-${tabId}-${wIdx}`,
-    domId: `map-viewport-${tabId}-${wIdx}`,
+    uid,
+    winIdx: posIdx,
+    id: `tab-${tabId}-win-${uid}`,
+    panelId: `win-panel-${tabId}-${uid}`,
+    headerId: `win-header-${tabId}-${uid}`,
+    badgeId: `win-badge-${tabId}-${uid}`,
+    titleId: `win-title-${tabId}-${uid}`,
+    presetSelectId: `win-preset-${tabId}-${uid}`,
+    levelSelectId: `win-level-${tabId}-${uid}`,
+    maxBtnId: `win-max-${tabId}-${uid}`,
+    pillId: `tab-item-win-${uid}`,
+    labelId: `tab-label-${uid}`,
+    closeBtnId: `tab-close-${uid}`,
+    domId: `map-viewport-${tabId}-${uid}`,
     map: null,
     activeGroup: null,
-    level: DEFAULT_LEVELS[wIdx] || 500,
+    level: DEFAULT_LEVELS[posIdx] || 500,
     period: 24,
     model: null,
     element: null,
@@ -31,15 +40,16 @@ export function createWindowPanel(tab, gridEl, wIdx) {
   };
 
   const panelEl = document.createElement("div");
-  panelEl.className = `window-panel ${wIdx === tab.activeWinIdx ? "active active-single" : ""}`;
+  panelEl.className = `window-panel ${posIdx === tab.activeWinIdx ? "active active-single" : ""}`;
   panelEl.id = winObj.panelId;
   panelEl.dataset.tabId = String(tabId);
-  panelEl.dataset.winIdx = String(wIdx);
+  panelEl.dataset.winIdx = String(posIdx);
+  panelEl.dataset.uid = String(uid);
 
   panelEl.innerHTML = `
-    <div class="win-header" id="${winObj.headerId}">
+    <div class="win-header" id="${winObj.headerId}" draggable="true" title="Drag to rearrange windows">
       <div class="win-title-group">
-        <span class="win-badge" id="${winObj.badgeId}">W${wIdx + 1}</span>
+        <span class="win-badge" id="${winObj.badgeId}">W${posIdx + 1}</span>
         <span class="win-title" id="${winObj.titleId}"></span>
       </div>
       <div class="win-actions">
@@ -103,17 +113,16 @@ export function createPrimaryWorkspace() {
   tabsState.activeTabId = tabId;
 
   // Create initial 4 windows (representing Tabs 1-4 and Split 1-4)
+  tab._nextWinSeq = 0;
   for (let wIdx = 0; wIdx < 4; wIdx++) {
-    createWindowPanel(tab, gridEl, wIdx);
+    createWindowPanel(tab, gridEl);
   }
-
-  // Initialize Window 0 map immediately
-  initWindowMap(tab.windows[0]);
 
   // Setup header controls for all 4 windows
   tab.windows.forEach((win) => setupWindowControlsForWin(tab, win, toggleTabsAndSplit));
 
-  // Focus Window 0
+  // Focus Window 0 (map init + onWindowInit owned by applySplitVisibility
+  // inside focusWindow).
   focusWindow(tabId, 0);
 
   updateLayoutButtons("1x1");
@@ -127,21 +136,19 @@ export function addTabWindow() {
   const gridEl = document.getElementById(`windows-grid-${tab.id}`);
   if (!gridEl) return;
 
-  let newIdx = tab.windows.length;
-  // Ensure pill id uniqueness (post-reindex length is unique, but guard against stale DOM)
-  while (document.getElementById(`tab-item-win-${newIdx}`)) newIdx++;
-  const newWin = createWindowPanel(tab, gridEl, newIdx);
+  const newWin = createWindowPanel(tab, gridEl);
   setupWindowControlsForWin(tab, newWin, toggleTabsAndSplit);
-  initWindowMap(newWin);
-  const callbacks = getCallbacks();
-  if (callbacks.onWindowInit) callbacks.onWindowInit(newWin);
-  focusWindow(tab.id, newIdx);
+  // Map init + visibility owned by focusWindow -> applySplitVisibility.
+  focusWindow(tab.id, newWin.winIdx);
 }
 
 export function closeWindowTab(tab, winIdx) {
   if (tab.windows.length <= 1) return;
   const win = tab.windows[winIdx];
   if (!win) return;
+
+  const wasActive = winIdx === tab.activeWinIdx;
+  const activeBeforeClose = tab.windows[tab.activeWinIdx] || null;
 
   if (win.map) {
     disarmAllContourReRenders(win.map, win);
@@ -150,113 +157,22 @@ export function closeWindowTab(tab, winIdx) {
     win.map = null;
   }
 
-  document.getElementById(win.panelId)?.remove();
-  document.getElementById(`tab-item-win-${win.winIdx}`)?.remove();
+  // Stable ids: simply remove this window's own panel + pill. Remaining
+  // windows keep their ids (and layers/legends/maps stay bound); only the
+  // positional winIdx / badges / labels are refreshed.
+  try { document.getElementById(win.panelId)?.remove(); } catch {}
+  try { document.getElementById(win.pillId || `tab-item-win-${win.winIdx}`)?.remove(); } catch {}
 
   tab.windows.splice(winIdx, 1);
-  tab.windows.forEach((w, idx) => {
-    const oldWinIdx = w.winIdx;
-    const oldPanelId = w.panelId;
-    const oldHeaderId = w.headerId;
-    const oldBadgeId = w.badgeId;
-    const oldTitleId = w.titleId;
-    const oldPresetId = w.presetSelectId;
-    const oldLevelId = w.levelSelectId;
-    const oldMaxBtnId = w.maxBtnId;
+  reindexWindowPositions(tab, wasActive ? null : activeBeforeClose);
+  applySplitVisibility(tab);
 
-    const newPanelId = `win-panel-${tab.id}-${idx}`;
-    const newHeaderId = `win-header-${tab.id}-${idx}`;
-    const newBadgeId = `win-badge-${tab.id}-${idx}`;
-    const newTitleId = `win-title-${tab.id}-${idx}`;
-    const newPresetId = `win-preset-${tab.id}-${idx}`;
-    const newLevelId = `win-level-${tab.id}-${idx}`;
-    const newMaxBtnId = `win-max-${tab.id}-${idx}`;
-    const newId = `tab-${tab.id}-win-${idx}`;
-
-    const renameEl = (oldId, newId) => {
-      if (oldId !== newId) {
-        const el = document.getElementById(oldId);
-        if (el) el.id = newId;
-      }
-    };
-
-    // Panel: rename and update dataset.winIdx (domId viewport kept as-is to avoid breaking map container)
-    if (oldPanelId !== newPanelId) {
-      const panelEl = document.getElementById(oldPanelId);
-      if (panelEl) {
-        panelEl.id = newPanelId;
-        panelEl.dataset.winIdx = String(idx);
-      }
-    } else {
-      const panelEl = document.getElementById(newPanelId);
-      if (panelEl) panelEl.dataset.winIdx = String(idx);
-    }
-    renameEl(oldHeaderId, newHeaderId);
-    renameEl(oldBadgeId, newBadgeId);
-    renameEl(oldTitleId, newTitleId);
-    renameEl(oldPresetId, newPresetId);
-    renameEl(oldLevelId, newLevelId);
-    renameEl(oldMaxBtnId, newMaxBtnId);
-    // w.domId intentionally not renamed to keep map container stable
-
-    const badge = document.getElementById(newBadgeId);
-    if (badge) badge.textContent = `W${idx + 1}`;
-
-    // Pill renaming: lookup by old winIdx
-    const oldPillId = `tab-item-win-${oldWinIdx}`;
-    const newPillId = `tab-item-win-${idx}`;
-    let pill = document.getElementById(oldPillId);
-    if (!pill) pill = document.getElementById(newPillId);
-    if (pill) {
-      if (pill.id !== newPillId) pill.id = newPillId;
-      pill.dataset.winIdx = String(idx);
-      // Update label id and text
-      const oldLabelId = `tab-label-${oldWinIdx}`;
-      const newLabelId = `tab-label-${idx}`;
-      let labelEl = document.getElementById(oldLabelId);
-      if (!labelEl) labelEl = pill.querySelector('[id^="tab-label-"]');
-      if (labelEl) {
-        if (labelEl.id !== newLabelId) labelEl.id = newLabelId;
-        const titleText = document.getElementById(newTitleId)?.textContent || "";
-        labelEl.textContent = titleText ? `W${idx + 1}: ${titleText}` : `Tab ${idx + 1}`;
-      }
-      const oldCloseId = `tab-close-${oldWinIdx}`;
-      const newCloseId = `tab-close-${idx}`;
-      const closeBtn = document.getElementById(oldCloseId);
-      if (closeBtn && closeBtn.id !== newCloseId) closeBtn.id = newCloseId;
-      // Ensure close button visibility matches new idx (>=4 closable)
-      const hasClose = !!pill.querySelector(`#${newCloseId}`) || !!document.getElementById(newCloseId);
-      if (idx >= 4 && !hasClose) {
-        const btn = document.createElement("button");
-        btn.className = "tab-close-btn";
-        btn.id = newCloseId;
-        btn.title = "Close Tab";
-        btn.textContent = "×";
-        btn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          const cur = parseInt(pill.dataset.winIdx, 10);
-          closeWindowTab(tab, Number.isNaN(cur) ? idx : cur);
-        });
-        pill.appendChild(btn);
-      } else if (idx < 4 && hasClose) {
-        document.getElementById(newCloseId)?.remove();
-      }
-    }
-
-    // Update window object fields to new ids (domId kept)
-    w.winIdx = idx;
-    w.id = newId;
-    w.panelId = newPanelId;
-    w.headerId = newHeaderId;
-    w.badgeId = newBadgeId;
-    w.titleId = newTitleId;
-    w.presetSelectId = newPresetId;
-    w.levelSelectId = newLevelId;
-    w.maxBtnId = newMaxBtnId;
-  });
-
-  const nextIdx = Math.max(0, winIdx - 1);
-  focusWindow(tab.id, nextIdx);
+  // Closing a background tab must not steal focus (F1). Only refocus when
+  // the closed tab was active; otherwise the preserved active object stays.
+  if (wasActive) {
+    const nextIdx = Math.max(0, Math.min(winIdx, tab.windows.length - 1));
+    focusWindow(tab.id, nextIdx);
+  }
 }
 
 export function setTabLayout(tabId, layout = "1x1") {
@@ -271,40 +187,12 @@ export function setTabLayout(tabId, layout = "1x1") {
 
   updateLayoutButtons(layout);
 
-  const numVisible = layout === "1x1" ? 1 : (layout === "1x2" ? 2 : 4);
-  const callbacks = getCallbacks();
-  for (let i = 0; i < Math.min(numVisible, tab.windows.length); i++) {
-    const win = tab.windows[i];
-    if (win && !win.map) {
-      initWindowMap(win);
-      if (callbacks.onWindowInit) {
-        callbacks.onWindowInit(win);
-      }
-    }
-  }
-
-  if (layout === "1x2" && tab.activeWinIdx > 1) {
-    tab.activeWinIdx = 0;
-  }
+  // Visibility always includes the active window, so focusing Tab 3 then
+  // entering 1x2 (or Tab 5 then 2x2) keeps it on screen. Order is unchanged
+  // unless the user drags to rearrange. Map init owned by applySplitVisibility.
+  applySplitVisibility(tab);
 
   focusWindow(tab.id, tab.activeWinIdx);
-
-  const visibleWins = tab.windows.slice(0, numVisible);
-
-  const scheduleLayoutSync = () => {
-    visibleWins.forEach((win) => {
-      if (win.map) win.map.resize();
-    });
-    if (layout !== "1x1" && tab.syncMap) {
-      syncTabCameras(tab);
-    }
-  };
-
-  if (typeof requestAnimationFrame === "function") {
-    requestAnimationFrame(scheduleLayoutSync);
-  } else {
-    setTimeout(scheduleLayoutSync, 20);
-  }
 }
 
 export function toggleTabsAndSplit(tabId = tabsState.activeTabId) {

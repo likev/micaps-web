@@ -57,7 +57,8 @@ export function updateWindowTitle(win, text = null) {
     el.title = fullTitle || "";
   }
 
-  const tabLabel = document.getElementById(`tab-label-${win.winIdx}`);
+  const labelId = win.labelId || `tab-label-${win.winIdx}`;
+  const tabLabel = document.getElementById(labelId);
   if (tabLabel) {
     tabLabel.textContent = fullTitle ? `W${win.winIdx + 1}: ${fullTitle}` : `Tab ${win.winIdx + 1}`;
     tabLabel.title = fullTitle ? `W${win.winIdx + 1}: ${fullTitle}` : `Tab ${win.winIdx + 1}`;

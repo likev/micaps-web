@@ -15,6 +15,7 @@ let isConfigTabOpen = false;
 let onConfigChangedCallback = null;
 let prevActiveTabId = null;
 let prevActiveWinIdx = null;
+let prevActiveWinId = null;
 let beforeUnloadHandler = null;
 let wasLayerControlOpen = false;
 let formState = null;
@@ -63,6 +64,7 @@ export function openConfigTab() {
   if (activeWin) {
     prevActiveTabId = activeWin.tabId;
     prevActiveWinIdx = activeWin.winIdx;
+    prevActiveWinId = activeWin.id || null;
   }
 
   let tabPill = document.getElementById("tab-item-config");
@@ -211,7 +213,21 @@ export function closeConfigTab() {
   if (panel) panel.remove();
 
   let restored = false;
-  if (prevActiveTabId !== null && prevActiveWinIdx !== null) {
+  if (prevActiveWinId) {
+    try {
+      const at = getActiveTab?.();
+      const pos = at?.windows?.findIndex((w) => w.id === prevActiveWinId);
+      if (at && pos != null && pos >= 0) {
+        focusWindow(at.id, pos);
+        restored = true;
+      } else if (prevActiveTabId !== null && prevActiveWinIdx !== null) {
+        focusWindow(prevActiveTabId, prevActiveWinIdx);
+        restored = true;
+      }
+    } catch {
+      try { focusWindow(prevActiveTabId, prevActiveWinIdx); restored = true; } catch {}
+    }
+  } else if (prevActiveTabId !== null && prevActiveWinIdx !== null) {
     try { focusWindow(prevActiveTabId, prevActiveWinIdx); restored = true; } catch {}
   }
   const activeTab = getActiveTab();
@@ -230,8 +246,9 @@ export function closeConfigTab() {
   }
 
   const tabsList = document.getElementById("tabs-list");
-  if (tabsList && activeTab) {
-    tabsList.classList.toggle("hidden", activeTab.layout !== "1x1");
+  if (tabsList) {
+    // Tabs stay visible in every layout so split slots remain reachable.
+    tabsList.classList.remove("hidden");
   }
 
   if (wasLayerControlOpen) {

@@ -3,10 +3,21 @@ import { setActiveMap } from "../../map/mapInstance.js";
 import { PRESET_GROUPS, isDivider, renderPresetOptions } from "../../config/presets.js";
 import { appState } from "../../store/appState.js";
 import { tabsState, getActiveTab, getActiveWindow, getCallbacks } from "./tabsStore.js";
-import { initWindowMap } from "./windowMaps.js";
+import { applySplitVisibility } from "./windowReorder.js";
 import { updateWindowTitle } from "./windowTitles.js";
 import { pausePlayback } from "../timeline/playbackController.js";
 import { setTimelineMode, setTimeSliderVisible } from "../timeline/timeSliderView.js";
+
+function getPillElForWin(win) {
+  if (!win) return null;
+  try {
+    if (win.pillId) {
+      const el = document.getElementById(win.pillId);
+      if (el) return el;
+    }
+    return document.getElementById(`tab-item-win-${win.winIdx}`);
+  } catch { return null; }
+}
 
 export function focusWindow(tabId, winIdx) {
   const tab = tabsState.tabs.find((t) => t.id === tabId) || getActiveTab();
@@ -33,10 +44,13 @@ export function focusWindow(tabId, winIdx) {
     ws.classList.add("active");
   }
 
-  const pillEl = document.getElementById(`tab-item-win-${activeWin.winIdx}`);
+  const pillEl = getPillElForWin(activeWin);
   const panelEl = document.getElementById(activeWin.panelId);
 
-  // Avoid redundant work when already focused
+  // Avoid redundant work when already focused, but still re-assert
+  // visibility: the active slot can be hidden after config close or
+  // mid-reorder (F4). applySplitVisibility is cheap (idempotent class
+  // toggles + rAF resize).
   const alreadyFocused =
     tab.activeWinIdx === winIdx &&
     tab.windows[tab.activeWinIdx]?.id === activeWin.id &&
@@ -44,33 +58,38 @@ export function focusWindow(tabId, winIdx) {
     pillEl?.classList.contains("active") &&
     ws?.classList.contains("active");
   if (alreadyFocused) {
+    try { applySplitVisibility(tab); } catch {}
     if (activeWin.map) setActiveMap(activeWin.map);
     return;
   }
 
   tab.activeWinIdx = winIdx;
 
-  // Highlight active panel and tab item (lookup by w.winIdx after reindex)
-  tab.windows.forEach((w) => {
+  // Highlight active panel and tab item (stable ids; winIdx is positional)
+  tab.windows.forEach((w, idx) => {
+    const isActive = idx === winIdx;
     const p = document.getElementById(w.panelId);
     if (p) {
-      p.classList.toggle("active", w.winIdx === winIdx);
-      p.classList.toggle("active-single", w.winIdx === winIdx);
+      p.classList.toggle("active", isActive);
+      p.classList.toggle("active-single", isActive);
     }
-    const pill = document.getElementById(`tab-item-win-${w.winIdx}`);
+    const pill = getPillElForWin(w);
     if (pill) {
-      pill.classList.toggle("active", w.winIdx === winIdx);
-      pill.setAttribute("aria-selected", w.winIdx === winIdx ? "true" : "false");
+      pill.classList.toggle("active", isActive);
+      pill.setAttribute("aria-selected", isActive ? "true" : "false");
     }
   });
 
-  const callbacks = getCallbacks();
-  if (!activeWin.map) {
-    initWindowMap(activeWin);
-    callbacks.onWindowInit?.(activeWin);
-  } else {
-    setActiveMap(activeWin.map);
+  // Focusing a hidden win in split mode must bring it on screen. Map init
+  // + onWindowInit owned by applySplitVisibility; here only assert the
+  // active map.
+  try { applySplitVisibility(tab); } catch {}
+
+  if (activeWin.map) {
+    try { setActiveMap(activeWin.map); } catch {}
   }
+
+  const callbacks = getCallbacks();
 
   appState.set("activeWinId", activeWin.id);
   appState.update({

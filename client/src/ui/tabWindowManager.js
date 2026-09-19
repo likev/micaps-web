@@ -6,6 +6,9 @@ import {
   getActiveWindow,
   getWindowById,
   setCallbacks,
+  getVisibleWindows,
+  getNumVisible,
+  isWindowVisible,
 } from "./tabs/tabsStore.js";
 import {
   renderTabsBar,
@@ -28,6 +31,7 @@ import {
   updateWindowTitle,
 } from "./tabs/windowTitles.js";
 import { syncTabCameras } from "./tabs/windowMaps.js";
+import { reorderWindows, applySplitVisibility, enableWindowReorderDnD } from "./tabs/windowReorder.js";
 
 export {
   getActiveTab,
@@ -42,6 +46,11 @@ export {
   setWindowHeaderLevel,
   refreshPresetControls,
   syncTabCameras,
+  reorderWindows,
+  applySplitVisibility,
+  getVisibleWindows,
+  getNumVisible,
+  isWindowVisible,
 };
 
 export function initTabWindowManager(callbacksObj = {}) {
@@ -63,5 +72,6 @@ export function initTabWindowManager(callbacksObj = {}) {
   });
 
   const firstTab = createPrimaryWorkspace();
+  try { enableWindowReorderDnD(); } catch {}
   return firstTab;
 }

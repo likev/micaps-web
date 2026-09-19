@@ -199,8 +199,7 @@
   display: none;
 }
 
-.windows-grid.layout-1x2 .window-panel[data-win-idx="0"],
-.windows-grid.layout-1x2 .window-panel[data-win-idx="1"] {
+.windows-grid.layout-1x2 .window-panel.slot-visible {
   display: flex;
 }
 
@@ -216,10 +215,12 @@
   display: none;
 }
 
-.windows-grid.layout-2x2 .window-panel[data-win-idx="0"],
-.windows-grid.layout-2x2 .window-panel[data-win-idx="1"],
-.windows-grid.layout-2x2 .window-panel[data-win-idx="2"],
-.windows-grid.layout-2x2 .window-panel[data-win-idx="3"] {
+.windows-grid.layout-2x2 .window-panel.slot-visible {
+  display: flex;
+}
+
+/* 1x1 follows the same slot-visible contract so focusing any tab-win shows it */
+.windows-grid.layout-1x1 .window-panel.slot-visible {
   display: flex;
 }
 
@@ -237,6 +238,37 @@
 .window-panel.active {
   border-color: #58a6ff !important;
   box-shadow: inset 0 0 0 1px #58a6ff;
+}
+
+/* Mouse-drag rearrange affordances */
+.tab-item[draggable="true"] {
+  cursor: grab;
+}
+
+.tab-item.dragging {
+  opacity: 0.5;
+}
+
+.tab-item.drag-over {
+  border-color: #58a6ff;
+  box-shadow: 0 0 0 1px #58a6ff;
+}
+
+.win-header[draggable="true"] {
+  cursor: grab;
+}
+
+.win-header:active {
+  cursor: grabbing;
+}
+
+.window-panel.dragging {
+  opacity: 0.6;
+}
+
+.window-panel.drag-over {
+  outline: 2px dashed #58a6ff;
+  outline-offset: -2px;
 }
 
 .window-panel.maximized {

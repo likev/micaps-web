@@ -45,16 +45,24 @@ export function renderTabPillForWindow(tab, winObj, { onFocus, onClose } = {}) {
   if (!tabsList || !addBtn) return;
 
   const wIdx = winObj.winIdx;
+  const pillId = winObj.pillId || `tab-item-win-${winObj.uid ?? wIdx}`;
+  const labelId = winObj.labelId || `tab-label-${winObj.uid ?? wIdx}`;
+  const closeId = winObj.closeBtnId || `tab-close-${winObj.uid ?? wIdx}`;
   const pill = document.createElement("div");
   pill.className = `tab-item ${wIdx === tab.activeWinIdx ? "active" : ""}`;
-  pill.id = `tab-item-win-${wIdx}`;
+  pill.id = pillId;
   pill.dataset.winIdx = String(wIdx);
+  pill.dataset.tabId = String(tab.id);
+  if (winObj.uid !== undefined && winObj.uid !== null) pill.dataset.uid = String(winObj.uid);
   pill.setAttribute("role", "tab");
   pill.setAttribute("aria-selected", wIdx === tab.activeWinIdx ? "true" : "false");
+  // Mouse-drag to rearrange tab-wins (see windowReorder.js delegation).
+  pill.draggable = true;
+  pill.title = "Drag to rearrange";
 
   pill.innerHTML = `
-    <span class="tab-label" id="tab-label-${wIdx}">Tab ${wIdx + 1}</span>
-    ${wIdx >= 4 ? `<button class="tab-close-btn" id="tab-close-${wIdx}" title="Close Tab">×</button>` : ""}
+    <span class="tab-label" id="${labelId}">Tab ${wIdx + 1}</span>
+    ${wIdx >= 4 ? `<button class="tab-close-btn" id="${closeId}" title="Close Tab">×</button>` : ""}
   `;
 
   pill.addEventListener("click", (e) => {
@@ -68,7 +76,9 @@ export function renderTabPillForWindow(tab, winObj, { onFocus, onClose } = {}) {
     }
   });
 
-  tabsList.insertBefore(pill, addBtn);
+  const cfgPill = document.getElementById("tab-item-config");
+  const anchor = cfgPill && cfgPill.parentNode === tabsList ? cfgPill : addBtn;
+  tabsList.insertBefore(pill, anchor);
 }
 
 export function updateLayoutButtons(layout) {
@@ -93,13 +103,16 @@ export function updateLayoutButtons(layout) {
   }
 
   if (tabsList) {
-    tabsList.classList.toggle("hidden", layout !== "1x1");
+    // Tabs stay visible in split modes so hidden wins (e.g. Tab 3 in 1x2,
+    // Tab 5 in 2x2) remain reachable by click, and pills can be mouse-dragged
+    // to rearrange which wins occupy the split slots.
+    tabsList.classList.remove("hidden");
   }
 
   if (syncBtn) {
     syncBtn.classList.toggle("hidden", layout === "1x1");
     if (tab) {
-      const isSync = tab.syncMap !== false;
+      const isSync = !!tab.syncMap;
       syncBtn.classList.toggle("active", isSync);
       syncBtn.setAttribute("aria-pressed", isSync ? "true" : "false");
       syncBtn.textContent = isSync ? "Sync 🔗" : "Sync ✕";
