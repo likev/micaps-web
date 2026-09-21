@@ -47,7 +47,7 @@
   let usages = $derived(getColormapUsageCounts(draft));
   let validation = $derived(formState.getValidation());
 
-  $effect.pre(() => {
+  $effect(() => {
     if (!activeColormap && colormapNames.length > 0) {
       activeColormap = colormapNames[0];
       formState.setSelectedColormapName(activeColormap);

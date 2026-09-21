@@ -43,6 +43,8 @@
       tabsState.tabs = [defaultTab];
       tabsState.activeTabId = 1;
       syncLayersState(defaultTab.windows[0].id);
+    } else if (tabsState.tabs[0]?.windows?.[0]) {
+      syncLayersState(tabsState.tabs[0].windows[0].id);
     }
   }
 

@@ -18,7 +18,7 @@
     logic = targetLayer.config?.filterLogic || "AND";
   }
 
-  $effect.pre(() => {
+  $effect(() => {
     if (layer && layer.id !== currentLayerId) {
       syncRulesFromLayer(layer);
     }

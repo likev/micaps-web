@@ -19,15 +19,14 @@ setOnLayersChangeCallback((winId) => {
 });
 
 export function syncLayersState(winId) {
+  if (!winId) return;
   const list = coreGetLayersForWindow(winId);
   layersByWindow[winId] = [...list];
 }
 
 export function getLayers(winId = getCurrentActiveWinId()) {
-  if (!layersByWindow[winId]) {
-    syncLayersState(winId);
-  }
-  return layersByWindow[winId];
+  const targetId = winId || getCurrentActiveWinId() || "default";
+  return layersByWindow[targetId] || coreGetLayersForWindow(targetId) || [];
 }
 
 export function addLayer(layerDef, winId = getCurrentActiveWinId()) {

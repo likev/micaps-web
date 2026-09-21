@@ -40,7 +40,7 @@
   let colormaps = $derived(draft.colormaps || {});
   let availableColormaps = $derived(Object.keys(colormaps));
 
-  $effect.pre(() => {
+  $effect(() => {
     if (!selectedId && presets.length > 0) {
       selectedId = presets.find((p) => !p.divider)?.id || presets[0]?.id || "";
       formState.setSelectedPresetId(selectedId);

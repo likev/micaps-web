@@ -4,6 +4,13 @@ import { createInitialUIState, clampTooltipPosition } from "../../src/lib/stores
 import { getVisibleWindows, isWindowVisible, getNumVisible } from "../../src/lib/stores/tabsCore.js";
 import { createTimelineState, getAdjacentTimeSteps } from "../../src/lib/stores/timelineCore.js";
 import { buildLegendItems, updateLegend, getWindowLegendsMap, clearLegends } from "../../src/lib/stores/legendCore.js";
+import {
+  getLayersForWindow,
+  addOrUpdateLayer,
+  removeLayer,
+  clearWindowWeatherLayers,
+  setOnLayersChangeCallback,
+} from "../../src/lib/stores/layersCore.js";
 
 describe("Plain-Core Stores (Phase 1 Foundations)", () => {
   describe("AppState Core", () => {
@@ -200,6 +207,34 @@ describe("Plain-Core Stores (Phase 1 Foundations)", () => {
 
       clearLegends("win-test");
       expect(buildLegendItems("win-test").length).toBe(0);
+    });
+  });
+
+  describe("Layers Core", () => {
+    it("creates default layers for window on first read without side-effects", () => {
+      const layers = getLayersForWindow("win-layers-test");
+      expect(Array.isArray(layers)).toBe(true);
+      expect(layers.length).toBeGreaterThan(0);
+      expect(layers.some((l) => l.type === "pmtiles")).toBe(true);
+    });
+
+    it("notifies layers changed callback on layer addition and removal", () => {
+      let notifiedWinId = null;
+      setOnLayersChangeCallback((winId) => {
+        notifiedWinId = winId;
+      });
+
+      const newLayer = addOrUpdateLayer("win-layers-test", {
+        id: "test-contour-1",
+        name: "Test Contour",
+        type: "contour",
+      });
+      expect(notifiedWinId).toBe("win-layers-test");
+      expect(newLayer.id).toBe("test-contour-1");
+
+      removeLayer("test-contour-1", "win-layers-test");
+      expect(notifiedWinId).toBe("win-layers-test");
+      expect(getLayersForWindow("win-layers-test").some((l) => l.id === "test-contour-1")).toBe(false);
     });
   });
 });

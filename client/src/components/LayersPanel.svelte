@@ -1,6 +1,8 @@
 <script>
   import { ui } from "../lib/stores/ui.svelte.js";
   import {
+    layersByWindow,
+    syncLayersState,
     getLayers,
     addLayer,
     deleteLayer,
@@ -21,6 +23,13 @@
         : (winObj.activeGroup ? `W${winObj.winIdx + 1}: ${winObj.activeGroup.name}` : `Window ${winObj.winIdx + 1}`))
       : getCurrentActiveWinTitle()
   );
+
+  $effect(() => {
+    if (activeWinId && !layersByWindow[activeWinId]) {
+      syncLayersState(activeWinId);
+    }
+  });
+
   let layers = $derived(getLayers(activeWinId) || []);
   let count = $derived(layers.length);
 

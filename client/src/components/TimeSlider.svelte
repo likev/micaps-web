@@ -22,7 +22,7 @@
 
   let { winId = "default", onTimeChange = null } = $props();
 
-  $effect.pre(() => {
+  $effect(() => {
     if (winId && !timelinesByWindow[winId]) {
       getOrCreateTimeline(winId);
     }
