@@ -61,9 +61,20 @@
       const defaultTab = createDefaultTab(1);
       tabsState.tabs = [defaultTab];
       tabsState.activeTabId = 1;
-      syncLayersState(defaultTab.windows[0].id);
-    } else if (tabsState.tabs[0]?.windows?.[0]) {
-      syncLayersState(tabsState.tabs[0].windows[0].id);
+    }
+    const tab = tabsState.tabs[0];
+    if (tab) {
+      if (tab._nextWinSeq == null) tab._nextWinSeq = tab.windows?.length || 0;
+      while (tab.windows.length < 4) {
+        const uid = tab._nextWinSeq++;
+        const posIdx = tab.windows.length;
+        const winObj = createDefaultWindow(posIdx, tab.id);
+        winObj.uid = uid;
+        winObj.id = `tab-${tab.id}-win-${uid}`;
+        winObj.level = DEFAULT_LEVELS[posIdx] || 500;
+        tab.windows.push(winObj);
+      }
+      syncLayersState(tab.windows[tab.activeWinIdx || 0].id);
     }
   }
 
@@ -112,24 +123,39 @@
     ui.timelineVisible = hasData;
   }
 
-  function handleAddTab() {
-    const nextId = tabsState.tabs.length > 0 ? Math.max(...tabsState.tabs.map((t) => t.id)) + 1 : 1;
-    const newTab = createDefaultTab(nextId);
-    newTab.title = `Workstation ${nextId}`;
-    tabsState.tabs.push(newTab);
-    tabsState.activeTabId = nextId;
-    syncLayersState(newTab.windows[0].id);
+  function handleAddWindow() {
+    if (!activeTab) return;
+    if (activeTab._nextWinSeq == null) activeTab._nextWinSeq = activeTab.windows.length;
+    const uid = activeTab._nextWinSeq++;
+    const posIdx = activeTab.windows.length;
+    const winObj = createDefaultWindow(posIdx, activeTab.id);
+    winObj.uid = uid;
+    winObj.id = `tab-${activeTab.id}-win-${uid}`;
+    winObj.level = DEFAULT_LEVELS[posIdx] || 500;
+    activeTab.windows.push(winObj);
+    handleWindowFocus(winObj);
   }
 
-  function handleCloseTab(id) {
-    if (tabsState.tabs.length <= 1) return;
-    const idx = tabsState.tabs.findIndex((t) => t.id === id);
+  function handleCloseWindow(win) {
+    if (!activeTab || activeTab.windows.length <= 1) return;
+    const idx = activeTab.windows.indexOf(win);
     if (idx !== -1) {
-      tabsState.tabs.splice(idx, 1);
-      if (tabsState.activeTabId === id) {
-        tabsState.activeTabId = tabsState.tabs[Math.max(0, idx - 1)].id;
+      const wasActive = idx === activeTab.activeWinIdx;
+      activeTab.windows.splice(idx, 1);
+      activeTab.windows.forEach((w, i) => {
+        w.winIdx = i;
+      });
+      if (wasActive) {
+        const nextIdx = Math.max(0, Math.min(idx, activeTab.windows.length - 1));
+        handleWindowFocus(activeTab.windows[nextIdx]);
       }
     }
+  }
+
+  function toggleTabsAndSplit() {
+    if (!activeTab) return;
+    const newLayout = activeTab.layout === "1x1" ? "2x2" : "1x1";
+    handleChangeLayout(newLayout);
   }
 
   function handleChangeLayout(layout) {
@@ -158,18 +184,6 @@
     activeTab.syncMap = activeTab.syncMap === false ? true : false;
     if (activeTab.syncMap) {
       syncTabCameras(activeTab);
-    }
-  }
-
-  function handleCloseWindow(win) {
-    if (!activeTab || activeTab.windows.length <= 1) return;
-    const idx = activeTab.windows.indexOf(win);
-    if (idx !== -1) {
-      activeTab.windows.splice(idx, 1);
-      activeTab.windows.forEach((w, i) => {
-        w.winIdx = i;
-      });
-      activeTab.activeWinIdx = Math.max(0, idx - 1);
     }
   }
 
@@ -480,12 +494,13 @@
   />
 
   <TabsBar
-    tabs={tabsState.tabs}
-    activeTabId={tabsState.activeTabId}
+    windows={activeTab?.windows || []}
+    activeWinIdx={activeTab?.activeWinIdx ?? 0}
     layout={activeTab?.layout || "1x1"}
     syncMap={activeTab?.syncMap !== false}
-    onAddTab={handleAddTab}
-    onCloseTab={handleCloseTab}
+    onSelectWin={handleWindowFocus}
+    onAddWin={handleAddWindow}
+    onCloseWin={handleCloseWindow}
     onChangeLayout={handleChangeLayout}
     onToggleSync={handleToggleSync}
   />
@@ -498,7 +513,7 @@
             {win}
             isActive={win === activeWin}
             onFocus={handleWindowFocus}
-            onClose={handleCloseWindow}
+            onToggleMax={toggleTabsAndSplit}
             onMapCreated={(map) => handleMapCreated(win, map)}
             onMapDestroyed={() => handleMapDestroyed(win)}
           />

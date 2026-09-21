@@ -34,18 +34,18 @@
     try {
       const res = await fetchStatus(abortController.signal);
       if (res && res.status === "ok") {
-        statusState = "connected";
-        statusText = res.mock_mode ? "Mock Mode" : "Online";
+        statusState = res.mock_mode ? "warning" : "connected";
+        statusText = res.mock_mode ? "MOCK" : `CASSANDRA :${res.cassandra_port ?? 8000}`;
         app.status = "connected";
         app.isMock = Boolean(res.mock_mode);
       } else {
         statusState = "warning";
-        statusText = "Degraded";
+        statusText = "OFFLINE";
       }
     } catch (err) {
       if (err.name !== "AbortError") {
-        statusState = "disconnected";
-        statusText = "Offline";
+        statusState = "warning";
+        statusText = "OFFLINE";
         app.status = "disconnected";
       }
     }
@@ -99,10 +99,6 @@
       ui.configOpen = !ui.configOpen;
     }
   }
-
-  function handleCatalogToggle() {
-    ui.catalogOpen = !ui.catalogOpen;
-  }
 </script>
 
 <header id="navbar" class="navbar">
@@ -112,16 +108,6 @@
   </div>
 
   <div class="nav-middle">
-    <button
-      id="btn-catalog-drawer"
-      class="btn nav-catalog-btn"
-      class:active={ui.catalogOpen}
-      onclick={handleCatalogToggle}
-      title="Open Dataset Catalog Drawer"
-    >
-      <span>📁 Catalog</span>
-    </button>
-
     <div class="nav-control-group">
       <label for="select-preset">Group:</label>
       <select id="select-preset" class="nav-select" value={currentPresetId} onchange={handlePresetChange}>
@@ -234,11 +220,6 @@
     gap: 12px;
     overflow-x: auto;
     min-width: 0;
-  }
-
-  .nav-catalog-btn.active {
-    background: rgba(56, 139, 253, 0.25);
-    border-color: var(--accent-blue, #388bfd);
   }
 
   .nav-control-group {

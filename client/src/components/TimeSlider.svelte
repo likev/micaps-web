@@ -267,7 +267,7 @@
     <div class="timeline-body">
       <div class="timeline-info">
         <span class="mode-badge" class:obs-badge={isObs}>
-          {isObs ? "OBSERVATION" : "FORECAST (NWP)"}
+          {isObs ? "OBSERVATION" : "NWP FORECAST"}
         </span>
 
         {#if !isObs}
@@ -287,16 +287,19 @@
         {/if}
 
         <div id="time-lead-wrapper">
+          {isObs ? "Observation Time: " : "Forecast Lead: "}
           <strong id="time-lead-label">
             {isObs ? (activeObsFile ? formatObsTimestamp(activeObsFile) : "--") : formatLeadTime(activePeriod)}
           </strong>
         </div>
 
-        {#if !isObs && currentCycle}
-          <div id="time-valid-label" class="valid-label">
-            Valid: {formatForecastValidTime(currentCycle, activePeriod)}
-          </div>
-        {/if}
+        <div id="time-valid-label" class="valid-label">
+          {#if isObs}
+            Real-time Observation (Step: {timeline.currentStepLength || 3}h)
+          {:else if currentCycle}
+            Valid: {formatForecastValidTime(currentCycle, activePeriod)} (Step: {timeline.currentStepLength || 6}h)
+          {/if}
+        </div>
       </div>
 
       <div id="timeline-chips" class="timeline-chips" role="tablist" aria-label={isObs ? "Observation time steps" : "Forecast lead time steps"}>

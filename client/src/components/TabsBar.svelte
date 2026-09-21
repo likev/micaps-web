@@ -4,29 +4,51 @@
 
   let {
     tabs = tabsState.tabs,
+    windows = [],
+    activeWinIdx = 0,
     activeTabId = tabsState.activeTabId,
     layout = "1x1",
     syncMap = true,
     onSelectTab = null,
+    onSelectWin = null,
     onAddTab = null,
+    onAddWin = null,
     onCloseTab = null,
+    onCloseWin = null,
     onChangeLayout = null,
     onToggleSync = null,
   } = $props();
 
-  function selectTab(id) {
-    tabsState.activeTabId = id;
+  let tabItems = $derived(
+    windows && windows.length > 0
+      ? windows
+      : (tabs && tabs[0]?.windows && tabs[0].windows.length > 0 ? tabs[0].windows : tabs)
+  );
+
+  function selectItem(item, idx) {
     ui.configOpen = false;
-    if (onSelectTab) onSelectTab(id);
+    if (onSelectWin) {
+      onSelectWin(item);
+    } else if (onSelectTab) {
+      onSelectTab(item.id ?? idx);
+    }
   }
 
-  function addTab() {
-    if (onAddTab) onAddTab();
+  function addItem() {
+    if (onAddWin) {
+      onAddWin();
+    } else if (onAddTab) {
+      onAddTab();
+    }
   }
 
-  function closeTab(e, id) {
+  function closeItem(e, item, idx) {
     e.stopPropagation();
-    if (onCloseTab) onCloseTab(id);
+    if (onCloseWin) {
+      onCloseWin(item);
+    } else if (onCloseTab) {
+      onCloseTab(item.id ?? idx);
+    }
   }
 
   function setLayout(l) {
@@ -35,26 +57,32 @@
 </script>
 
 <div id="tabs-bar" class="tabs-bar" role="tablist" aria-label="Workstation Tabs and Layout">
-  <div class="tabs-list">
-    {#each tabs as tab (tab.id)}
+  <div class="tabs-list" id="tabs-list">
+    {#each tabItems as item, idx (item.id || idx)}
       <div
+        id={item.pillId || `tab-item-win-${item.uid ?? item.winIdx ?? idx}`}
         class="tab-item"
-        class:active={tab.id === activeTabId && !ui.configOpen}
+        class:active={(item.winIdx ?? idx) === activeWinIdx && !ui.configOpen}
         role="tab"
-        aria-selected={tab.id === activeTabId && !ui.configOpen}
+        aria-selected={(item.winIdx ?? idx) === activeWinIdx && !ui.configOpen}
         tabindex="0"
-        onclick={() => selectTab(tab.id)}
-        onkeydown={(e) => e.key === "Enter" && selectTab(tab.id)}
+        title="Drag to rearrange"
+        draggable="true"
+        onclick={() => selectItem(item, item.winIdx ?? idx)}
+        onkeydown={(e) => e.key === "Enter" && selectItem(item, item.winIdx ?? idx)}
       >
-        <span class="tab-label">{tab.title || `Tab ${tab.id}`}</span>
-        {#if tabs.length > 1}
+        <span class="tab-label" id={item.labelId || `tab-label-${item.uid ?? item.winIdx ?? idx}`}>
+          {item.title ? (item.title.startsWith("W") ? item.title : `W${(item.winIdx ?? idx) + 1}: ${item.title}`) : `Tab ${(item.winIdx ?? idx) + 1}`}
+        </span>
+        {#if (item.winIdx ?? idx) >= 4}
           <button
             type="button"
+            id={item.closeBtnId || `tab-close-${item.uid ?? item.winIdx ?? idx}`}
             class="tab-close-btn"
             title="Close Tab"
             aria-label="Close Tab"
-            onclick={(e) => closeTab(e, tab.id)}
-          >✕</button>
+            onclick={(e) => closeItem(e, item, item.winIdx ?? idx)}
+          >×</button>
         {/if}
       </div>
     {/each}
@@ -73,7 +101,8 @@
         <button
           type="button"
           class="tab-close-btn"
-          title="Close Config Tab"
+          id="btn-close-config-tab"
+          title="Close Configuration Editor"
           aria-label="Close Config Tab"
           onclick={(e) => {
             e.stopPropagation();
@@ -87,53 +116,52 @@
       id="btn-add-tab"
       type="button"
       class="btn-add-tab"
-      title="Add New Tab"
-      aria-label="Add New Tab"
-      onclick={addTab}
-    >＋</button>
+      title="Add new tab"
+      aria-label="Add new tab"
+      onclick={addItem}
+    >+</button>
   </div>
 
-  <div class="layout-controls">
-    <span class="layout-label">Split:</span>
+  <div class="layout-controls" id="layout-controls">
+    <span class="layout-label">Layout:</span>
     <button
-      id="btn-split-1"
+      id="btn-layout-1"
       type="button"
       class="layout-btn"
       class:active={layout === "1x1"}
-      title="Single Window Layout (1x1)"
+      title="Tabs Mode (Full window tab)"
       onclick={() => setLayout("1x1")}
-    >1x1</button>
+    >⊟ Tabs</button>
     <button
-      id="btn-split-2"
+      id="btn-layout-2"
       type="button"
       class="layout-btn"
       class:active={layout === "1x2"}
-      title="2-Split Windows Layout (1x2)"
+      title="2-Split Mode (Side-by-side 1x2)"
       onclick={() => setLayout("1x2")}
-    >1x2</button>
+    >◫ 2-Split</button>
     <button
-      id="btn-split-4"
+      id="btn-layout-4"
       type="button"
       class="layout-btn"
       class:active={layout === "2x2"}
-      title="4-Split Windows Layout (2x2)"
+      title="4-Split Mode (2x2 grid)"
       onclick={() => setLayout("2x2")}
-    >2x2</button>
-    {#if layout !== "1x1"}
-      <button
-        id="btn-sync-toggle"
-        type="button"
-        class="layout-btn"
-        class:active={syncMap}
-        aria-pressed={syncMap ? "true" : "false"}
-        title={syncMap
-          ? "Camera sync enabled across windows (Click to toggle off)"
-          : "Camera sync disabled (Click to toggle on)"}
-        onclick={() => onToggleSync && onToggleSync()}
-      >
-        {syncMap ? "Sync 🔗" : "Sync ✕"}
-      </button>
-    {/if}
+    >⊞ 4-Split</button>
+    <button
+      id="btn-sync-toggle"
+      type="button"
+      class="layout-btn"
+      class:active={syncMap}
+      class:hidden={layout === "1x1"}
+      aria-pressed={syncMap ? "true" : "false"}
+      title={syncMap
+        ? "Camera sync enabled across windows (Click to toggle off)"
+        : "Camera sync disabled (Click to toggle on)"}
+      onclick={() => onToggleSync && onToggleSync()}
+    >
+      {syncMap ? "Sync 🔗" : "Sync ✕"}
+    </button>
   </div>
 </div>
 
@@ -270,5 +298,13 @@
     border-color: #58a6ff;
     color: #58a6ff;
     font-weight: 600;
+  }
+
+  .layout-btn.hidden {
+    display: none !important;
+  }
+
+  .tab-item[draggable="true"] {
+    cursor: grab;
   }
 </style>

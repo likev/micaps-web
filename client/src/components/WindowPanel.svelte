@@ -5,7 +5,7 @@
     win,
     isActive = false,
     onFocus = null,
-    onClose = null,
+    onToggleMax = null,
     onMapCreated = null,
     onMapDestroyed = null,
   } = $props();
@@ -30,14 +30,17 @@
   class="window-panel"
   class:active={isActive}
   data-win-id={win.id}
+  id={win.panelId || `win-panel-${win.tabId || 1}-${win.uid ?? win.winIdx}`}
   tabindex="-1"
 >
   <div
     class="win-header"
+    id={win.headerId || `win-header-${win.tabId || 1}-${win.uid ?? win.winIdx}`}
     role="button"
     tabindex="0"
     aria-label={`Focus window W${win.winIdx + 1}: ${winTitle}`}
     onclick={() => onFocus && onFocus(win)}
+    ondblclick={() => onToggleMax && onToggleMax(win)}
     onkeydown={(e) => {
       if (e.key === "Enter" || e.key === " ") {
         if (onFocus) onFocus(win);
@@ -45,23 +48,23 @@
     }}
   >
     <div class="win-title-group">
-      <span class="win-badge">W{win.winIdx + 1}</span>
-      <span class="win-title" title={winTitle}>{winTitle}</span>
+      <span class="win-badge" id={win.badgeId || `win-badge-${win.tabId || 1}-${win.uid ?? win.winIdx}`}>W{win.winIdx + 1}</span>
+      <span class="win-title" id={win.titleId || `win-title-${win.tabId || 1}-${win.uid ?? win.winIdx}`} title={winTitle}>{winTitle}</span>
     </div>
 
     <div class="win-actions">
-      {#if onClose}
-        <button
-          type="button"
-          class="win-btn-close"
-          title="Close Subwindow"
-          aria-label="Close Subwindow"
-          onclick={(e) => {
-            e.stopPropagation();
-            onClose(win);
-          }}
-        >✕</button>
-      {/if}
+      <button
+        type="button"
+        id={win.maxBtnId || `win-max-${win.tabId || 1}-${win.uid ?? win.winIdx}`}
+        class="win-btn-max"
+        title="Maximize Window"
+        aria-label="Maximize Window"
+        onclick={(e) => {
+          e.stopPropagation();
+          if (onFocus) onFocus(win);
+          if (onToggleMax) onToggleMax(win);
+        }}
+      >⛶</button>
     </div>
   </div>
 
@@ -170,19 +173,23 @@
     gap: 6px;
   }
 
-  .win-btn-close {
+  .win-btn-max {
     background: transparent;
     border: none;
-    color: var(--text-secondary, #8b949e);
+    color: #8b949e;
     cursor: pointer;
-    font-size: 13px;
-    padding: 2px 4px;
+    font-size: 14px;
+    padding: 2px 5px;
     border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s ease, background 0.15s ease;
   }
 
-  .win-btn-close:hover {
-    color: var(--accent-red, #f85149);
-    background: rgba(248, 81, 73, 0.15);
+  .win-btn-max:hover {
+    color: #58a6ff;
+    background: rgba(56, 139, 253, 0.18);
   }
 
   .win-body {
