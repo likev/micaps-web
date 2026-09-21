@@ -179,9 +179,10 @@ micaps-web/
 │       ├── grid_data.go              # Grid Float32 payload decoding
 │       ├── station_parser.go         # 288-byte station header & observation decoder (QC & elevation/height)
 │       └── station_parser_test.go    # Go unit tests for station QC, rain, elevation vs height, & calm winds
-├── client/                           # Frontend Meteorological Workstation
-│   ├── index.html                    # Workstation HTML shell
-│   ├── package.json                  # Dependencies, build scripts & test runner
+├── client/                           # Frontend Meteorological Workstation (Svelte 5 Runes)
+│   ├── index.html                    # Workstation HTML shell (mounts Svelte 5 App directly)
+│   ├── package.json                  # Dependencies (Svelte 5, Vite, MapLibre), build scripts & test runner
+│   ├── vite.config.js                # Vite build config with @sveltejs/vite-plugin-svelte
 │   ├── config.json                   # Runtime-editable meteorological configuration (presets, colormaps & derived layers)
 │   ├── map/
 │   │   └── map-china.pmtiles         # Offline China vector tiles (borders & provinces)
@@ -190,9 +191,36 @@ micaps-web/
 │   │   ├── assets/
 │   │   └── index.html
 │   ├── src/
-│   │   ├── main.js                   # Application bootstrap & lifecycle orchestrator
-│   │   ├── style.css                 # Dark meteorological theme stylesheet
-│   │   ├── tabs.css                  # Multi-window tabs & layout styling
+│   │   ├── main.svelte.js            # Svelte 5 entrypoint & application mount
+│   │   ├── App.svelte                # Root Svelte 5 workstation shell (workspace, window grid, shortcuts)
+│   │   ├── styles/
+│   │   │   └── tokens.css            # Dark meteorological theme design tokens & global layout CSS
+│   │   ├── components/               # Scoped Svelte 5 Workstation UI Components
+│   │   │   ├── NavBar.svelte         # Meteorological preset/level selector & live status indicator
+│   │   │   ├── TabsBar.svelte        # Multi-tab bar, window split layout controls (1x1, 1x2, 2x2)
+│   │   │   ├── WindowPanel.svelte    # Subwindow container with header, actions, and map viewport
+│   │   │   ├── CatalogDrawer.svelte  # Multi-tier meteorological product catalog selector
+│   │   │   ├── LayersPanel.svelte    # Per-window layer manager with drag/toggle/action controls
+│   │   │   ├── LayerRow.svelte       # Individual layer row, opacity slider, palette picker, filters
+│   │   │   ├── StationFilter.svelte  # Focus-stable interactive station value and quality filter
+│   │   │   ├── TimeSlider.svelte     # Timeline stepper, init-time chips & playback controls
+│   │   │   ├── Legend.svelte         # Dynamic per-window colormap legend
+│   │   │   ├── Tooltip.svelte        # Clamped meteorological value tooltip
+│   │   │   ├── Toast.svelte          # Reactive notification toast
+│   │   │   ├── FullscreenButton.svelte # Fullscreen toggle button
+│   │   │   └── ConfigEditor.svelte   # Interactive config schema editor & preset manager
+│   │   ├── actions/                  # Svelte actions (use:clickOutside, use:mapViewport)
+│   │   │   ├── clickOutside.js       # Drawer outside-click detection action
+│   │   │   └── mapViewport.js        # MapLibre GL instance lifecycle action
+│   │   ├── lib/stores/               # Svelte 5 Runes Reactive Stores & Plain-Core Pure Logic
+│   │   │   ├── appCore.js & app.svelte.js           # Workstation global status & level state
+│   │   │   ├── tabsCore.js & tabs.svelte.js         # Multi-window layouts, active tab/window
+│   │   │   ├── layersCore.js & layers.svelte.js     # Per-window layer CRUD & active window sync
+│   │   │   ├── timelineCore.js & timeline.svelte.js # Per-window timeline isolation & playback
+│   │   │   ├── timelineMath.js                      # Timeline period & observation calculations
+│   │   │   ├── legendCore.js & legend.svelte.js     # Dynamic colormap legend item builder
+│   │   │   ├── uiCore.js & ui.svelte.js             # Boolean visibility state (all panels/drawers)
+│   │   │   └── formState.js & configForm.svelte.js  # Config form draft & dirty tracking
 │   │   ├── api/                      # REST & binary stream fetchers (3-minute TTL cache & inflight deduplication)
 │   │   ├── layers/                   # MapLibre, Deck.gl, Canvas, Kinematics, Sounding & Surface analysis layers
 │   │   │   ├── tlogp/                # Upper-air T-lnP sounding diagram, RK4 parcel ascent & convective indices
@@ -202,10 +230,9 @@ micaps-web/
 │   │   │   └── dtd/                  # Dew-point depression (DTD) analysis & moisture contours
 │   │   ├── map/                      # MapLibre GL setup, PMTiles protocol, graticule lines
 │   │   ├── services/                 # Intelligent background data prefetch engine (Left/Right/Up/Down)
-│   │   ├── store/                    # Reactive workstation state manager
-│   │   ├── ui/                       # Navbar, catalog drawer, layer control, time slider, tooltip
 │   │   └── utils/                    # CMA palettes, weather symbols, griddata-js adapter
-│   └── test/                         # Meteorological Unit Test Suite (518 bun tests across 74 files)
+│   └── test/                         # Meteorological Unit Test Suite (525 bun tests across 75 files)
+│       ├── stores/plain-core.test.js # Unit tests for plain-core UI, tabs, timeline, legend stores
 │       ├── tlogp/                    # T-lnP thermodynamics, parcel ascent & aspect-ratio resize tests
 │       ├── timeheight/               # Time-height loading, canvas math, sampling, resize & integration tests
 │       ├── colormaps.test.js         # Dynamic colormaps & level scaling tests
@@ -243,7 +270,9 @@ The application uses a unified Go server architecture. A separate frontend devel
 
 ### 3.1. Frontend Build (Client)
 
-The frontend JavaScript and CSS modules are compiled using Vite into `client/dist`.
+The frontend uses **Svelte 5** with fine-grained reactivity runes (`$state`, `$derived`, `$effect`, actions) and scoped styles. Pure logic is separated into plain `.js` core stores (`tabsCore.js`, `layersCore.js`, `timelineCore.js`, `uiCore.js`, `formState.js`), wrapped by thin `.svelte.js` rune shells. This ensures all 525 meteorological unit tests execute cleanly under `bun test` without requiring runtime compiler transpilation.
+
+The frontend is compiled using Vite with `@sveltejs/vite-plugin-svelte` into `client/dist`.
 
 > [!IMPORTANT]
 > Non-bundled assets remain strictly outside `client/dist`:

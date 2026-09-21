@@ -1,7 +1,7 @@
 {
   "name": "micaps-client",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,9 +15,11 @@
     "@deck.gl/core": "^9.0.38",
     "@deck.gl/layers": "^9.0.38",
     "@deck.gl/mapbox": "^9.0.38",
+    "@sveltejs/vite-plugin-svelte": "^5.1.1",
+    "griddata": "file:../../griddata-js",
     "maplibre-gl": "^5.0.1",
     "pmtiles": "^3.2.1",
-    "griddata": "file:../../griddata-js"
+    "svelte": "^5.57.1"
   },
   "devDependencies": {
     "vite": "^6.1.1"

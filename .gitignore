@@ -20,6 +20,7 @@ node_modules/
 .bun/
 .bun-cache/
 bun.lockb
+package-lock.json
 
 # Frontend Build Outputs & Caches
 client/dist/

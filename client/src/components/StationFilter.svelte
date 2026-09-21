@@ -1,0 +1,265 @@
+<script>
+  import { ensureLayerFilterRules } from "../ui/stationFilterControl.js";
+
+  let { layer, onFilterChange = null } = $props();
+
+  let currentLayerId = $state(null);
+  let rules = $state([]);
+  let logic = $state("AND");
+
+  function syncRulesFromLayer(targetLayer) {
+    if (!targetLayer) return;
+    ensureLayerFilterRules(targetLayer);
+    currentLayerId = targetLayer.id;
+    rules = (targetLayer.config?.filterRules || [{ field: "none", op: ">", val: "", val2: "" }]).map((r, i) => ({
+      ...r,
+      _id: r._id || `rule-${targetLayer.id || "default"}-${i}`,
+    }));
+    logic = targetLayer.config?.filterLogic || "AND";
+  }
+
+  $effect.pre(() => {
+    if (layer && layer.id !== currentLayerId) {
+      syncRulesFromLayer(layer);
+    }
+  });
+
+  function isUpperAir(l) {
+    if (!l) return false;
+    if (l.model === "UPPER_AIR") return true;
+    const id = (l.id || "").toLowerCase();
+    const name = (l.name || "").toLowerCase();
+    return id.includes("upper") || id.includes("sounding") || name.includes("upper") || name.includes("sounding") || name.includes("高空") || name.includes("探空") || (l.type === "station" && typeof l.level === "number" && l.level > 0);
+  }
+
+  let upper = $derived(isUpperAir(layer));
+
+  function update() {
+    layer.config.filterRules = rules.map(({ field, op, val, val2 }) => ({ field, op, val, val2 }));
+    layer.config.filterLogic = logic;
+    if (onFilterChange) {
+      onFilterChange({ rules: layer.config.filterRules, logic });
+    }
+  }
+
+  function addRule() {
+    rules.push({ field: "none", op: ">", val: "", val2: "", _id: `rule-${Date.now()}-${rules.length}` });
+    update();
+  }
+
+  function removeRule(idx) {
+    if (rules.length <= 1) {
+      rules[0] = { field: "none", op: ">", val: "", val2: "", _id: `rule-${Date.now()}-0` };
+    } else {
+      rules.splice(idx, 1);
+    }
+    update();
+  }
+
+  function clearRules() {
+    rules = [{ field: "none", op: ">", val: "", val2: "", _id: `rule-${Date.now()}-0` }];
+    update();
+  }
+</script>
+
+<div class="config-filter-section">
+  <div class="filter-header">
+    <span class="filter-title">Data Filter Rules</span>
+    <div class="filter-match">
+      <span>Match:</span>
+      <select
+        class="sel-filter-global-logic"
+        bind:value={logic}
+        onchange={update}
+      >
+        <option value="AND">ALL (AND)</option>
+        <option value="OR">ANY (OR)</option>
+        <option value="none">Rule 1 Only</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="filter-rules-list">
+    {#each rules as rule, idx (rule._id || idx)}
+      <div class="filter-rule-row" data-rule-idx={idx}>
+        <select
+          class="sel-filter-field"
+          bind:value={rule.field}
+          onchange={update}
+        >
+          <option value="none">No Filter</option>
+          {#if upper}
+            <option value="Height">Height (位势高度)</option>
+            <option value="TT">Temperature (温度)</option>
+            <option value="Td">Dewpoint (露点)</option>
+            <option value="DTD">T-Td (温度露点差)</option>
+            <option value="Wind">Wind Speed (风速)</option>
+          {:else}
+            <option value="TT">Temperature (气温)</option>
+            <option value="Td">Dewpoint (露点)</option>
+            <option value="SLP">Sea-Level Pressure (气压)</option>
+            <option value="Wind">Wind Speed (风速)</option>
+            <option value="Rain">Rain 1h (降水)</option>
+            <option value="Visibility">Visibility (能见度)</option>
+          {/if}
+        </select>
+
+        {#if rule.field !== "none"}
+          <select
+            class="sel-filter-op"
+            bind:value={rule.op}
+            onchange={update}
+          >
+            <option value=">">&gt;</option>
+            <option value=">=">&gt;=</option>
+            <option value="<">&lt;</option>
+            <option value="<=">&lt;=</option>
+            <option value="=">=</option>
+            <option value="!=">!=</option>
+            <option value="between">between</option>
+          </select>
+
+          <input
+            type="number"
+            class="input-filter-val"
+            placeholder="Val"
+            bind:value={rule.val}
+            oninput={update}
+          />
+
+          {#if rule.op === "between"}
+            <span>~</span>
+            <input
+              type="number"
+              class="input-filter-val2"
+              placeholder="Max"
+              bind:value={rule.val2}
+              oninput={update}
+            />
+          {/if}
+        {/if}
+
+        <button
+          type="button"
+          class="btn-remove-rule"
+          title="Remove Rule"
+          onclick={() => removeRule(idx)}
+        >✕</button>
+      </div>
+    {/each}
+  </div>
+
+  <div class="filter-actions">
+    <button type="button" class="btn-add-rule" onclick={addRule}>＋ Add Rule</button>
+    <button type="button" class="btn-clear-rules" onclick={clearRules}>Clear</button>
+  </div>
+</div>
+
+<style>
+  .config-filter-section {
+    margin-top: 8px;
+    border-top: 1px solid rgba(48, 54, 61, 0.6);
+    padding-top: 6px;
+  }
+
+  .filter-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .filter-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary, #8b949e);
+  }
+
+  .filter-match {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: var(--text-secondary, #8b949e);
+  }
+
+  .sel-filter-global-logic {
+    background: #161b22;
+    color: #58a6ff;
+    font-weight: bold;
+    border: 1px solid #388bfd;
+    border-radius: 4px;
+    font-size: 10px;
+    padding: 1px 4px;
+  }
+
+  .filter-rules-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .filter-rule-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+  }
+
+  .sel-filter-field,
+  .sel-filter-op {
+    background: #161b22;
+    color: var(--text-primary, #e6edf3);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    border-radius: 4px;
+    font-size: 10px;
+    padding: 2px 4px;
+  }
+
+  .input-filter-val,
+  .input-filter-val2 {
+    width: 48px;
+    background: #161b22;
+    color: var(--text-primary, #e6edf3);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    border-radius: 4px;
+    font-size: 10px;
+    padding: 2px 4px;
+  }
+
+  .btn-remove-rule {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary, #8b949e);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 2px 4px;
+  }
+
+  .btn-remove-rule:hover {
+    color: var(--accent-red, #f85149);
+  }
+
+  .filter-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 6px;
+  }
+
+  .btn-add-rule,
+  .btn-clear-rules {
+    background: #21262d;
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    color: var(--text-primary, #e6edf3);
+    border-radius: 4px;
+    font-size: 10px;
+    padding: 2px 8px;
+    cursor: pointer;
+  }
+
+  .btn-add-rule:hover,
+  .btn-clear-rules:hover {
+    background: #30363d;
+  }
+</style>

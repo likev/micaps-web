@@ -212,17 +212,21 @@ describe("Fullscreen Button Control", () => {
     ctrl.destroy();
   });
 
-  test("verifies index.html places btn-fullscreen-toggle directly in #main-content above map", () => {
-    const htmlPath = path.resolve(__dirname, "../../index.html");
-    const html = fs.readFileSync(htmlPath, "utf-8");
+  test("verifies FullscreenButton places btn-fullscreen-toggle with correct id and class inside main-content", () => {
+    const sveltePath = path.resolve(__dirname, "../../src/components/FullscreenButton.svelte");
+    const svelteCode = fs.readFileSync(sveltePath, "utf-8");
 
-    expect(html).toContain('<main id="main-content">');
-    expect(html).toContain('id="btn-fullscreen-toggle"');
-    expect(html).toContain('class="btn-fullscreen-toggle"');
+    expect(svelteCode).toContain('id="btn-fullscreen-toggle"');
+    expect(svelteCode).toContain('class="btn-fullscreen-toggle"');
 
-    // Ensure it is positioned within #main-content
-    const mainContentSlice = html.split('<main id="main-content">')[1].split("</main>")[0];
-    expect(mainContentSlice).toContain('id="btn-fullscreen-toggle"');
+    const appPath = path.resolve(__dirname, "../../src/App.svelte");
+    const appCode = fs.readFileSync(appPath, "utf-8");
+    const mainContentIdx = appCode.indexOf('<main id="main-content"');
+    const fsBtnIdx = appCode.indexOf('<FullscreenButton');
+    const mainCloseIdx = appCode.indexOf('</main>');
+    expect(mainContentIdx).toBeGreaterThan(-1);
+    expect(fsBtnIdx).toBeGreaterThan(mainContentIdx);
+    expect(fsBtnIdx).toBeLessThan(mainCloseIdx);
   });
 
   test("verifies tokens.css defines .btn-fullscreen-toggle with left-middle positioning", () => {

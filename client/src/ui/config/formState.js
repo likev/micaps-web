@@ -279,6 +279,15 @@ export function createFormState(initialConfig = {}) {
       notify();
     },
 
+    touch() {
+      validation = validateConfig(draft);
+      notify();
+    },
+
+    notifyDirty() {
+      this.touch();
+    },
+
     getValidation() {
       return validation;
     },

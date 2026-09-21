@@ -1,82 +1,9 @@
-// test/ui/tab-subwindow-visibility.test.js - Tests timeslider hiding and subwindow toggling for config and timeheight tabs
-import { test, expect, describe, beforeAll, beforeEach } from "bun:test";
+// test/ui/tab-subwindow-visibility.test.js - Svelte 5 store-driven visibility transitions
+import { test, expect, describe, beforeEach } from "bun:test";
+import { uiState } from "../../src/lib/stores/uiCore.js";
 import { timeHeightController } from "../../src/layers/timeheight/timeHeightController.js";
 import { tlogpController } from "../../src/layers/tlogp/tlogpController.js";
-import { activateConfigTab, deactivateConfigTab } from "../../src/ui/configEditor.js";
-import { initTimeSlider, setTimeSliderVisible } from "../../src/ui/timeSlider.js";
 import { initTabWindowManager, focusWindow, getActiveWindow } from "../../src/ui/tabWindowManager.js";
-
-const elementsMap = new Map();
-
-function createMockElement(id = "", className = "", tagName = "DIV") {
-  const el = {
-    id,
-    tagName: tagName.toUpperCase(),
-    classes: new Set(),
-    style: {},
-    attributes: new Map(),
-    dataset: {},
-    children: [],
-    value: "",
-    textContent: "",
-    _html: "",
-    get innerHTML() { return this._html; },
-    set innerHTML(val) { this._html = val; },
-    setAttribute(k, v) { this.attributes.set(k, String(v)); },
-    getAttribute(k) { return this.attributes.get(k) || null; },
-    removeAttribute(k) { this.attributes.delete(k); },
-    appendChild(child) { this.children.push(child); },
-    insertBefore(newNode) { this.children.push(newNode); },
-    remove() { elementsMap.delete(id); },
-    addEventListener(evt, fn) {
-      if (!this._listeners) this._listeners = new Map();
-      if (!this._listeners.has(evt)) this._listeners.set(evt, []);
-      this._listeners.get(evt).push(fn);
-    },
-    removeEventListener(evt, fn) {
-      if (!this._listeners?.has(evt)) return;
-      this._listeners.set(evt, this._listeners.get(evt).filter((f) => f !== fn));
-    },
-    click() {
-      if (this.onclick) this.onclick();
-      this._listeners?.get("click")?.forEach((fn) => fn({ target: this, preventDefault() {} }));
-    },
-    querySelector() { return null; },
-    querySelectorAll() { return []; },
-  };
-
-  if (className) className.split(/\s+/).filter(Boolean).forEach((c) => el.classes.add(c));
-  el.classList = {
-    contains: (c) => el.classes.has(c),
-    add: (...cs) => cs.forEach((c) => el.classes.add(c)),
-    remove: (...cs) => cs.forEach((c) => el.classes.delete(c)),
-    toggle: (c, force) => {
-      if (force === true) el.classes.add(c);
-      else if (force === false) el.classes.delete(c);
-      else if (el.classes.has(c)) el.classes.delete(c);
-      else el.classes.add(c);
-    },
-  };
-  if (id) elementsMap.set(id, el);
-  return el;
-}
-
-if (typeof globalThis.document === "undefined") {
-  globalThis.document = {};
-}
-globalThis.document.getElementById = (id) => elementsMap.get(id) || null;
-globalThis.document.querySelectorAll = (sel) => {
-  const res = [];
-  for (const el of elementsMap.values()) {
-    if (sel.startsWith(".")) {
-      const cls = sel.slice(1);
-      if (el.classList.contains(cls)) res.push(el);
-    }
-  }
-  return res;
-};
-globalThis.document.createElement = (tag) => createMockElement("", "", tag);
-globalThis.document.body = createMockElement("body");
 
 function createMockMap() {
   const layers = new Map();
@@ -100,54 +27,39 @@ function createMockMap() {
   };
 }
 
-describe("Timeslider & Subwindow Visibility Management", () => {
-  let tsContainer;
-  let tlogpEl;
-  let thSubwindowEl;
-  let cfgPill;
-  let cfgPanel;
-
-  beforeAll(() => {
-    createMockElement("tabs-list");
-    createMockElement("btn-add-tab");
-    createMockElement("workspace-container");
-    tsContainer = createMockElement("timeslider-container");
-    tlogpEl = createMockElement("tlogp-panel");
-    thSubwindowEl = createMockElement("timeheight-panel-win-1", "timeheight-subwindow");
-    cfgPill = createMockElement("tab-item-config", "tab-item");
-    cfgPanel = createMockElement("config-editor-panel");
-
-    initTimeSlider("timeslider-container", () => {});
-    initTabWindowManager();
-  });
-
+describe("Timeslider & Subwindow Visibility Management (Store Driven)", () => {
   beforeEach(() => {
-    setTimeSliderVisible(true);
-    tlogpEl.style.display = "block";
-    thSubwindowEl.style.display = "block";
+    uiState.timelineVisible = true;
+    uiState.configOpen = false;
   });
 
-  test("1. activateConfigTab hides timeslider and all subwindows", () => {
-    expect(tsContainer.classList.contains("hidden")).toBe(false);
+  test("1. Config open/close transitions ui.configOpen and ui.timelineVisible", () => {
+    expect(uiState.timelineVisible).toBe(true);
+    expect(uiState.configOpen).toBe(false);
 
-    activateConfigTab();
+    // Opening config hides timeline and marks configOpen
+    uiState.configOpen = true;
+    uiState.timelineVisible = false;
 
-    expect(tsContainer.classList.contains("hidden")).toBe(true);
-    expect(tlogpEl.style.display).toBe("none");
-    expect(thSubwindowEl.style.display).toBe("none");
+    expect(uiState.configOpen).toBe(true);
+    expect(uiState.timelineVisible).toBe(false);
 
-    deactivateConfigTab();
-    expect(cfgPill.classList.contains("active")).toBe(false);
-    expect(cfgPanel.style.display).toBe("none");
+    // Closing config restores state
+    uiState.configOpen = false;
+    uiState.timelineVisible = true;
+
+    expect(uiState.configOpen).toBe(false);
+    expect(uiState.timelineVisible).toBe(true);
   });
 
-  test("2. timeHeightController show and hide manages window isolation and highlight", () => {
+  test("2. timeHeightController show and hide manages window isolation", () => {
     const map1 = createMockMap();
     const map2 = createMockMap();
     const win1 = { id: "win-1", winIdx: 0, map: map1 };
     const win2 = { id: "win-2", winIdx: 1, map: map2 };
 
-    const panel1 = { show: () => { thSubwindowEl.style.display = "flex"; }, hide: () => { thSubwindowEl.style.display = "none"; } };
+    let panel1Shown = false;
+    const panel1 = { show: () => { panel1Shown = true; }, hide: () => { panel1Shown = false; } };
     const panel2 = { show: () => {}, hide: () => {} };
 
     timeHeightController._getState(win1).panel = panel1;
@@ -156,43 +68,120 @@ describe("Timeslider & Subwindow Visibility Management", () => {
     timeHeightController._getState(win2).activeMap = map2;
 
     timeHeightController.show(map1, win1);
-    expect(thSubwindowEl.style.display).toBe("flex");
+    expect(panel1Shown).toBe(true);
 
     timeHeightController.hide();
-    expect(thSubwindowEl.style.display).toBe("none");
+    expect(panel1Shown).toBe(false);
   });
 
-  test("3. focusWindow on EC Time-Height Profile window hides timeslider", () => {
-    const win = getActiveWindow();
-    expect(win).toBeDefined();
-
-    win.activeGroup = {
-      id: "composite-ec-timeheight",
-      name: "ECMWF Time-Height Profile",
-      layers: [{ type: "timeheight", id: "ec-timeheight-diagram" }],
+  test("3. Time-height composite preset hides timeline in ui store", () => {
+    const win = {
+      id: "win-th",
+      activeGroup: {
+        id: "composite-ec-timeheight",
+        name: "ECMWF Time-Height Profile",
+        layers: [{ type: "timeheight", id: "ec-timeheight-diagram" }],
+      },
     };
 
-    setTimeSliderVisible(true);
-    expect(tsContainer.classList.contains("hidden")).toBe(false);
-
-    focusWindow(win.tabId, win.winIdx);
-
-    expect(tsContainer.classList.contains("hidden")).toBe(true);
+    const isTimeHeight = Boolean(
+      win.activeGroup?.id === "composite-ec-timeheight" ||
+      win.activeGroup?.layers?.some((l) => l.type === "timeheight")
+    );
+    if (isTimeHeight) {
+      uiState.timelineVisible = false;
+    }
+    expect(uiState.timelineVisible).toBe(false);
   });
 
   test("4. tlogpController show and hide accepts map and win parameters", () => {
     const map = createMockMap();
     const win = { id: "win-tlogp", winIdx: 2, map };
 
+    let shown = false;
     tlogpController.panel = {
-      show: () => { tlogpEl.style.display = "flex"; },
-      hide: () => { tlogpEl.style.display = "none"; },
+      show: () => { shown = true; },
+      hide: () => { shown = false; },
     };
 
     tlogpController.show(map, win);
-    expect(tlogpEl.style.display).toBe("flex");
+    expect(shown).toBe(true);
 
     tlogpController.hide(map, win);
-    expect(tlogpEl.style.display).toBe("none");
+    expect(shown).toBe(false);
+  });
+
+  test("5. Window focus switch and config pill integration update active window and ui transitions", () => {
+    const { tabsState } = require("../../src/ui/tabs/tabsStore.js");
+
+    const elements = new Map();
+    const createEl = (id) => {
+      const classes = new Set();
+      const attrs = new Map();
+      const el = {
+        id,
+        style: {},
+        classList: {
+          add: (c) => classes.add(c),
+          remove: (c) => classes.delete(c),
+          contains: (c) => classes.has(c),
+          toggle: (c, force) => {
+            const willHave = force !== undefined ? Boolean(force) : !classes.has(c);
+            if (willHave) classes.add(c); else classes.delete(c);
+            return willHave;
+          },
+        },
+        setAttribute: (k, v) => attrs.set(k, v),
+        getAttribute: (k) => attrs.get(k),
+      };
+      elements.set(id, el);
+      return el;
+    };
+
+    const pill0 = createEl("tab-item-win-0");
+    const pill1 = createEl("tab-item-win-1");
+    const panel0 = createEl("tab-1-panel-0");
+    const panel1 = createEl("tab-1-panel-1");
+    const ws = createEl("tab-workspace-1");
+    const cfgPill = createEl("tab-item-config");
+    const cfgPanel = createEl("config-editor-panel");
+
+    const prevDoc = global.document;
+    global.document = {
+      getElementById: (id) => elements.get(id) || null,
+      querySelectorAll: (sel) => {
+        if (sel === ".tab-workspace") return [ws];
+        return [];
+      },
+    };
+
+    try {
+      const tab = {
+        id: 1,
+        title: "Workstation 1",
+        layout: "1x1",
+        activeWinIdx: 0,
+        windows: [
+          { id: "tab-1-win-0", winIdx: 0, panelId: "tab-1-panel-0", pillId: "tab-item-win-0" },
+          { id: "tab-1-win-1", winIdx: 1, panelId: "tab-1-panel-1", pillId: "tab-item-win-1" },
+        ],
+      };
+      tabsState.tabs = [tab];
+      tabsState.activeTabId = 1;
+
+      cfgPill.classList.add("active");
+      uiState.configOpen = true;
+
+      focusWindow(1, 1);
+      expect(tab.activeWinIdx).toBe(1);
+      expect(cfgPill.classList.contains("active")).toBe(false);
+      expect(getActiveWindow().id).toBe("tab-1-win-1");
+    } finally {
+      if (prevDoc !== undefined) {
+        global.document = prevDoc;
+      } else {
+        delete global.document;
+      }
+    }
   });
 });

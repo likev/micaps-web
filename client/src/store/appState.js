@@ -1,49 +1,9 @@
-// appState.js - Central reactive state manager for MICAPS-Web
+// appState.js - Central reactive state manager for MICAPS-Web (delegating initial state to lib/stores/appCore.js)
+import { createInitialAppState } from "../lib/stores/appCore.js";
 
 class AppState {
   constructor() {
-    this.state = {
-      // Model and catalog selection
-      model: "ECMWF_HR",
-      element: "TMP",
-      level: 850,
-      activeGroup: null,
-      activeWinId: null,
-      cycle: "26082708.024",
-      period: 24,
-      obsTime: null,
-      isObservation: false,
-      availableLevels: [1000, 925, 850, 700, 500, 400, 300, 200, 100],
-      availableFiles: [],
-
-      // Layer visibility & opacity
-      layers: {
-        pmtiles: true,
-        contour: true,
-        contourf: true,
-        raster: false,
-        wind: false,
-        station: true,
-        graticule: true,
-      },
-      opacity: {
-        contourf: 0.75,
-        raster: 0.85,
-      },
-
-      // Loaded dataset caches
-      gridData: null,
-      stationData: null,
-
-      // Time playback
-      isPlaying: false,
-      playbackSpeed: 1500, // ms per frame
-
-      // System / connection state
-      status: "connecting",
-      isMock: false,
-    };
-
+    this.state = createInitialAppState();
     this.listeners = new Map();
   }
 
