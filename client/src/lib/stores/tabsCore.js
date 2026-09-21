@@ -22,8 +22,9 @@ export function createDefaultWindow(winIdx = 0, tabId = 1) {
 export function createDefaultTab(id = 1) {
   return {
     id,
-    title: "Workstation 1",
+    title: `Workstation ${id}`,
     layout: "1x1",
+    syncMap: true,
     activeWinIdx: 0,
     _nextWinSeq: 1,
     windows: [createDefaultWindow(0, id)],

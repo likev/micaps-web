@@ -1,12 +1,12 @@
 <script>
   import { mapViewport } from "../actions/mapViewport.js";
 
-  let { winId = "default", isActive = false, onMapCreated = null } = $props();
+  let { winId = "default", isActive = false, onMapCreated = null, onMapDestroyed = null } = $props();
 </script>
 
 <div
   class="map-viewport"
-  use:mapViewport={{ winId, isActive, onMapCreated }}
+  use:mapViewport={{ winId, isActive, onMapCreated, onMapDestroyed }}
   data-testid="map-viewport-{winId}"
 ></div>
 

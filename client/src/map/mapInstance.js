@@ -61,12 +61,14 @@ export const MAP_PROJECTIONS = [
 
 export function resolveInitialProjection() {
   try {
-    const stored = typeof localStorage !== "undefined" ? localStorage.getItem("micaps-map-projection") : null;
-    if (stored && (stored === "mercator" || stored === "globe" || stored === "vertical-perspective")) return stored;
+    const cfg = (typeof window !== "undefined" ? window.__MICAPS_CONFIG__ : null) || (typeof globalThis !== "undefined" ? globalThis.__MICAPS_CONFIG__ : null);
+    if (cfg?.basemap?.projection && (cfg.basemap.projection === "mercator" || cfg.basemap.projection === "globe" || cfg.basemap.projection === "vertical-perspective")) {
+      return cfg.basemap.projection;
+    }
   } catch {}
   try {
-    const cfg = typeof window !== "undefined" ? window.__MICAPS_CONFIG__ : null;
-    if (cfg?.basemap?.projection) return cfg.basemap.projection;
+    const stored = typeof localStorage !== "undefined" ? localStorage.getItem("micaps-map-projection") : null;
+    if (stored && (stored === "mercator" || stored === "globe" || stored === "vertical-perspective")) return stored;
   } catch {}
   return "mercator";
 }

@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import { ui, showToast } from "../lib/stores/ui.svelte.js";
   import { createFormState } from "../lib/stores/formState.js";
-  import { CURRENT_CONFIG, savePresetConfig } from "../config/presets.js";
+  import { CURRENT_CONFIG, savePresetConfig, onConfigLoaded } from "../config/presets.js";
   import PresetForm from "./config/PresetForm.svelte";
   import ColormapForm from "./config/ColormapForm.svelte";
   import SettingsForm from "./config/SettingsForm.svelte";
@@ -23,6 +23,19 @@
       activeSubtab = ui.activeConfigSubtab;
       formState.setActiveSubTab(activeSubtab);
       updateStatus();
+    }
+  });
+
+  let wasConfigOpen = $state(false);
+  $effect(() => {
+    if (ui.configOpen && !wasConfigOpen) {
+      wasConfigOpen = true;
+      if (!isDirty && CURRENT_CONFIG && CURRENT_CONFIG.presets && CURRENT_CONFIG.presets.length > 0) {
+        formState.reset(CURRENT_CONFIG);
+        updateStatus();
+      }
+    } else if (!ui.configOpen && wasConfigOpen) {
+      wasConfigOpen = false;
     }
   });
 
@@ -62,13 +75,13 @@
     const draft = formState.getDraft();
     try {
       const res = await savePresetConfig(draft);
-      if (res.ok) {
+      if (res && (res.ok || res.status === "ok")) {
         formState.markSaved();
         updateStatus();
         showToast("success", "Configuration saved and applied successfully!");
         if (onConfigSaved) onConfigSaved(draft);
       } else {
-        showToast("error", `Failed to save configuration: ${res.error || "Unknown error"}`);
+        showToast("error", `Failed to save configuration: ${res?.error || "Unknown error"}`);
       }
     } catch (err) {
       showToast("error", `Failed to save configuration: ${err.message || err}`);
@@ -102,15 +115,29 @@
     }
   }
 
+  let unsubConfig = null;
   onMount(() => {
     window.addEventListener("beforeunload", beforeUnloadListener);
     const unsub = formState.subscribe(() => {
       updateStatus();
     });
+    unsubConfig = onConfigLoaded((cfg) => {
+      if (!isDirty && cfg && cfg.presets && cfg.presets.length > 0) {
+        formState.reset(cfg);
+        updateStatus();
+      }
+    });
+
+    if (!isDirty && CURRENT_CONFIG && CURRENT_CONFIG.presets && CURRENT_CONFIG.presets.length > 0) {
+      if (!formState.getDraft()?.presets?.length) {
+        formState.reset(CURRENT_CONFIG);
+      }
+    }
     updateStatus();
     return () => {
       window.removeEventListener("beforeunload", beforeUnloadListener);
       unsub();
+      if (unsubConfig) unsubConfig();
     };
   });
 </script>

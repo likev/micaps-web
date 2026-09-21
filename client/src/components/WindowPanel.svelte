@@ -7,6 +7,7 @@
     onFocus = null,
     onClose = null,
     onMapCreated = null,
+    onMapDestroyed = null,
   } = $props();
 
   let winTitle = $derived.by(() => {
@@ -65,7 +66,12 @@
   </div>
 
   <div class="win-body">
-    <MapViewport winId={win.id} {isActive} {onMapCreated} />
+    <MapViewport
+      winId={win.id}
+      {isActive}
+      {onMapCreated}
+      onMapDestroyed={() => onMapDestroyed && onMapDestroyed(win)}
+    />
   </div>
 </div>
 

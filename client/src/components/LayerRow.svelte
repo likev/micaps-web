@@ -20,7 +20,7 @@
   function handleConfigChange(field, val) {
     if (!layer.config) layer.config = {};
     layer.config[field] = val;
-    handleAction("config", { field, value: val });
+    handleAction("config", { [field]: val, field, value: val });
   }
 
   let isWind = $derived(isWindRelated(layer));
@@ -223,7 +223,7 @@
           </label>
         </div>
       {:else if layer.type === "pmtiles"}
-        <div class="config-row">
+        <div class="config-row" style="flex-wrap: wrap;">
           <label>
             <input
               type="checkbox"
@@ -231,7 +231,16 @@
               checked={layer.config?.showGraticule !== false}
               onchange={(e) => handleConfigChange("showGraticule", e.target.checked)}
             />
-            <span>Graticule (经纬网)</span>
+            <span>经纬网 (Graticule)</span>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              class="chk-pmtiles-world"
+              checked={layer.config?.showWorld !== false}
+              onchange={(e) => handleConfigChange("showWorld", e.target.checked)}
+            />
+            <span>国界 (World)</span>
           </label>
           <label>
             <input
@@ -240,8 +249,45 @@
               checked={layer.config?.showProvinces !== false}
               onchange={(e) => handleConfigChange("showProvinces", e.target.checked)}
             />
-            <span>Provinces (省界)</span>
+            <span>省界 (Provinces)</span>
           </label>
+          <label>
+            <input
+              type="checkbox"
+              class="chk-pmtiles-cities"
+              checked={Boolean(layer.config?.showCities)}
+              onchange={(e) => handleConfigChange("showCities", e.target.checked)}
+            />
+            <span>城市 (Cities)</span>
+          </label>
+        </div>
+
+        <div class="config-row" style="margin-top: 4px;">
+          <label for="sel-basemap-scheme-{layer.id}" class="select-label">🎨 Scheme:</label>
+          <select
+            id="sel-basemap-scheme-{layer.id}"
+            class="sel-basemap-scheme"
+            value={layer.config?.scheme || "dark"}
+            onchange={(e) => handleConfigChange("scheme", e.target.value)}
+          >
+            <option value="dark">🌙 Midnight Slate (Dark)</option>
+            <option value="light">☀️ Daybreak Neutral (Light)</option>
+            <option value="micaps">🌐 MICAPS Classic (Navy)</option>
+          </select>
+        </div>
+
+        <div class="config-row" style="margin-top: 4px;">
+          <label for="sel-basemap-proj-{layer.id}" class="select-label">🌐 Projection:</label>
+          <select
+            id="sel-basemap-proj-{layer.id}"
+            class="sel-basemap-projection"
+            value={layer.config?.projection || "mercator"}
+            onchange={(e) => handleConfigChange("projection", e.target.value)}
+          >
+            <option value="mercator">🗺️ Mercator (2D)</option>
+            <option value="globe">🌍 Globe (3D)</option>
+            <option value="vertical-perspective">🪐 Perspective (3D)</option>
+          </select>
         </div>
       {/if}
     </div>
@@ -409,5 +455,27 @@
 
   .lbl-press {
     color: var(--accent-blue, #58a6ff);
+  }
+
+  .sel-basemap-scheme,
+  .sel-basemap-projection {
+    background: var(--bg-secondary, #161b22);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    color: var(--text-primary, #e6edf3);
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 11px;
+    min-width: 140px;
+    max-width: 100%;
+    outline: none;
+  }
+
+  .select-label {
+    color: var(--text-secondary, #8b949e);
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
   }
 </style>

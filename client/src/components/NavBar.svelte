@@ -6,6 +6,7 @@
   import { PRESET_GROUPS, isDivider } from "../config/presets.js";
 
   let {
+    presetGroups = [],
     presetId = "",
     level = 500,
     onPresetSelect = null,
@@ -15,6 +16,13 @@
   } = $props();
 
   const levels = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
+  let effectivePresetGroups = $derived(presetGroups && presetGroups.length > 0 ? presetGroups : PRESET_GROUPS);
+  let currentPresetId = $state(presetId);
+
+  $effect(() => {
+    currentPresetId = presetId;
+  });
+
   let statusText = $state("Connecting...");
   let statusState = $state("connecting"); // connected | warning | disconnected
   let pollInterval = null;
@@ -54,13 +62,14 @@
 
   function handlePresetChange(e) {
     const val = e.target.value;
-    const group = PRESET_GROUPS.find((g) => !isDivider(g) && g.id === val) || null;
+    currentPresetId = val;
+    const group = effectivePresetGroups.find((g) => !isDivider(g) && g.id === val) || null;
     if (group && (group.defaultLevel != null || group.hasLevel)) {
       const nextLvl = group.defaultLevel != null ? group.defaultLevel : app.level;
       if (nextLvl != null) {
         app.level = nextLvl;
       }
-    } else {
+    } else if (group && group.hasLevel === false) {
       app.level = null;
     }
     if (onPresetSelect) onPresetSelect(group);
@@ -75,8 +84,8 @@
   }
 
   function handleLoadClick() {
-    if (!presetId) return;
-    const group = PRESET_GROUPS.find((g) => !isDivider(g) && g.id === presetId) || null;
+    if (!currentPresetId) return;
+    const group = effectivePresetGroups.find((g) => !isDivider(g) && g.id === currentPresetId) || null;
     if (!group) return;
     if (onLoadData) {
       onLoadData(group, app.level);
@@ -115,9 +124,9 @@
 
     <div class="nav-control-group">
       <label for="select-preset">Group:</label>
-      <select id="select-preset" class="nav-select" value={presetId} onchange={handlePresetChange}>
+      <select id="select-preset" class="nav-select" value={currentPresetId} onchange={handlePresetChange}>
         <option value="">-- Presets / 组合图 --</option>
-        {#each PRESET_GROUPS as group}
+        {#each effectivePresetGroups as group}
           {#if isDivider(group)}
             <option disabled value="">──────── {group.label || ""} ────────</option>
           {:else}
@@ -128,7 +137,7 @@
       <button
         id="btn-load-data"
         class="btn btn-primary nav-load-btn"
-        disabled={!presetId}
+        disabled={!currentPresetId}
         onclick={handleLoadClick}
         title="Load selected preset group data"
       >

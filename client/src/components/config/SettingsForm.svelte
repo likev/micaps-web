@@ -8,7 +8,11 @@
 
   let { formState } = $props();
 
-  let draft = $state({ ...formState.getDraft() });
+  let draft = $state({
+    ...formState.getDraft(),
+    basemap: { ...(formState.getDraft()?.basemap || {}) },
+    performance: { ...(formState.getDraft()?.performance || {}) },
+  });
 
   const unsub = formState.subscribe(() => {
     draft = {

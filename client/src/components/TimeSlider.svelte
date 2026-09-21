@@ -190,7 +190,7 @@
   });
 </script>
 
-{#if ui.timelineVisible}
+{#if ui.timelineVisible && !ui.configOpen}
   <footer id="timeslider-container" class="timeslider-container" aria-label="Timeline and Playback Controls">
     <div class="timeline-stepper">
       <button

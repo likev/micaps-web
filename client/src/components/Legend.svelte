@@ -1,4 +1,5 @@
 <script>
+  import { ui } from "../lib/stores/ui.svelte.js";
   import { buildLegendItems } from "../lib/stores/legendCore.js";
   import { legends } from "../lib/stores/legend.svelte.js";
 
@@ -11,7 +12,7 @@
   });
 </script>
 
-{#if items && items.length > 0}
+{#if !ui.configOpen && items && items.length > 0}
   <div id="legend-panel" class="legend-panel" role="region" aria-label="Map Legends">
     {#each items as item}
       <div class="legend-item">

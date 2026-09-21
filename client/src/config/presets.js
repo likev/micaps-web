@@ -77,6 +77,24 @@ export function renderPresetOptions(groups = PRESET_GROUPS, selectedId = null) {
     .join("");
 }
 
+const configListeners = new Set();
+
+export function onConfigLoaded(cb) {
+  if (typeof cb !== "function") return () => {};
+  configListeners.add(cb);
+  return () => configListeners.delete(cb);
+}
+
+export function notifyConfigLoaded() {
+  configListeners.forEach((cb) => {
+    try {
+      cb(CURRENT_CONFIG, PRESET_GROUPS);
+    } catch (e) {
+      console.error("[Config] Listener error:", e);
+    }
+  });
+}
+
 export async function loadPresetGroups() {
   let response = await fetch(new URL(CONFIG_URL.href + "?_t=" + Date.now()), { cache: "no-store" });
   if (!response.ok) {
@@ -90,7 +108,10 @@ export async function loadPresetGroups() {
   const config = await response.json();
   CURRENT_CONFIG = config;
   // expose for mapInstance resolveInitialBasemapScheme
-  try { if (typeof window !== "undefined") window.__MICAPS_CONFIG__ = config; } catch {}
+  try {
+    if (typeof window !== "undefined") window.__MICAPS_CONFIG__ = config;
+    if (typeof globalThis !== "undefined") globalThis.__MICAPS_CONFIG__ = config;
+  } catch {}
   const groups = Array.isArray(config) ? config : config?.presets;
   if (!Array.isArray(groups) || groups.some((group) => {
     if (!group || !group.id) return true;
@@ -115,6 +136,7 @@ export async function loadPresetGroups() {
     }
   } catch {}
   PRESET_GROUPS = groups;
+  notifyConfigLoaded();
   return PRESET_GROUPS;
 }
 
@@ -142,7 +164,20 @@ export async function savePresetConfig(configObj = CURRENT_CONFIG) {
     setColormaps(configObj.colormaps);
   }
   CURRENT_CONFIG = configObj;
-  return { status: "ok" };
+  try {
+    if (typeof window !== "undefined") window.__MICAPS_CONFIG__ = configObj;
+    if (typeof globalThis !== "undefined") globalThis.__MICAPS_CONFIG__ = configObj;
+    const scheme = configObj?.basemap?.scheme;
+    if (scheme === "light" || scheme === "dark" || scheme === "micaps") {
+      try { if (typeof localStorage !== "undefined") localStorage.setItem("micaps-basemap-scheme", scheme); } catch {}
+    }
+    const proj = configObj?.basemap?.projection;
+    if (proj === "mercator" || proj === "globe" || proj === "vertical-perspective") {
+      try { if (typeof localStorage !== "undefined") localStorage.setItem("micaps-map-projection", proj); } catch {}
+    }
+  } catch {}
+  notifyConfigLoaded();
+  return { status: "ok", ok: true };
 }
 
 export function autoSaveLayerConfig(layer) {
@@ -151,10 +186,16 @@ export function autoSaveLayerConfig(layer) {
   let matched = false;
 
   // 1. Basemap (PMTiles & Graticule) configuration
-  if (layer.type === "pmtiles" || layer.id === "pmtiles-base" || layer.id === "basemap") {
+  if (layer.type === "pmtiles" || layer.id === "pmtiles-base" || layer.id === "basemap" || layer.id?.startsWith("layer-pmtiles")) {
     if (!CURRENT_CONFIG.basemap) CURRENT_CONFIG.basemap = {};
     if (layer.config) {
       Object.assign(CURRENT_CONFIG.basemap, layer.config);
+      if (layer.config.scheme && (layer.config.scheme === "light" || layer.config.scheme === "dark" || layer.config.scheme === "micaps")) {
+        try { if (typeof localStorage !== "undefined") localStorage.setItem("micaps-basemap-scheme", layer.config.scheme); } catch {}
+      }
+      if (layer.config.projection && (layer.config.projection === "mercator" || layer.config.projection === "globe" || layer.config.projection === "vertical-perspective")) {
+        try { if (typeof localStorage !== "undefined") localStorage.setItem("micaps-map-projection", layer.config.projection); } catch {}
+      }
     }
     matched = true;
   }

@@ -6,10 +6,12 @@
     tabs = tabsState.tabs,
     activeTabId = tabsState.activeTabId,
     layout = "1x1",
+    syncMap = true,
     onSelectTab = null,
     onAddTab = null,
     onCloseTab = null,
     onChangeLayout = null,
+    onToggleSync = null,
   } = $props();
 
   function selectTab(id) {
@@ -64,6 +66,8 @@
         role="tab"
         aria-selected="true"
         tabindex="0"
+        onclick={() => (ui.configOpen = true)}
+        onkeydown={(e) => e.key === "Enter" && (ui.configOpen = true)}
       >
         <span class="tab-label">⚙ Config</span>
         <button
@@ -71,7 +75,10 @@
           class="tab-close-btn"
           title="Close Config Tab"
           aria-label="Close Config Tab"
-          onclick={() => (ui.configOpen = false)}
+          onclick={(e) => {
+            e.stopPropagation();
+            ui.configOpen = false;
+          }}
         >✕</button>
       </div>
     {/if}
@@ -112,6 +119,21 @@
       title="4-Split Windows Layout (2x2)"
       onclick={() => setLayout("2x2")}
     >2x2</button>
+    {#if layout !== "1x1"}
+      <button
+        id="btn-sync-toggle"
+        type="button"
+        class="layout-btn"
+        class:active={syncMap}
+        aria-pressed={syncMap ? "true" : "false"}
+        title={syncMap
+          ? "Camera sync enabled across windows (Click to toggle off)"
+          : "Camera sync disabled (Click to toggle on)"}
+        onclick={() => onToggleSync && onToggleSync()}
+      >
+        {syncMap ? "Sync 🔗" : "Sync ✕"}
+      </button>
+    {/if}
   </div>
 </div>
 

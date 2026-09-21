@@ -70,7 +70,7 @@
   }
 </script>
 
-{#if ui.layersOpen}
+{#if ui.layersOpen && !ui.configOpen}
   <div id="layer-control" class="panel layers-panel" role="region" aria-label="Layers Manager">
     <div class="panel-title">
       <div class="panel-title-left">

@@ -167,4 +167,38 @@ describe("Config Save and Reload Safeguards", () => {
     const nullGridFetches = fetchedUrls.filter((u) => u.includes("/api/data/grid") && u.includes("null"));
     expect(nullGridFetches.length).toBe(0);
   });
+
+  it("onConfigLoaded notifies listeners on loadPresetGroups and savePresetConfig", async () => {
+    let notifiedCount = 0;
+    let lastNotifiedGroups = null;
+    const { onConfigLoaded, savePresetConfig } = await import("../src/config/presets.js");
+
+    const unsub = onConfigLoaded((cfg, groups) => {
+      notifiedCount++;
+      lastNotifiedGroups = groups;
+    });
+
+    globalThis.fetch = async (url, opts) => {
+      const urlStr = String(url);
+      if (opts?.method === "POST" && urlStr.includes("/api/config")) {
+        return new Response(JSON.stringify({ status: "ok" }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (urlStr.includes("config")) {
+        return new Response(JSON.stringify(realConfig), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response("{}", { status: 200 });
+    };
+
+    await loadPresetGroups();
+    expect(notifiedCount).toBeGreaterThan(0);
+    expect(Array.isArray(lastNotifiedGroups)).toBe(true);
+    expect(lastNotifiedGroups.length).toBeGreaterThan(0);
+
+    const saveRes = await savePresetConfig(realConfig);
+    expect(saveRes.ok).toBe(true);
+    expect(saveRes.status).toBe("ok");
+    expect(notifiedCount).toBeGreaterThan(1);
+
+    unsub();
+  });
 });
