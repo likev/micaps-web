@@ -8,7 +8,7 @@ import { loadTLogPLayer, removeTLogPLayer, tlogpController } from "../layers/tlo
 import { loadTimeHeightLayer, removeTimeHeightLayer, timeHeightController } from "../layers/timeheight/timeHeightLayer.js";
 import { loadLineHeightLayer, removeLineHeightLayer, lineHeightController, loadHovmollerLayer, removeHovmollerLayer, hovmollerController } from "../layers/lineprofile/lineProfileLayer.js";
 import { clearLegends } from "../ui/legend.js";
-import { getActiveWindow, updateWindowTitle, setWindowHeaderPreset, refreshPresetControls } from "../ui/tabWindowManager.js";
+import { getActiveWindow, updateWindowTitle, refreshPresetControls } from "../ui/tabWindowManager.js";
 import { setNavBarPreset, refreshNavBarPresets } from "../ui/navBar.js";
 import { appState } from "../store/appState.js";
 import { resolveForecastCycles, syncObservationTimeline, invalidateForecastCyclesCache } from "../utils/timelineSync.js";
@@ -176,7 +176,6 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
         .replace(/\s*\((?:SURFACE|UPPER_AIR)\/[^)]*\)/i, "")
       : group.name;
     updateWindowTitle(win, titleName);
-    setWindowHeaderPreset(win, group.id);
   }
   if (win && getActiveWindow() === win) {
     appState.update({

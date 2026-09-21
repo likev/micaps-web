@@ -25,10 +25,13 @@ describe("ECMWF_HR group: chip-btn and keyboard shortkey regression", () => {
     expect(src).toContain("btnLoadData?.blur()");
   });
 
-  test("windowFocus.js: window-header preset select blurs after change so Arrow keys work", () => {
-    const src = readSrcText("ui/tabs/windowFocus.js");
-    // Fix 5: The presetSelect change handler must blur the element after update
-    expect(src).toContain("presetSelect.blur()");
+  test("global navbar selects blur after change so Arrow keys work (focused window)", () => {
+    const legacy = readSrcText("ui/navBar.js");
+    // Global select-preset / select-level drive the focused window; they must
+    // release focus after change so Arrow-key shortcuts keep working.
+    expect(legacy).toContain("e.target?.blur?.()");
+    const svelte = readSrcText("components/NavBar.svelte");
+    expect(svelte).toContain("e.target?.blur?.()");
   });
 
   test("isObs logic: pure NWP group with stale SURFACE model evaluates to false", () => {

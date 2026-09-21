@@ -1,5 +1,5 @@
 // levelController.js - Vertical level transitions, layer state snapshots, and sounding/preset level sync
-import { getActiveWindow, setWindowHeaderLevel, updateWindowTitle } from "../ui/tabWindowManager.js";
+import { getActiveWindow, updateWindowTitle } from "../ui/tabWindowManager.js";
 import { setNavBarLevel } from "../ui/navBar.js";
 import { appState } from "../store/appState.js";
 import { getLayersForWindow, addOrUpdateLayer } from "../ui/layerControl.js";
@@ -47,7 +47,6 @@ export async function changeVerticalLevel(map, direction, explicitLevel = null, 
   if (win) win.level = targetLevel;
   if (win && getActiveWindow() === win) appState.set("level", targetLevel);
   setNavBarLevel(targetLevel);
-  setWindowHeaderLevel(win, targetLevel);
 
   // Snapshot all window layers before level change to preserve visibility and config
   const prevLayers = getLayersForWindow(win);

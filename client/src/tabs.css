@@ -359,11 +359,6 @@
   flex-shrink: 0;
 }
 
-.win-preset-select,
-.win-level-select {
-  display: none !important;
-}
-
 .win-btn-max {
   background: transparent;
   border: none;

@@ -1,6 +1,6 @@
 // windowFocus.js - Window focus management, header controls, and timeline sync wiring
 import { setActiveMap } from "../../map/mapInstance.js";
-import { PRESET_GROUPS, isDivider, renderPresetOptions } from "../../config/presets.js";
+import { PRESET_GROUPS, isDivider } from "../../config/presets.js";
 import { appState } from "../../store/appState.js";
 import { tabsState, getActiveTab, getActiveWindow, getCallbacks } from "./tabsStore.js";
 import { applySplitVisibility } from "./windowReorder.js";
@@ -149,52 +149,12 @@ export function focusWindow(tabId, winIdx) {
 }
 
 export function setupWindowControlsForWin(tab, win, onToggleTabsAndSplit) {
-  const callbacks = getCallbacks();
-  const presetSelect = document.getElementById(win.presetSelectId);
-  const levelSelect = document.getElementById(win.levelSelectId);
   const maxBtn = document.getElementById(win.maxBtnId);
-
-  if (presetSelect) {
-    presetSelect.addEventListener("change", (e) => {
-      const gid = e.target.value;
-      const g = PRESET_GROUPS.find((grp) => grp.id === gid) || null;
-      if (callbacks.onWindowGroupChange && g) {
-        callbacks.onWindowGroupChange(win, g);
-      } else if (g) {
-        try {
-          win.activeGroup = typeof structuredClone === "function" ? structuredClone(g) : JSON.parse(JSON.stringify(g));
-        } catch {
-          win.activeGroup = g;
-        }
-        updateWindowTitle(win, g ? g.name : "");
-      } else {
-        win.activeGroup = g;
-        updateWindowTitle(win, g ? g.name : "");
-      }
-      // Release keyboard focus so Arrow key shortcuts aren't blocked by the SELECT element
-      presetSelect.blur();
-      focusWindow(win.tabId, win.winIdx);
-    });
-  }
-
-
-  if (levelSelect) {
-    levelSelect.addEventListener("change", (e) => {
-      const lvl = parseInt(e.target.value, 10);
-      if (!isNaN(lvl)) {
-        win.level = lvl;
-        if (callbacks.onWindowLevelChange) {
-          callbacks.onWindowLevelChange(win, lvl);
-        }
-        focusWindow(win.tabId, win.winIdx);
-      }
-    });
-  }
 
   const header = document.getElementById(win.headerId);
   if (header) {
     header.addEventListener("dblclick", (e) => {
-      if (e.target.tagName === "SELECT" || e.target.tagName === "BUTTON") return;
+      if (e.target.tagName === "BUTTON") return;
       focusWindow(win.tabId, win.winIdx);
       onToggleTabsAndSplit?.(win.tabId);
     });
@@ -210,18 +170,11 @@ export function setupWindowControlsForWin(tab, win, onToggleTabsAndSplit) {
 }
 
 export function setWindowHeaderPreset(win, groupId) {
-  if (!win || typeof document === "undefined") return;
-  const el = document.getElementById(win.presetSelectId);
-  if (el) el.value = groupId || "";
+  return;
 }
 
 export function setWindowHeaderLevel(win, level) {
-  if (!win || typeof document === "undefined") return;
-  const el = document.getElementById(win.levelSelectId);
-  if (el) {
-    if (level == null || level === "") el.value = "";
-    else el.value = String(level);
-  }
+  return;
 }
 
 export function refreshPresetControls() {
@@ -230,22 +183,12 @@ export function refreshPresetControls() {
     tab.windows.forEach((win) => {
       const currentGroupId = win.activeGroup?.id;
       const group = PRESET_GROUPS.find((candidate) => !isDivider(candidate) && candidate.id === currentGroupId) || null;
-      // Per-window copy so later ✕-removes don't mutate the shared preset.
       try {
         win.activeGroup = group
           ? (typeof structuredClone === "function" ? structuredClone(group) : JSON.parse(JSON.stringify(group)))
           : group;
       } catch {
         win.activeGroup = group;
-      }
-
-      const select = document.getElementById(win.presetSelectId);
-      if (select) {
-        select.innerHTML = `
-          <option value="">-- Group --</option>
-          ${renderPresetOptions(PRESET_GROUPS)}
-        `;
-        select.value = group?.id || "";
       }
 
       updateWindowTitle(win, group ? group.name : "");

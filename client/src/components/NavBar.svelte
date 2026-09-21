@@ -23,6 +23,12 @@
     currentPresetId = presetId;
   });
 
+  // Focused window's group drives whether a vertical level applies.
+  let currentGroup = $derived(
+    effectivePresetGroups.find((g) => !isDivider(g) && g.id === currentPresetId) || null
+  );
+  let levelDisabled = $derived(currentGroup?.hasLevel === false);
+
   let statusText = $state("Connecting...");
   let statusState = $state("connecting"); // connected | warning | disconnected
   let pollInterval = null;
@@ -73,6 +79,7 @@
       app.level = null;
     }
     if (onPresetSelect) onPresetSelect(group);
+    e.target?.blur?.();
   }
 
   function handleLevelChange(e) {
@@ -81,15 +88,18 @@
     const safeLvl = Number.isNaN(lvl) ? null : lvl;
     app.level = safeLvl;
     if (onLevelSelect) onLevelSelect(safeLvl);
+    e.target?.blur?.();
   }
 
-  function handleLoadClick() {
+  function handleLoadClick(e) {
     if (!currentPresetId) return;
     const group = effectivePresetGroups.find((g) => !isDivider(g) && g.id === currentPresetId) || null;
     if (!group) return;
     if (onLoadData) {
       onLoadData(group, app.level);
     }
+    e?.currentTarget?.blur?.();
+    document.getElementById("select-preset")?.blur?.();
   }
 
   function handleConfigClick() {
@@ -110,7 +120,7 @@
   <div class="nav-middle">
     <div class="nav-control-group">
       <label for="select-preset">Group:</label>
-      <select id="select-preset" class="nav-select" value={currentPresetId} onchange={handlePresetChange}>
+      <select id="select-preset" class="nav-select" value={currentPresetId} onchange={handlePresetChange} title="Select group for focused window">
         <option value="">-- Presets / 组合图 --</option>
         {#each effectivePresetGroups as group}
           {#if isDivider(group)}
@@ -125,7 +135,7 @@
         class="btn btn-primary nav-load-btn"
         disabled={!currentPresetId}
         onclick={handleLoadClick}
-        title="Load selected preset group data"
+        title="Load selected preset group data into focused window"
       >
         <span>Load Data</span>
       </button>
@@ -133,7 +143,7 @@
 
     <div class="nav-control-group">
       <label for="select-nav-level">Level:</label>
-      <select id="select-nav-level" class="nav-select" value={app.level ?? ""} onchange={handleLevelChange}>
+      <select id="select-nav-level" class="nav-select" value={app.level ?? ""} onchange={handleLevelChange} disabled={levelDisabled} title="Select level for focused window">
         <option value="">None</option>
         {#each levels as lvl}
           <option value={lvl}>{lvl} hPa</option>

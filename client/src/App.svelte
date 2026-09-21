@@ -197,9 +197,9 @@
     if (idx !== -1) {
       activeTab.activeWinIdx = idx;
     }
-    if (win.level) {
-      app.level = win.level;
-    }
+    // Keep global navbar selects in sync with the focused window, including
+    // null levels for presets without vertical levels.
+    app.level = win.level ?? null;
     syncLayersState(win.id);
     syncLegendState(win.id);
 
@@ -249,18 +249,6 @@
       if (win.title) win.title = win.title.replace(/^W\d+:\s*/, `W${idx + 1}: `);
     });
     activeTab.activeWinIdx = Math.max(0, windows.indexOf(activeWindow));
-  }
-
-  async function handleWindowGroupSelect(win, group) {
-    if (!win || !group) return;
-    handleWindowFocus(win);
-    await handleLoadData(group, group.hasLevel === false ? null : (win.level || group.defaultLevel || 500), win);
-  }
-
-  async function handleWindowLevelSelect(win, level) {
-    if (!win || level === null || level === undefined) return;
-    handleWindowFocus(win);
-    await handleLevelSelect(level, win);
   }
 
   function toggleTabsAndSplit() {
@@ -738,11 +726,8 @@
             {win}
             isActive={win === activeWin}
             isVisible={visibleWindows.includes(win)}
-            {presetGroups}
             onFocus={handleWindowFocus}
             onToggleMax={toggleTabsAndSplit}
-            onGroupSelect={handleWindowGroupSelect}
-            onLevelSelect={handleWindowLevelSelect}
             onMapCreated={(map) => handleMapCreated(win, map)}
             onMapDestroyed={() => handleMapDestroyed(win)}
           />

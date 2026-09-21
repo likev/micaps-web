@@ -113,6 +113,7 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
     if (onPresetSelectCallback) {
       onPresetSelectCallback(group);
     }
+    e.target?.blur?.();
   });
 
   btnLoadData.addEventListener("click", () => {
@@ -140,6 +141,7 @@ export function initNavBar(containerId = "navbar", callbacks = {}) {
     if (onLevelSelectCallback) {
       onLevelSelectCallback(safeLvl);
     }
+    e.target?.blur?.();
   });
 
   btnToggleLayers.addEventListener("click", (e) => {

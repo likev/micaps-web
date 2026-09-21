@@ -1,4 +1,3 @@
-import { PRESET_GROUPS, isDivider, renderPresetOptions } from "../../config/presets.js";
 import { disarmAllContourReRenders } from "../../services/contourReRender.js";
 import { cleanupWindLayer } from "../../layers/windLayer.js";
 import { DEFAULT_LEVELS, tabsState, getActiveTab } from "./tabsStore.js";
@@ -22,8 +21,6 @@ export function createWindowPanel(tab, gridEl) {
     headerId: `win-header-${tabId}-${uid}`,
     badgeId: `win-badge-${tabId}-${uid}`,
     titleId: `win-title-${tabId}-${uid}`,
-    presetSelectId: `win-preset-${tabId}-${uid}`,
-    levelSelectId: `win-level-${tabId}-${uid}`,
     maxBtnId: `win-max-${tabId}-${uid}`,
     pillId: `tab-item-win-${uid}`,
     labelId: `tab-label-${uid}`,
@@ -53,13 +50,6 @@ export function createWindowPanel(tab, gridEl) {
         <span class="win-title" id="${winObj.titleId}"></span>
       </div>
       <div class="win-actions">
-        <select class="win-preset-select" id="${winObj.presetSelectId}">
-          <option value="">-- Group --</option>
-          ${renderPresetOptions(PRESET_GROUPS)}
-        </select>
-        <select class="win-level-select" id="${winObj.levelSelectId}">
-          ${DEFAULT_LEVELS.map((l) => `<option value="${l}" ${l === winObj.level ? "selected" : ""}>${l} hPa</option>`).join("")}
-        </select>
         <button class="win-btn-max" id="${winObj.maxBtnId}" title="Maximize Window">⛶</button>
       </div>
     </div>
