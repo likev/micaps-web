@@ -1,12 +1,11 @@
 // tooltip-units-palettes.test.js - Units & Legend Formatting (§5-J7) + Colormap & Palette (§3.3, §5-G) + Station Tooltip DTD Audit Row (§5-H)
-import { test, expect, describe, beforeEach } from "bun:test";
+import { test, expect, describe } from "bun:test";
 import { analyzeAndRenderSurfaceContours, SURFACE_CONTOUR_CONFIGS } from "../../src/layers/surfaceAnalysis.js";
 import { analyzeAndRenderSoundingElementContour, SOUNDING_CONTOUR_CONFIGS } from "../../src/layers/soundingAnalysis.js";
 import { getFieldValue, matchesStationFilters, renderStationPlotToCanvas } from "../../src/layers/stationLayer.js";
 import { formatElementUnit } from "../../src/utils/formatters.js";
 import { getColormap, getColor, getElementLevels } from "../../src/utils/colormaps.js";
 import { getPaletteCategory } from "../../src/utils/paletteLoader.js";
-import { initTooltip } from "../../src/ui/tooltip.js";
 import { getLayersForWindow, clearWindowWeatherLayers, renderStationDrawerHTML, addOrUpdateLayer } from "../../src/ui/layerControl.js";
 import fs from "fs";
 
@@ -291,38 +290,5 @@ describe("8. Colormap & Palette Configuration (§3.3, §5-G)", () => {
 
     // Palette category maps to TMP
     expect(getPaletteCategory("DTD")).toBe("TMP");
-  });
-});
-
-describe("10. Station Tooltip DTD Audit Row (§5-H)", () => {
-  let tooltipEl;
-  beforeEach(() => {
-    mockElements.clear();
-    tooltipEl = createMockElement("tooltip");
-    initTooltip("tooltip");
-  });
-
-  test("tooltip displays DTD (T−Td) when TT and Td are valid and '--' when missing", () => {
-    expect(tooltipEl).not.toBeNull();
-
-    // Valid station observation: TT=24.5, Td=18.3 -> DTD = 6.2 °C
-    window.__SHOW_TOOLTIP__([116.4, 39.9], {
-      station_id: 54511,
-      temperature: 24.5,
-      dewpoint: 18.3,
-    });
-
-    expect(tooltipEl.innerHTML).toContain("DTD (T−Td):");
-    expect(tooltipEl.innerHTML).toContain("6.2 °C");
-
-    // Missing dewpoint observation
-    window.__SHOW_TOOLTIP__([116.4, 39.9], {
-      station_id: 54511,
-      temperature: 24.5,
-      dewpoint: -999, // missing sentinel
-    });
-
-    expect(tooltipEl.innerHTML).toContain("DTD (T−Td):");
-    expect(tooltipEl.innerHTML).toContain("--");
   });
 });

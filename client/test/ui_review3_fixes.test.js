@@ -3,8 +3,7 @@ import { test, expect, describe, beforeAll, beforeEach } from "bun:test";
 import fs from "fs";
 import path from "path";
 import { readStyleCss } from "./helpers/cssText.js";
-import { initTabWindowManager, getWindowById, getActiveWindow, getActiveTab } from "../src/ui/tabWindowManager.js";
-import { activateConfigTab, closeConfigTab } from "../src/ui/configEditor.js";
+import { initTabWindowManager, getWindowById, getActiveWindow } from "../src/ui/tabWindowManager.js";
 import { setStepLength } from "../src/ui/timeSlider.js";
 import { getLayersForWindow } from "../src/ui/layerControl.js";
 import { analyzeAndRenderSoundingElementContour } from "../src/layers/soundingAnalysis.js";
@@ -208,31 +207,6 @@ describe("UI Review 3: Layer Panel A11y & Interactions (§2)", () => {
 });
 
 describe("UI Review 3: Windows, Config, Timeline, and A11y (§3)", () => {
-  test("W1 & W2 & W3: Config tab activation and closing restores workspace, tabs-list, and layer control", () => {
-    const ws1 = createMockElement("tab-workspace-1", "tab-workspace active");
-    const panelWin = createMockElement("win-panel-1-0", "window-panel active active-single");
-    const btnLayers = createMockElement("btn-toggle-layers", "active");
-    btnLayers.setAttribute("aria-pressed", "true");
-    const layerCtrl = createMockElement("layer-control", "panel");
-    const legendPanel = createMockElement("legend-panel", "panel");
-
-    const activeTab = getActiveTab();
-    if (activeTab) activeTab.layout = "1x1";
-
-    activateConfigTab();
-
-    expect(panelWin.classList.contains("active")).toBe(false);
-    expect(panelWin.classList.contains("active-single")).toBe(false);
-    expect(layerCtrl.classList.contains("hidden")).toBe(true);
-    expect(btnLayers.classList.contains("active")).toBe(false);
-
-    closeConfigTab();
-
-    expect(ws1.classList.contains("active")).toBe(true);
-    expect(layerCtrl.classList.contains("hidden")).toBe(false);
-    expect(btnLayers.classList.contains("active")).toBe(true);
-  });
-
   test("W8: setStepLength falls back to first available option when passed an unlisted step", () => {
     const sel = createMockElement("select-step-length", "", "SELECT");
     sel.options = [{ value: "6" }, { value: "12" }];
@@ -242,17 +216,6 @@ describe("UI Review 3: Windows, Config, Timeline, and A11y (§3)", () => {
     expect(sel.value).toBe("6");
   });
 
-  test("W9: Tooltip positioning clamps to viewport and avoids navbar overlap (y >= 52)", async () => {
-    const { initTooltip } = await import("../src/ui/tooltip.js");
-    const tt = createMockElement("tooltip", "tooltip hidden");
-    initTooltip("tooltip");
-
-    globalThis.__SHOW_TOOLTIP__([116.4, 39.9], { temperature: 25, slp: 1012 }, { clientX: 100, clientY: 10 });
-    expect(parseInt(tt.style.top || "0", 10)).toBeGreaterThanOrEqual(52);
-
-    globalThis.__SHOW_TOOLTIP__([116.4, 39.9], { temperature: 25, slp: 1012 }, { clientX: 790, clientY: 100 });
-    expect(parseInt(tt.style.left || "0", 10)).toBeLessThan(800);
-  });
 });
 
 describe("UI Review 3: Map & Analysis Consistency (§4)", () => {

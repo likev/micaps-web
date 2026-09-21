@@ -12,43 +12,12 @@
 //      so layers hidden via the eye icon stayed permanently hidden even after a fresh
 //      "Load Data" group reload. Fix: pass resetVisibility:true for fresh reloads.
 //
-// These tests assert the bootstrap.js guard logic and the src code fixes.
+// These tests assert the active service/UI code and the source-level fixes.
 
 import { test, expect, describe } from "bun:test";
 import { readSrcText } from "../helpers/cssText.js";
 
 describe("ECMWF_HR group: chip-btn and keyboard shortkey regression", () => {
-  test("bootstrap.js: onWindowFocus guards against stale win.model pollution (hasNwpGroup guard)", () => {
-    const src = readSrcText("app/bootstrap.js");
-    // Fix 1: The hasNwpGroup guard must exist to short-circuit isObs when an NWP group is active
-    expect(src).toContain("const hasNwpGroup = Boolean(win.activeGroup && !win.activeGroup.isObservation);");
-    expect(src).toContain("const isObs = !hasNwpGroup &&");
-  });
-
-  test("bootstrap.js: onWindowGroupChange clears stale win.model when switching to NWP group", () => {
-    const src = readSrcText("app/bootstrap.js");
-    // Fix 2: onWindowGroupChange must clear win.model/element/obsTime for NWP groups
-    expect(src).toContain("onWindowGroupChange: async (win, group)");
-    // The guard block must appear before the title update (within the handler)
-    const handlerStart = src.indexOf("onWindowGroupChange: async (win, group)");
-    const handlerSnippet = src.slice(handlerStart, handlerStart + 800);
-    expect(handlerSnippet).toContain("if (!group.isObservation)");
-    expect(handlerSnippet).toContain("win.model = null;");
-    expect(handlerSnippet).toContain("win.element = null;");
-    expect(handlerSnippet).toContain("win.obsTime = null;");
-  });
-
-  test("bootstrap.js: onLoadData clears stale win.model when switching to NWP group", () => {
-    const src = readSrcText("app/bootstrap.js");
-    // Fix 3: onLoadData must also clear win.model/element/obsTime for NWP groups
-    const handlerStart = src.indexOf("onLoadData: async (group, overrideLevel");
-    const handlerSnippet = src.slice(handlerStart, handlerStart + 800);
-    expect(handlerSnippet).toContain("if (!group.isObservation)");
-    expect(handlerSnippet).toContain("win.model = null;");
-    expect(handlerSnippet).toContain("win.element = null;");
-    expect(handlerSnippet).toContain("win.obsTime = null;");
-  });
-
   test("navBar.js: Load Data button blurs select after callback so Arrow keys work", () => {
     const src = readSrcText("ui/navBar.js");
     // Fix 4: The btnLoadData click handler must blur the select (and button) after loading
@@ -212,14 +181,6 @@ describe("Layer hide/show: can't reload group when layer previously hidden", () 
     expect(src).toContain("clearAllWeatherLayersFromMap(map, win, { resetVisibility: true })");
   });
 
-  test("bootstrap.js: init-cycle change (isInitChange) passes resetVisibility:true", () => {
-    const src = readSrcText("app/bootstrap.js");
-    // Changing forecast cycle is like a fresh load — hidden layers should reset to visible
-    const initChangeIdx = src.indexOf("isInitChange");
-    const snippet = src.slice(initChangeIdx, initChangeIdx + 600);
-    expect(snippet).toContain("clearAllWeatherLayersFromMap(map, win, { resetVisibility: true })");
-  });
-
   test("resetVisibility logic: snapshot forces visible=true when resetVisibility=true", () => {
     // Simulate the clearAllWeatherLayersFromMap snapshot logic
     function buildSnapshot(layers, resetVisibility) {
@@ -275,12 +236,6 @@ describe("Layer remove (✕): Load Data restores previously-removed ECMWF-HR bas
     expect(src).toContain("isDerivedOverlay");
     // The unconditional splice was the bug — it must now be gated on derived only.
     expect(src).not.toContain("Persist deletion of layer from preset configuration");
-  });
-
-  test("bootstrap.js: win.activeGroup is a per-window clone, not the live PRESET_GROUPS ref", () => {
-    const src = readSrcText("app/bootstrap.js");
-    expect(src).toContain("function clonePresetGroup(group)");
-    expect(src).toContain("group = clonePresetGroup(group);");
   });
 
   test("presetLoader.js: fresh reload self-heals missing base layers from pristine preset", () => {

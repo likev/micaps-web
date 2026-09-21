@@ -11,7 +11,7 @@
   import FullscreenButton from "./components/FullscreenButton.svelte";
   import ConfigEditor from "./components/ConfigEditor.svelte";
 
-  import { ui, showToast } from "./lib/stores/ui.svelte.js";
+  import { ui, showToast, showTooltip, hideTooltip } from "./lib/stores/ui.svelte.js";
   import { app } from "./lib/stores/app.svelte.js";
   import { tabsState, getVisibleWindows, getWindowById, setMapInstance, getMapInstance, mapInstances } from "./lib/stores/tabs.svelte.js";
   import { syncLayersState } from "./lib/stores/layers.svelte.js";
@@ -39,6 +39,14 @@
   let visibleWindows = $derived(getVisibleWindows(activeTab));
 
   let presetGroups = $state(PRESET_GROUPS);
+
+  // Station canvas hover is implemented in plain JS and uses this small
+  // bridge so it can update the Svelte tooltip without the retired DOM
+  // tooltip initializer.
+  if (typeof window !== "undefined") {
+    window.__SHOW_TOOLTIP__ = showTooltip;
+    window.__HIDE_TOOLTIP__ = hideTooltip;
+  }
 
   const syncCleanups = new Map();
   let forecastRefreshTimer = null;

@@ -106,7 +106,6 @@ const { appState } = await import("../../src/store/appState.js");
 const {
   initTimeSlider, setTimelineMode, startPlayback, pausePlayback, step, setPlaybackSpeed, bindVisibilityPause,
 } = await import("../../src/ui/timeSlider.js");
-const { initKeyboardShortcuts } = await import("../../src/ui/keyboardShortcuts.js");
 const { initTabWindowManager } = await import("../../src/ui/tabWindowManager.js");
 
 beforeAll(() => {
@@ -144,62 +143,6 @@ describe("UI Play-Loop Review 1 (R3, R4, m7, m8, m9, m10, m10 CSS)", () => {
     expect(selSpeed._listeners?.get("change")?.length || 0).toBe(0);
   });
 
-  test("R4: Space on focused #btn-play does not double-toggle", () => {
-    let toggles = 0;
-    const windowListeners = new Map();
-    const mockWindow = {
-      addEventListener(evt, fn) {
-        if (!windowListeners.has(evt)) windowListeners.set(evt, []);
-        windowListeners.get(evt).push(fn);
-      },
-    };
-
-    initKeyboardShortcuts({ onTogglePlay: () => { toggles++; } }, mockWindow);
-
-    const focusedBtnEvent = {
-      key: " ", code: "Space",
-      target: { id: "btn-play", tagName: "BUTTON" },
-      preventDefault: () => {},
-    };
-    windowListeners.get("keydown")?.forEach((fn) => fn(focusedBtnEvent));
-    expect(toggles).toBe(0);
-
-    const bodyEvent = {
-      key: " ", code: "Space",
-      target: { tagName: "BODY" },
-      preventDefault: () => {},
-    };
-    windowListeners.get("keydown")?.forEach((fn) => fn(bodyEvent));
-    expect(toggles).toBe(1);
-  });
-
-  test("m7: Space key triggers onTogglePlay shortcut", () => {
-    let playToggled = false;
-    const windowListeners = new Map();
-    const mockWindow = {
-      addEventListener(evt, fn) {
-        if (!windowListeners.has(evt)) windowListeners.set(evt, []);
-        windowListeners.get(evt).push(fn);
-      },
-    };
-
-    initKeyboardShortcuts({ onTogglePlay: () => { playToggled = true; } }, mockWindow);
-
-    let prevented = false;
-    const spaceEvent = {
-      key: " ", code: "Space",
-      target: { tagName: "BODY" },
-      preventDefault: () => { prevented = true; },
-    };
-
-    const listeners = windowListeners.get("keydown");
-    expect(listeners?.length).toBeGreaterThan(0);
-    listeners?.forEach((fn) => fn(spaceEvent));
-
-    expect(playToggled).toBe(true);
-    expect(prevented).toBe(true);
-  });
-
   test("m7: Singleton / empty timeline disables play button and prevents playback", () => {
     initTimeSlider("timeslider-container", () => {});
     const btnPlay = globalThis.document.getElementById("btn-play");
@@ -232,13 +175,6 @@ describe("UI Play-Loop Review 1 (R3, R4, m7, m8, m9, m10, m10 CSS)", () => {
 
     expect(appState.get("isPlaying")).toBe(false);
     globalThis.document.hidden = false;
-  });
-
-  test("m9: NWP step updates win._nwpTimeline.period to keep window state in sync", () => {
-    const bootstrapContent = readSrcText("app/bootstrap.js");
-
-    expect(bootstrapContent).toContain("if (win._nwpTimeline) {");
-    expect(bootstrapContent).toContain("win._nwpTimeline.period = period;");
   });
 
   test("m10: aria-label swaps between Play and Pause Animation; button has aria-keyshortcuts", () => {

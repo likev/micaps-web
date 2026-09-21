@@ -2,7 +2,6 @@
 import { test, expect, describe, beforeEach, afterEach } from "bun:test";
 import { isTextInput, keyboardShortcuts } from "../../src/actions/keyboardShortcuts.js";
 import { focusRestore } from "../../src/actions/focusRestore.js";
-import { clickOutside } from "../../src/actions/clickOutside.js";
 
 describe("Svelte Actions & Navigation Helpers", () => {
   describe("isTextInput helper", () => {
@@ -188,53 +187,6 @@ describe("Svelte Actions & Navigation Helpers", () => {
         if (document.body && origContains) {
           document.body.contains = origContains;
         }
-      }
-    });
-  });
-
-  describe("clickOutside action", () => {
-    test("calls onOutside when clicking outside node", () => {
-      let outsideClicked = false;
-      const mockNode = {
-        contains: (t) => t === mockNode,
-      };
-      const outsideTarget = { id: "outside" };
-
-      const origAdd = document.addEventListener.bind(document);
-      const origRemove = document.removeEventListener.bind(document);
-      let capturedHandler = null;
-
-      document.addEventListener = (evt, handler, capture) => {
-        if (evt === "pointerdown") capturedHandler = handler;
-        return origAdd(evt, handler, capture);
-      };
-      document.removeEventListener = (evt, handler, capture) => {
-        if (evt === "pointerdown" && capturedHandler === handler) capturedHandler = null;
-        return origRemove(evt, handler, capture);
-      };
-
-      try {
-        const action = clickOutside(mockNode, {
-          onOutside: () => {
-            outsideClicked = true;
-          },
-        });
-
-        expect(capturedHandler).toBeDefined();
-
-        // Click inside
-        capturedHandler({ target: mockNode });
-        expect(outsideClicked).toBe(false);
-
-        // Click outside
-        capturedHandler({ target: outsideTarget });
-        expect(outsideClicked).toBe(true);
-
-        action.destroy();
-        expect(capturedHandler).toBeNull();
-      } finally {
-        document.addEventListener = origAdd;
-        document.removeEventListener = origRemove;
       }
     });
   });

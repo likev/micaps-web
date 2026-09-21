@@ -6,7 +6,6 @@ import { getFieldValue, matchesStationFilters, renderStationPlotToCanvas } from 
 import { formatElementUnit } from "../../src/utils/formatters.js";
 import { getColormap, getColor, getElementLevels } from "../../src/utils/colormaps.js";
 import { getPaletteCategory } from "../../src/utils/paletteLoader.js";
-import { initTooltip } from "../../src/ui/tooltip.js";
 import { getLayersForWindow, clearWindowWeatherLayers, renderStationDrawerHTML, addOrUpdateLayer } from "../../src/ui/layerControl.js";
 import fs from "fs";
 
@@ -260,4 +259,3 @@ describe("12. Robust Domain Bounding & Grid Dimension Guard", () => {
     }).not.toThrow();
   });
 });
-

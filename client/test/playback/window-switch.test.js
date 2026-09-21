@@ -137,14 +137,10 @@ describe("UI Play-Loop Review 1 (L1, m6, R5, R1, R2)", () => {
   });
 
   test("m6: Background preset update defers to _pendingNwp when window is not active", () => {
-    const bootstrapContent = readSrcText("app/bootstrap.js");
     const presetLoaderContent = readSrcText("services/presetLoader.js");
 
-    for (const content of [bootstrapContent, presetLoaderContent]) {
-      expect(content).toContain("if (getActiveWindow() === win) {");
-      expect(content).toContain("win._pendingNwp = nwpPayload;");
-    }
-    expect(bootstrapContent).toContain("syncObservationTimeline(obsPath, win.obsTime, winTitle, win)");
+    expect(presetLoaderContent).toContain("if (getActiveWindow() === win) {");
+    expect(presetLoaderContent).toContain("win._pendingNwp = nwpPayload;");
   });
 
   test("R5: P0 guard skips obs re-sync on time-step ticks with a valid file", () => {
