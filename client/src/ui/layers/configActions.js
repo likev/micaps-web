@@ -6,6 +6,7 @@ import {
   setLayerIsolineStyle,
   renderContourLayers,
 } from "../../layers/contourLayer.js";
+import { getLayerById } from "./layerStore.js";
 import { setStationConfig, getStationGeoJSON } from "../../layers/stationLayer.js";
 import { setRasterVisibility, getRasterDOMIds } from "../../layers/rasterLayer.js";
 import { stopWindAnimation, removeGridWindBarbs } from "../../layers/windLayer.js";
@@ -25,6 +26,30 @@ const paletteSeq = new Map();
 
 export function handleConfigAction(map, layerId, value, layer, winObj) {
   if (!layer) return;
+  if (value && typeof value === "object") {
+    // LayerRow already applies this optimistically, but the legacy layer
+    // bindings and programmatic actions do not. Keep one authoritative live
+    // config so the next timeline reload can snapshot it.
+    layer.config = { ...(layer.config || {}), ...value };
+  }
+  // Write-through to the canonical store object: the caller may hold a stale
+  // copy (e.g. Svelte panel array pre-dating an addOrUpdateLayer replace), in
+  // which case map-move re-renders (which read the store) would resurrect the
+  // old style until the next timeline reload. Sync here so every path agrees.
+  if (layer?.id && winObj) {
+    try {
+      const canonical = getLayerById(layer.id, winObj);
+      if (canonical && canonical !== layer) {
+        canonical.config = { ...(canonical.config || {}), ...(layer.config || {}) };
+        if (layer.color !== undefined) canonical.color = layer.color;
+        if (layer.colormap !== undefined) canonical.colormap = layer.colormap;
+        if (layer.visible !== undefined) canonical.visible = layer.visible;
+        if (layer.gridData !== undefined && canonical.gridData === undefined) {
+          canonical.gridData = layer.gridData;
+        }
+      }
+    } catch { /* best-effort */ }
+  }
 
   if (layer.type === "pmtiles") {
     if (value.scheme !== undefined) {
@@ -121,6 +146,21 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
       value.boldLineWidth !== undefined ||
       value.labelSize !== undefined
     ) {
+      // Keep the list dot + loader fallback (existingLayer.color) in sync:
+      // the Svelte row only patches layer.config, so without this a lineColor
+      // change would be overwritten by the stale layer.color on next chip.
+      if (value.lineColor !== undefined) {
+        layer.color = value.lineColor;
+        // `layer` can be a Svelte proxy while the layer store keeps the raw
+        // object. Update the raw mirror after applying the patch as well.
+        try {
+          const canonical = getLayerById(layerId, winObj);
+          if (canonical) {
+            canonical.color = value.lineColor;
+            canonical.config = { ...(canonical.config || {}), lineColor: value.lineColor };
+          }
+        } catch {}
+      }
       setLayerIsolineStyle(map, layerId, {
         lineWidth: value.lineWidth ?? layer.config?.lineWidth,
         lineColor: value.lineColor ?? layer.config?.lineColor,
@@ -320,5 +360,78 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
         stopWindAnimation(map);
       }
     }
+  } else if (layer.type === "tlogp") {
+    import("../../layers/tlogp/tlogpLayer.js").then(({ tlogpController }) => {
+      if (value.stationId !== undefined) tlogpController.setStation(value.stationId, winObj, map);
+      if (value.parcelLevel !== undefined) tlogpController.setParcelLevel(value.parcelLevel, null, winObj);
+      const flags = {};
+      ["showTemp", "showDewpoint", "showWind", "showParcel", "showDryAdiabats", "showMoistAdiabats", "showMixingRatio"].forEach((key) => {
+        if (value[key] !== undefined) flags[key] = Boolean(value[key]);
+      });
+      if (Object.keys(flags).length && tlogpController.panel?.canvasRenderer) {
+        tlogpController.panel.canvasRenderer.setOptions(flags);
+      }
+    });
+  } else if (layer.type === "timeheight") {
+    import("../../layers/timeheight/timeHeightLayer.js").then(({ timeHeightController }) => {
+      const state = timeHeightController._getState(winObj);
+      if (value.lon !== undefined || value.lat !== undefined) {
+        timeHeightController.setPoint(value.lon ?? state.activePoint.lon, value.lat ?? state.activePoint.lat, winObj, map);
+      }
+      if (value.startHour !== undefined || value.endHour !== undefined || value.stepHours !== undefined) {
+        timeHeightController.setRange(value.startHour ?? state.startHour, value.endHour ?? state.endHour, value.stepHours ?? state.stepHours, winObj);
+      }
+      if (value.initCycle !== undefined) timeHeightController.setCycle(value.initCycle, winObj);
+      if (value.timeDirection !== undefined) timeHeightController.setTimeDirection(value.timeDirection, winObj);
+      const flags = {};
+      [["showRH", "showRH"], ["showTemp", "showTemp"], ["showVVel", "showVVel"], ["showWind", "showWind"]].forEach(([key, target]) => {
+        if (value[key] !== undefined) flags[target] = Boolean(value[key]);
+      });
+      if (value.showGridPointMarker !== undefined) timeHeightController.setHighlightVisible(map, Boolean(value.showGridPointMarker));
+      if (Object.keys(flags).length) state.panel?.canvasRenderer?.setOptions(flags);
+    });
+  } else if (layer.type === "lineheight") {
+    import("../../layers/lineprofile/lineProfileLayer.js").then(({ lineHeightController }) => {
+      const state = lineHeightController._getState(winObj);
+      if (value.lon0 !== undefined || value.lat0 !== undefined || value.lon1 !== undefined || value.lat1 !== undefined || value.npoints !== undefined) {
+        lineHeightController.setLine(
+          { lon: value.lon0 ?? state.line.a.lon, lat: value.lat0 ?? state.line.a.lat },
+          { lon: value.lon1 ?? state.line.b.lon, lat: value.lat1 ?? state.line.b.lat },
+          value.npoints ?? state.npoints,
+          winObj
+        );
+      }
+      if (value.flipDirection !== undefined) lineHeightController.setFlip(value.flipDirection, winObj);
+      if (value.initCycle !== undefined) lineHeightController.setCycle(value.initCycle, winObj);
+      const flags = {};
+      ["showRH", "showTemp", "showVVel", "showWind"].forEach((key) => {
+        if (value[key] !== undefined) flags[key] = Boolean(value[key]);
+      });
+      if (Object.keys(flags).length) state.panel?.canvasRenderer?.setOptions(flags);
+    });
+  } else if (layer.type === "hovmoller") {
+    import("../../layers/lineprofile/lineProfileLayer.js").then(({ hovmollerController }) => {
+      const state = hovmollerController._getState(winObj);
+      if (value.lon0 !== undefined || value.lat0 !== undefined || value.lon1 !== undefined || value.lat1 !== undefined || value.npoints !== undefined) {
+        hovmollerController.setLine(
+          { lon: value.lon0 ?? state.line.a.lon, lat: value.lat0 ?? state.line.a.lat },
+          { lon: value.lon1 ?? state.line.b.lon, lat: value.lat1 ?? state.line.b.lat },
+          value.npoints ?? state.npoints,
+          winObj
+        );
+      }
+      if (value.startHour !== undefined || value.endHour !== undefined || value.stepHours !== undefined) {
+        hovmollerController.setSpan(value.startHour ?? state.startHour, value.endHour ?? state.endHour, value.stepHours ?? state.stepHours, winObj);
+      }
+      if (value.level !== undefined) hovmollerController.setLevel(value.level, winObj);
+      if (value.initCycle !== undefined) hovmollerController.setCycle(value.initCycle, winObj);
+      if (value.axisSwap !== undefined) hovmollerController.setAxisSwap(value.axisSwap, winObj);
+      if (value.timeDir !== undefined) hovmollerController.setTimeDir(value.timeDir, winObj);
+      const flags = {};
+      ["showRH", "showTemp", "showVVel", "showWind"].forEach((key) => {
+        if (value[key] !== undefined) flags[key] = Boolean(value[key]);
+      });
+      if (Object.keys(flags).length) state.panel?.canvasRenderer?.setOptions(flags);
+    });
   }
 }

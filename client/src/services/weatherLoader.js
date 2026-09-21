@@ -12,6 +12,26 @@ import { schedulePrefetch } from "./prefetchService.js";
 import { armContourReRender } from "./contourReRender.js";
 import { showErrorToast } from "../ui/toast.js";
 
+/**
+ * Resolve a contour's stroke color across a timeline reload.
+ *
+ * `customOptions` comes from the active preset copy and is the authoritative
+ * value for a time-step load. The live layer config is the fallback for
+ * callers that load a field directly. `layer.color` is only a UI mirror and
+ * must never outrank either config source.
+ */
+export function resolveLineColor({ customOptions = null, existingLayer = null, snapshot = null, defaultLineColor = "#ffffff" } = {}) {
+  const values = [
+    customOptions?.lineColor,
+    existingLayer?.config?.lineColor,
+    snapshot?.config?.lineColor,
+    existingLayer?.color,
+    snapshot?.color,
+    defaultLineColor,
+  ];
+  return values.find((value) => typeof value === "string" && value.trim()) || defaultLineColor;
+}
+
 export async function loadWeatherField(map, model, element, level, period, customOptions = null, win = null, isTimeStep = false, expectedSeq = null) {
   if (!map || !model || !element || typeof model !== "string" || typeof element !== "string" || model.toLowerCase() === "null" || model.toLowerCase() === "undefined" || element.toLowerCase() === "null" || element.toLowerCase() === "undefined") {
     console.warn(`[weatherLoader] Aborting loadWeatherField: invalid map (${Boolean(map)}), model (${model}), or element (${element})`);
@@ -48,7 +68,12 @@ export async function loadWeatherField(map, model, element, level, period, custo
   const isHeight = element === "HGT";
   const isTemp = element === "TMP";
   const defaultLineColor = isHeight ? "#58a6ff" : (isTemp ? "#f85149" : (isVOR ? "#c678dd" : (isDIV ? "#56d4dd" : "#58a6ff")));
-  const lineColor = existingLayer?.color || snap?.color || exCfg.lineColor || customOptions?.lineColor || defaultLineColor;
+  const lineColor = resolveLineColor({
+    customOptions: isTimeStep ? customOptions : null,
+    existingLayer,
+    snapshot: snap,
+    defaultLineColor: customOptions?.lineColor || defaultLineColor,
+  });
   const opacity = exCfg.opacity ?? customOptions?.opacity ?? 0.75;
   let showFill = exCfg.showFill ?? customOptions?.showFill ?? (!isHeight && !isWind && !isVortDiv);
   const showLine = exCfg.showLine ?? customOptions?.showLine ?? !isWind;
@@ -71,7 +96,9 @@ export async function loadWeatherField(map, model, element, level, period, custo
   };
   const pickedPalette = pickPalettePath(exCfg, customOptions, snap?.config);
   const savedPalettePath = pickedPalette === undefined ? null : pickedPalette;
-  const isVisible = existingLayer ? (existingLayer.visible !== false) : (snap ? snap.visible !== false : true);
+  const isVisible = existingLayer
+    ? (existingLayer.visible !== false)
+    : (snap ? snap.visible !== false : (customOptions?.visible !== undefined ? customOptions.visible !== false : true));
   const smooth = exCfg.smooth ?? customOptions?.smooth ?? true;
   const smoothIterations = exCfg.smoothIterations ?? customOptions?.smoothIterations ?? 2;
   const labelSize = exCfg.labelSize ?? customOptions?.labelSize;
@@ -156,7 +183,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
         lineColor,
         lineWidth,
         boldValues,
-        boldLineWidth: customOptions?.boldLineWidth,
+        boldLineWidth: exCfg.boldLineWidth ?? customOptions?.boldLineWidth,
         opacity,
         colormap,
         smooth,

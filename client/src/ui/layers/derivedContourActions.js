@@ -10,6 +10,23 @@ import {
   triggerVortDivOverlay,
 } from "../../services/overlayTriggers.js";
 
+function syncDerivedLayerToWindowPreset(activeGroup, layerEntry) {
+  if (!activeGroup || !Array.isArray(activeGroup.layers) || !layerEntry) return;
+  const index = activeGroup.layers.findIndex((candidate) =>
+    candidate?.id === layerEntry.id ||
+    (candidate?.derivedFrom && candidate.model === layerEntry.model && candidate.element === layerEntry.element)
+  );
+  if (index >= 0) {
+    activeGroup.layers[index] = {
+      ...activeGroup.layers[index],
+      ...layerEntry,
+      render: { ...(activeGroup.layers[index].render || {}), ...(layerEntry.render || {}) },
+    };
+  } else {
+    activeGroup.layers.push({ ...layerEntry, render: { ...(layerEntry.render || {}) } });
+  }
+}
+
 export function handleAddContourAction(map, layer, value, winObj) {
   let elem = (value || "SLP").toUpperCase();
   if (elem === "VORT" || elem === "VORTICITY" || elem === "RVOR" || elem === "REL_VOR") elem = "VOR";
@@ -109,16 +126,7 @@ export function handleAddContourAction(map, layer, value, winObj) {
         },
       };
       upsertDerivedLayerToPreset(activeGroup.id, derivedEntry);
-      if (Array.isArray(activeGroup.layers)) {
-        const idx = activeGroup.layers.findIndex(
-          (l) => l.id === liveLayerId || (l.model === model && l.element === elem && l.derivedFrom)
-        );
-        if (idx >= 0) {
-          activeGroup.layers[idx] = { ...activeGroup.layers[idx], ...derivedEntry };
-        } else {
-          activeGroup.layers.push(derivedEntry);
-        }
-      }
+      syncDerivedLayerToWindowPreset(activeGroup, derivedEntry);
     }
     return;
   }
@@ -191,6 +199,7 @@ export function handleAddContourAction(map, layer, value, winObj) {
             },
           };
           upsertDerivedLayerToPreset(activeGroup.id, derivedEntry);
+          syncDerivedLayerToWindowPreset(activeGroup, derivedEntry);
         }
         if (isDTD) {
           const renderedLayer = getLayersForWindow(winObj).find((l) => l.id === liveLayerId);
@@ -258,6 +267,7 @@ export function handleAddContourAction(map, layer, value, winObj) {
             },
           };
           upsertDerivedLayerToPreset(activeGroup.id, derivedEntry);
+          syncDerivedLayerToWindowPreset(activeGroup, derivedEntry);
         }
         if (isDTD) {
           const renderedLayer = getLayersForWindow(winObj).find((l) => l.id === liveLayerId);

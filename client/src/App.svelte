@@ -3,7 +3,6 @@
   import NavBar from "./components/NavBar.svelte";
   import TabsBar from "./components/TabsBar.svelte";
   import WindowPanel from "./components/WindowPanel.svelte";
-  import CatalogDrawer from "./components/CatalogDrawer.svelte";
   import LayersPanel from "./components/LayersPanel.svelte";
   import TimeSlider from "./components/TimeSlider.svelte";
   import Legend from "./components/Legend.svelte";
@@ -12,30 +11,28 @@
   import FullscreenButton from "./components/FullscreenButton.svelte";
   import ConfigEditor from "./components/ConfigEditor.svelte";
 
-  import { ui } from "./lib/stores/ui.svelte.js";
+  import { ui, showToast } from "./lib/stores/ui.svelte.js";
   import { app } from "./lib/stores/app.svelte.js";
-  import { tabsState, getVisibleWindows, getActiveTab, getActiveWindow, setMapInstance, getMapInstance, mapInstances } from "./lib/stores/tabs.svelte.js";
+  import { tabsState, getVisibleWindows, getWindowById, setMapInstance, getMapInstance, mapInstances } from "./lib/stores/tabs.svelte.js";
   import { syncLayersState } from "./lib/stores/layers.svelte.js";
   import { syncLegendState } from "./lib/stores/legend.svelte.js";
-  import { getOrCreateTimeline, setTimeChangeCallback, playback } from "./lib/stores/timeline.svelte.js";
+  import { getOrCreateTimeline, playback, selectObsChipsWindow, filterObsFilesByStep, getPeriodsForStep } from "./lib/stores/timeline.svelte.js";
 
   import { loadPresetGroups, PRESET_GROUPS, onConfigLoaded, CURRENT_CONFIG, autoSaveLayerConfig } from "./config/presets.js";
-  import { loadPresetGroup, clearAllWeatherLayersFromMap, reloadConfiguration } from "./services/presetLoader.js";
-  import { loadWeatherField } from "./services/weatherLoader.js";
+  import { loadPresetGroup, reloadConfiguration } from "./services/presetLoader.js";
   import { changeVerticalLevel } from "./services/levelController.js";
-  import { loadUpperAirComposite, loadObservationProduct } from "./services/derivedContours.js";
-  import { loadTLogPLayer } from "./layers/tlogp/tlogpLayer.js";
   import { handleLayerAction as serviceHandleLayerAction } from "./ui/layerActions.js";
-  import { resolveForecastCycles, syncObservationTimeline } from "./utils/timelineSync.js";
+  import { resolveForecastCycles } from "./utils/timelineSync.js";
   import { DEFAULT_LEVELS, createDefaultTab, createDefaultWindow, getNumVisible } from "./lib/stores/tabsCore.js";
   import { stopWindAnimation, removeGridWindBarbs } from "./layers/windLayer.js";
   import { removeRasterLayer } from "./layers/rasterLayer.js";
-  import { shouldHideTimelineForGroup, applyPresetToWindow, applyProductToWindow, stepWindowTimeline } from "./lib/services/appWorkflow.js";
+  import { shouldHideTimelineForGroup, applyPresetToWindow, stepWindowTimeline } from "./lib/services/appWorkflow.js";
   import { isTextInput } from "./actions/keyboardShortcuts.js";
   import { registerWindowMapSync, syncTabCameras } from "./ui/tabs/windowMaps.js";
   import { setMapProjection } from "./map/mapInstance.js";
   import { applyBasemapScheme } from "./map/pmtilesLayers.js";
   import { updateGraticuleScheme } from "./map/graticule.js";
+  import { hovmollerController, lineHeightController } from "./layers/lineprofile/lineProfileLayer.js";
 
   let activeTab = $derived(tabsState.tabs.find((t) => t.id === tabsState.activeTabId) || tabsState.tabs[0] || null);
   let activeWin = $derived(activeTab && activeTab.windows ? (activeTab.windows[activeTab.activeWinIdx] || activeTab.windows[0]) : null);
@@ -44,12 +41,46 @@
   let presetGroups = $state(PRESET_GROUPS);
 
   const syncCleanups = new Map();
+  let forecastRefreshTimer = null;
+
+  async function waitForMapStyle(map, timeoutMs = 15000) {
+    if (!map) return false;
+    const isReady = () => {
+      try {
+        return Boolean(
+          (typeof map.isStyleLoaded === "function" && map.isStyleLoaded()) ||
+          (typeof map.loaded === "function" && map.loaded())
+        );
+      } catch {
+        return false;
+      }
+    };
+    if (isReady()) return true;
+    if (typeof map.once !== "function") return false;
+
+    return await new Promise((resolve) => {
+      let settled = false;
+      let timer = null;
+      const finish = (ready) => {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
+        resolve(Boolean(ready) && isReady());
+      };
+      timer = setTimeout(() => finish(false), timeoutMs);
+      map.once("load", () => finish(true));
+    });
+  }
 
   const unsubConfig = onConfigLoaded((cfg, groups) => {
     presetGroups = [...groups];
   });
   onDestroy(() => {
     unsubConfig();
+    if (forecastRefreshTimer) {
+      clearInterval(forecastRefreshTimer);
+      forecastRefreshTimer = null;
+    }
     for (const cleanup of syncCleanups.values()) {
       if (typeof cleanup === "function") cleanup();
     }
@@ -80,6 +111,9 @@
 
   onMount(async () => {
     ensureInitialTab();
+    forecastRefreshTimer = setInterval(() => {
+      if (activeWin) refreshForecastTimeline(activeWin, true);
+    }, 60 * 1000);
     try {
       const groups = await loadPresetGroups();
       presetGroups = [...groups];
@@ -107,6 +141,48 @@
     }
   });
 
+  function getForecastLayer(win) {
+    return win?.activeGroup?.layers?.find((layer) =>
+      layer.type === "contour" || layer.type === "wind" || layer.type === "lineheight" || layer.type === "hovmoller"
+    ) || null;
+  }
+
+  async function refreshForecastTimeline(win, forceRefresh = false) {
+    if (!win || win.isObservation || !win.activeGroup) return;
+    if (shouldHideTimelineForGroup(win.activeGroup)) return;
+
+    const layer = getForecastLayer(win);
+    const model = layer?.model || "ECMWF_HR";
+    const element = ["VOR", "DIV"].includes(layer?.element) ? "WIND" : (layer?.element || "TMP");
+    const refreshSeq = (win._forecastRefreshSeq || 0) + 1;
+    win._forecastRefreshSeq = refreshSeq;
+    const cycles = await resolveForecastCycles(model, element, win.level || 500, forceRefresh);
+    if (win._forecastRefreshSeq !== refreshSeq) return;
+    if (!cycles.length) return;
+
+    const timeline = getOrCreateTimeline(win.id);
+    const previousCycles = timeline.forecastCycles || [];
+    const previousCycle = timeline.currentInitCycle || win.forecastCycle;
+    const wasFollowingLatest = !previousCycle || !previousCycles.length || previousCycle === previousCycles[0];
+    const nextCycle = wasFollowingLatest || !cycles.includes(previousCycle) ? cycles[0] : previousCycle;
+
+    timeline.currentMode = "nwp";
+    timeline.forecastCycles = cycles;
+    timeline.currentInitCycle = nextCycle;
+    if (win.forecastCycle !== nextCycle) {
+      win.forecastCycle = nextCycle;
+      if (getMapInstance(win.id) && win === activeWin) {
+        if (win.activeGroup) {
+          // Timestep reload preserves eye-hidden + custom palette via snapshots;
+          // fresh (!isTimeStep) would force everything visible on every auto-refresh.
+          const loadSeq = (win.loadSeq || 0) + 1;
+          win.loadSeq = loadSeq;
+          await loadPresetGroup(getMapInstance(win.id), win.activeGroup, win.period, win.level, win, true, loadSeq);
+        }
+      }
+    }
+  }
+
   function handleWindowFocus(win) {
     if (!activeTab || !win) return;
     const idx = activeTab.windows.indexOf(win);
@@ -119,8 +195,9 @@
     syncLayersState(win.id);
     syncLegendState(win.id);
 
-    const hasData = Boolean(win.activeGroup || win.model || win.isObservation || win.obsTime);
-    ui.timelineVisible = hasData;
+    const hasData = Boolean(win.activeGroup);
+    ui.timelineVisible = hasData && !shouldHideTimelineForGroup(win.activeGroup);
+    if (hasData && !win.isObservation) refreshForecastTimeline(win, true);
   }
 
   function handleAddWindow() {
@@ -150,6 +227,32 @@
         handleWindowFocus(activeTab.windows[nextIdx]);
       }
     }
+  }
+
+  function handleReorderWindows(fromIndex, toIndex) {
+    if (!activeTab || fromIndex === toIndex) return;
+    const windows = activeTab.windows;
+    if (fromIndex < 0 || toIndex < 0 || fromIndex >= windows.length || toIndex >= windows.length) return;
+    const activeWindow = windows[activeTab.activeWinIdx];
+    const [moved] = windows.splice(fromIndex, 1);
+    windows.splice(toIndex, 0, moved);
+    windows.forEach((win, idx) => {
+      win.winIdx = idx;
+      if (win.title) win.title = win.title.replace(/^W\d+:\s*/, `W${idx + 1}: `);
+    });
+    activeTab.activeWinIdx = Math.max(0, windows.indexOf(activeWindow));
+  }
+
+  async function handleWindowGroupSelect(win, group) {
+    if (!win || !group) return;
+    handleWindowFocus(win);
+    await handleLoadData(group, group.hasLevel === false ? null : (win.level || group.defaultLevel || 500), win);
+  }
+
+  async function handleWindowLevelSelect(win, level) {
+    if (!win || level === null || level === undefined) return;
+    handleWindowFocus(win);
+    await handleLevelSelect(level, win);
   }
 
   function toggleTabsAndSplit() {
@@ -187,90 +290,159 @@
     }
   }
 
-  async function handleLoadData(group, overrideLevel = null) {
-    const win = activeWin;
-    if (!win || !group) return;
-    const groupCopy = applyPresetToWindow(win, group, overrideLevel);
+  async function handleLoadData(group, overrideLevel = null, targetWin = activeWin) {
+    const win = targetWin;
+    if (!win || !group) {
+      console.warn("[App] Load Data skipped: missing window or group");
+      return;
+    }
+    console.log(`[App] Load Data: group=${group.id} overrideLevel=${overrideLevel} win=${win.id} period=${win.period}`);
+    const map = getMapInstance(win.id);
+    if (!map) {
+      console.warn(`[App] Load Data skipped: map not ready for window ${win.id}`);
+      showToast("error", "Map not ready — please retry Load Data in a moment.");
+      return;
+    }
+    if (!(await waitForMapStyle(map))) {
+      console.warn(`[App] Load Data skipped: map style did not finish loading for window ${win.id}`);
+      showToast("error", "Map is still loading — please retry Load Data in a moment.");
+      return;
+    }
+    const loadSeq = (win.loadSeq || 0) + 1;
+    win.loadSeq = loadSeq;
+    win._forecastRefreshSeq = (win._forecastRefreshSeq || 0) + 1;
+    applyPresetToWindow(win, group, overrideLevel);
+    const groupCopy = win.activeGroup;
+    if (!groupCopy || !Array.isArray(groupCopy.layers)) {
+      console.error("[App] Load Data aborted: activeGroup has no layers", groupCopy);
+      showToast("error", "Load Data failed: preset has no layers.");
+      return;
+    }
     ui.timelineVisible = !shouldHideTimelineForGroup(groupCopy);
 
     const effectiveLevel = overrideLevel || win.level || groupCopy.defaultLevel || 500;
     const isSpecialProfile = shouldHideTimelineForGroup(groupCopy);
 
     if (win.isObservation) {
-      const isTLogP = groupCopy.id === "composite-tlogp" || groupCopy.layers?.some((l) => l.element === "TLOGP");
-      const obsPath = isTLogP
-        ? "UPPER_AIR/TLOGP"
-        : (groupCopy.id?.includes("upper") ? `UPPER_AIR/PLOT/${effectiveLevel}` : "SURFACE/PLOT_GLOBAL_3H");
-      const latestFile = await syncObservationTimeline(obsPath, win.obsTime, win.title, win);
-      win.obsTime = latestFile;
+      // Clear stale obs state so loadPresetGroup per-layer sync lands on latest
+      // (single source of truth, per-layer path, bypassCache). Do NOT pre-sync
+      // here with a generic path — it would set _obsTimeline and prevent
+      // forceLatest detection inside the loader, or downgrade via stale cache.
+      win.obsTime = null;
+      win._obsTimeline = null;
+      win._obsTimelinePath = null;
+      // v1.1.0 step defaults: upper-air/TLOGP 12h (08:00/20:00), surface 3h.
+      // Coerce BEFORE the loader syncs so its 08:00/20:00 filter and latest
+      // target use a valid step (a stale 3h carried from surface would admit
+      // 02:00/14:00 soundings and desync map vs chips).
+      const isUpperLoad =
+        /upper|tlogp/i.test(groupCopy.id || "") ||
+        (Array.isArray(groupCopy.layers) && groupCopy.layers.some((l) =>
+          l?.model === "UPPER_AIR" || String(l?.path || "").includes("TLOGP") || l?.element === "TLOGP"));
+      const validSteps = isUpperLoad ? [12, 24, 6] : [1, 3, 6, 12, 24];
+      let coercedStep = parseInt(win.stepLength, 10);
+      if (!validSteps.includes(coercedStep)) coercedStep = isUpperLoad ? 12 : 3;
+      win.stepLength = coercedStep;
       const tl = getOrCreateTimeline(win.id);
       tl.currentMode = "obs";
+      tl.currentStepLength = coercedStep;
+      tl.isUpperAirMode = isUpperLoad;
     } else if (!isSpecialProfile) {
       const pLayer = groupCopy.layers?.find((l) => l.type === "contour" || l.type === "wind");
-      const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", win.level || 500);
+      const cycles = await resolveForecastCycles(pLayer?.model || "ECMWF_HR", pLayer?.element || "TMP", win.level || 500, true);
       win.forecastCycle = cycles[0];
       const tl = getOrCreateTimeline(win.id);
       tl.currentMode = "nwp";
       tl.forecastCycles = cycles;
       tl.currentInitCycle = cycles[0];
+      // v1.1.0 setTimelineMode(nwp): init step + rebuild periods from it so
+      // the step select and chips always have coherent init values.
+      let nwpStep = parseInt(win.stepLength, 10);
+      if (![1, 3, 6, 12, 24].includes(nwpStep)) nwpStep = 6;
+      win.stepLength = nwpStep;
+      tl.currentStepLength = nwpStep;
+      tl.discretePeriods = getPeriodsForStep(nwpStep);
+      const pIdx = tl.discretePeriods.indexOf(win.period ?? 24);
+      tl.currentPeriodIdx = pIdx !== -1 ? pIdx : Math.min(4, tl.discretePeriods.length - 1);
     }
 
-    const map = getMapInstance(win.id);
-    if (map) {
-      await loadPresetGroup(map, groupCopy, win.period, overrideLevel, win);
+    try {
+      await loadPresetGroup(map, groupCopy, win.period, overrideLevel, win, false, loadSeq);
+    } catch (err) {
+      console.error("[App] Load Data failed:", err);
+      showToast("error", `Load Data failed: ${err?.message || err}`);
     }
-    syncLayersState(win.id);
-    syncLegendState(win.id);
-  }
-
-  async function handleLoadProduct(product) {
-    const win = activeWin;
-    if (!win) return;
-    const map = getMapInstance(win.id);
-    await applyProductToWindow(win, map, product, {
-      clearAllWeatherLayersFromMap,
-      syncObservationTimeline,
-      getOrCreateTimeline,
-      loadObservationProduct,
-      loadTLogPLayer,
-      loadUpperAirComposite,
-      resolveForecastCycles,
-      loadWeatherField,
-    });
-    app.level = win.level;
+    // Bridge loader's legacy timeline (win._obsTimeline) into the Svelte
+    // per-window store the TimeSlider actually renders. Without this the
+    // obs chips stay empty/stale for surface + upper-air loads.
+    // v1.1.0: step already coerced above (upper 12h 08:00/20:00, surface 3h);
+    // re-validate here in case the loader ran from another entry point.
+    if (win.isObservation && win._obsTimeline) {
+      try {
+        const t = win._obsTimeline;
+        const tl = getOrCreateTimeline(win.id);
+        tl.currentMode = "obs";
+        tl.isUpperAirMode = Boolean(t.isUpper);
+        const validSteps = tl.isUpperAirMode ? [12, 24, 6] : [1, 3, 6, 12, 24];
+        let step = parseInt(win.stepLength, 10);
+        if (!validSteps.includes(step)) step = parseInt(t.stepLength, 10);
+        if (!validSteps.includes(step)) step = tl.isUpperAirMode ? 12 : 3;
+        win.stepLength = step;
+        tl.currentStepLength = step;
+        if (win._obsTimeline) win._obsTimeline.stepLength = step;
+        tl.currentWinTitle = t.winTitle || "";
+        if (Array.isArray(t.files) && t.files.length > 0) {
+          tl.rawObsFiles = [...t.files];
+          const filtered = filterObsFilesByStep(tl.rawObsFiles, tl.currentStepLength, tl.isUpperAirMode);
+          const chips = selectObsChipsWindow(filtered, t.file);
+          tl.obsFiles = chips.length > 0 ? chips : filtered;
+          const idx = t.file ? tl.obsFiles.indexOf(t.file) : -1;
+          tl.currentObsIdx = idx !== -1 ? idx : Math.max(0, tl.obsFiles.length - 1);
+          const latest = tl.obsFiles[tl.currentObsIdx];
+          if (latest && win.obsTime !== latest) win.obsTime = latest;
+        }
+      } catch (e) {
+        console.warn("[App] Obs timeline bridge failed:", e);
+      }
+    }
     syncLayersState(win.id);
     syncLegendState(win.id);
   }
 
   async function handleTimeChange(payload) {
-    const win = activeWin;
+    const win = payload?.winId ? getWindowById(payload.winId) : activeWin;
     const map = win ? getMapInstance(win.id) : null;
     if (!win || !map) return;
+    const loadSeq = (win.loadSeq || 0) + 1;
+    win.loadSeq = loadSeq;
+
+    // v1.1.0: per-event prefetch hint (keyboard steps pass prev/next,
+    // chip/cycle jumps carry none) — consumed by loadPresetGroup prefetch.
+    win.prefetchDirections = payload.prefetchDirections || payload.directions || null;
 
     if (payload.isObs) {
       win.obsTime = payload.file;
+      if (payload.stepLength) {
+        win.stepLength = payload.stepLength;
+        if (win._obsTimeline) win._obsTimeline.stepLength = payload.stepLength;
+      }
       stopWindAnimation(map);
       removeGridWindBarbs(map);
       removeRasterLayer(map);
 
       if (win.activeGroup) {
-        await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, true);
-      } else {
-        const model = win.model || "SURFACE";
-        const element = win.element || "PLOT_GLOBAL_3H";
-        if (model === "UPPER_AIR") {
-          await loadUpperAirComposite(map, win.level || 500, payload.file, win);
-        } else {
-          await loadObservationProduct(map, model, element, win.level, payload.file, win);
-        }
+        await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, true, loadSeq);
       }
     } else {
+      if (payload.cycle) {
+        win.forecastCycle = payload.cycle;
+        const timeline = getOrCreateTimeline(win.id);
+        timeline.currentInitCycle = payload.cycle;
+      }
       win.period = payload.period;
       app.period = payload.period;
       if (win.activeGroup) {
-        await loadPresetGroup(map, win.activeGroup, payload.period, win.level, win, false);
-      } else if (win.model && win.element) {
-        await loadWeatherField(map, win.model, win.element, win.level, payload.period, null, win, false);
+        await loadPresetGroup(map, win.activeGroup, payload.period, win.level, win, true, loadSeq);
       }
     }
     syncLayersState(win.id);
@@ -284,6 +456,21 @@
     const valPayload = event.field !== undefined ? { [event.field]: event.value } : event.value;
     serviceHandleLayerAction(map, event.action, event.layer?.id, valPayload, event.layer, win);
     if (event.action === "config" && event.layer) {
+      if (valPayload && typeof valPayload === "object" && win.activeGroup?.layers) {
+        const presetLayer = win.activeGroup.layers.find((candidate) =>
+          candidate?.id === event.layer.id ||
+          (candidate?.model === event.layer.model && candidate?.element === event.layer.element &&
+            Boolean(candidate?.derivedFrom) === Boolean(event.layer.derivedFrom) &&
+            (candidate?.level === undefined || event.layer?.level === undefined || candidate.level === event.layer.level))
+        );
+        if (presetLayer) {
+          // Keep both representations in the per-window preset copy. The
+          // loader consumes render, while the layer panel edits config.
+          presetLayer.config = { ...(presetLayer.config || {}), ...valPayload };
+          presetLayer.render = { ...(presetLayer.render || {}), ...valPayload };
+          if (valPayload.lineColor !== undefined) presetLayer.color = valPayload.lineColor;
+        }
+      }
       autoSaveLayerConfig(event.layer);
       if (event.layer.type === "pmtiles" || event.layer.id?.startsWith("layer-pmtiles")) {
         if (valPayload && typeof valPayload === "object") {
@@ -367,8 +554,8 @@
     }
   }
 
-  async function handleLevelSelect(lvl) {
-    const win = activeWin;
+  async function handleLevelSelect(lvl, targetWin = activeWin) {
+    const win = targetWin;
     if (!win) return;
     app.level = lvl;
     const map = getMapInstance(win.id);
@@ -379,11 +566,37 @@
         console.error("[App] Level change error:", err);
       }
     }
+    if (win.isObservation && win._obsTimeline) {
+      try {
+        const t = win._obsTimeline;
+        const tl = getOrCreateTimeline(win.id);
+        tl.currentMode = "obs";
+        tl.isUpperAirMode = Boolean(t.isUpper);
+        tl.currentStepLength = t.stepLength || (t.isUpper ? 12 : 3);
+        tl.currentWinTitle = t.winTitle || "";
+        if (Array.isArray(t.files) && t.files.length > 0) {
+          tl.rawObsFiles = [...t.files];
+          const filtered = filterObsFilesByStep(tl.rawObsFiles, tl.currentStepLength, tl.isUpperAirMode);
+          const chips = selectObsChipsWindow(filtered, t.file);
+          tl.obsFiles = chips.length > 0 ? chips : filtered;
+          const idx = t.file ? tl.obsFiles.indexOf(t.file) : -1;
+          tl.currentObsIdx = idx !== -1 ? idx : Math.max(0, tl.obsFiles.length - 1);
+        }
+      } catch (e) {
+        console.warn("[App] Obs timeline bridge (level) failed:", e);
+      }
+    }
     syncLayersState(win.id);
     syncLegendState(win.id);
   }
 
   function stepVerticalLevel(delta) {
+    // v1.1.0: line-profile diagrams own the vertical axis — Up/Down never
+    // touch win.level while they are active.
+    try {
+      const win = activeWin;
+      if (win && (lineHeightController.isActive(win) || hovmollerController.isActive(win))) return;
+    } catch {}
     const levels = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
     const cur = app.level || activeWin?.level || 500;
     const idx = levels.indexOf(cur);
@@ -402,9 +615,15 @@
   async function stepTimelineDelta(delta) {
     const win = activeWin;
     if (!win) return;
+    // v1.1.0: Hovmöller panel owns its time axis — global ←/→ are swallowed.
+    try {
+      if (hovmollerController.isActive(win)) return;
+    } catch {}
     const tl = getOrCreateTimeline(win.id);
     const res = stepWindowTimeline(tl, delta);
     if (!res) return;
+    // v1.1.0: keyboard steps hint prefetch direction (prev/next).
+    res.prefetchDirections = delta < 0 ? ["prev"] : ["next"];
     if (!res.isObs) {
       app.period = res.period;
     }
@@ -417,16 +636,13 @@
   }
 
   function cycleLayout() {
+    // v1.1.0: F4 toggles split 1x1 <-> 2x2 (1x2 reachable via layout buttons).
     if (!activeTab) return;
-    const order = ["1x1", "1x2", "2x2"];
-    const curIdx = order.indexOf(activeTab.layout || "1x1");
-    const nextLayout = order[(curIdx + 1) % order.length];
-    handleChangeLayout(nextLayout);
+    handleChangeLayout(activeTab.layout === "1x1" ? "2x2" : "1x1");
   }
 
   async function handleKeydown(e) {
     if (e.key === "Escape") {
-      ui.catalogOpen = false;
       ui.configOpen = false;
       return;
     }
@@ -445,7 +661,7 @@
       return;
     }
 
-    if (isSpace && (e.target?.id === "btn-play" || e.target?.tagName === "BUTTON")) {
+    if (isSpace && (e.target?.id === "sl-btn-play" || e.target?.tagName === "BUTTON")) {
       return;
     }
 
@@ -501,6 +717,7 @@
     onSelectWin={handleWindowFocus}
     onAddWin={handleAddWindow}
     onCloseWin={handleCloseWindow}
+    onReorder={handleReorderWindows}
     onChangeLayout={handleChangeLayout}
     onToggleSync={handleToggleSync}
   />
@@ -508,12 +725,16 @@
   <main id="main-content" class="main-content">
     <div id="workspace-container">
       <div class="windows-grid layout-{activeTab?.layout || '1x1'}">
-        {#each visibleWindows as win (win.id)}
+        {#each activeTab?.windows || [] as win (win.id)}
           <WindowPanel
             {win}
             isActive={win === activeWin}
+            isVisible={visibleWindows.includes(win)}
+            {presetGroups}
             onFocus={handleWindowFocus}
             onToggleMax={toggleTabsAndSplit}
+            onGroupSelect={handleWindowGroupSelect}
+            onLevelSelect={handleWindowLevelSelect}
             onMapCreated={(map) => handleMapCreated(win, map)}
             onMapDestroyed={() => handleMapDestroyed(win)}
           />
@@ -522,7 +743,6 @@
     </div>
 
     <FullscreenButton />
-    <CatalogDrawer onLoadProduct={handleLoadProduct} />
     <LayersPanel winId={activeWin?.id} onLayerAction={handleLayerAction} />
     <Legend winId={activeWin?.id} />
     <Tooltip />

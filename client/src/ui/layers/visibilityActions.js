@@ -16,13 +16,33 @@ import {
   triggerStationStreamlines,
 } from "../../services/overlayTriggers.js";
 import { syncLegendForLayer } from "./legendSync.js";
+import { getLayerById } from "./layerStore.js";
 
 export function handleVisibilityAction(map, layerId, value, layer, winObj) {
   if (!layer) return;
 
+  // The Svelte layer panel works with a reactive copy of the core layer list.
+  // Keep the live object and the canonical window store in sync before the
+  // panel is refreshed; otherwise syncLayersState() restores the old value
+  // and the next eye click repeats the hide action instead of showing it.
+  const isVisible = Boolean(value);
+  layer.visible = isVisible;
+  if (layerId && winObj) {
+    try {
+      const canonical = getLayerById(layerId, winObj);
+      if (canonical && canonical !== layer) canonical.visible = isVisible;
+    } catch { /* best-effort store synchronization */ }
+
+    for (const snapshots of [winObj.layerSnapshots, winObj.derivedContourSnapshots]) {
+      if (!Array.isArray(snapshots)) continue;
+      const snapshot = snapshots.find((entry) => entry?.id === layerId);
+      if (snapshot) snapshot.visible = isVisible;
+    }
+  }
+
   if (layer.type === "contour" || layer.type === "wind") {
     if (layer.config?.showFill) {
-      if (value) {
+      if (isVisible) {
         const { isobandSrcId } = getLayerDOMIds(layerId);
         const isobandSrc = map.getSource(isobandSrcId);
         const features = getSourceFeatures(isobandSrc);
@@ -38,10 +58,10 @@ export function handleVisibilityAction(map, layerId, value, layer, winObj) {
       setLayerIsobandVisibility(map, layerId, false);
     }
 
-    setLayerIsolineVisibility(map, layerId, value && layer.config?.showLine);
+    setLayerIsolineVisibility(map, layerId, isVisible && layer.config?.showLine);
 
     if (layer.config?.showRaster) {
-      if (value) {
+      if (isVisible) {
         const { rasterLayerId } = getRasterDOMIds(layerId);
         if (map.getLayer(rasterLayerId)) {
           setRasterVisibility(map, true, layerId);
@@ -54,7 +74,7 @@ export function handleVisibilityAction(map, layerId, value, layer, winObj) {
     }
 
     if (layer.type === "wind" || layer.config?.showWind) {
-      if (value && layer.config?.showWind !== false) {
+      if (isVisible && layer.config?.showWind !== false) {
         triggerWindStreamlines(map, layer, winObj);
       } else {
         stopWindAnimation(map);
@@ -62,26 +82,26 @@ export function handleVisibilityAction(map, layerId, value, layer, winObj) {
     }
 
     if (layer.type === "wind" || layer.config?.showBarbs) {
-      if (value && layer.config?.showBarbs) {
+      if (isVisible && layer.config?.showBarbs) {
         triggerWindBarbs(map, layer, winObj);
       } else {
         removeGridWindBarbs(map);
       }
     }
   } else if (layer.type === "station") {
-    setStationVisibility(map, value);
+    setStationVisibility(map, isVisible);
     if (layer.config?.showStreamlines) {
-      if (value) {
+      if (isVisible) {
         triggerStationStreamlines(map, layer, winObj);
       } else {
         stopWindAnimation(map);
       }
     }
   } else if (layer.type === "pmtiles") {
-    const showGraticule = value && layer.config?.showGraticule !== false;
-    const showWorld = value && layer.config?.showWorld !== false;
-    const showProvinces = value && layer.config?.showProvinces !== false;
-    const showCities = value && layer.config?.showCities !== false;
+    const showGraticule = isVisible && layer.config?.showGraticule !== false;
+    const showWorld = isVisible && layer.config?.showWorld !== false;
+    const showProvinces = isVisible && layer.config?.showProvinces !== false;
+    const showCities = isVisible && layer.config?.showCities !== false;
 
     const worldLayers = ["world-fill", "world-boundary"];
     const chinaLayers = ["china-fill", "china-boundary"];
@@ -105,22 +125,22 @@ export function handleVisibilityAction(map, layerId, value, layer, winObj) {
     }
   } else if (layer.type === "tlogp") {
     import("../../layers/tlogp/tlogpLayer.js").then(({ setTLogPVisibility }) => {
-      setTLogPVisibility(map, value, winObj);
+      setTLogPVisibility(map, isVisible, winObj);
     });
   } else if (layer.type === "timeheight") {
     import("../../layers/timeheight/timeHeightLayer.js").then(({ setTimeHeightVisibility }) => {
-      setTimeHeightVisibility(map, value, winObj);
+      setTimeHeightVisibility(map, isVisible, winObj);
     });
   } else if (layer.type === "lineheight") {
     import("../../layers/lineprofile/lineProfileLayer.js").then(({ setLineHeightVisibility }) => {
-      setLineHeightVisibility(map, value, winObj);
+      setLineHeightVisibility(map, isVisible, winObj);
     });
   } else if (layer.type === "hovmoller") {
     import("../../layers/lineprofile/lineProfileLayer.js").then(({ setHovmollerVisibility }) => {
-      setHovmollerVisibility(map, value, winObj);
+      setHovmollerVisibility(map, isVisible, winObj);
     });
   }
 
   // Synchronize legend lifecycle on layer visibility change (contour/wind only)
-  syncLegendForLayer(layer, winObj, value);
+  syncLegendForLayer(layer, winObj, isVisible);
 }

@@ -1,7 +1,6 @@
 // bootstrap.js - Application bootstrap, window synchronization, and UI events binding
 import { getActiveMap } from "../map/mapInstance.js";
 import { initNavBar, setNavBarLevel, setNavBarPreset } from "../ui/navBar.js";
-import { initCatalogDrawer } from "../ui/catalogDrawer.js";
 import { initLayerControl, syncLayerControlForWindow, getLayersForWindow } from "../ui/layerControl.js";
 import { initTimeSlider, setTimelineMode, setTimeSliderVisible, setActiveWindowProvider, step as timeSliderStep } from "../ui/timeSlider.js";
 import { handleLayerAction, triggerVortDivOverlay } from "../ui/layerActions.js";
@@ -235,13 +234,9 @@ export async function bootstrap() {
       const isTimeHeight = group.id === "composite-ec-timeheight" || group.layers?.some((l) => l.type === "timeheight");
       const isHovmoller = group.id === "composite-ec-hovmoller" || group.layers?.some((l) => l.type === "hovmoller");
       if (win.isObservation) {
-        const isTLogP = group.id === "composite-tlogp" || group.layers?.some((l) => l.element === "TLOGP");
-        const effectiveLevel = win.level || group.defaultLevel || 500;
-        const obsPath = isTLogP
-          ? "UPPER_AIR/TLOGP"
-          : (group.id?.includes("upper") ? `UPPER_AIR/PLOT/${effectiveLevel}` : "SURFACE/PLOT_GLOBAL_3H");
-        const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle, win);
-        win.obsTime = latestFile;
+        win.obsTime = null;
+        win._obsTimeline = null;
+        win._obsTimelinePath = null;
         updateWindowTitle(win);
       } else if (isTimeHeight || isHovmoller) {
         if (getActiveWindow() === win) {
@@ -249,7 +244,7 @@ export async function bootstrap() {
         }
       } else {
         const pLayer = group.layers?.find((l) => l.type === "contour" || l.type === "wind");
-        const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", win.level || 500);
+        const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", win.level || 500, true);
         win.forecastCycle = cycles[0];
         updateWindowTitle(win);
         const nwpPayload = { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 };
@@ -325,12 +320,11 @@ export async function bootstrap() {
       const isTimeHeight = group.id === "composite-ec-timeheight" || group.layers?.some((l) => l.type === "timeheight");
       const isHovmoller = group.id === "composite-ec-hovmoller" || group.layers?.some((l) => l.type === "hovmoller");
       if (win.isObservation) {
-        const isTLogP = group.id === "composite-tlogp" || group.layers?.some((l) => l.element === "TLOGP");
-        const obsPath = isTLogP
-          ? "UPPER_AIR/TLOGP"
-          : (group.id?.includes("upper") ? `UPPER_AIR/PLOT/${effectiveLevel}` : "SURFACE/PLOT_GLOBAL_3H");
-        const latestFile = await syncObservationTimeline(obsPath, win.obsTime, winTitle, win);
-        win.obsTime = latestFile;
+        // Fresh Load Data always lands on latest; clear so the loader's
+        // freshObsLoad flag triggers bypassCache + forceLatest per layer.
+        win.obsTime = null;
+        win._obsTimeline = null;
+        win._obsTimelinePath = null;
         updateWindowTitle(win);
       } else if (isTimeHeight || isHovmoller) {
         if (getActiveWindow() === win) {
@@ -338,7 +332,7 @@ export async function bootstrap() {
         }
       } else {
         const pLayer = group.layers?.find((l) => l.type === "contour" || l.type === "wind");
-        const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", win.level || 500);
+        const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", win.level || 500, true);
         win.forecastCycle = cycles[0];
         updateWindowTitle(win);
         const nwpPayload = { period: win.period ?? 24, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 };
@@ -378,60 +372,6 @@ export async function bootstrap() {
       const btnPlay = document.getElementById("btn-play");
       btnPlay?.click();
     },
-  });
-
-  initCatalogDrawer("catalog-drawer", async ({ model, element, level, period, obsTime, isObservation }) => {
-    const map = getMap(), win = getActiveWindow();
-    if (!win || !map) return;
-    const upd = { activeGroup: null, model, element, level: level !== null ? level : win.level, period: period !== null ? period : win.period, obsTime, isObservation, forecastCycle: null };
-    Object.assign(win, upd);
-    appState.update(upd);
-    setNavBarPreset("");
-
-    const isUpper = model === "UPPER_AIR" || (element && element.includes("UPPER"));
-    const catalogTitle = isObservation ? (isUpper ? `${win.level || 500} hPa Sounding (${model})` : `${element} (${model})`) : `${win.level ? `${win.level} hPa ` : ""}${element} (${model})`;
-
-    updateWindowTitle(win, catalogTitle);
-    setWindowHeaderPreset(win, "");
-    if (win.level) { setWindowHeaderLevel(win, win.level); setNavBarLevel(win.level); }
-
-    const winBannerTitle = `W${win.winIdx + 1}: ${catalogTitle}`;
-    clearAllWeatherLayersFromMap(map, win, { resetVisibility: true });
-
-    if (isObservation) {
-      const isTLogP = element === "TLOGP";
-      const obsPath = isTLogP
-        ? "UPPER_AIR/TLOGP"
-        : (model === "SURFACE" ? `SURFACE/${element}` : (model === "UPPER_AIR" ? `UPPER_AIR/${element}/${win.level || 500}` : `${model}/${element}`));
-      const latestFile = await syncObservationTimeline(obsPath, obsTime || win.obsTime, winBannerTitle);
-      win.obsTime = latestFile;
-      updateWindowTitle(win);
-      if (isTLogP) {
-        win.level = null;
-        await loadObservationProduct(map, "UPPER_AIR", "TLOGP", null, latestFile, win, "UPPER_AIR/TLOGP", null, "upperair-tlogp-stations");
-        await loadTLogPLayer(map, {
-          id: "upperair-tlogp-diagram",
-          name: "T-lnP Sounding Diagram",
-          type: "tlogp",
-          model: "UPPER_AIR",
-          element: "TLOGP",
-          visible: true,
-          removable: true,
-        }, null, null, win);
-      } else if (model === "UPPER_AIR") {
-        await loadUpperAirComposite(map, win.level || 500, latestFile, win);
-      } else {
-        await loadObservationProduct(map, model, element, win.level, latestFile, win);
-      }
-    } else {
-      const dataElement = (element === "VOR" || element === "DIV") ? "WIND" : element;
-      const cycles = await resolveForecastCycles(model, dataElement, win.level || 500);
-      win.forecastCycle = cycles[0];
-      updateWindowTitle(win);
-      setTimelineMode("nwp", { period: win.period ?? 24, winTitle: winBannerTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || 6 });
-      await loadWeatherField(map, model, element, win.level, win.period, null, win);
-    }
-    if (win?.layerSnapshots) win.layerSnapshots = null;
   });
 
   // ── Layer Control ────────────────────────────────────────────────────────

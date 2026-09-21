@@ -1,6 +1,22 @@
 // apiClient.js - Unified REST and Binary fetch wrappers with 3-minute TTL prefetch cache
 
-const BASE_URL = "";
+// Same-origin by default (production dist is served by the Go server on :8088).
+// Dev (`vite`) uses vite.config.js server.proxy for /api; override with
+// VITE_API_BASE=http://localhost:8088 (build-time) or window.__MICAPS_API_BASE__.
+function resolveBaseUrl() {
+  try {
+    const fromVite = typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE;
+    if (fromVite) return String(fromVite).replace(/\/+$/, "");
+  } catch {}
+  try {
+    if (typeof window !== "undefined" && window.__MICAPS_API_BASE__) {
+      return String(window.__MICAPS_API_BASE__).replace(/\/+$/, "");
+    }
+  } catch {}
+  return "";
+}
+
+const BASE_URL = resolveBaseUrl();
 
 // 3 minutes TTL in milliseconds (180,000 ms)
 export const DEFAULT_CACHE_TTL_MS = 3 * 60 * 1000;

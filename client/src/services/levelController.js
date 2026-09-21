@@ -127,7 +127,7 @@ export async function changeVerticalLevel(map, direction, explicitLevel = null, 
     }
     const obsPath = `UPPER_AIR/PLOT/${targetLevel}`;
     const winTitle = `W${(win?.winIdx ?? 0) + 1}: Upper-Air ${targetLevel} hPa Sounding`;
-    const file = await syncObservationTimeline(obsPath, null, winTitle, win);
+    const file = await syncObservationTimeline(obsPath, null, winTitle, win, { forceLatest: true });
     if (win && win.loadSeq !== currentSeq) return;
     if (win) {
       win.obsTime = file;

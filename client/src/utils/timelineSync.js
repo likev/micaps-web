@@ -85,7 +85,10 @@ export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP",
   const shortPath = `${model}/${elem}`;
 
   if (!forceRefresh) {
-    const cached = forecastCyclesCache[path] || forecastCyclesCache[shortPath] || forecastCyclesCache[model];
+    // Keep cache entries scoped to the complete data path. A model-wide alias
+    // can return the cycle list for a different element/level and, more
+    // importantly, keeps the timeline stale after a new model run appears.
+    const cached = forecastCyclesCache[path];
     if (cached && Array.isArray(cached.data) && cached.data.length && (Date.now() - cached.ts) < FORECAST_CYCLES_TTL_MS) {
       return cached.data;
     }
@@ -93,25 +96,25 @@ export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP",
 
   // 1. First priority: O(1) point lookup in latestdatatime index table
   try {
-    const latestRes = await fetchLatest(path, "*.024");
-    const latestStr = latestRes?.latest || latestRes?.value;
+    const requestOptions = forceRefresh ? { bypassCache: true } : {};
+    const latestRes = await fetchLatest(path, "*.024", requestOptions);
+    const latestStr = typeof latestRes === "string" ? latestRes : (latestRes?.latest || latestRes?.value || latestRes?.file);
     if (latestStr) {
       const cycles = generateDynamicForecastCycles(latestStr, 10);
       if (cycles.length > 0) {
         forecastCyclesCache[path] = { data: cycles, ts: Date.now() };
-        forecastCyclesCache[model] = { data: cycles, ts: Date.now() };
         return cycles;
       }
     }
   } catch (_) {
     try {
-      const latestRes = await fetchLatest(shortPath, "*.024");
-      const latestStr = latestRes?.latest || latestRes?.value;
+      const requestOptions = forceRefresh ? { bypassCache: true } : {};
+      const latestRes = await fetchLatest(shortPath, "*.024", requestOptions);
+      const latestStr = typeof latestRes === "string" ? latestRes : (latestRes?.latest || latestRes?.value || latestRes?.file);
       if (latestStr) {
         const cycles = generateDynamicForecastCycles(latestStr, 10);
         if (cycles.length > 0) {
           forecastCyclesCache[path] = { data: cycles, ts: Date.now() };
-          forecastCyclesCache[model] = { data: cycles, ts: Date.now() };
           return cycles;
         }
       }
@@ -120,11 +123,10 @@ export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP",
 
   // 2. Second priority: Bounded treeview catalog query with limit=100
   try {
-    const fileEntries = await fetchTree(path, 100);
+    const fileEntries = await fetchTree(path, 100, forceRefresh ? { bypassCache: true } : {});
     const cycles = extractCyclesFromFiles(fileEntries);
     if (cycles.length > 0) {
       forecastCyclesCache[path] = { data: cycles, ts: Date.now() };
-      forecastCyclesCache[model] = { data: cycles, ts: Date.now() };
       return cycles;
     }
   } catch (err) {
@@ -134,12 +136,10 @@ export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP",
   // 3. Third priority: Bounded treeview catalog query on model/element path with limit=100
   if (shortPath !== path) {
     try {
-      const fileEntries = await fetchTree(shortPath, 100);
+      const fileEntries = await fetchTree(shortPath, 100, forceRefresh ? { bypassCache: true } : {});
       const cycles = extractCyclesFromFiles(fileEntries);
       if (cycles.length > 0) {
         forecastCyclesCache[path] = { data: cycles, ts: Date.now() };
-        forecastCyclesCache[shortPath] = { data: cycles, ts: Date.now() };
-        forecastCyclesCache[model] = { data: cycles, ts: Date.now() };
         return cycles;
       }
     } catch (err) {
@@ -150,7 +150,6 @@ export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP",
   // 4. Dynamic fallback based on real-time clock
   const dynamicFallback = generateDynamicForecastCycles(null, 10);
   forecastCyclesCache[path] = { data: dynamicFallback, ts: Date.now() };
-  forecastCyclesCache[model] = { data: dynamicFallback, ts: Date.now() };
   return dynamicFallback;
 }
 
@@ -159,13 +158,15 @@ export async function resolveLatestForecastCycle(model = "ECMWF_HR", element = "
   return cycles[0] || generateDynamicForecastCycles(null, 1)[0];
 }
 
-export async function syncObservationTimeline(path, currentFile = null, winTitle = "", win = null) {
+export async function syncObservationTimeline(path, currentFile = null, winTitle = "", win = null, options = {}) {
+  const forceLatest = options === true || Boolean(options?.forceLatest);
   const isUpper = path.includes("UPPER_AIR") || path.includes("TLOGP") || winTitle.toLowerCase().includes("upper") || winTitle.toLowerCase().includes("sounding") || winTitle.toLowerCase().includes("tlogp");
   const stepLength = (win && win.stepLength) ? win.stepLength : (isUpper ? 12 : 3);
   const applyTimeline = (file, files) => {
     const timelineData = { file, files, winTitle, stepLength, path, isUpper };
     if (win) {
       win._obsTimeline = timelineData;
+      win._obsTimelinePath = path;
       if (getActiveWindow() === win) {
         setTimelineMode("obs", timelineData);
       } else {
@@ -176,19 +177,23 @@ export async function syncObservationTimeline(path, currentFile = null, winTitle
     }
   };
   try {
-    const fileEntries = await fetchTree(path, 100);
+    const fileEntries = await fetchTree(path, 100, forceLatest ? { bypassCache: true } : {});
     if (Array.isArray(fileEntries) && fileEntries.length > 0) {
       let validFiles = fileEntries.filter((f) => f.name && (f.size > 100 || f.size === 0)).map((f) => f.name);
       const hasObsFormat = validFiles.some((f) => f.length >= 14 && f.endsWith(".000"));
       const isMockFallback = !hasObsFormat;
       validFiles = hasObsFormat ? validFiles.filter((f) => f.length >= 14 && f.endsWith(".000")) : [...DEFAULT_MOCK_OBS_FILES];
       if (validFiles.length > 0) {
-        const rawFiles = !isMockFallback && validFiles.length >= 2
-          ? validFiles.slice(0, 100).reverse()
-          : (validFiles.length >= 2 ? validFiles.slice(-100) : [...DEFAULT_MOCK_OBS_FILES]);
+        // The catalog normally returns newest-first, while mock/test providers
+        // may return oldest-first. Sort by the filename timestamp so the
+        // timeline is always chronological and its last chip is truly latest.
+        const chronologicalFiles = [...validFiles].sort((a, b) => a.localeCompare(b));
+        const rawFiles = isMockFallback && chronologicalFiles.length < 2
+          ? [...DEFAULT_MOCK_OBS_FILES]
+          : chronologicalFiles.slice(-100);
 
         const filteredFiles = filterObsFilesByStep(rawFiles, stepLength, isUpper);
-        let targetFile = currentFile && filteredFiles.includes(currentFile)
+        let targetFile = !forceLatest && currentFile && filteredFiles.includes(currentFile)
           ? currentFile
           : (filteredFiles.length > 0 ? filteredFiles[filteredFiles.length - 1] : rawFiles[rawFiles.length - 1]);
         if (isUpper && currentFile && !filteredFiles.includes(currentFile)) {
@@ -204,7 +209,7 @@ export async function syncObservationTimeline(path, currentFile = null, winTitle
   }
   const rawFallback = [...DEFAULT_MOCK_OBS_FILES];
   const filteredFallback = filterObsFilesByStep(rawFallback, stepLength, isUpper);
-  let fallbackFile = currentFile && filteredFallback.includes(currentFile)
+  let fallbackFile = !forceLatest && currentFile && filteredFallback.includes(currentFile)
     ? currentFile
     : (filteredFallback.length > 0 ? filteredFallback[filteredFallback.length - 1] : rawFallback[rawFallback.length - 1]);
   if (isUpper && currentFile && !filteredFallback.includes(currentFile)) {

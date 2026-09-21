@@ -7,10 +7,45 @@
     "showProvinces": false,
     "showWorld": true
   },
-  "performance": {
-    "maxEffectiveCells": 50000
-  },
   "colormaps": {
+    "DIV": [
+      {
+        "color": [118, 42, 131, 255],
+        "val": -20
+      },
+      {
+        "color": [153, 112, 171, 255],
+        "val": -10
+      },
+      {
+        "color": [194, 165, 207, 255],
+        "val": -4
+      },
+      {
+        "color": [231, 212, 232, 255],
+        "val": -2
+      },
+      {
+        "color": [245, 245, 245, 0],
+        "val": 0
+      },
+      {
+        "color": [254, 224, 182, 255],
+        "val": 2
+      },
+      {
+        "color": [253, 174, 97, 255],
+        "val": 4
+      },
+      {
+        "color": [227, 74, 51, 255],
+        "val": 10
+      },
+      {
+        "color": [179, 0, 0, 255],
+        "val": 20
+      }
+    ],
     "DTD": [
       {
         "color": [20, 90, 200, 255],
@@ -189,40 +224,6 @@
         "val": 40
       }
     ],
-    "WIND": [
-      {
-        "color": [220, 240, 255, 0],
-        "val": 0
-      },
-      {
-        "color": [170, 220, 250, 0],
-        "val": 2
-      },
-      {
-        "color": [120, 190, 245, 140],
-        "val": 6
-      },
-      {
-        "color": [70, 200, 120, 180],
-        "val": 12
-      },
-      {
-        "color": [230, 210, 50, 220],
-        "val": 18
-      },
-      {
-        "color": [240, 120, 40, 240],
-        "val": 25
-      },
-      {
-        "color": [230, 40, 40, 255],
-        "val": 32
-      },
-      {
-        "color": [160, 20, 120, 255],
-        "val": 45
-      }
-    ],
     "VOR": [
       {
         "color": [30, 60, 180, 255],
@@ -261,44 +262,43 @@
         "val": 20
       }
     ],
-    "DIV": [
+    "WIND": [
       {
-        "color": [118, 42, 131, 255],
-        "val": -20
-      },
-      {
-        "color": [153, 112, 171, 255],
-        "val": -10
-      },
-      {
-        "color": [194, 165, 207, 255],
-        "val": -4
-      },
-      {
-        "color": [231, 212, 232, 255],
-        "val": -2
-      },
-      {
-        "color": [245, 245, 245, 0],
+        "color": [220, 240, 255, 0],
         "val": 0
       },
       {
-        "color": [254, 224, 182, 255],
+        "color": [170, 220, 250, 0],
         "val": 2
       },
       {
-        "color": [253, 174, 97, 255],
-        "val": 4
+        "color": [120, 190, 245, 140],
+        "val": 6
       },
       {
-        "color": [227, 74, 51, 255],
-        "val": 10
+        "color": [70, 200, 120, 180],
+        "val": 12
       },
       {
-        "color": [179, 0, 0, 255],
-        "val": 20
+        "color": [230, 210, 50, 220],
+        "val": 18
+      },
+      {
+        "color": [240, 120, 40, 240],
+        "val": 25
+      },
+      {
+        "color": [230, 40, 40, 255],
+        "val": 32
+      },
+      {
+        "color": [160, 20, 120, 255],
+        "val": 45
       }
     ]
+  },
+  "performance": {
+    "maxEffectiveCells": 50000
   },
   "presets": [
     {
@@ -317,7 +317,6 @@
             "lineColor": "#ffffff",
             "lineWidth": 2,
             "opacity": 0.55,
-            "palettePath": "/palettes/RH/dark-850hpa-850hPa比湿.xml",
             "showBarbs": false,
             "showFill": true,
             "showLine": false,
@@ -340,11 +339,18 @@
               588
             ],
             "colormap": "HGT",
-            "lineColor": "#58a6ff",
+            "interval": null,
+            "lineColor": "#ff0000",
             "lineWidth": 2,
+            "opacity": 0.75,
+            "palettePath": null,
+            "showBarbs": false,
             "showFill": false,
             "showLine": true,
-            "smooth": true
+            "showRaster": false,
+            "showWind": false,
+            "smooth": true,
+            "smoothIterations": 2
           },
           "type": "contour"
         },
@@ -380,11 +386,18 @@
               588
             ],
             "colormap": "HGT",
-            "lineColor": "#58a6ff",
+            "interval": null,
+            "lineColor": "#ff0000",
             "lineWidth": 2,
+            "opacity": 0.75,
+            "palettePath": null,
+            "showBarbs": false,
             "showFill": false,
             "showLine": true,
-            "smooth": true
+            "showRaster": false,
+            "showWind": false,
+            "smooth": true,
+            "smoothIterations": 2
           },
           "type": "contour"
         },
@@ -465,11 +478,18 @@
               588
             ],
             "colormap": "HGT",
-            "lineColor": "#58a6ff",
+            "interval": null,
+            "lineColor": "#ff0000",
             "lineWidth": 2,
+            "opacity": 0.75,
+            "palettePath": null,
+            "showBarbs": false,
             "showFill": false,
             "showLine": true,
-            "smooth": true
+            "showRaster": false,
+            "showWind": false,
+            "smooth": true,
+            "smoothIterations": 2
           },
           "type": "contour"
         },
@@ -642,163 +662,185 @@
       "name": "500 hPa Upper-Air Sounding"
     },
     {
-      "id": "composite-tlogp",
-      "name": "T-lnP Sounding Analysis (TlogP)",
       "category": "TlogP Observation",
-      "isObservation": true,
-      "hasLevel": false,
       "defaultLevel": null,
+      "hasLevel": false,
+      "id": "composite-tlogp",
+      "isObservation": true,
       "layers": [
         {
-          "id": "upperair-tlogp-stations",
-          "name": "Sounding Station Network",
-          "type": "station",
-          "model": "UPPER_AIR",
           "element": "TLOGP",
+          "id": "upperair-tlogp-stations",
+          "model": "UPPER_AIR",
+          "name": "Sounding Station Network",
           "path": "UPPER_AIR/TLOGP",
           "removable": false,
           "render": {
-            "showTemp": true,
             "showDewpoint": true,
-            "showWind": true,
-            "showPressure": true
-          }
+            "showPressure": true,
+            "showTemp": true,
+            "showWind": true
+          },
+          "type": "station"
         },
         {
-          "id": "upperair-tlogp-diagram",
-          "name": "T-lnP Sounding Diagram (58362 Shanghai)",
-          "type": "tlogp",
-          "model": "UPPER_AIR",
-          "element": "TLOGP",
-          "stationId": "58362",
-          "defaultStation": "58362",
-          "parcelLevel": "surface",
-          "visible": true,
-          "removable": true,
           "config": {
-            "stationId": "58362",
             "parcelLevel": "surface",
-            "showTemp": true,
             "showDewpoint": true,
-            "showWind": true,
-            "showParcel": true,
             "showDryAdiabats": true,
-            "showMoistAdiabats": true,
+            "showIndices": true,
             "showMixingRatio": true,
-            "showIndices": true
-          }
+            "showMoistAdiabats": true,
+            "showParcel": true,
+            "showTemp": true,
+            "showWind": true,
+            "stationId": "58362"
+          },
+          "defaultStation": "58362",
+          "element": "TLOGP",
+          "id": "upperair-tlogp-diagram",
+          "model": "UPPER_AIR",
+          "name": "T-lnP Sounding Diagram (58362 Shanghai)",
+          "parcelLevel": "surface",
+          "removable": true,
+          "stationId": "58362",
+          "type": "tlogp",
+          "visible": true
         }
-      ]
+      ],
+      "name": "T-lnP Sounding Analysis (TlogP)"
     },
     {
-      "id": "composite-ec-timeheight",
-      "name": "EC Time-Height Profile (RH+T+VVEL+Wind)",
       "category": "NWP Time-Height Profile",
-      "isObservation": false,
-      "hasLevel": false,
-      "defaultLevel": null,
       "colormap": "RH",
+      "defaultLevel": null,
+      "hasLevel": false,
+      "id": "composite-ec-timeheight",
+      "isObservation": false,
       "layers": [
         {
-          "id": "ec-timeheight-diagram",
-          "name": "EC Time-Height Profile (click map for point)",
-          "type": "timeheight",
-          "model": "ECMWF_HR",
-          "element": "RH",
-          "visible": true,
-          "removable": true,
           "config": {
-            "lon": 121.5,
+            "endHour": 144,
+            "initCycle": null,
             "lat": 31.4,
-            "initCycle": null,
-            "startHour": 0,
-            "endHour": 144,
-            "stepHours": 12,
-            "timeDirection": "ltr",
-            "levels": [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200],
+            "levels": [
+              1000,
+              925,
+              850,
+              700,
+              600,
+              500,
+              400,
+              300,
+              250,
+              200
+            ],
+            "lon": 121.5,
+            "showGridPointMarker": true,
             "showRH": true,
             "showTemp": true,
             "showVVel": true,
             "showWind": true,
-            "showGridPointMarker": true
-          }
+            "startHour": 0,
+            "stepHours": 12,
+            "timeDirection": "ltr"
+          },
+          "element": "RH",
+          "id": "ec-timeheight-diagram",
+          "model": "ECMWF_HR",
+          "name": "EC Time-Height Profile (click map for point)",
+          "removable": true,
+          "type": "timeheight",
+          "visible": true
         }
-      ]
+      ],
+      "name": "EC Time-Height Profile (RH+T+VVEL+Wind)"
     },
     {
-      "id": "composite-ec-lineheight",
-      "name": "EC Line-Height Cross-Section (RH+T+VVEL+Wind)",
       "category": "NWP Line-Height Profile",
-      "isObservation": false,
-      "hasLevel": false,
-      "defaultLevel": null,
       "colormap": "RH",
+      "defaultLevel": null,
+      "hasLevel": false,
+      "id": "composite-ec-lineheight",
+      "isObservation": false,
       "layers": [
         {
-          "id": "ec-lineheight-diagram",
-          "name": "EC Line-Height Cross-Section (draw line on map)",
-          "type": "lineheight",
-          "model": "ECMWF_HR",
-          "element": "RH",
-          "visible": true,
-          "removable": true,
           "config": {
-            "lon0": 115.0,
-            "lat0": 28.0,
-            "lon1": 125.0,
-            "lat1": 38.0,
-            "npoints": 41,
-            "lead": null,
-            "initCycle": null,
-            "levels": [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200],
             "flipDirection": false,
+            "initCycle": null,
+            "lat0": 28,
+            "lat1": 38,
+            "lead": null,
+            "levels": [
+              1000,
+              925,
+              850,
+              700,
+              600,
+              500,
+              400,
+              300,
+              250,
+              200
+            ],
+            "lon0": 115,
+            "lon1": 125,
+            "npoints": 41,
             "showRH": true,
             "showTemp": true,
+            "showTransectMarker": true,
             "showVVel": true,
-            "showWind": true,
-            "showTransectMarker": true
-          }
+            "showWind": true
+          },
+          "element": "RH",
+          "id": "ec-lineheight-diagram",
+          "model": "ECMWF_HR",
+          "name": "EC Line-Height Cross-Section (draw line on map)",
+          "removable": true,
+          "type": "lineheight",
+          "visible": true
         }
-      ]
+      ],
+      "name": "EC Line-Height Cross-Section (RH+T+VVEL+Wind)"
     },
     {
-      "id": "composite-ec-hovmoller",
-      "name": "EC Time-Line Hovmoller (RH+T+VVEL+Wind @ level)",
       "category": "NWP Time-Distance Profile",
-      "isObservation": false,
-      "hasLevel": false,
-      "defaultLevel": null,
       "colormap": "RH",
+      "defaultLevel": null,
+      "hasLevel": false,
+      "id": "composite-ec-hovmoller",
+      "isObservation": false,
       "layers": [
         {
-          "id": "ec-hovmoller-diagram",
-          "name": "EC Time-Line Hovmoller (draw line on map)",
-          "type": "hovmoller",
-          "model": "ECMWF_HR",
-          "element": "RH",
-          "visible": true,
-          "removable": true,
           "config": {
-            "lon0": 115.0,
-            "lat0": 28.0,
-            "lon1": 125.0,
-            "lat1": 38.0,
-            "npoints": 41,
-            "initCycle": null,
-            "startHour": 0,
-            "endHour": 144,
-            "stepHours": 12,
-            "level": 850,
             "axisSwap": "dist-x",
-            "timeDir": "fwd",
+            "endHour": 144,
+            "initCycle": null,
+            "lat0": 28,
+            "lat1": 38,
+            "level": 850,
+            "lon0": 115,
+            "lon1": 125,
+            "npoints": 41,
             "showRH": true,
             "showTemp": true,
+            "showTransectMarker": true,
             "showVVel": true,
             "showWind": true,
-            "showTransectMarker": true
-          }
+            "startHour": 0,
+            "stepHours": 12,
+            "timeDir": "fwd"
+          },
+          "element": "RH",
+          "id": "ec-hovmoller-diagram",
+          "model": "ECMWF_HR",
+          "name": "EC Time-Line Hovmoller (draw line on map)",
+          "removable": true,
+          "type": "hovmoller",
+          "visible": true
         }
-      ]
+      ],
+      "name": "EC Time-Line Hovmoller (RH+T+VVEL+Wind @ level)"
     }
   ]
 }

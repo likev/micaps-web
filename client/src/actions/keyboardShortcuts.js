@@ -35,7 +35,7 @@ export function keyboardShortcuts(node, options = {}) {
       return;
     }
 
-    if (isSpace && (e.target?.id === "btn-play" || e.target?.tagName === "BUTTON")) {
+    if (isSpace && (e.target?.id === "sl-btn-play" || e.target?.tagName === "BUTTON")) {
       return;
     }
 

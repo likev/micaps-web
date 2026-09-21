@@ -15,9 +15,12 @@
     onAddWin = null,
     onCloseTab = null,
     onCloseWin = null,
+    onReorder = null,
     onChangeLayout = null,
     onToggleSync = null,
   } = $props();
+
+  let draggedIndex = $state(null);
 
   let tabItems = $derived(
     windows && windows.length > 0
@@ -54,6 +57,30 @@
   function setLayout(l) {
     if (onChangeLayout) onChangeLayout(l);
   }
+
+  function handleDragStart(event, idx) {
+    draggedIndex = idx;
+    event.dataTransfer?.setData("text/plain", String(idx));
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+  }
+
+  function handleDragOver(event) {
+    if (draggedIndex === null) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+  }
+
+  function handleDrop(event, idx) {
+    event.preventDefault();
+    const encoded = event.dataTransfer?.getData("text/plain");
+    const from = encoded === "" ? draggedIndex : parseInt(encoded, 10);
+    if (Number.isInteger(from) && onReorder) onReorder(from, idx);
+    draggedIndex = null;
+  }
+
+  function handleDragEnd() {
+    draggedIndex = null;
+  }
 </script>
 
 <div id="tabs-bar" class="tabs-bar" role="tablist" aria-label="Workstation Tabs and Layout">
@@ -68,6 +95,10 @@
         tabindex="0"
         title="Drag to rearrange"
         draggable="true"
+        ondragstart={(e) => handleDragStart(e, idx)}
+        ondragover={handleDragOver}
+        ondrop={(e) => handleDrop(e, idx)}
+        ondragend={handleDragEnd}
         onclick={() => selectItem(item, item.winIdx ?? idx)}
         onkeydown={(e) => e.key === "Enter" && selectItem(item, item.winIdx ?? idx)}
       >

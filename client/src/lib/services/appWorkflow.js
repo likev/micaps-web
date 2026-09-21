@@ -22,6 +22,7 @@ export function shouldHideTimelineForGroup(group) {
 export function applyPresetToWindow(win, group, overrideLevel = null, timelinesMap = null) {
   if (!win || !group) return null;
   const isSpecialProfile = shouldHideTimelineForGroup(group);
+  const previousGroupId = win.activeGroup?.id;
 
   // Use JSON round-trip to safely copy plain data from the group,
   // since `group` may be a Svelte 5 reactive $state proxy (or contain
@@ -31,6 +32,13 @@ export function applyPresetToWindow(win, group, overrideLevel = null, timelinesM
   win.activeGroup = groupCopy;
   win.isObservation = Boolean(groupCopy.isObservation);
   win.forecastCycle = null;
+  if (previousGroupId !== groupCopy.id) {
+    // Observation files belong to a product path/level. Never carry a file
+    // from the previous preset into a newly selected surface/upper-air plot.
+    win.obsTime = null;
+    win._obsTimeline = null;
+    win._obsTimelinePath = null;
+  }
   if (!groupCopy.isObservation) {
     win.model = null;
     win.element = null;
@@ -90,102 +98,4 @@ export function stepWindowTimeline(tl, delta) {
       _seq: ++tl.periodStepSeq,
     };
   }
-}
-
-/**
- * Applies a single catalog product to a window and loads relevant weather layers.
- */
-export async function applyProductToWindow(win, map, product, services = {}) {
-  if (!win) return null;
-  const { model, element, level, period, obsTime, isObservation } = product;
-  Object.assign(win, {
-    activeGroup: null,
-    model,
-    element,
-    level: level !== null ? level : win.level,
-    period: period !== null ? period : win.period,
-    obsTime,
-    isObservation: Boolean(isObservation),
-    forecastCycle: null,
-  });
-
-  const isTLogP = element === "TLOGP";
-  const isUpper = !isTLogP && (model === "UPPER_AIR" || (element && element.includes("UPPER")));
-  const title = isObservation
-    ? (isTLogP ? `${element} (${model})` : (isUpper ? `${win.level || 500} hPa Sounding (${model})` : `${element} (${model})`))
-    : `${win.level ? `${win.level} hPa ` : ""}${element} (${model})`;
-  win.title = `W${(win.winIdx ?? 0) + 1}: ${title}`;
-  uiState.timelineVisible = true;
-
-  if (!map) return win;
-
-  if (typeof services.clearAllWeatherLayersFromMap === "function") {
-    services.clearAllWeatherLayersFromMap(map, win, { resetVisibility: true });
-  }
-
-  if (isObservation) {
-    const isTLogP = element === "TLOGP";
-    const obsPath = isTLogP
-      ? "UPPER_AIR/TLOGP"
-      : (model === "SURFACE" ? `SURFACE/${element}` : (model === "UPPER_AIR" ? `UPPER_AIR/${element}/${win.level || 500}` : `${model}/${element}`));
-
-    let latestFile = obsTime || win.obsTime;
-    if (typeof services.syncObservationTimeline === "function") {
-      latestFile = await services.syncObservationTimeline(obsPath, latestFile, win.title, win);
-    }
-    win.obsTime = latestFile;
-
-    if (typeof services.getOrCreateTimeline === "function") {
-      const tl = services.getOrCreateTimeline(win.id);
-      if (tl) tl.currentMode = "obs";
-    }
-
-    if (isTLogP) {
-      win.level = null;
-      if (typeof services.loadObservationProduct === "function") {
-        await services.loadObservationProduct(map, "UPPER_AIR", "TLOGP", null, latestFile, win, "UPPER_AIR/TLOGP", null, "upperair-tlogp-stations");
-      }
-      if (typeof services.loadTLogPLayer === "function") {
-        await services.loadTLogPLayer(map, {
-          id: "upperair-tlogp-diagram",
-          name: "T-lnP Sounding Diagram",
-          type: "tlogp",
-          model: "UPPER_AIR",
-          element: "TLOGP",
-          visible: true,
-          removable: true,
-        }, null, null, win);
-      }
-    } else if (model === "UPPER_AIR") {
-      if (typeof services.loadUpperAirComposite === "function") {
-        await services.loadUpperAirComposite(map, win.level || 500, latestFile, win);
-      }
-    } else {
-      if (typeof services.loadObservationProduct === "function") {
-        await services.loadObservationProduct(map, model, element, win.level, latestFile, win);
-      }
-    }
-  } else {
-    const dataElement = (element === "VOR" || element === "DIV") ? "WIND" : element;
-    let cycles = [];
-    if (typeof services.resolveForecastCycles === "function") {
-      cycles = await services.resolveForecastCycles(model, dataElement, win.level || 500);
-    }
-    win.forecastCycle = cycles[0] || null;
-
-    if (typeof services.getOrCreateTimeline === "function") {
-      const tl = services.getOrCreateTimeline(win.id);
-      if (tl) {
-        tl.currentMode = "nwp";
-        tl.forecastCycles = cycles;
-        tl.currentInitCycle = cycles[0] || "";
-      }
-    }
-
-    if (typeof services.loadWeatherField === "function") {
-      await services.loadWeatherField(map, model, element, win.level, win.period, null, win);
-    }
-  }
-
-  return win;
 }

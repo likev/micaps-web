@@ -2,7 +2,6 @@
 
 export function createInitialUIState() {
   return {
-    catalogOpen: false,
     layersOpen: true,
     timelineVisible: false,
     configOpen: false,

@@ -150,7 +150,8 @@ describe("UI Play-Loop Review 1 (L1, m6, R5, R1, R2)", () => {
   test("R5: P0 guard skips obs re-sync on time-step ticks with a valid file", () => {
     const presetLoaderContent = readSrcText("services/presetLoader.js");
 
-    expect(presetLoaderContent).toContain("if (!file || (!isTimeStep && group.isObservation && level !== null)) {");
+    expect(presetLoaderContent).toContain("freshObsLoad");
+    expect(presetLoaderContent).toContain("if (!file || freshObsLoad");
   });
 
   test("R1: speed change while a tick is loading does not re-arm a second chain", async () => {

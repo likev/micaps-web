@@ -218,6 +218,7 @@
       {:else}
         {#each filteredPresets as item, idx (item.id || idx)}
           {#if isDivider(item)}
+            {@const realIdx = presets.findIndex((p) => p.id === item.id)}
             <div
               class="sidebar-divider-item"
               class:selected={item.id === selectedId}
@@ -226,8 +227,23 @@
               <span class="divider-line"></span>
               <span class="divider-title">{item.label || item.id}</span>
               <span class="divider-line"></span>
+              <button
+                type="button"
+                class="btn-sidebar-action btn-move-up"
+                title="Move up"
+                disabled={realIdx <= 0}
+                onclick={(e) => { e.stopPropagation(); handleMove(realIdx, -1); }}
+              >↑</button>
+              <button
+                type="button"
+                class="btn-sidebar-action btn-move-down"
+                title="Move down"
+                disabled={realIdx < 0 || realIdx >= presets.length - 1}
+                onclick={(e) => { e.stopPropagation(); handleMove(realIdx, 1); }}
+              >↓</button>
             </div>
           {:else}
+            {@const realIdx = presets.findIndex((p) => p.id === item.id)}
             <div
               class="config-sidebar-item"
               class:selected={item.id === selectedId}
@@ -236,6 +252,20 @@
               <div class="sidebar-item-top">
                 <span class="sidebar-item-name">{item.name || item.id}</span>
                 <span class="sidebar-item-chip">{item.layers?.length || 0} layers</span>
+                <button
+                  type="button"
+                  class="btn-sidebar-action btn-move-up"
+                  title="Move up"
+                  disabled={realIdx <= 0}
+                  onclick={(e) => { e.stopPropagation(); handleMove(realIdx, -1); }}
+                >↑</button>
+                <button
+                  type="button"
+                  class="btn-sidebar-action btn-move-down"
+                  title="Move down"
+                  disabled={realIdx < 0 || realIdx >= presets.length - 1}
+                  onclick={(e) => { e.stopPropagation(); handleMove(realIdx, 1); }}
+                >↓</button>
               </div>
               <div class="sidebar-item-sub">
                 <span>{item.category || "General"}</span>
@@ -548,6 +578,28 @@
     border-radius: 10px;
     background: rgba(110, 118, 129, 0.2);
     color: var(--text-secondary, #8b949e);
+  }
+
+  .btn-sidebar-action {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--text-secondary, #8b949e);
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    padding: 1px 5px;
+    flex-shrink: 0;
+  }
+
+  .btn-sidebar-action:hover:not(:disabled) {
+    border-color: var(--border-color, #30363d);
+    color: var(--text-primary, #e6edf3);
+  }
+
+  .btn-sidebar-action:disabled {
+    cursor: not-allowed;
+    opacity: 0.3;
   }
 
   .sidebar-item-chip.type-contour {

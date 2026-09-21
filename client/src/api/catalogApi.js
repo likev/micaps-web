@@ -9,16 +9,16 @@ export async function fetchModels() {
   return await fetchJson("/api/catalog/models");
 }
 
-export async function fetchTree(path, limit = 100) {
-  return await fetchJson("/api/catalog/tree", { path, limit });
+export async function fetchTree(path, limit = 100, options = {}) {
+  return await fetchJson("/api/catalog/tree", { path, limit }, options);
 }
 
 export async function fetchLevels(path) {
   return await fetchJson("/api/catalog/levels", { path });
 }
 
-export async function fetchLatest(path, suffix = "*.024") {
-  return await fetchJson("/api/catalog/latest", { path, suffix });
+export async function fetchLatest(path, suffix = "*.024", options = {}) {
+  return await fetchJson("/api/catalog/latest", { path, suffix }, options);
 }
 
 export async function fetchGridData(path, file) {

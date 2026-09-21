@@ -2,6 +2,7 @@
 import { test, expect, describe, beforeEach } from "bun:test";
 import { addOrUpdateLayer, getLayerById, clearWindowWeatherLayers } from "../src/ui/layerControl.js";
 import { autoSaveLayerConfig, CURRENT_CONFIG } from "../src/config/presets.js";
+import { resolveLineColor } from "../src/services/weatherLoader.js";
 
 describe("Raster Palette Configuration Persistence", () => {
   beforeEach(() => {
@@ -158,5 +159,20 @@ describe("Raster Palette Configuration Persistence", () => {
     layer = getLayerById("contour-HGT", winId);
     expect(layer.isExpanded).toBe(true);
     expect(layer.config.palettePath).toBe("/palettes/height/dark-height.xml");
+  });
+
+  test("timeline reload uses the updated preset color instead of a stale layer mirror", () => {
+    expect(resolveLineColor({
+      customOptions: { lineColor: "#00ff00" },
+      existingLayer: { color: "#ff0000", config: { lineColor: "#ff0000" } },
+      defaultLineColor: "#ffffff",
+    })).toBe("#00ff00");
+  });
+
+  test("direct reload still uses live config before the top-level color mirror", () => {
+    expect(resolveLineColor({
+      existingLayer: { color: "#ff0000", config: { lineColor: "#00ff00" } },
+      defaultLineColor: "#ffffff",
+    })).toBe("#00ff00");
   });
 });

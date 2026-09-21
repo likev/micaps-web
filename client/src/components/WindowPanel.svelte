@@ -1,11 +1,16 @@
 <script>
   import MapViewport from "../map/MapViewport.svelte";
+  import { PRESET_GROUPS, isDivider } from "../config/presets.js";
 
   let {
     win,
     isActive = false,
+    isVisible = true,
+    presetGroups = PRESET_GROUPS,
     onFocus = null,
     onToggleMax = null,
+    onGroupSelect = null,
+    onLevelSelect = null,
     onMapCreated = null,
     onMapDestroyed = null,
   } = $props();
@@ -24,11 +29,25 @@
     return `Window ${win.winIdx + 1}`;
   });
 
+  const levels = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
+
+  function selectGroup(event) {
+    const group = presetGroups.find((item) => !isDivider(item) && item.id === event.target.value);
+    if (group && onGroupSelect) onGroupSelect(win, group);
+  }
+
+  function selectLevel(event) {
+    const value = event.target.value;
+    const level = value === "" ? null : parseInt(value, 10);
+    if (level !== null && Number.isFinite(level) && onLevelSelect) onLevelSelect(win, level);
+  }
+
 </script>
 
 <div
   class="window-panel"
   class:active={isActive}
+  class:hidden={!isVisible}
   data-win-id={win.id}
   id={win.panelId || `win-panel-${win.tabId || 1}-${win.uid ?? win.winIdx}`}
   tabindex="-1"
@@ -53,6 +72,36 @@
     </div>
 
     <div class="win-actions">
+      <select
+        class="win-preset-select"
+        aria-label={`Group for W${win.winIdx + 1}`}
+        title="Select group for this window"
+        value={win.activeGroup?.id || ""}
+        onchange={selectGroup}
+        onclick={(e) => e.stopPropagation()}
+      >
+        <option value="">-- Group --</option>
+        {#each presetGroups as group}
+          {#if isDivider(group)}
+            <option disabled value="">──────── {group.label || ""} ────────</option>
+          {:else}
+            <option value={group.id}>{group.name}</option>
+          {/if}
+        {/each}
+      </select>
+      <select
+        class="win-level-select"
+        aria-label={`Level for W${win.winIdx + 1}`}
+        title="Select level for this window"
+        value={win.level ?? ""}
+        onchange={selectLevel}
+        onclick={(e) => e.stopPropagation()}
+      >
+        <option value="">None</option>
+        {#each levels as level}
+          <option value={level}>{level} hPa</option>
+        {/each}
+      </select>
       <button
         type="button"
         id={win.maxBtnId || `win-max-${win.tabId || 1}-${win.uid ?? win.winIdx}`}
@@ -72,6 +121,7 @@
     <MapViewport
       winId={win.id}
       {isActive}
+      {isVisible}
       {onMapCreated}
       onMapDestroyed={() => onMapDestroyed && onMapDestroyed(win)}
     />
@@ -94,6 +144,10 @@
   .window-panel.active {
     border-color: #58a6ff !important;
     box-shadow: inset 0 0 0 1px #58a6ff;
+  }
+
+  .window-panel.hidden {
+    display: none !important;
   }
 
   .win-header {
@@ -171,6 +225,24 @@
     display: flex;
     align-items: center;
     gap: 6px;
+  }
+
+  .win-preset-select,
+  .win-level-select {
+    max-width: 145px;
+    min-width: 70px;
+    height: 24px;
+    padding: 2px 4px;
+    background: #21262d;
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    border-radius: 4px;
+    color: var(--text-primary, #e6edf3);
+    font-size: 10px;
+    cursor: pointer;
+  }
+
+  .win-level-select {
+    width: 78px;
   }
 
   .win-btn-max {

@@ -120,7 +120,12 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
     if (prevLayer.config?.palettePath && layerDef.config?.palettePath === undefined) {
       mergedConfig.palettePath = prevLayer.config.palettePath;
     }
-    const mergedColormap = layerDef.colormap || (mergedConfig.palettePath ? `palette:${prevLayer.id}` : prevLayer.colormap);
+    const mergedColormap = layerDef.colormap
+      || (mergedConfig.palettePath ? `palette:${prevLayer.id}` : (
+        prevLayer.colormap && !String(prevLayer.colormap).startsWith("palette:")
+          ? prevLayer.colormap
+          : (prevLayer.element || layerDef.element)
+      ));
     layers[existingIdx] = {
       ...prevLayer,
       ...layerDef,

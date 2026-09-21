@@ -29,7 +29,6 @@ describe("Plain-Core Stores (Phase 1 Foundations)", () => {
   describe("UI Core & Tooltip Clamp", () => {
     it("creates initial UI state matching Section 1.5 inventory", () => {
       const ui = createInitialUIState();
-      expect(ui.catalogOpen).toBe(false);
       expect(ui.layersOpen).toBe(true);
       expect(ui.timelineVisible).toBe(false);
       expect(ui.configOpen).toBe(false);
@@ -57,42 +56,35 @@ describe("Plain-Core Stores (Phase 1 Foundations)", () => {
     it("verifies the complete Section 1.5 UI toggle matrix transitions", () => {
       const ui = createInitialUIState();
 
-      // 1. Catalog drawer
-      expect(ui.catalogOpen).toBe(false);
-      ui.catalogOpen = true;
-      expect(ui.catalogOpen).toBe(true);
-      ui.catalogOpen = false;
-      expect(ui.catalogOpen).toBe(false);
-
-      // 2. Layer control
+      // 1. Layer control
       expect(ui.layersOpen).toBe(true);
       ui.layersOpen = false;
       expect(ui.layersOpen).toBe(false);
       ui.layersOpen = true;
       expect(ui.layersOpen).toBe(true);
 
-      // 3. Time slider
+      // 2. Time slider
       expect(ui.timelineVisible).toBe(false);
       ui.timelineVisible = true;
       expect(ui.timelineVisible).toBe(true);
       ui.timelineVisible = false;
       expect(ui.timelineVisible).toBe(false);
 
-      // 4. Tooltip
+      // 3. Tooltip
       expect(ui.tooltip).toBeNull();
       ui.tooltip = { lngLat: [116.4, 39.9], props: { name: "Beijing" }, x: 120, y: 80 };
       expect(ui.tooltip.props.name).toBe("Beijing");
       ui.tooltip = null;
       expect(ui.tooltip).toBeNull();
 
-      // 5. Toast
+      // 4. Toast
       expect(ui.toast).toBeNull();
       ui.toast = { kind: "error", message: "Failed to load" };
       expect(ui.toast.kind).toBe("error");
       ui.toast = null;
       expect(ui.toast).toBeNull();
 
-      // 6. Config editor & subtabs & dirty flag
+      // 5. Config editor & subtabs & dirty flag
       expect(ui.configOpen).toBe(false);
       expect(ui.activeConfigSubtab).toBe("presets");
       expect(ui.configDirty).toBe(false);
@@ -110,7 +102,7 @@ describe("Plain-Core Stores (Phase 1 Foundations)", () => {
       ui.configDirty = false;
       expect(ui.configOpen).toBe(false);
 
-      // 7. Layer row expansion (single-expanded accordion model)
+      // 6. Layer row expansion (single-expanded accordion model)
       expect(ui.expandedLayerId).toBeNull();
       ui.expandedLayerId = "layer-contour-500";
       expect(ui.expandedLayerId).toBe("layer-contour-500");
@@ -119,7 +111,7 @@ describe("Plain-Core Stores (Phase 1 Foundations)", () => {
       ui.expandedLayerId = null;
       expect(ui.expandedLayerId).toBeNull();
 
-      // 8. Fullscreen
+      // 7. Fullscreen
       expect(ui.isFullscreen).toBe(false);
       ui.isFullscreen = true;
       expect(ui.isFullscreen).toBe(true);

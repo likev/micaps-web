@@ -15,7 +15,10 @@ export function createDefaultWindow(winIdx = 0, tabId = 1) {
     isObservation: false,
     obsTime: null,
     activeGroup: null,
-    stepLength: 6,
+    // v1.1.0: no step default on fresh windows — the mode decides on load
+    // (upper-air 12h, surface 3h, NWP 6h). A hardcoded 6 here would stick and
+    // override the upper-air 12h default with a "valid" 6h.
+    stepLength: null,
   };
 }
 

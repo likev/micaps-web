@@ -48,7 +48,7 @@
   function handleToggleVisible(layer) {
     layer.visible = !layer.visible;
     if (onLayerAction) {
-      onLayerAction({ action: "toggleVisibility", layer, visible: layer.visible });
+      onLayerAction({ action: "visibility", layer, value: layer.visible });
     }
   }
 

@@ -7,6 +7,30 @@
   let rules = $state([]);
   let logic = $state("AND");
 
+  const PRESETS = {
+    hgt_5880: [{ field: "Height", op: ">=", val: "5880" }],
+    hgt_5520: [{ field: "Height", op: "<=", val: "5520" }],
+    wind_20: [{ field: "Wind", op: ">=", val: "20" }],
+    wind_12: [{ field: "Wind", op: ">=", val: "12" }],
+    tt_m20: [{ field: "TT", op: "<=", val: "-20" }],
+    wind5_rain10_tt10_30: [
+      { field: "Wind", op: ">", val: "5" },
+      { field: "Rain", op: ">", val: "10" },
+      { field: "TT", op: "between", val: "10", val2: "30" },
+    ],
+    wind5_rain10: [
+      { field: "Wind", op: ">", val: "5" },
+      { field: "Rain", op: ">", val: "10" },
+    ],
+    tt_10_30: [{ field: "TT", op: "between", val: "10", val2: "30" }],
+    tt_gt30: [{ field: "TT", op: ">", val: "30" }],
+    tt_lt10: [{ field: "TT", op: "<", val: "10" }],
+    wind_gt5: [{ field: "Wind", op: ">", val: "5" }],
+    rain_gt10: [{ field: "Rain", op: ">", val: "10" }],
+    rain6_gt10: [{ field: "Rain6", op: ">", val: "10" }],
+    vis_lt1: [{ field: "Visibility", op: "<", val: "1" }],
+  };
+
   function syncRulesFromLayer(targetLayer) {
     if (!targetLayer) return;
     ensureLayerFilterRules(targetLayer);
@@ -38,12 +62,12 @@
     layer.config.filterRules = rules.map(({ field, op, val, val2 }) => ({ field, op, val, val2 }));
     layer.config.filterLogic = logic;
     if (onFilterChange) {
-      onFilterChange({ rules: layer.config.filterRules, logic });
+      onFilterChange({ filterRules: layer.config.filterRules, filterLogic: logic });
     }
   }
 
   function addRule() {
-    rules.push({ field: "none", op: ">", val: "", val2: "", _id: `rule-${Date.now()}-${rules.length}` });
+    rules = [...rules, { field: "none", op: ">", val: "", val2: "", _id: `rule-${Date.now()}-${rules.length}` }];
     update();
   }
 
@@ -51,7 +75,7 @@
     if (rules.length <= 1) {
       rules[0] = { field: "none", op: ">", val: "", val2: "", _id: `rule-${Date.now()}-0` };
     } else {
-      rules.splice(idx, 1);
+      rules = rules.filter((_, ruleIdx) => ruleIdx !== idx);
     }
     update();
   }
@@ -60,6 +84,32 @@
     rules = [{ field: "none", op: ">", val: "", val2: "", _id: `rule-${Date.now()}-0` }];
     update();
   }
+
+  function applyPreset(key) {
+    const preset = PRESETS[key];
+    if (!preset) return;
+    rules = preset.map((rule, idx) => ({ ...rule, _id: `rule-${Date.now()}-${idx}` }));
+    logic = "AND";
+    update();
+  }
+
+  let quickPresets = $derived(upper ? [
+    ["hgt_5880", "Height≥5880"],
+    ["wind_20", "Wind≥20 m/s"],
+    ["tt_m20", "TT≤−20°C"],
+    ["hgt_5520", "Height≤5520"],
+    ["wind_12", "Wind≥12 m/s"],
+  ] : [
+    ["wind5_rain10_tt10_30", "Wind>5 & Rain>10 & TT 10..30"],
+    ["wind5_rain10", "Wind>5 & Rain>10"],
+    ["tt_10_30", "TT 10..30"],
+    ["tt_gt30", "TT>30"],
+    ["tt_lt10", "TT<10"],
+    ["wind_gt5", "Wind>5"],
+    ["rain_gt10", "Rain>10"],
+    ["rain6_gt10", "Rain6>10"],
+    ["vis_lt1", "Vis<1 km"],
+  ]);
 </script>
 
 <div class="config-filter-section">
@@ -81,7 +131,8 @@
 
   <div class="filter-rules-list">
     {#each rules as rule, idx (rule._id || idx)}
-      <div class="filter-rule-row" data-rule-idx={idx}>
+      <div class="filter-rule-row" class:hidden={logic === "none" && idx > 0} data-rule-idx={idx}>
+        <span class="rule-index">#{idx + 1}</span>
         <select
           class="sel-filter-field"
           bind:value={rule.field}
@@ -100,6 +151,8 @@
             <option value="SLP">Sea-Level Pressure (气压)</option>
             <option value="Wind">Wind Speed (风速)</option>
             <option value="Rain">Rain 1h (降水)</option>
+            <option value="Rain6">Rain 6h (降水)</option>
+            <option value="DTD">T-Td (露点差)</option>
             <option value="Visibility">Visibility (能见度)</option>
           {/if}
         </select>
@@ -151,7 +204,13 @@
 
   <div class="filter-actions">
     <button type="button" class="btn-add-rule" onclick={addRule}>＋ Add Rule</button>
-    <button type="button" class="btn-clear-rules" onclick={clearRules}>Clear</button>
+    <button type="button" class="btn-clear-rules" onclick={clearRules}>Clear All</button>
+  </div>
+
+  <div class="config-quick-presets" aria-label="Quick station filter presets">
+    {#each quickPresets as [key, label]}
+      <button type="button" class="btn-filter-preset" onclick={() => applyPreset(key)}>{label}</button>
+    {/each}
   </div>
 </div>
 
@@ -206,6 +265,17 @@
     font-size: 11px;
   }
 
+  .filter-rule-row.hidden {
+    display: none;
+  }
+
+  .rule-index {
+    width: 18px;
+    color: var(--text-secondary, #8b949e);
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+
   .sel-filter-field,
   .sel-filter-op {
     background: #161b22;
@@ -245,6 +315,27 @@
     align-items: center;
     justify-content: space-between;
     margin-top: 6px;
+  }
+
+  .config-quick-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+  }
+
+  .btn-filter-preset {
+    padding: 2px 6px;
+    background: #21262d;
+    border: 1px solid #388bfd;
+    border-radius: 3px;
+    color: #58a6ff;
+    font-size: 10px;
+    cursor: pointer;
+  }
+
+  .btn-filter-preset:hover {
+    background: rgba(56, 139, 253, 0.18);
   }
 
   .btn-add-rule,

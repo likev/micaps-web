@@ -68,7 +68,26 @@ export function clearAllWeatherLayersFromMap(map, win = null, { resetVisibility 
 
 
 export async function loadPresetGroup(map, group, period = null, level = null, win = null, isTimeStep = false, expectedSeq = null) {
-  if (!group || !group.layers) return;
+  if (!group) {
+    console.warn("[PresetGroup] Abort: no group");
+    return;
+  }
+  if (!map) {
+    console.warn(`[PresetGroup] Abort "${group.id || group.name}": no map instance`);
+    return;
+  }
+  if (!Array.isArray(group.layers) && group?.id) {
+    try {
+      const pristine = PRESET_GROUPS?.find((g) => g.id === group.id);
+      if (pristine && Array.isArray(pristine.layers)) {
+        group.layers = JSON.parse(JSON.stringify(pristine.layers));
+      }
+    } catch { /* fall through to the invalid-group guard */ }
+  }
+  if (!Array.isArray(group.layers)) {
+    console.warn(`[PresetGroup] Abort "${group.id || group.name}": group.layers is not an array`);
+    return;
+  }
   if (!isTimeStep && group?.id) {
     // Self-heal: if a base preset layer was ✕-removed from this window copy,
     // restore it from the pristine global definition so fresh Load Data always
@@ -99,6 +118,38 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
   const curPeriod = period !== null ? period : (win?.period ?? 24);
   const curLevel = level !== null ? level : (group.defaultLevel || win?.level || 500);
   const prevPeriod = win?.period;
+  // Fresh observation loads must land on latest even when re-clicking the same
+  // preset (applyPresetToWindow only clears on group-id change). Capture before
+  // the first per-layer sync sets _obsTimeline, so every station layer in this
+  // Load uses bypassCache + latest instead of the second layer downgrading via
+  // stale cache. Level steps keep _obsTimeline and preserve the selected chip.
+  const freshObsLoad = !isTimeStep && Boolean(group.isObservation) && !win?._obsTimeline;
+
+  // Rewrite derived/station ids to the requested level so Load Data at a
+  // non-default level (e.g. 850 preset opened at 700) does not load stale
+  // 500/850 ids/paths. Mirrors levelController rewriting for level steps.
+  if (level !== null && group.hasLevel !== false && Array.isArray(group.layers)) {
+    for (const l of group.layers) {
+      if (l?.model === "UPPER_AIR") {
+        l.level = level;
+        if (l.type === "station") {
+          l.id = `upperair-obs-${level}`;
+          l.path = `UPPER_AIR/${l.element || "PLOT"}/${level}`;
+          l.name = `${level} hPa Sounding Station Plots`;
+        } else if (l.derivedFrom) {
+          l.id = `contour-sounding-${(l.element || "HGT").toLowerCase()}-${level}`;
+          if (typeof l.derivedFrom === "string" && l.derivedFrom.startsWith("upperair-obs-")) {
+            l.derivedFrom = `upperair-obs-${level}`;
+          }
+          const elemName = l.element === "HGT" ? "Geopotential Height" : (l.element === "TMP" ? "Temperature" : (l.element === "DTD" ? "Dew-Point Depression" : (l.element === "VOR" ? "Relative Vorticity" : (l.element === "DIV" ? "Divergence" : l.element))));
+          l.name = `${level} hPa Derived ${elemName}`;
+        }
+      } else if (l?.derivedFrom && (l.element === "VOR" || l.element === "DIV" || l.element === "WIND")) {
+        l.level = level;
+        l.id = `contour-${l.model || "ECMWF_HR"}-${String(l.element).toLowerCase()}-${level}`;
+      }
+    }
+  }
 
   if (win) {
     if (group.hasLevel === false) {
@@ -143,7 +194,10 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
   const winTitle = `W${(win?.winIdx ?? 0) + 1}: ${group.name}`;
   if (!isTimeStep && !group.isObservation && win) {
     const pLayer = group.layers.find((l) => l.type === "contour" || l.type === "wind" || l.type === "timeheight" || l.type === "lineheight" || l.type === "hovmoller");
-    const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", curLevel);
+    // Fresh Loads bypass the 5-min cycle cache so a new model run appears
+    // immediately; without this the loader could overwrite handleLoadData's
+    // fresh latest with a stale cached cycles[0].
+    const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", curLevel, true);
     if (!win.forecastCycle || !cycles.includes(win.forecastCycle)) {
       win.forecastCycle = cycles[0];
     }
@@ -189,6 +243,7 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
           ...render,
           id: layer.id,
           keepWind: true,
+          visible: layer.visible !== false,
           colormap: resolveColormap(group, render, targetLevel),
         }, win, isTimeStep, expectedSeq);
       } else if (layer.type === "station") {
@@ -201,19 +256,29 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
               ? `UPPER_AIR/${layer.element || "PLOT"}/${targetLevel || 500}`
               : `${layer.model}/${layer.element}`));
         let file = win?.obsTime;
-        if (!file || (!isTimeStep && group.isObservation && level !== null)) {
-          file = await syncObservationTimeline(obsPath, win?.obsTime, winTitle, win);
+        // Fresh Load Data always lands on latest (bypassCache). Level steps
+        // preserve the selected chip: _obsTimeline exists so freshObsLoad is
+        // false and the current file is kept when still valid.
+        if (!file || freshObsLoad || (!isTimeStep && group.isObservation && level !== null && !win?._obsTimeline)) {
+          file = await syncObservationTimeline(obsPath, freshObsLoad ? null : win?.obsTime, winTitle, win, { forceLatest: freshObsLoad });
+          if (win) {
+            win.obsTime = file;
+            updateWindowTitle(win);
+          }
+        } else if (freshObsLoad) {
+          file = await syncObservationTimeline(obsPath, null, winTitle, win, { forceLatest: true });
           if (win) {
             win.obsTime = file;
             updateWindowTitle(win);
           }
         }
         const stationLayerId = (!isTLogP && layer.model === "UPPER_AIR" && targetLevel) ? `upperair-obs-${targetLevel}` : layer.id;
+        console.log(`[PresetGroup] Station load ${obsPath}/${file} (layer ${stationLayerId})`);
         await loadObservationProduct(map, layer.model, layer.element, targetLevel, file, win, obsPath, expectedSeq, stationLayerId);
       } else if (layer.type === "tlogp") {
         let file = win?.obsTime;
-        if (!file || (!isTimeStep && group.isObservation && !win?.obsTime)) {
-          file = await syncObservationTimeline(layer.path || "UPPER_AIR/TLOGP", win?.obsTime, winTitle, win);
+        if (!file || freshObsLoad || (!isTimeStep && group.isObservation && !win?.obsTime)) {
+          file = await syncObservationTimeline(layer.path || "UPPER_AIR/TLOGP", freshObsLoad ? null : win?.obsTime, winTitle, win, { forceLatest: freshObsLoad });
           if (win) {
             win.obsTime = file;
             updateWindowTitle(win);
@@ -246,6 +311,11 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
     })
   );
   const anySuccess = results.some((r) => r.status === "fulfilled");
+  for (const result of results) {
+    if (result.status === "rejected") {
+      console.warn(`[PresetGroup] Layer load failed for "${group.name}":`, result.reason);
+    }
+  }
   if (!anySuccess && win && prevPeriod !== undefined) {
     // Rollback period assignment if all layer loads failed
     win.period = prevPeriod;

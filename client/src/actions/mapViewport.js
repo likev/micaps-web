@@ -4,6 +4,7 @@ import { setMapInstance } from "../lib/stores/tabs.svelte.js";
 
 export function mapViewport(node, options = {}) {
   let winId = options.winId || "default";
+  let isVisible = options.isVisible !== false;
   let map = null;
 
   try {
@@ -50,6 +51,15 @@ export function mapViewport(node, options = {}) {
       }
       if (newOptions.isActive && map) {
         setActiveMap(map);
+      }
+      if (newOptions.isVisible !== undefined && newOptions.isVisible !== isVisible) {
+        isVisible = newOptions.isVisible;
+        if (isVisible && map && typeof map.resize === "function") {
+          const scheduleResize = typeof requestAnimationFrame === "function" ? requestAnimationFrame : (cb) => setTimeout(cb, 0);
+          scheduleResize(() => {
+            try { map.resize(); } catch {}
+          });
+        }
       }
     },
   };

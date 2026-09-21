@@ -1,7 +1,7 @@
 // contourReRender.js - Viewport-bounded debounced contour re-rendering for massive grids (§8.8.4)
 import { getMaxEffectiveCells } from "../config/presets.js";
 import { shouldBypassCrop } from "../utils/viewportCrop.js";
-import { renderContourLayers } from "../layers/contourLayer.js";
+import { renderContourLayers, setLayerIsolineStyle } from "../layers/contourLayer.js";
 import { renderGridRaster } from "../layers/rasterLayer.js";
 import { getLayerById } from "../ui/layerControl.js";
 import { COLORMAPS, setColormaps } from "../utils/colormaps.js";
@@ -158,10 +158,22 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
           }
 
           if (liveLayer.type === "contour" && liveLayer.gridData?.values) {
+            // Resolve style explicitly from the LIVE layer (same fallbacks as
+            // weatherLoader) so a map move can never resurrect a stale color.
+            const el = liveLayer.element || "TMP";
+            const isHgt = el === "HGT";
+            const isTmp = el === "TMP";
+            const styleLineColor = liveLayer.config?.lineColor || liveLayer.color
+              || (isHgt ? "#58a6ff" : (isTmp ? "#f85149" : "#58a6ff"));
+            const styleLineWidth = liveLayer.config?.lineWidth ?? 2.0;
+            const styleBoldLineWidth = liveLayer.config?.boldLineWidth ?? 4.0;
             renderContourLayers(map, liveLayer.gridData, liveLayer.element || "TMP", {
               ...liveLayer.config,
               layerId: liveLayer.id,
               colormap: targetColormap,
+              lineColor: styleLineColor,
+              lineWidth: styleLineWidth,
+              boldLineWidth: styleBoldLineWidth,
               preserveIsobands: true, // Preserve existing contour fill polygons (§8.8.4)
               visibleIsoband: liveLayer.visible !== false && Boolean(liveLayer.config?.showFill),
               showFill: false, // NEVER contourf on move (spec §8.8.4: isolines + raster only)
@@ -173,6 +185,18 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
                 if (typeof opts.onStats === "function") opts.onStats(s);
               },
             });
+            // Re-assert paint after rebuild: the render path may recreate
+            // layers with default paint, which would revert a user-picked
+            // color/width on every pan/zoom.
+            try {
+              setLayerIsolineStyle(map, liveLayer.id, {
+                lineColor: styleLineColor,
+                lineWidth: styleLineWidth,
+                boldValues: liveLayer.config?.boldValues,
+                boldLineWidth: styleBoldLineWidth,
+                labelSize: liveLayer.config?.labelSize,
+              });
+            } catch {}
           }
 
           if (liveLayer.visible !== false && liveLayer.config?.showRaster && liveLayer.gridData) {

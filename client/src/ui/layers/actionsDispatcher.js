@@ -102,7 +102,7 @@ export function handleRemoveAction(map, layerId, layer, win) {
   }
 }
 
-export function handleAuxAction(map, layerId, value, winObj) {
+export function handleAuxAction(map, layerId, value, winObj, layer = null) {
   if (layerId === "raster") {
     if (value) {
       const layers = getLayersForWindow(winObj);
@@ -146,6 +146,15 @@ export function handleAuxAction(map, layerId, value, winObj) {
     } else {
       stopWindAnimation(map);
     }
+  } else if (value === "drawLine" || value === "setA" || value === "setB") {
+    const type = layer?.type;
+    import("../../layers/lineprofile/lineProfileLayer.js")
+      .then(({ lineHeightController, hovmollerController }) => {
+        const controller = type === "hovmoller" ? hovmollerController : lineHeightController;
+        if (value === "drawLine") controller.startDraw?.(winObj);
+        if (value === "setA") controller.setAFromMap?.(winObj);
+        if (value === "setB") controller.setBFromMap?.(winObj);
+      });
   }
 }
 
@@ -161,6 +170,6 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
   } else if (action === "remove") {
     handleRemoveAction(map, layerId, layer, winObj);
   } else if (action === "aux") {
-    handleAuxAction(map, layerId, value, winObj);
+    handleAuxAction(map, layerId, value, winObj, layer);
   }
 }

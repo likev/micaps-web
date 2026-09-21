@@ -47,6 +47,7 @@ export function validateConfig(draft) {
     addError("root", "Config draft must be a valid object");
     return {
       isValid: false,
+      valid: false,
       errors,
       warnings,
       presetErrors,
@@ -302,6 +303,7 @@ export function validateConfig(draft) {
 
   return {
     isValid: errors.length === 0,
+    valid: errors.length === 0,
     errors,
     warnings,
     presetErrors,

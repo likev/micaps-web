@@ -43,7 +43,8 @@
     isDirty = formState.isDirty();
     ui.configDirty = isDirty;
     const val = formState.getValidation();
-    if (!val.valid) {
+    const isValid = val.isValid ?? val.valid ?? true;
+    if (!isValid) {
       statusText = `Invalid (${val.errors.length} err)`;
       statusClass = "error";
       statusMsg = val.errors.map((e) => `${e.path}: ${e.message}`).join("; ");
@@ -67,8 +68,10 @@
 
   async function handleSaveApply() {
     const val = formState.getValidation();
-    if (!val.valid) {
-      showToast("error", `Cannot save invalid configuration: ${val.errors[0]?.message}`);
+    const isValid = val.isValid ?? val.valid ?? true;
+    if (!isValid) {
+      const first = val.errors[0];
+      showToast("error", `Cannot save invalid configuration: ${first?.path ? `${first.path} ` : ""}${first?.message || "Unknown validation error"}`);
       return;
     }
 

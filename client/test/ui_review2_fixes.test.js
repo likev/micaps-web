@@ -7,6 +7,7 @@ import { setLayerIsolineStyle } from "../src/layers/contourLayer.js";
 import { setStationConfig, renderStationWeatherPlots } from "../src/layers/stationLayer.js";
 import { getSkyCoverSVG, getWindBarbSVG } from "../src/utils/weatherSymbols.js";
 import { handleLayerAction } from "../src/ui/layerActions.js";
+import { addOrUpdateLayer, clearWindowWeatherLayers, getLayerById } from "../src/ui/layerControl.js";
 
 function createMockMap() {
   const sources = new Map();
@@ -176,6 +177,29 @@ describe("UI Review 2: Layer Consistency & Addenda", () => {
       if (hadDoc) globalThis.document.getElementById = prev;
       else delete globalThis.document;
     }
+  });
+
+  test("visibility toggle writes through to the canonical layer store", () => {
+    const map = createMockMap();
+    const win = { id: "win-visibility-write-through" };
+    clearWindowWeatherLayers(win);
+    addOrUpdateLayer({
+      id: "contour-visibility-write-through",
+      type: "contour",
+      element: "TMP",
+      visible: true,
+      config: { showFill: false, showLine: true, showRaster: false },
+    }, win);
+
+    // This represents the Svelte panel copy, not the canonical store object.
+    const panelLayer = { ...getLayerById("contour-visibility-write-through", win) };
+    handleLayerAction(map, "visibility", panelLayer.id, false, panelLayer, win);
+    expect(panelLayer.visible).toBe(false);
+    expect(getLayerById(panelLayer.id, win).visible).toBe(false);
+
+    handleLayerAction(map, "visibility", panelLayer.id, true, panelLayer, win);
+    expect(panelLayer.visible).toBe(true);
+    expect(getLayerById(panelLayer.id, win).visible).toBe(true);
   });
 
   test("Addendum §7: Contour value labels use 13/14px text-size, 160 spacing, 2.0 halo", () => {

@@ -141,6 +141,29 @@
           {/each}
         </select>
       </label>
+      <label class="config-field">
+        <span class="config-label">XML Palette Path (optional)</span>
+        <input
+          type="text"
+          class="config-input"
+          value={layer.render?.palettePath || ""}
+          placeholder="e.g. /palettes/RH/dark-850hpa.xml"
+          oninput={(e) => mutateRender("palettePath", e.target.value.trim() || null)}
+        />
+      </label>
+    {/if}
+
+    {#if layer.type === "wind"}
+      <label class="config-field">
+        <span class="config-label">XML Palette Path (optional)</span>
+        <input
+          type="text"
+          class="config-input"
+          value={layer.render?.palettePath || ""}
+          placeholder="e.g. /palettes/WIND/speed.xml"
+          oninput={(e) => mutateRender("palettePath", e.target.value.trim() || null)}
+        />
+      </label>
     {/if}
   </div>
 

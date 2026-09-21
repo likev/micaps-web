@@ -17,8 +17,9 @@
     formatForecastInitTime,
     formatForecastValidTime,
   } from "../utils/formatters.js";
-  import { getPeriodsForStep, filterObsFilesByStep, selectObsChipsWindow } from "../lib/stores/timelineMath.js";
+  import { getPeriodsForStep, filterObsFilesByStep, selectObsChipsWindow, findClosestFile } from "../lib/stores/timelineMath.js";
   import { stepWindowTimeline } from "../lib/services/appWorkflow.js";
+  import { getWindowById } from "../lib/stores/tabs.svelte.js";
 
   let { winId = "default", onTimeChange = null } = $props();
 
@@ -49,6 +50,20 @@
     periodStepSeq: 0,
   });
   let isObs = $derived(timeline.currentMode === "obs");
+  // The selects must never render empty: coerce any stale/invalid store value
+  // into the valid option set (step: upper 12/24/6 default 12 like v1.1.0,
+  // otherwise 1/3/6/12/24; speed: 3000/1500/750 default 1500). The store
+  // itself is corrected on next load/change.
+  let stepValue = $derived.by(() => {
+    const valid = timeline.isUpperAirMode ? [12, 24, 6] : [1, 3, 6, 12, 24];
+    const cur = parseInt(timeline.currentStepLength, 10);
+    return String(valid.includes(cur) ? cur : valid[0]);
+  });
+  let speedValue = $derived.by(() => {
+    const valid = [3000, 1500, 750];
+    const cur = parseInt(playback.speed, 10);
+    return String(valid.includes(cur) ? cur : DEFAULT_PLAYBACK_MS);
+  });
   let periods = $derived(timeline.discretePeriods || []);
   let activePeriod = $derived(periods[timeline.currentPeriodIdx] ?? 0);
   let obsFiles = $derived(timeline.obsFiles || []);
@@ -58,6 +73,10 @@
 
   let playTimer = null;
 
+  function emitTimeChange(payload) {
+    if (onTimeChange) onTimeChange({ ...payload, winId });
+  }
+
   function handleStep(delta, options = {}) {
     if (!options.fromPlay) {
       pause();
@@ -65,10 +84,12 @@
     const tl = timelinesByWindow[winId] || getOrCreateTimeline(winId);
     const res = stepWindowTimeline(tl, delta);
     if (!res) return;
+    // v1.1.0 legacy step(): btn-prev -> prev, btn-next/btn-play -> next.
+    res.prefetchDirections = delta < 0 ? ["prev"] : ["next"];
     if (!res.isObs) {
       app.period = res.period;
     }
-    if (onTimeChange) onTimeChange(res);
+    emitTimeChange(res);
   }
 
   function handleChipClick(idx) {
@@ -77,14 +98,14 @@
       const file = obsFiles[idx];
       if (file) {
         goToObsFile(winId, file);
-        if (onTimeChange) onTimeChange({ isObs: true, file, _seq: ++timeline.periodStepSeq });
+        emitTimeChange({ isObs: true, file, _seq: ++timeline.periodStepSeq });
       }
     } else {
       const p = periods[idx];
       if (p !== undefined) {
         goToPeriod(winId, p);
         app.period = p;
-        if (onTimeChange) onTimeChange({ period: p, cycle: currentCycle, _seq: ++timeline.periodStepSeq });
+        emitTimeChange({ period: p, cycle: currentCycle, _seq: ++timeline.periodStepSeq });
       }
     }
   }
@@ -94,7 +115,7 @@
     timeline.currentInitCycle = cycle;
     app.cycle = cycle;
     if (onTimeChange) {
-      onTimeChange({
+      emitTimeChange({
         cycle,
         period: activePeriod,
         _seq: ++timeline.periodStepSeq,
@@ -103,17 +124,46 @@
   }
 
   function handleStepLengthChange(e) {
+    // v1.1.0 (legacy setStepLength, triggerCallback=true): preserve the
+    // current position, re-filter, snap to closest when the current value
+    // drops out, and reload the map at the snapped position.
     const step = parseInt(e.target.value, 10);
-    timeline.currentStepLength = step;
+    pause();
+    const tl = timelinesByWindow[winId] || getOrCreateTimeline(winId);
+    tl.currentStepLength = step;
+    const win = getWindowById(winId);
+    if (win) {
+      win.stepLength = step;
+      if (win._obsTimeline) win._obsTimeline.stepLength = step;
+    }
     if (!isObs) {
-      timeline.discretePeriods = getPeriodsForStep(step);
-      if (timeline.currentPeriodIdx >= timeline.discretePeriods.length) {
-        timeline.currentPeriodIdx = 0;
-      }
+      const curVal = periods[tl.currentPeriodIdx] ?? 24;
+      tl.discretePeriods = getPeriodsForStep(step);
+      let closestIdx = 0;
+      let minDiff = Infinity;
+      tl.discretePeriods.forEach((p, idx) => {
+        const diff = Math.abs(p - curVal);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestIdx = idx;
+        }
+      });
+      tl.currentPeriodIdx = closestIdx;
+      const newPeriod = tl.discretePeriods[tl.currentPeriodIdx];
+      app.period = newPeriod;
+      emitTimeChange({ period: newPeriod, cycle: currentCycle, stepLength: step, _seq: ++tl.periodStepSeq });
     } else {
-      const filtered = filterObsFilesByStep(timeline.rawObsFiles, step, timeline.isUpperAirMode);
-      timeline.obsFiles = selectObsChipsWindow(filtered);
-      timeline.currentObsIdx = Math.max(0, timeline.obsFiles.length - 1);
+      const curFile = obsFiles[tl.currentObsIdx] || "";
+      const allFiltered = filterObsFilesByStep(tl.rawObsFiles, step, tl.isUpperAirMode);
+      let targetFile = curFile;
+      if (allFiltered.length > 0 && curFile && !allFiltered.includes(curFile)) {
+        targetFile = findClosestFile(allFiltered, curFile);
+      }
+      tl.obsFiles = selectObsChipsWindow(allFiltered, targetFile);
+      const newIdx = targetFile ? tl.obsFiles.indexOf(targetFile) : -1;
+      tl.currentObsIdx = newIdx !== -1 ? newIdx : Math.max(0, tl.obsFiles.length - 1);
+      const file = tl.obsFiles[tl.currentObsIdx];
+      if (file) emitTimeChange({ isObs: true, file, stepLength: step, _seq: ++tl.periodStepSeq });
     }
   }
 
@@ -145,8 +195,9 @@
 
   function handleSpeedChange(e) {
     const spd = parseInt(e.target.value, 10);
-    playback.speed = spd;
-    app.playbackSpeed = spd;
+    const next = Number.isFinite(spd) ? spd : DEFAULT_PLAYBACK_MS;
+    playback.speed = next;
+    app.playbackSpeed = next;
     if (playback.isPlaying) {
       start(); // restart with new speed
     }
@@ -191,10 +242,10 @@
 </script>
 
 {#if ui.timelineVisible && !ui.configOpen}
-  <footer id="timeslider-container" class="timeslider-container" aria-label="Timeline and Playback Controls">
+  <footer id="sl-timeslider" class="timeslider-container" aria-label="Timeline and Playback Controls">
     <div class="timeline-stepper">
       <button
-        id="btn-play"
+        id="sl-btn-play"
         class="play-btn"
         class:active={playback.isPlaying}
         type="button"
@@ -210,7 +261,7 @@
       </button>
 
       <button
-        id="btn-step-prev"
+        id="sl-btn-step-prev"
         class="step-nav-btn"
         type="button"
         title="Previous Step (Left Arrow)"
@@ -219,7 +270,7 @@
       >◀</button>
 
       <button
-        id="btn-step-next"
+        id="sl-btn-step-next"
         class="step-nav-btn"
         type="button"
         title="Next Step (Right Arrow)"
@@ -228,17 +279,17 @@
       >▶</button>
 
       <div class="step-length-control">
-        <label for="select-step-length" class="step-length-label">Step:</label>
+        <label for="sl-select-step-length" class="step-length-label">Step:</label>
         <select
-          id="select-step-length"
+          id="sl-select-step-length"
           class="step-length-select"
-          value={timeline.currentStepLength}
+          value={stepValue}
           onchange={handleStepLengthChange}
         >
           {#if timeline.isUpperAirMode}
-            <option value="6">6h</option>
             <option value="12">12h</option>
             <option value="24">24h</option>
+            <option value="6">6h</option>
           {:else}
             <option value="1">1h</option>
             <option value="3">3h</option>
@@ -250,11 +301,11 @@
       </div>
 
       <div class="playback-speed-control">
-        <label for="select-playback-speed" class="step-length-label">Speed:</label>
+        <label for="sl-select-playback-speed" class="step-length-label">Speed:</label>
         <select
-          id="select-playback-speed"
+          id="sl-select-playback-speed"
           class="step-length-select"
-          value={playback.speed}
+          value={speedValue}
           onchange={handleSpeedChange}
         >
           <option value="3000">0.5x</option>
@@ -272,9 +323,9 @@
 
         {#if !isObs}
           <div class="init-time-control">
-            <label for="select-forecast-cycle" class="init-time-label">Init:</label>
+            <label for="sl-select-forecast-cycle" class="init-time-label">Init:</label>
             <select
-              id="select-forecast-cycle"
+              id="sl-select-forecast-cycle"
               class="init-time-select"
               value={currentCycle}
               onchange={handleCycleChange}
@@ -286,14 +337,14 @@
           </div>
         {/if}
 
-        <div id="time-lead-wrapper">
+        <div id="sl-time-lead-wrapper">
           {isObs ? "Observation Time: " : "Forecast Lead: "}
-          <strong id="time-lead-label">
+          <strong id="sl-time-lead-label">
             {isObs ? (activeObsFile ? formatObsTimestamp(activeObsFile) : "--") : formatLeadTime(activePeriod)}
           </strong>
         </div>
 
-        <div id="time-valid-label" class="valid-label">
+        <div id="sl-time-valid-label" class="valid-label">
           {#if isObs}
             Real-time Observation (Step: {timeline.currentStepLength || 3}h)
           {:else if currentCycle}
@@ -302,7 +353,7 @@
         </div>
       </div>
 
-      <div id="timeline-chips" class="timeline-chips" role="tablist" aria-label={isObs ? "Observation time steps" : "Forecast lead time steps"}>
+      <div id="sl-timeline-chips" class="timeline-chips" role="tablist" aria-label={isObs ? "Observation time steps" : "Forecast lead time steps"}>
         {#if isObs}
           {#each obsFiles as file, idx}
             <button
@@ -336,7 +387,7 @@
     </div>
   </footer>
 {:else}
-  <footer id="timeslider-container" class="timeslider-container hidden"></footer>
+  <footer id="sl-timeslider" class="timeslider-container hidden"></footer>
 {/if}
 
 <style>
@@ -495,7 +546,7 @@
     color: #56d364;
   }
 
-  #time-lead-wrapper {
+  #sl-time-lead-wrapper {
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;

@@ -220,16 +220,6 @@ describe("Layer hide/show: can't reload group when layer previously hidden", () 
     expect(snippet).toContain("clearAllWeatherLayersFromMap(map, win, { resetVisibility: true })");
   });
 
-  test("bootstrap.js: catalog drawer load passes resetVisibility:true", () => {
-    const src = readSrcText("app/bootstrap.js");
-    // Catalog load = fresh load — hidden layers should reset to visible
-    // Find the second occurrence (first is the import, second is the initCatalogDrawer() call)
-    const firstIdx = src.indexOf("initCatalogDrawer");
-    const catalogIdx = src.indexOf("initCatalogDrawer", firstIdx + 1);
-    const snippet = src.slice(catalogIdx, catalogIdx + 1200);
-    expect(snippet).toContain("clearAllWeatherLayersFromMap(map, win, { resetVisibility: true })");
-  });
-
   test("resetVisibility logic: snapshot forces visible=true when resetVisibility=true", () => {
     // Simulate the clearAllWeatherLayersFromMap snapshot logic
     function buildSnapshot(layers, resetVisibility) {

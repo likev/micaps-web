@@ -38,8 +38,14 @@ export async function renderSoundingDerivedContoursForStation(map, stations, cur
         cfg.derivedFrom = cLayer.derivedFrom || stationLayerId;
         if (existingDerived?.colormap) cfg.colormap = existingDerived.colormap;
         else if (snap?.colormap) cfg.colormap = snap.colormap;
-        if (existingDerived?.color) cfg.lineColor = existingDerived.color;
+        if (cfg.lineColor == null && existingDerived?.color) cfg.lineColor = existingDerived.color;
         else if (snap?.color) cfg.lineColor = snap.color;
+        // Explicit built-in reset (palettePath null/empty) must drop stale
+        // palette: keys inherited from snap/existing so timeline chips don't
+        // resurrect the old custom palette.
+        if (!cfg.palettePath && typeof cfg.colormap === "string" && cfg.colormap.startsWith("palette:")) {
+          cfg.colormap = elem;
+        }
 
         if (cfg.palettePath) {
           const paletteKey = `palette:${targetId}`;
@@ -93,8 +99,11 @@ export async function renderSoundingDerivedContoursForStation(map, stations, cur
           cfg.visible = isVisible;
           if (existingDerived?.colormap) cfg.colormap = existingDerived.colormap;
           else if (snap?.colormap) cfg.colormap = snap.colormap;
-          if (existingDerived?.color) cfg.lineColor = existingDerived.color;
+          if (cfg.lineColor == null && existingDerived?.color) cfg.lineColor = existingDerived.color;
           else if (snap?.color) cfg.lineColor = snap.color;
+          if (!cfg.palettePath && typeof cfg.colormap === "string" && cfg.colormap.startsWith("palette:")) {
+            cfg.colormap = elem;
+          }
 
           if (cfg.palettePath) {
             const paletteKey = `palette:${targetId}`;
@@ -157,8 +166,11 @@ export async function renderSurfaceDerivedContoursForStation(map, stations, acti
         cfg.derivedFrom = cLayer.derivedFrom || stationLayerId;
         if (existingDerived?.colormap) cfg.colormap = existingDerived.colormap;
         else if (snap?.colormap) cfg.colormap = snap.colormap;
-        if (existingDerived?.color) cfg.lineColor = existingDerived.color;
+        if (cfg.lineColor == null && existingDerived?.color) cfg.lineColor = existingDerived.color;
         else if (snap?.color) cfg.lineColor = snap.color;
+        if (!cfg.palettePath && typeof cfg.colormap === "string" && cfg.colormap.startsWith("palette:")) {
+          cfg.colormap = elem;
+        }
 
         if (cfg.palettePath) {
           const paletteKey = `palette:${targetId}`;
@@ -212,8 +224,11 @@ export async function renderSurfaceDerivedContoursForStation(map, stations, acti
           cfg.visible = isVisible;
           if (existingDerived?.colormap) cfg.colormap = existingDerived.colormap;
           else if (snap?.colormap) cfg.colormap = snap.colormap;
-          if (existingDerived?.color) cfg.lineColor = existingDerived.color;
+          if (cfg.lineColor == null && existingDerived?.color) cfg.lineColor = existingDerived.color;
           else if (snap?.color) cfg.lineColor = snap.color;
+          if (!cfg.palettePath && typeof cfg.colormap === "string" && cfg.colormap.startsWith("palette:")) {
+            cfg.colormap = elem;
+          }
 
           if (cfg.palettePath) {
             const paletteKey = `palette:${targetId}`;
@@ -323,7 +338,9 @@ export async function loadObservationProduct(map, model, element, level, file, w
     const layerId = customStationLayerId || groupStationLayer?.id || (isTLogP ? "upperair-tlogp-stations" : (model === "UPPER_AIR" ? "station-upper" : `station-${model.toLowerCase()}`));
     const existingStn = getLayerById(layerId, win);
     const snapStn = win?.layerSnapshots?.find((s) => s.id === layerId || (s.type === "station" && s.model === model));
-    const isVisible = existingStn ? (existingStn.visible !== false) : (snapStn ? snapStn.visible !== false : (appState.state.layers.station !== false));
+    const isVisible = existingStn
+      ? (existingStn.visible !== false)
+      : (snapStn ? snapStn.visible !== false : (groupStationLayer?.visible !== undefined ? groupStationLayer.visible !== false : (appState.state.layers.station !== false)));
     const name = isTLogP
       ? "Sounding Station Network"
       : (model === "UPPER_AIR" ? `${level || 500} hPa Sounding Station Plots` : `${model === "SURFACE" ? "Surface" : "Upper Air"} Station Observations`);
