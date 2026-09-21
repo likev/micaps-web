@@ -23,7 +23,11 @@ export function applyPresetToWindow(win, group, overrideLevel = null, timelinesM
   if (!win || !group) return null;
   const isSpecialProfile = shouldHideTimelineForGroup(group);
 
-  const groupCopy = typeof structuredClone === "function" ? structuredClone(group) : JSON.parse(JSON.stringify(group));
+  // Use JSON round-trip to safely copy plain data from the group,
+  // since `group` may be a Svelte 5 reactive $state proxy (or contain
+  // non-serializable references like MapLibre map instances or DOM nodes)
+  // that would cause structuredClone to throw a DataCloneError.
+  const groupCopy = JSON.parse(JSON.stringify(group));
   win.activeGroup = groupCopy;
   win.isObservation = Boolean(groupCopy.isObservation);
   win.forecastCycle = null;
