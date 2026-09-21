@@ -87,6 +87,24 @@ export class LineHeightPanel {
           <div class="lh-footer-meta">Draw a line on the map (two clicks)</div>
           <div style="color:#6e7681;font-size:10px;">VVEL: 10⁻² Pa/s (ω&lt;0 ascent) | Fixed 10 levels (1000–200 hPa)</div>
         </div>
+      </div>
+
+      <!-- Resize Handles (locked aspect ratio) -->
+      <div class="lh-resize-handle lh-resize-se" title="Resize window (keeps aspect ratio)" style="position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; cursor: nwse-resize; z-index: 1010; display: flex; align-items: flex-end; justify-content: flex-end; padding: 3px; user-select: none;">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#6e7681" stroke-width="1.5" stroke-linecap="round">
+          <line x1="8" y1="2" x2="2" y2="8" />
+          <line x1="8" y1="5" x2="5" y2="8" />
+          <line x1="8" y1="8" x2="8" y2="8" />
+        </svg>
+      </div>
+      <div class="lh-resize-handle lh-resize-e" style="position: absolute; right: 0; top: 40px; bottom: 18px; width: 6px; cursor: ew-resize; z-index: 1009; user-select: none;"></div>
+      <div class="lh-resize-handle lh-resize-s" style="position: absolute; bottom: 0; left: 18px; right: 18px; height: 6px; cursor: ns-resize; z-index: 1009; user-select: none;"></div>
+      <div class="lh-resize-handle lh-resize-sw" title="Resize window (keeps aspect ratio)" style="position: absolute; left: 0; bottom: 0; width: 18px; height: 18px; cursor: nesw-resize; z-index: 1010; display: flex; align-items: flex-end; justify-content: flex-start; padding: 3px; user-select: none;">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#6e7681" stroke-width="1.5" stroke-linecap="round">
+          <line x1="2" y1="2" x2="8" y2="8" />
+          <line x1="2" y1="5" x2="5" y2="8" />
+          <line x1="2" y1="8" x2="2" y2="8" />
+        </svg>
       </div>`;
     const canvas = this.container.querySelector(".lh-canvas");
     this.canvasRenderer = new LineHeightCanvasRenderer(canvas, { flipDirection: this.flipDirection });
@@ -151,6 +169,127 @@ export class LineHeightPanel {
         this.container.style.top = `${Math.max(10, it + e.clientY - sy)}px`;
       });
       window.addEventListener("mouseup", () => { drag = false; });
+    }
+
+    // Resize Handles
+    this._initResizeHandles();
+  }
+  _initResizeHandles() {
+    if (!this.container) return;
+    const handles = this.container.querySelectorAll(".lh-resize-handle");
+    handles.forEach((handle) => {
+      const isSE = handle.classList.contains("lh-resize-se");
+      const isSW = handle.classList.contains("lh-resize-sw");
+      const isE = handle.classList.contains("lh-resize-e");
+      const isS = handle.classList.contains("lh-resize-s");
+
+      handle.addEventListener("mousedown", (e) => {
+        if (this.isMinimized) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        let isResizing = true;
+        const startX = e.clientX, startY = e.clientY;
+        const rect = this.container.getBoundingClientRect ? this.container.getBoundingClientRect() : { left: 100, top: 60, right: 100 + DEFAULT_LH_WIDTH };
+        const { left: initialLeft, top: initialTop, right: initialRight } = rect;
+        const initialWidth = this.container.offsetWidth || this.width || DEFAULT_LH_WIDTH;
+        const initialHeight = this.container.offsetHeight || this.height || DEFAULT_LH_HEIGHT;
+
+        this.container.style.right = "auto";
+        this.container.style.left = `${initialLeft}px`;
+        this.container.style.top = `${initialTop}px`;
+
+        const ratio = this.aspectRatio;
+        const winW = (typeof window !== "undefined" && window.innerWidth) || 1920;
+        const winH = (typeof window !== "undefined" && window.innerHeight) || 1080;
+
+        const onMouseMove = (moveEvt) => {
+          if (!isResizing) return;
+          const dx = moveEvt.clientX - startX;
+          const dy = moveEvt.clientY - startY;
+
+          let newWidth, newHeight;
+          if (isE) {
+            newWidth = initialWidth + dx;
+            newHeight = Math.round(newWidth / ratio);
+          } else if (isS) {
+            newHeight = initialHeight + dy;
+            newWidth = Math.round(newHeight * ratio);
+          } else {
+            const effDx = isSW ? -dx : dx;
+            if (Math.abs(effDx) >= Math.abs(dy * ratio)) {
+              newWidth = initialWidth + effDx;
+              newHeight = Math.round(newWidth / ratio);
+            } else {
+              newHeight = initialHeight + dy;
+              newWidth = Math.round(newHeight * ratio);
+            }
+          }
+
+          const maxW = Math.min(isSW ? initialRight - 10 : winW - initialLeft - 10, 1600);
+          const maxH = winH - initialTop - 10;
+
+          newWidth = Math.max(MIN_LH_WIDTH, Math.min(maxW, newWidth));
+          newHeight = Math.round(newWidth / ratio);
+          if (newHeight > maxH) {
+            newHeight = maxH;
+            newWidth = Math.round(newHeight * ratio);
+          }
+          if (newHeight < MIN_LH_HEIGHT) {
+            newHeight = MIN_LH_HEIGHT;
+            newWidth = Math.round(newHeight * ratio);
+          }
+
+          if (isSW) {
+            const newLeft = initialRight - newWidth;
+            if (newLeft >= 10) {
+              this.container.style.left = `${newLeft}px`;
+              this.setDimensions(newWidth, newHeight);
+            }
+          } else {
+            this.setDimensions(newWidth, newHeight);
+          }
+        };
+
+        const onMouseUp = () => {
+          isResizing = false;
+          if (typeof window !== "undefined") {
+            window.removeEventListener("mousemove", onMouseMove);
+            window.removeEventListener("mouseup", onMouseUp);
+          }
+          this.canvasRenderer?.resize();
+        };
+
+        if (typeof window !== "undefined") {
+          window.addEventListener("mousemove", onMouseMove);
+          window.addEventListener("mouseup", onMouseUp);
+        }
+      });
+
+      if (isSE) {
+        handle.addEventListener("dblclick", (e) => {
+          e.stopPropagation();
+          this.setDimensions(DEFAULT_LH_WIDTH, DEFAULT_LH_HEIGHT);
+        });
+      }
+    });
+  }
+
+  setDimensions(width, height = null) {
+    if (!this.container) return;
+    const w = Math.round(width);
+    const h = height !== null ? Math.round(height) : Math.round(w / this.aspectRatio);
+
+    this.width = w;
+    this.height = h;
+
+    this.container.style.width = `${w}px`;
+    if (!this.isMinimized) {
+      this.container.style.height = `${h}px`;
+    }
+
+    if (this.canvasRenderer) {
+      this.canvasRenderer.resize();
     }
   }
   _fireLineApply() {
@@ -229,9 +368,11 @@ export class LineHeightPanel {
     if (!this.container) return;
     const body = this.container.querySelector(".lh-body");
     const controls = this.container.querySelector(".lh-controls-row");
+    const handles = this.container.querySelectorAll(".lh-resize-handle");
     if (body) body.style.display = this.isMinimized ? "none" : "flex";
     if (controls) controls.style.display = this.isMinimized ? "none" : "flex";
     this.container.style.height = this.isMinimized ? "auto" : `${this.height || DEFAULT_LH_HEIGHT}px`;
+    handles.forEach((h) => (h.style.display = this.isMinimized ? "none" : "flex"));
     if (!this.isMinimized) setTimeout(() => this.canvasRenderer?.resize(), 50);
   }
   exportPNG() {

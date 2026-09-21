@@ -87,9 +87,9 @@ export async function bootstrap() {
       const hasData = Boolean(win.activeGroup || win.model || win.isObservation || win.gridData || win.obsTime);
       if (!hasData) {
         setTimeSliderVisible(false);
-        try { timeHeightController.hide(win.map, win); } catch {}
-        try { lineHeightController.hide(win.map, win); } catch {}
-        try { hovmollerController.hide(win.map, win); } catch {}
+        try { timeHeightController.hide(); } catch {}
+        try { lineHeightController.hide(); } catch {}
+        try { hovmollerController.hide(); } catch {}
         try { tlogpController.hide(win.map, win); } catch {}
         return;
       }
@@ -136,8 +136,8 @@ export async function bootstrap() {
         } else {
           timeHeightController.hide(win.map, win);
         }
-        try { lineHeightController.hide(win.map, win); } catch {}
-        try { hovmollerController.hide(win.map, win); } catch {}
+        try { lineHeightController.hide(); } catch {}
+        try { hovmollerController.hide(); } catch {}
         tlogpController.hide(win.map, win);
         setTimeSliderVisible(false);
         return;
@@ -149,8 +149,8 @@ export async function bootstrap() {
         } else {
           hovmollerController.hide(win.map, win);
         }
-        try { timeHeightController.hide(win.map, win); } catch {}
-        try { lineHeightController.hide(win.map, win); } catch {}
+        try { timeHeightController.hide(); } catch {}
+        try { lineHeightController.hide(); } catch {}
         tlogpController.hide(win.map, win);
         setTimeSliderVisible(false);
         return;
@@ -162,8 +162,8 @@ export async function bootstrap() {
         } else {
           lineHeightController.hide(win.map, win);
         }
-        try { timeHeightController.hide(win.map, win); } catch {}
-        try { hovmollerController.hide(win.map, win); } catch {}
+        try { timeHeightController.hide(); } catch {}
+        try { hovmollerController.hide(); } catch {}
         tlogpController.hide(win.map, win);
         // Slider stays VISIBLE: fall through to NWP timeline setup below
       } else if (hasTLogP) {

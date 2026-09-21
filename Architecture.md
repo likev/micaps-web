@@ -205,7 +205,7 @@ micaps-web/
 │   │   ├── store/                    # Reactive workstation state manager
 │   │   ├── ui/                       # Navbar, catalog drawer, layer control, time slider, tooltip
 │   │   └── utils/                    # CMA palettes, weather symbols, griddata-js adapter
-│   └── test/                         # Meteorological Unit Test Suite (514 bun tests across 73 files)
+│   └── test/                         # Meteorological Unit Test Suite (518 bun tests across 74 files)
 │       ├── tlogp/                    # T-lnP thermodynamics, parcel ascent & aspect-ratio resize tests
 │       ├── timeheight/               # Time-height loading, canvas math, sampling, resize & integration tests
 │       ├── colormaps.test.js         # Dynamic colormaps & level scaling tests
@@ -1680,7 +1680,7 @@ GET /api/data/hovmoller/profile?model=ECMWF_HR&cycle=<8 digits>&leads=0,12,...,1
 
 - Per-load wire targets `<= 100 KB` (10×41×6 floats ≈ 30–60 KB section; 13×41×6 ≈ 40–80 KB hovmoller).
 - Browser holds matrices only — no grids (same posture as time–height); per-window `matrixCache<=20`.
-- Measured suites: `go test ./...` + `bun test` (514 tests: 492 existing + 22 line-profile).
+- Measured suites: `go test ./...` + `bun test` (518 tests: 492 existing + 26 line-profile).
 
 ---
 
