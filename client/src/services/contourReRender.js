@@ -1,6 +1,6 @@
 // contourReRender.js - Viewport-bounded debounced contour re-rendering for massive grids (§8.8.4)
 import { getMaxEffectiveCells } from "../config/presets.js";
-import { shouldBypassCrop } from "../utils/viewportCrop.js";
+import { shouldBypassCrop, normalizeBounds } from "../utils/viewportCrop.js";
 import { renderContourLayers, setLayerIsolineStyle } from "../layers/contourLayer.js";
 import { renderGridRaster } from "../layers/rasterLayer.js";
 import { getLayerById } from "../ui/layerControl.js";
@@ -13,6 +13,40 @@ const reRenderBusy = new Set();     // keys with an active recompute in flight
 const pendingReRenders = new Map(); // key -> boolean
 const lastBoundsKey = new Map();    // key -> serialized bounds string
 const handlerMaps = new Map();      // key -> map instance
+// Fill coverage tracking (expand-on-demand fills): key -> expanded [w, s, e, n]
+// lon/lat box the last isoband-fill computation covered. Fills are computed
+// once at load for the load-time viewport; without this, zooming out or
+// panning leaves the fill confined to that stale patch while isolines keep
+// refreshing around it.
+const lastFillBounds = new Map();
+
+// Must match the render path default (options.bufferDelta ?? 1.75 in
+// computeCropIndices) so coverage bookkeeping agrees with what was drawn.
+export const FILL_BOUNDS_BUFFER_DEG = 1.75;
+// Inset required between viewport edge and fill edge before triggering a
+// recompute; absorbs sub-pixel jitter between moveend bounds reads.
+export const FILL_BOUNDS_TOLERANCE_DEG = 0.02;
+
+export function expandFillBounds(bounds, deltaDeg = FILL_BOUNDS_BUFFER_DEG) {
+  const norm = normalizeBounds(bounds);
+  if (!norm) return null;
+  const d = Number.isFinite(deltaDeg) && deltaDeg > 0 ? deltaDeg : FILL_BOUNDS_BUFFER_DEG;
+  return [norm[0] - d, norm[1] - d, norm[2] + d, norm[3] + d];
+}
+
+// True when the current viewport sits strictly inside the last fill box.
+// False (=> recompute fills) on nulls, edge contact, overflow, or
+// antimeridian crossing (safe side: recompute rather than reason about wrap).
+export function isViewportWithinFill(viewportBounds, fillBounds, toleranceDeg = FILL_BOUNDS_TOLERANCE_DEG) {
+  const inner = normalizeBounds(viewportBounds);
+  const outer = normalizeBounds(fillBounds);
+  if (!inner || !outer) return false;
+  const [w, s, e, n] = inner;
+  const [fw, fs, fe, fn] = outer;
+  if (!(w <= e && fw <= fe)) return false;
+  const tol = Number.isFinite(toleranceDeg) && toleranceDeg >= 0 ? toleranceDeg : 0;
+  return (w - fw) > tol && (s - fs) > tol && (fe - e) > tol && (fn - n) > tol;
+}
 
 function getWinKey(win) {
   if (!win) return "default";
@@ -39,6 +73,7 @@ function cleanupKey(key, map = null) {
   reRenderBusy.delete(key);
   pendingReRenders.delete(key);
   lastBoundsKey.delete(key);
+  lastFillBounds.delete(key);
 }
 
 /**
@@ -83,6 +118,16 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
       const bKey = `${b[0][0].toFixed(2)},${b[0][1].toFixed(2)},${b[1][0].toFixed(2)},${b[1][1].toFixed(2)}`;
       lastBoundsKey.set(key, bKey);
     } catch {}
+  }
+
+  // Record initial fill coverage: the load-time render cropped fills to the
+  // load-time viewport (+buffer). Later moves expand on demand from here.
+  try {
+    const fb = expandFillBounds(map.getBounds().toArray(), opts.bufferDelta ?? FILL_BOUNDS_BUFFER_DEG);
+    if (fb) lastFillBounds.set(key, fb);
+    else lastFillBounds.delete(key);
+  } catch {
+    lastFillBounds.delete(key);
   }
 
   const triggerReRender = () => {
@@ -167,6 +212,22 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
               || (isHgt ? "#58a6ff" : (isTmp ? "#f85149" : "#58a6ff"));
             const styleLineWidth = liveLayer.config?.lineWidth ?? 2.0;
             const styleBoldLineWidth = liveLayer.config?.boldLineWidth ?? 4.0;
+            // Expand-on-demand fills: the load-time fill only covers the
+            // load-time viewport. If the map moved outside that box,
+            // recompute fills for the new viewport instead of preserving a
+            // stale patch (which would cover only part of the map after
+            // zoom-out/pan). Inside the box, keep the cheap path: refresh
+            // isolines only, never contourf on move.
+            let recomputeFill = false;
+            try {
+              if (liveLayer.visible !== false && liveLayer.config?.showFill !== false && !liveLayer.config?.showRaster) {
+                if (!isViewportWithinFill(b, lastFillBounds.get(key))) {
+                  recomputeFill = true;
+                  const fb = expandFillBounds(b, opts.bufferDelta ?? FILL_BOUNDS_BUFFER_DEG);
+                  if (fb) lastFillBounds.set(key, fb);
+                }
+              }
+            } catch {}
             renderContourLayers(map, liveLayer.gridData, liveLayer.element || "TMP", {
               ...liveLayer.config,
               layerId: liveLayer.id,
@@ -174,9 +235,9 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
               lineColor: styleLineColor,
               lineWidth: styleLineWidth,
               boldLineWidth: styleBoldLineWidth,
-              preserveIsobands: true, // Preserve existing contour fill polygons (§8.8.4)
+              preserveIsobands: recomputeFill ? false : true, // Preserve existing contour fill polygons (§8.8.4)
               visibleIsoband: liveLayer.visible !== false && Boolean(liveLayer.config?.showFill),
-              showFill: false, // NEVER contourf on move (spec §8.8.4: isolines + raster only)
+              showFill: recomputeFill ? liveLayer.config?.showFill : false, // NEVER contourf on move unless out of fill bounds
               showLine: liveLayer.visible !== false && liveLayer.config?.showLine !== false,
               viewportBounds: map.getBounds().toArray(),
               maxEffectiveCells: budget,
