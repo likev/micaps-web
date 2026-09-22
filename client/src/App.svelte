@@ -40,6 +40,7 @@
   import { updateGraticuleScheme } from "./map/graticule.js";
   import { hovmollerController, lineHeightController } from "./layers/lineprofile/lineProfileLayer.js";
   import { syncProfilePanelsForWindow, hideAllProfilePanels } from "./lib/services/profileVisibility.js";
+  import { version as APP_VERSION } from "../package.json";
 
   let activeTab = $derived(tabsState.tabs.find((t) => t.id === tabsState.activeTabId) || tabsState.tabs[0] || null);
   let activeWin = $derived(activeTab && activeTab.windows ? (activeTab.windows[activeTab.activeWinIdx] || activeTab.windows[0]) : null);
@@ -125,6 +126,7 @@
   }
 
   onMount(async () => {
+    console.info(`[MICAPS-Web] client v${APP_VERSION}`);
     ensureInitialTab();
     forecastRefreshTimer = setInterval(() => {
       if (activeWin) refreshForecastTimeline(activeWin, true);

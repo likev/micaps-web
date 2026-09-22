@@ -4,6 +4,7 @@
   import { app } from "../lib/stores/app.svelte.js";
   import { fetchStatus } from "../api/catalogApi.js";
   import { PRESET_GROUPS, isDivider } from "../config/presets.js";
+  import { version as appVersion } from "../../package.json";
 
   let {
     presetGroups = [],
@@ -115,6 +116,7 @@
   <div class="nav-brand">
     <a href="https://github.com/likev/micaps-web" target="_blank" rel="noopener noreferrer" class="brand-link" title="MICAPS-Web on GitHub">MICAPS-Web</a>
     <span class="brand-badge">PRO</span>
+    <span class="brand-version" title="Client build version — compare with git tag when reporting bugs">v{appVersion}</span>
   </div>
 
   <div class="nav-middle">
@@ -222,6 +224,13 @@
     padding: 2px 6px;
     border-radius: 4px;
     font-weight: 700;
+  }
+
+  .brand-version {
+    font-size: 10px;
+    color: var(--text-secondary, #8b949e);
+    font-family: var(--font-mono, monospace);
+    letter-spacing: 0.3px;
   }
 
   .nav-middle {
