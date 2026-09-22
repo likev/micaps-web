@@ -8,12 +8,29 @@ import { tabsState, getVisibleWindows, isWindowVisible, getActiveTab } from "./t
  */
 export function registerWindowMapSync(win, map) {
   if (!win || !map) return () => {};
+  // Identity must compare stable win.id, never object references: callers
+  // (App.svelte) pass Svelte 5 $state proxies while this module reads the
+  // raw core store, and proxy !== raw under ===/includes. Comparing
+  // references here silently broke sync entirely (isWindowVisible was
+  // always false, so onMove always bailed).
+  const winId = win.id;
+  const winTabId = win.tabId;
+
+  const findTab = () => tabsState.tabs.find((t) => t.id === winTabId) || getActiveTab();
+  const findSelf = (tab) => {
+    if (!tab || !Array.isArray(tab.windows)) return null;
+    if (winId !== undefined && winId !== null) {
+      return tab.windows.find((w) => w && w.id === winId) || null;
+    }
+    return tab.windows.includes(win) ? win : null;
+  };
 
   const alignToActive = () => {
-    const tab = tabsState.tabs.find((t) => t.id === win.tabId) || getActiveTab();
+    const tab = findTab();
     if (!tab || tab.syncMap === false || tab.layout === "1x1") return;
+    const self = findSelf(tab);
     const activeWin = tab.windows[tab.activeWinIdx] || tab.windows[0];
-    if (activeWin && activeWin !== win && activeWin.map) {
+    if (activeWin && self && activeWin.id !== self.id && activeWin.map) {
       try {
         map.jumpTo({
           center: activeWin.map.getCenter(),
@@ -33,9 +50,10 @@ export function registerWindowMapSync(win, map) {
 
   let syncAnimId = null;
   const onMove = () => {
-    const tab = tabsState.tabs.find((t) => t.id === win.tabId) || getActiveTab();
+    const tab = findTab();
     if (!tab || tab.syncMap === false || tab.layout === "1x1" || tabsState.syncingTabs.has(tab.id)) return;
-    if (!isWindowVisible(tab, win)) return;
+    const self = findSelf(tab);
+    if (!self || !isWindowVisible(tab, self)) return;
 
     if (syncAnimId) return;
     const schedule = typeof requestAnimationFrame === "function" ? requestAnimationFrame : (cb) => setTimeout(cb, 16);
@@ -50,7 +68,7 @@ export function registerWindowMapSync(win, map) {
         const bearing = map.getBearing();
 
         getVisibleWindows(tab).forEach((otherWin) => {
-          if (otherWin !== win && otherWin.map && (typeof otherWin.map.jumpTo === "function")) {
+          if (otherWin && otherWin.id !== winId && otherWin.map && (typeof otherWin.map.jumpTo === "function")) {
             const isLoaded = typeof otherWin.map.isStyleLoaded === "function" ? otherWin.map.isStyleLoaded() : true;
             if (isLoaded) {
               otherWin.map.jumpTo({ center, zoom, pitch, bearing });

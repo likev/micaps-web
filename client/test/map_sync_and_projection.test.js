@@ -156,8 +156,7 @@ describe("Map Camera Synchronization in Split View", () => {
     expect(mockMap2.center).not.toEqual([100, 30]);
   });
 
-  it("syncTabCameras explicitly aligns all visible windows to active window", () => {
-    const tab = tabsState.tabs[0];
+  it("syncTabCameras explicitly aligns all visible windows to active window", () => {    const tab = tabsState.tabs[0];
     mockMap1.center = [110, 35];
     mockMap1.zoom = 7;
     mockMap1.pitch = 15;
@@ -169,6 +168,28 @@ describe("Map Camera Synchronization in Split View", () => {
     expect(mockMap2.zoom).toBe(7);
     expect(mockMap2.pitch).toBe(15);
     expect(mockMap2.bearing).toBe(30);
+  });
+
+  it("synchronizes when registered with an identity-mismatched handle (Svelte $state proxy)", async () => {
+    // Production: App.svelte passes $state proxy windows while windowMaps
+    // reads the raw core store. Proxy !== raw under ===/includes, so
+    // identity MUST be compared by stable win.id. A shallow copy has the
+    // same id with a different identity, faithfully simulating the proxy.
+    const tab = tabsState.tabs[0];
+    const win0Proxy = { ...tab.windows[0] };
+    const win1Proxy = { ...tab.windows[1] };
+
+    cleanup1 = registerWindowMapSync(win0Proxy, mockMap1);
+    cleanup2 = registerWindowMapSync(win1Proxy, mockMap2);
+
+    mockMap1.center = [121.5, 31.2];
+    mockMap1.zoom = 6;
+    mockMap1.fireMove();
+
+    await new Promise((r) => setTimeout(r, 40));
+
+    expect(mockMap2.center).toEqual([121.5, 31.2]);
+    expect(mockMap2.zoom).toBe(6);
   });
 });
 
