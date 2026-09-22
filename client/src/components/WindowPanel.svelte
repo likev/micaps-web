@@ -13,8 +13,11 @@
 
   let winTitle = $derived.by(() => {
     if (!win) return "";
-    if (win.title) return win.title;
-    if (win.activeGroup?.name) return win.activeGroup.name;
+    // Strip any stale "Wn: " prefix: the badge already shows Wn, and the
+    // prefix is derived at render time so drag-reorder stays consistent.
+    const stripPrefix = (t) => String(t || "").replace(/^W\d+:\s*/, "");
+    if (win.title) return stripPrefix(win.title);
+    if (win.activeGroup?.name) return stripPrefix(win.activeGroup.name);
     if (win.model && win.element) {
       const isUpper = win.model === "UPPER_AIR" || (typeof win.element === "string" && win.element.includes("UPPER"));
       if (win.isObservation) {
@@ -123,7 +126,7 @@
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.14));
     border-radius: 20px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
-    z-index: 25;
+    z-index: 450;
     user-select: none;
     pointer-events: auto;
     max-width: min(85%, 680px);

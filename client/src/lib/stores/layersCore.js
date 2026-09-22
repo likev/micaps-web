@@ -82,9 +82,10 @@ export function removeLayer(layerId, winOrId = null) {
 export function syncLayerControlForWindow(win) {
   if (!win) return;
   currentActiveWinId = win.id || "default";
-  currentActiveWinTitle = win.title
-    ? `W${win.winIdx + 1}: ${win.title}`
-    : (win.activeGroup ? `W${win.winIdx + 1}: ${win.activeGroup.name}` : `Window ${win.winIdx + 1}`);
+  const baseTitle = win.title ? String(win.title).replace(/^W\d+:\s*/, "") : "";
+  currentActiveWinTitle = baseTitle
+    ? `W${win.winIdx + 1}: ${baseTitle}`
+    : (win.activeGroup ? `W${win.winIdx + 1}: ${String(win.activeGroup.name || "").replace(/^W\d+:\s*/, "")}` : `Window ${win.winIdx + 1}`);
   notifyLayersChanged(currentActiveWinId);
 }
 

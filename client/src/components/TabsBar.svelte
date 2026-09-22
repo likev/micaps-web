@@ -103,7 +103,10 @@
         onkeydown={(e) => e.key === "Enter" && selectItem(item, item.winIdx ?? idx)}
       >
         <span class="tab-label" id={item.labelId || `tab-label-${item.uid ?? item.winIdx ?? idx}`}>
-          {item.title ? (item.title.startsWith("W") ? item.title : `W${(item.winIdx ?? idx) + 1}: ${item.title}`) : `Tab ${(item.winIdx ?? idx) + 1}`}
+          {(() => {
+            const raw = item.title ? String(item.title).replace(/^W\d+:\s*/, "") : "";
+            return raw ? `W${(item.winIdx ?? idx) + 1}: ${raw}` : `Tab ${(item.winIdx ?? idx) + 1}`;
+          })()}
         </span>
         {#if (item.winIdx ?? idx) >= 4}
           <button

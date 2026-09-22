@@ -49,7 +49,8 @@ export function applyPresetToWindow(win, group, overrideLevel = null, timelinesM
   } else if (overrideLevel !== null) {
     win.level = overrideLevel;
   }
-  win.title = `W${(win.winIdx ?? 0) + 1}: ${groupCopy.name || groupCopy.id}`;
+  win.title = groupCopy.name || groupCopy.id;
+  win.baseTitle = groupCopy.name || groupCopy.id;
 
   // Manage UI timeline visibility
   uiState.timelineVisible = !isSpecialProfile;

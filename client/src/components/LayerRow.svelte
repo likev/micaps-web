@@ -316,10 +316,12 @@
 
         <div class="config-row config-row-wrap">
           <label><input type="checkbox" checked={Boolean(layer.config?.showDTD)} onchange={(e) => handleConfigChange("showDTD", e.target.checked)} /> T−Td</label>
-          <label><input type="checkbox" checked={Boolean(layer.config?.showCloud)} onchange={(e) => handleConfigChange("showCloud", e.target.checked)} /> Cloud</label>
-          <label><input type="checkbox" checked={Boolean(layer.config?.showWeather)} onchange={(e) => handleConfigChange("showWeather", e.target.checked)} /> Weather</label>
-          <label><input type="checkbox" checked={Boolean(layer.config?.showVisibility)} onchange={(e) => handleConfigChange("showVisibility", e.target.checked)} /> Visibility</label>
-          <label><input type="checkbox" checked={Boolean(layer.config?.showRain6)} onchange={(e) => handleConfigChange("showRain6", e.target.checked)} /> Rain 6h</label>
+          {#if !isUpperStation}
+            <label><input type="checkbox" checked={Boolean(layer.config?.showCloud)} onchange={(e) => handleConfigChange("showCloud", e.target.checked)} /> Cloud</label>
+            <label><input type="checkbox" checked={Boolean(layer.config?.showWeather)} onchange={(e) => handleConfigChange("showWeather", e.target.checked)} /> Weather</label>
+            <label><input type="checkbox" checked={Boolean(layer.config?.showVisibility)} onchange={(e) => handleConfigChange("showVisibility", e.target.checked)} /> Visibility</label>
+            <label><input type="checkbox" checked={Boolean(layer.config?.showRain6)} onchange={(e) => handleConfigChange("showRain6", e.target.checked)} /> Rain 6h</label>
+          {/if}
           <label><input type="checkbox" checked={Boolean(layer.config?.showStreamlines)} onchange={(e) => handleConfigChange("showStreamlines", e.target.checked)} /> Streamlines</label>
         </div>
 

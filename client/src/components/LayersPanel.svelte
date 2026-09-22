@@ -18,9 +18,12 @@
   let winObj = $derived(getWindowById(activeWinId));
   let winTitle = $derived(
     winObj
-      ? (winObj.title
-        ? (winObj.title.startsWith("W") ? winObj.title : `W${winObj.winIdx + 1}: ${winObj.title}`)
-        : (winObj.activeGroup ? `W${winObj.winIdx + 1}: ${winObj.activeGroup.name}` : `Window ${winObj.winIdx + 1}`))
+      ? (() => {
+          const raw = winObj.title ? String(winObj.title).replace(/^W\d+:\s*/, "") : "";
+          if (raw) return `W${winObj.winIdx + 1}: ${raw}`;
+          const groupName = winObj.activeGroup?.name ? String(winObj.activeGroup.name).replace(/^W\d+:\s*/, "") : "";
+          return groupName ? `W${winObj.winIdx + 1}: ${groupName}` : `Window ${winObj.winIdx + 1}`;
+        })()
       : getCurrentActiveWinTitle()
   );
 

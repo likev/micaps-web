@@ -33,7 +33,7 @@
   import { applyBasemapScheme } from "./map/pmtilesLayers.js";
   import { updateGraticuleScheme } from "./map/graticule.js";
   import { hovmollerController, lineHeightController } from "./layers/lineprofile/lineProfileLayer.js";
-  import { syncProfilePanelsForWindow } from "./lib/services/profileVisibility.js";
+  import { syncProfilePanelsForWindow, hideAllProfilePanels } from "./lib/services/profileVisibility.js";
 
   let activeTab = $derived(tabsState.tabs.find((t) => t.id === tabsState.activeTabId) || tabsState.tabs[0] || null);
   let activeWin = $derived(activeTab && activeTab.windows ? (activeTab.windows[activeTab.activeWinIdx] || activeTab.windows[0]) : null);
@@ -216,6 +216,8 @@
 
   function handleAddWindow() {
     if (!activeTab) return;
+    // Leave the config editor so the newly created tab-win is visible.
+    ui.configOpen = false;
     if (activeTab._nextWinSeq == null) activeTab._nextWinSeq = activeTab.windows.length;
     const uid = activeTab._nextWinSeq++;
     const posIdx = activeTab.windows.length;
@@ -252,7 +254,11 @@
     windows.splice(toIndex, 0, moved);
     windows.forEach((win, idx) => {
       win.winIdx = idx;
-      if (win.title) win.title = win.title.replace(/^W\d+:\s*/, `W${idx + 1}: `);
+      // Titles store the base name only; the "Wn: " prefix is derived at
+      // render time from winIdx. Strip any stale prefix carried from a
+      // previous position so tab-title and win-title stay consistent.
+      if (win.title) win.title = String(win.title).replace(/^W\d+:\s*/, "");
+      if (win.baseTitle) win.baseTitle = String(win.baseTitle).replace(/^W\d+:\s*/, "");
     });
     activeTab.activeWinIdx = Math.max(0, windows.indexOf(activeWindow));
   }
@@ -643,6 +649,38 @@
     handleChangeLayout(activeTab.layout === "1x1" ? "2x2" : "1x1");
   }
 
+  function handleToggleConfig() {
+    const opening = !ui.configOpen;
+    ui.configOpen = opening;
+    // $effect below hides/restores floating panels; apply immediately too
+    // so body-appended panels never cover the editor on the same tick.
+    if (opening) {
+      try { hideAllProfilePanels(); } catch {}
+    } else {
+      try {
+        if (activeWin) syncProfilePanelsForWindow(activeWin, getMapInstance(activeWin.id));
+      } catch {}
+    }
+  }
+
+  // Opening the config editor auto-hides floating profile panels
+  // (T-LogP, Time-Height, Line-Height, Hovmoller/Time-Line). The timeline
+  // already hides via `!ui.configOpen`. Closing re-syncs the focused
+  // window so its panels come back.
+  let prevConfigOpen = $state(false);
+  $effect(() => {
+    const isOpen = ui.configOpen;
+    if (isOpen === prevConfigOpen) return;
+    prevConfigOpen = isOpen;
+    if (isOpen) {
+      try { hideAllProfilePanels(); } catch {}
+    } else {
+      try {
+        if (activeWin) syncProfilePanelsForWindow(activeWin, getMapInstance(activeWin.id));
+      } catch {}
+    }
+  });
+
   async function handleKeydown(e) {
     if (e.key === "Escape") {
       ui.configOpen = false;
@@ -708,7 +746,7 @@
     onPresetSelect={handlePresetSelect}
     onLoadData={handleLoadData}
     onLevelSelect={handleLevelSelect}
-    onOpenConfig={() => (ui.configOpen = !ui.configOpen)}
+    onOpenConfig={handleToggleConfig}
   />
 
   <TabsBar

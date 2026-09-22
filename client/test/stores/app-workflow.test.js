@@ -46,7 +46,8 @@ describe("App Workflow & Preset Orchestration Integration (Phase 3 Gate)", () =>
       applyPresetToWindow(win, thGroup, null, timelines);
 
       expect(win.activeGroup.id).toBe("composite-ec-timeheight");
-      expect(win.title).toBe("W1: ECMWF Time-Height Profile");
+      expect(win.title).toBe("ECMWF Time-Height Profile");
+      expect(win.baseTitle).toBe("ECMWF Time-Height Profile");
       expect(uiState.timelineVisible).toBe(false);
     });
 

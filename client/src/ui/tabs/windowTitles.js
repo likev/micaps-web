@@ -9,6 +9,8 @@ export function computeFullWindowTitle(win, baseText = null) {
   }
   if (!base) return "";
 
+  // Strip any stale "Wn: " window prefix so drag-reorder never bakes it in.
+  base = String(base).replace(/^W\d+:\s*/, "").trim();
   // Strip any existing timestamp suffix to prevent duplicate accumulation
   base = base.replace(/\s*[\(\[](Obs|Valid).*?[\)\]]$/i, "").trim();
   win.baseTitle = base;
