@@ -15,6 +15,31 @@ let lastPrefetchStats = {
   targets: null,
 };
 
+// Live per-window timeline resolver (Svelte era). The legacy global
+// timelineState singleton no longer tracks the focused window (legacy
+// setTimelineMode never fires since the Svelte refactor), so left/right
+// targets resolved from it are frozen at defaults — prefetching wrong
+// periods / mock obs files while up/down (static VERTICAL_LEVELS + live
+// win.level) kept working. App.svelte registers a resolver reading the
+// live per-window store; when absent we fall back to the legacy global
+// (keeps unit tests and legacy callers working).
+let liveTimelineResolver = null;
+export function setLiveTimelineResolver(fn) {
+  liveTimelineResolver = typeof fn === "function" ? fn : null;
+}
+export function getLiveTimelineResolver() {
+  return liveTimelineResolver;
+}
+function resolveLiveSteps(win) {
+  try {
+    const live = liveTimelineResolver ? liveTimelineResolver(win?.id) : null;
+    if (live && (Array.isArray(live.discretePeriods) || Array.isArray(live.obsFiles))) {
+      return getAdjacentTimeSteps(live);
+    }
+  } catch {}
+  return null;
+}
+
 /**
  * Normalizes input direction(s) into canonical direction names ('left', 'right', 'up', 'down').
  * Maps 'prev' -> 'left' and 'next' -> 'right'.
@@ -51,7 +76,7 @@ export function getPrefetchTargets(win, options = {}) {
     return { left: null, right: null, up: null, down: null };
   }
 
-  const timelineSteps = options.timelineSteps || getAdjacentTimeSteps();
+  const timelineSteps = options.timelineSteps || resolveLiveSteps(win) || getAdjacentTimeSteps();
   const mode = timelineSteps.mode || (win.isObservation ? "obs" : "nwp");
   const activeGroup = win.activeGroup;
 
@@ -433,9 +458,21 @@ export function schedulePrefetch(win, delayMs = 150, options = {}) {
     clearTimeout(prefetchTimers.get(winKey));
     prefetchTimers.delete(winKey);
   }
+  const opts = { ...(options || {}) };
+  if (win) {
+    // Direction hints are single-use: an explicit options.directions wins,
+    // otherwise consume a pending win.prefetchDirections (set per keyboard
+    // time-step). Either way the stored hint is cleared so a stale direction
+    // never leaks into an unrelated later prefetch (e.g. a left-step hint
+    // restricting a subsequent level-step prefetch to one time axis).
+    if (opts.directions === undefined && win.prefetchDirections) {
+      opts.directions = win.prefetchDirections;
+    }
+    win.prefetchDirections = null;
+  }
   const timer = setTimeout(() => {
     prefetchTimers.delete(winKey);
-    prefetchSurroundingData(win, options).catch(() => {});
+    prefetchSurroundingData(win, opts).catch(() => {});
   }, delayMs);
   prefetchTimers.set(winKey, timer);
 }

@@ -16,7 +16,13 @@
   import { tabsState, getVisibleWindows, getWindowById, setMapInstance, getMapInstance, mapInstances } from "./lib/stores/tabs.svelte.js";
   import { syncLayersState } from "./lib/stores/layers.svelte.js";
   import { syncLegendState } from "./lib/stores/legend.svelte.js";
-  import { getOrCreateTimeline, playback, selectObsChipsWindow, filterObsFilesByStep, getPeriodsForStep } from "./lib/stores/timeline.svelte.js";
+  import { getOrCreateTimeline, playback, selectObsChipsWindow, filterObsFilesByStep, getPeriodsForStep, timelinesByWindow } from "./lib/stores/timeline.svelte.js";
+  import { setLiveTimelineResolver } from "./services/prefetchService.js";
+
+  // Feed the prefetch engine the live per-window timeline (not the frozen
+  // legacy global) so left/right keyboard steps warm the actual adjacent
+  // periods / obs files.
+  setLiveTimelineResolver((winId) => (winId ? timelinesByWindow[winId] : null) || null);
 
   import { loadPresetGroups, PRESET_GROUPS, onConfigLoaded, CURRENT_CONFIG, autoSaveLayerConfig } from "./config/presets.js";
   import { loadPresetGroup, reloadConfiguration } from "./services/presetLoader.js";
