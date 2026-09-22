@@ -40,7 +40,6 @@
   import { updateGraticuleScheme } from "./map/graticule.js";
   import { hovmollerController, lineHeightController } from "./layers/lineprofile/lineProfileLayer.js";
   import { syncProfilePanelsForWindow, hideAllProfilePanels } from "./lib/services/profileVisibility.js";
-  import { version as APP_VERSION } from "../package.json";
 
   let activeTab = $derived(tabsState.tabs.find((t) => t.id === tabsState.activeTabId) || tabsState.tabs[0] || null);
   let activeWin = $derived(activeTab && activeTab.windows ? (activeTab.windows[activeTab.activeWinIdx] || activeTab.windows[0]) : null);
@@ -126,7 +125,6 @@
   }
 
   onMount(async () => {
-    console.info(`[MICAPS-Web] client v${APP_VERSION}`);
     ensureInitialTab();
     forecastRefreshTimer = setInterval(() => {
       if (activeWin) refreshForecastTimeline(activeWin, true);
@@ -313,7 +311,7 @@
     }
     if (layout !== "1x1" && activeTab.syncMap !== false) {
       setTimeout(() => {
-        syncTabCameras(activeTab);
+        syncTabCameras(activeTab, { getMap: (id) => getMapInstance(id) });
       }, 50);
     }
   }
@@ -322,7 +320,7 @@
     if (!activeTab) return;
     activeTab.syncMap = activeTab.syncMap === false ? true : false;
     if (activeTab.syncMap) {
-      syncTabCameras(activeTab);
+      syncTabCameras(activeTab, { getMap: (id) => getMapInstance(id) });
     }
   }
 
@@ -540,7 +538,17 @@
     if (syncCleanups.has(win.id)) {
       try { syncCleanups.get(win.id)(); } catch {}
     }
-    const cleanup = registerWindowMapSync(win, map);
+    // Pass LIVE resolvers closing over the Svelte $state proxy store.
+    // windowMaps must never read layout/syncMap from the plain core copy:
+    // the proxy fork keeps layout === "1x1" stale there, which silently
+    // disabled all move/zoom sync in split mode. Maps resolve via the
+    // shared (never-proxied) registry so MapLibre instances stay raw.
+    const winTabId = win.tabId;
+    const cleanup = registerWindowMapSync(win, map, {
+      getTab: () => tabsState.tabs.find((t) => t.id === winTabId) || tabsState.tabs[0] || null,
+      getMap: (id) => getMapInstance(id),
+      getVisible: (tab) => getVisibleWindows(tab),
+    });
     syncCleanups.set(win.id, cleanup);
   }
 

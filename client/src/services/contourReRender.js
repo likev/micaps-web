@@ -61,12 +61,21 @@ function cleanupKey(key, map = null) {
     reRenderTimers.delete(key);
   }
   const handler = reRenderHandlers.get(key);
-  const targetMap = map || handlerMaps.get(key);
-  if (handler && targetMap && typeof targetMap.off === "function") {
-    try {
-      targetMap.off("moveend", handler);
-      targetMap.off("zoomend", handler);
-    } catch {}
+  // Always detach from the STORED map first: the caller may pass a different
+  // window's map (e.g. disarmAll from the active window while keys belong to
+  // background windows). Off on the wrong map is a no-op and leaks the
+  // listener, which later resurrects deleted layers on zoom/pan.
+  const storedMap = handlerMaps.get(key);
+  const targetMaps = [storedMap, map].filter(Boolean);
+  if (handler) {
+    for (const targetMap of targetMaps) {
+      if (typeof targetMap.off === "function") {
+        try {
+          targetMap.off("moveend", handler);
+          targetMap.off("zoomend", handler);
+        } catch {}
+      }
+    }
   }
   reRenderHandlers.delete(key);
   handlerMaps.delete(key);
@@ -177,7 +186,26 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
 
       const runCompute = async () => {
         if (!map || !layer) return;
-        const liveLayer = (win && typeof getLayerById === "function" ? getLayerById(layer.id, win) : null) || layer;
+        // Disarmed after scheduling (delete/clear/preset switch) but before
+        // the idle callback ran: the handler entry is gone, so abort instead
+        // of resurrecting a deleted layer on zoom/pan.
+        if (!reRenderHandlers.has(key)) return;
+        // Deleted-layer guard: when the window is known, the layer store is
+        // authoritative. NEVER fall back to the stale closure `layer` here —
+        // it still holds gridData after ✕-delete and would recreate map
+        // sources/layers on the next zoom (reported fill-resurrection bug).
+        // Only when win is unknown (legacy callers) keep the closure.
+        let liveLayer = null;
+        if (win && typeof getLayerById === "function") {
+          try {
+            liveLayer = getLayerById(layer.id, win);
+          } catch {
+            liveLayer = null;
+          }
+          if (!liveLayer) return;
+        } else {
+          liveLayer = layer;
+        }
         if (!liveLayer.gridData) return;
         if (reRenderBusy.has(key)) {
           pendingReRenders.set(key, true);
@@ -200,6 +228,21 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
                 liveLayer.colormap = targetColormap;
               }
             } catch {}
+          }
+
+          // Re-check after the await: the layer may have been ✕-deleted or
+          // the key disarmed while the palette was loading.
+          if (!reRenderHandlers.has(key)) return;
+          if (win && typeof getLayerById === "function") {
+            let stillThere = null;
+            try {
+              stillThere = getLayerById(layer.id, win);
+            } catch {
+              stillThere = null;
+            }
+            if (!stillThere) return;
+            liveLayer = stillThere;
+            if (!liveLayer.gridData) return;
           }
 
           if (liveLayer.type === "contour" && liveLayer.gridData?.values) {

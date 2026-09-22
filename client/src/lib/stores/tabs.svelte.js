@@ -7,13 +7,20 @@ import {
   getCallbacks,
   setCallbacks,
   getSyncingTabs,
+  mapInstances as coreMapInstances,
+  getMapInstance as coreGetMapInstance,
+  setMapInstance as coreSetMapInstance,
 } from "./tabsCore.js";
 import { setDefaultWinResolver } from "./legendCore.js";
 
 export const tabsState = $state(coreTabsState);
 
-// MapLibre map handles kept outside $state to prevent reactive proxy loops
-export const mapInstances = new Map();
+// MapLibre map handles kept outside $state to prevent reactive proxy loops.
+// MUST reuse the core registry instance (no `new Map()` fork): windowMaps.js
+// reads the core registry in plain-JS tests and production, while App and
+// mapViewport write through this module. A forked Map would make writes
+// invisible to sync reads, silently breaking split-view camera sync.
+export const mapInstances = coreMapInstances;
 
 export function getActiveTab() {
   return tabsState.tabs.find((t) => t.id === tabsState.activeTabId) || tabsState.tabs[0] || null;
@@ -38,15 +45,11 @@ export function getWindowById(winId) {
 setDefaultWinResolver(getWindowById);
 
 export function getMapInstance(winId) {
-  return mapInstances.get(winId) || null;
+  return coreGetMapInstance(winId);
 }
 
 export function setMapInstance(winId, map) {
-  if (map) {
-    mapInstances.set(winId, map);
-  } else {
-    mapInstances.delete(winId);
-  }
+  coreSetMapInstance(winId, map);
 }
 
 export {

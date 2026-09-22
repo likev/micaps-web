@@ -88,6 +88,27 @@ export function getWindowById(winId) {
   return null;
 }
 
+// ── Shared MapLibre instance registry (plain, never reactive) ─────────────
+// Map handles must never live inside Svelte $state: the proxy would wrap
+// MapLibre Map methods and break `this`, plus cause reactive loops.
+// This registry is the single source of truth for live maps. tabs.svelte.js
+// re-exports this SAME Map instance (no `new Map()` fork) so App/mapViewport
+// writes are visible to windowMaps sync reads even though tab state itself
+// is forked between core (plain) and svelte (proxy).
+export const mapInstances = new Map();
+
+export function getMapInstance(winId) {
+  return mapInstances.get(winId) || null;
+}
+
+export function setMapInstance(winId, map) {
+  if (map) {
+    mapInstances.set(winId, map);
+  } else {
+    mapInstances.delete(winId);
+  }
+}
+
 // ── Split visibility helpers (pure, no DOM) ───────────────────────────────
 export function getNumVisible(layout) {
   if (layout === "1x2") return 2;
