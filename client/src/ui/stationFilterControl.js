@@ -1,5 +1,6 @@
 // stationFilterControl.js - Interactive Station Multi-Filter Rule Builder Component
 import { autoSaveLayerConfig } from "../config/presets.js";
+import { getViewAutoCheckPatch } from "../layers/station/stationFilter.js";
 
 const PRESETS = {
   clear: [],
@@ -232,6 +233,7 @@ export function bindStationFilterEvents(configDrawer, layer, onAction, winId) {
         const idx = parseInt(e.target.dataset.ruleIdx, 10);
         if (layer.config.filterRules[idx]) {
           layer.config.filterRules[idx].field = e.target.value;
+          Object.assign(layer.config, getViewAutoCheckPatch(layer.config));
           triggerUpdate();
         }
       });
@@ -252,6 +254,7 @@ export function bindStationFilterEvents(configDrawer, layer, onAction, winId) {
         const idx = parseInt(e.target.dataset.ruleIdx, 10);
         if (layer.config.filterRules[idx]) {
           layer.config.filterRules[idx].val = e.target.value;
+          Object.assign(layer.config, getViewAutoCheckPatch(layer.config));
           triggerUpdate();
         }
       });
@@ -313,6 +316,7 @@ export function bindStationFilterEvents(configDrawer, layer, onAction, winId) {
       const presetRules = PRESETS[pKey];
       if (presetRules) {
         layer.config.filterRules = presetRules.map((r) => ({ ...r }));
+        Object.assign(layer.config, getViewAutoCheckPatch(layer.config));
         rerender();
       }
     });

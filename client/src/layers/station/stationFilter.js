@@ -86,6 +86,41 @@ export function isFieldVisibleInView(p, cfg, field) {
   return true;
 }
 
+// Plot-element display toggle (layer.config flag) driven by a filter field.
+// Used to auto-check an element when its first ViewOnly rule appears, so a
+// new rule (e.g. vis<1km) has a visible effect instead of gating a hidden
+// element. Fields without a plotted toggle (Cloud/Weather/Tendency) map
+// to null.
+const FIELD_CONFIG_FLAGS = {
+  TT: "showTemp",
+  Td: "showDewpoint",
+  DTD: "showDTD",
+  Wind: "showWind",
+  Rain: "showRain6",
+  Rain6: "showRain6",
+  Visibility: "showVisibility",
+  SLP: "showPressure",
+  Height: "showPressure",
+};
+
+export function filterFieldToConfigFlag(field) {
+  return FIELD_CONFIG_FLAGS[normalizeFilterField(field)] || null;
+}
+
+// ViewOnly auto-check patch: { flag: true } for every ruled element that is
+// currently off. Pure (does not mutate cfg); callers assign the result to
+// the layer config and forward it in the config-change payload. Only
+// complete (active) rules trigger; empty rows never flip toggles.
+export function getViewAutoCheckPatch(cfg) {
+  if (!isViewOnly(cfg)) return {};
+  const patch = {};
+  for (const r of collectActiveRules(cfg)) {
+    const flag = filterFieldToConfigFlag(r.field);
+    if (flag && !cfg?.[flag]) patch[flag] = true;
+  }
+  return patch;
+}
+
 export function evaluateSingleRule(p, rule) {
   if (!rule || !rule.field || rule.field === "none") return true;
   const actual = getFieldValue(p, rule.field);

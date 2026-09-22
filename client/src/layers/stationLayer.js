@@ -24,6 +24,8 @@ export {
   normalizeFilterField,
   collectActiveRules,
   isFieldVisibleInView,
+  filterFieldToConfigFlag,
+  getViewAutoCheckPatch,
   VIEW_LOGIC,
 } from "./station/stationFilter.js";
 

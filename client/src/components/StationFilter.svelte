@@ -1,5 +1,6 @@
 <script>
   import { ensureLayerFilterRules } from "../ui/stationFilterControl.js";
+  import { getViewAutoCheckPatch } from "../layers/station/stationFilter.js";
 
   let { layer, onFilterChange = null } = $props();
 
@@ -61,8 +62,13 @@
   function update() {
     layer.config.filterRules = rules.map(({ field, op, val, val2 }) => ({ field, op, val, val2 }));
     layer.config.filterLogic = logic;
+    // ViewOnly: a new rule auto-checks its element's display toggle so the
+    // rule has a visible effect (e.g. vis<1km enables Visibility). Only
+    // transitions off->on, never unchecks, and only complete rules trigger.
+    const autoChecked = getViewAutoCheckPatch(layer.config);
+    Object.assign(layer.config, autoChecked);
     if (onFilterChange) {
-      onFilterChange({ filterRules: layer.config.filterRules, filterLogic: logic });
+      onFilterChange({ filterRules: layer.config.filterRules, filterLogic: logic, ...autoChecked });
     }
   }
 

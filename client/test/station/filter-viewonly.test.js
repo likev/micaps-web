@@ -7,6 +7,8 @@ import {
   isFieldVisibleInView,
   matchesStationFilters,
   compileStationFilter,
+  filterFieldToConfigFlag,
+  getViewAutoCheckPatch,
   VIEW_LOGIC,
 } from "../../src/layers/station/stationFilter.js";
 
@@ -103,5 +105,45 @@ describe("ViewOnly match mode", () => {
       expect(isFieldVisibleInView(calm, cfg, f)).toBe(true);
     }
     expect(matchesStationFilters(calm, cfg)).toBe(true);
+  });
+});
+
+describe("ViewOnly auto-check", () => {
+  it("maps filter fields to their element display toggles", () => {
+    expect(filterFieldToConfigFlag("TT")).toBe("showTemp");
+    expect(filterFieldToConfigFlag("Td")).toBe("showDewpoint");
+    expect(filterFieldToConfigFlag("DTD")).toBe("showDTD");
+    expect(filterFieldToConfigFlag("Wind")).toBe("showWind");
+    expect(filterFieldToConfigFlag("Rain")).toBe("showRain6");
+    expect(filterFieldToConfigFlag("Rain6")).toBe("showRain6");
+    expect(filterFieldToConfigFlag("Visibility")).toBe("showVisibility");
+    expect(filterFieldToConfigFlag("Vis")).toBe("showVisibility");
+    expect(filterFieldToConfigFlag("SLP")).toBe("showPressure");
+    expect(filterFieldToConfigFlag("Height")).toBe("showPressure");
+    expect(filterFieldToConfigFlag("Cloud")).toBe(null);
+    expect(filterFieldToConfigFlag("none")).toBe(null);
+  });
+
+  it("patches only ruled elements that are currently off, ViewOnly only", () => {
+    // vis<1km with Visibility off -> patch enables it; Wind already on -> untouched
+    const cfg = {
+      filterLogic: "VIEW",
+      showVisibility: false,
+      showWind: true,
+      filterRules: [
+        { field: "Visibility", op: "<", val: "1" },
+        { field: "Wind", op: ">", val: "5" },
+      ],
+    };
+    expect(getViewAutoCheckPatch(cfg)).toEqual({ showVisibility: true });
+    // Non-VIEW modes never auto-check
+    expect(getViewAutoCheckPatch({ ...cfg, filterLogic: "AND" })).toEqual({});
+    // Incomplete rows (no val) never flip toggles
+    expect(
+      getViewAutoCheckPatch({ filterLogic: "VIEW", showVisibility: false, filterRules: [{ field: "Visibility", op: "<", val: "" }] })
+    ).toEqual({});
+    // Patch is idempotent once applied
+    const applied = { ...cfg, showVisibility: true };
+    expect(getViewAutoCheckPatch(applied)).toEqual({});
   });
 });
