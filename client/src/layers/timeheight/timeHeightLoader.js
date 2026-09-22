@@ -69,7 +69,7 @@ export async function loadTimeHeightMatrix({
   levels = PROFILE_LEVELS,
   point = { lon: 121.5, lat: 31.4 },
   onProgress = null,
-  signalSeq = null,
+  signalSeq = null, // legacy, ignored: cancellation is owned by isCancelled + abort signal
   isCancelled = null,
   abortController = null,
 } = {}) {
@@ -86,12 +86,6 @@ export async function loadTimeHeightMatrix({
   const shouldCancel = () => {
     if (signal.aborted) return true;
     if (typeof isCancelled === "function" && isCancelled()) return true;
-    if (signalSeq !== null && win && win._thLoadSeq !== undefined && win._thLoadSeq !== signalSeq) {
-      return true;
-    }
-    if (signalSeq !== null && win && win.loadSeq !== undefined && win.loadSeq !== signalSeq) {
-      return true;
-    }
     return false;
   };
 

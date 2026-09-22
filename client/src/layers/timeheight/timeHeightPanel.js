@@ -120,7 +120,7 @@ export class TimeHeightPanel {
           <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;"><input type="checkbox" class="th-cb-rh" checked /> <span style="color: #56d4dd;">RH</span></label>
           <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;"><input type="checkbox" class="th-cb-temp" checked /> <span style="color: #f85149;">T</span></label>
           <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;"><input type="checkbox" class="th-cb-vvel" checked /> <span style="color: #39c5bb;">VVEL</span></label>
-          <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;"><input type="checkbox" class="th-cb-wind" checked /> <span style="color: #58a6ff;">Wind</span></label>
+          <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;"><input type="checkbox" class="th-cb-wind" checked /> <span style="color: #e3b341;">Wind</span></label>
         </div>
       </div>
 

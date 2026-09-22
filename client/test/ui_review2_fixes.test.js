@@ -202,7 +202,7 @@ describe("UI Review 2: Layer Consistency & Addenda", () => {
     expect(getLayerById(panelLayer.id, win).visible).toBe(true);
   });
 
-  test("Addendum §7: Contour value labels use 13/14px text-size, 160 spacing, 2.0 halo", () => {
+  test("Addendum §7: Contour value labels use 13/14px text-size, 160 spacing, 2.5 halo", () => {
     const map = createMockMap();
     map.addSource("contour-tmp-isoline-source", {
       type: "geojson",

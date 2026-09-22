@@ -24,7 +24,7 @@
           class="legend-bar"
           role="img"
           aria-label="{item.element} color scale {item.zMin ?? ''} to {item.zMax ?? ''} {item.unit}"
-          style:background={item.gradient}
+          style:background={item.gradient || "rgba(255,255,255,0.08)"}
         ></div>
         <div class="legend-ticks">
           {#each item.tickLabels as tick}

@@ -4,7 +4,10 @@ const HALO_LAYER_ID = "lp-line-halo";
 const LINE_LAYER_ID = "lp-line-line";
 const A_LAYER_ID = "lp-line-a";
 const B_LAYER_ID = "lp-line-b";
+const LABEL_A_LAYER_ID = "lp-line-a-label";
+const LABEL_B_LAYER_ID = "lp-line-b-label";
 const PENDING_SOURCE_ID = "lp-line-pending";
+const PENDING_LABEL_LAYER_ID = "lp-line-pending-label";
 const PREVIEW_SOURCE_ID = "lp-line-preview";
 
 function ensureSource(map, id, data) {
@@ -19,6 +22,29 @@ function ensureSource(map, id, data) {
 function ensureCircleLayer(map, id, source, paint, filter = null) {
   if (!map.getLayer(id)) {
     map.addLayer({ id, type: "circle", source, ...(filter ? { filter } : {}), paint });
+  }
+}
+
+function ensureLabelLayer(map, id, source, text, filter) {
+  if (!map.getLayer(id)) {
+    map.addLayer({
+      id, type: "symbol", source, ...(filter ? { filter } : {}),
+      layout: {
+        "text-field": text,
+        "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+        "text-size": 13,
+        "text-offset": [0, -1.6],
+        "text-anchor": "bottom",
+        "text-allow-overlap": true,
+        "text-ignore-placement": true,
+        visibility: "visible",
+      },
+      paint: {
+        "text-color": "#e3b341",
+        "text-halo-color": "rgba(10, 15, 25, 0.95)",
+        "text-halo-width": 2,
+      },
+    });
   }
 }
 
@@ -52,6 +78,8 @@ export function showLineHighlight(map, a, b) {
   ensureCircleLayer(map, B_LAYER_ID, SOURCE_ID, {
     "circle-radius": 6, "circle-color": "#e3b341", "circle-stroke-width": 2, "circle-stroke-color": "#ffffff",
   }, ["==", ["get", "kind"], "lp-b"]);
+  ensureLabelLayer(map, LABEL_A_LAYER_ID, SOURCE_ID, "A", ["==", ["get", "kind"], "lp-a"]);
+  ensureLabelLayer(map, LABEL_B_LAYER_ID, SOURCE_ID, "B", ["==", ["get", "kind"], "lp-b"]);
   // Idempotent re-show fallback for maps that dropped filters:
   try {
     if (map.getLayer(A_LAYER_ID) && !map.getLayer(A_LAYER_ID).filter) {
@@ -59,6 +87,12 @@ export function showLineHighlight(map, a, b) {
     }
     if (map.getLayer(B_LAYER_ID) && !map.getLayer(B_LAYER_ID).filter) {
       map.setFilter?.(B_LAYER_ID, ["==", ["get", "kind"], "lp-b"]);
+    }
+    if (map.getLayer(LABEL_A_LAYER_ID) && !map.getLayer(LABEL_A_LAYER_ID).filter) {
+      map.setFilter?.(LABEL_A_LAYER_ID, ["==", ["get", "kind"], "lp-a"]);
+    }
+    if (map.getLayer(LABEL_B_LAYER_ID) && !map.getLayer(LABEL_B_LAYER_ID).filter) {
+      map.setFilter?.(LABEL_B_LAYER_ID, ["==", ["get", "kind"], "lp-b"]);
     }
   } catch { /* mock maps may lack setFilter */ }
 }
@@ -72,6 +106,7 @@ export function showPendingA(map, a) {
   ensureCircleLayer(map, PENDING_SOURCE_ID, PENDING_SOURCE_ID, {
     "circle-radius": 6, "circle-color": "#e3b341", "circle-stroke-width": 2, "circle-stroke-color": "#ffffff",
   });
+  ensureLabelLayer(map, PENDING_LABEL_LAYER_ID, PENDING_SOURCE_ID, "A", null);
 }
 
 export function showPreviewLine(map, a, cursor) {
@@ -93,12 +128,13 @@ export function removePreview(map) {
   if (map.getLayer(PREVIEW_SOURCE_ID)) map.removeLayer(PREVIEW_SOURCE_ID);
   if (map.getSource(PREVIEW_SOURCE_ID)) map.removeSource(PREVIEW_SOURCE_ID);
   if (map.getLayer(PENDING_SOURCE_ID)) map.removeLayer(PENDING_SOURCE_ID);
+  if (map.getLayer(PENDING_LABEL_LAYER_ID)) map.removeLayer(PENDING_LABEL_LAYER_ID);
   if (map.getSource(PENDING_SOURCE_ID)) map.removeSource(PENDING_SOURCE_ID);
 }
 
 export function removeLineHighlight(map = null) {
   if (!map || typeof map.removeLayer !== "function") return;
-  for (const id of [HALO_LAYER_ID, LINE_LAYER_ID, A_LAYER_ID, B_LAYER_ID]) {
+  for (const id of [HALO_LAYER_ID, LINE_LAYER_ID, A_LAYER_ID, B_LAYER_ID, LABEL_A_LAYER_ID, LABEL_B_LAYER_ID]) {
     if (map.getLayer(id)) map.removeLayer(id);
   }
   if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
@@ -108,7 +144,7 @@ export function removeLineHighlight(map = null) {
 export function setLineHighlightVisible(map = null, visible = true) {
   if (!map || typeof map.getLayer !== "function") return;
   const val = visible ? "visible" : "none";
-  for (const id of [HALO_LAYER_ID, LINE_LAYER_ID, A_LAYER_ID, B_LAYER_ID]) {
+  for (const id of [HALO_LAYER_ID, LINE_LAYER_ID, A_LAYER_ID, B_LAYER_ID, LABEL_A_LAYER_ID, LABEL_B_LAYER_ID]) {
     if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", val);
   }
 }

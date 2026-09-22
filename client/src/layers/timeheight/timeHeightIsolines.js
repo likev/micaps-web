@@ -2,6 +2,7 @@
 import * as griddata from "griddata";
 import { drawWindBarbCanvas } from "../station/stationSymbols.js";
 import { pressureToFy } from "./timeHeightCanvas.js";
+import { contourFillBands, rhBandFill } from "../lineprofile/lineIsolines.js";
 
 /**
  * Generates temperature contour levels (-92 to +48, step 4, containing 0C)
@@ -26,56 +27,28 @@ export function getVVelLevels() {
 }
 
 /**
- * Renders RH color fill inside the diagram plotRect
+ * Renders RH smooth contour-fill inside the diagram plotRect
  */
 export function renderRHFill(ctx, matrix, layout, xFn, yFn, rhColorResolver) {
   const pRect = layout.plotRect;
   const { leads, levels, rh } = matrix;
   if (!rh || rh.length === 0 || !leads || leads.length < 2) return;
 
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(pRect.x, pRect.y, pRect.width, pRect.height);
-  ctx.clip();
-
   const nLevels = levels.length;
   const nLeads = leads.length;
-  const rgba = [0, 0, 0, 255];
-
-  for (let li = 0; li < nLevels - 1; li++) {
-    const pBot = levels[li];
-    const pTop = levels[li + 1];
-    const yBot = yFn(pBot);
-    const yTop = yFn(pTop);
-    const cellH = yBot - yTop;
-
-    for (let ti = 0; ti < nLeads - 1; ti++) {
-      const lead0 = leads[ti];
-      const lead1 = leads[ti + 1];
-      const x0 = xFn(lead0);
-      const x1 = xFn(lead1);
-      const cellW = Math.abs(x1 - x0);
-      const minX = Math.min(x0, x1);
-
-      const v00 = rh[li][ti];
-      const v10 = rh[li][ti + 1];
-      const v01 = rh[li + 1][ti];
-      const v11 = rh[li + 1][ti + 1];
-
-      let sum = 0, count = 0;
-      if (!Number.isNaN(v00)) { sum += v00; count++; }
-      if (!Number.isNaN(v10)) { sum += v10; count++; }
-      if (!Number.isNaN(v01)) { sum += v01; count++; }
-      if (!Number.isNaN(v11)) { sum += v11; count++; }
-
-      if (count > 0) {
-        rhColorResolver(sum / count, rgba);
-        ctx.fillStyle = `rgba(${rgba[0]}, ${rgba[1]}, ${rgba[2]}, 0.82)`;
-        ctx.fillRect(minX, yTop, cellW + 0.5, cellH + 0.5);
-      }
+  const flat = new Float32Array(nLevels * nLeads);
+  for (let li = 0; li < nLevels; li++) {
+    for (let ti = 0; ti < nLeads; ti++) {
+      const v = rh[li][ti];
+      flat[li * nLeads + ti] = (v === null || v === undefined || Number.isNaN(v)) ? NaN : v;
     }
   }
-  ctx.restore();
+
+  const fyList = levels.map((p) => pressureToFy(p));
+  contourFillBands(ctx, layout, nLevels, flat, leads, fyList,
+    (ld) => xFn(ld), (u, v) => pRect.y + v * pRect.height,
+    (lvl) => rhBandFill(rhColorResolver, lvl));
+  void yFn;
 }
 
 /**
@@ -240,7 +213,7 @@ export function renderWindBarbs(ctx, matrix, layout, xFn, yFn) {
       const speed = Math.hypot(uVal, vVal);
       const dir = ((Math.atan2(-uVal, -vVal) * 180) / Math.PI + 360) % 360;
 
-      drawWindBarbCanvas(ctx, px, py, speed, dir, 0.55);
+      drawWindBarbCanvas(ctx, px, py, speed, dir, 0.55, "#e3b341");
     }
   }
   ctx.restore();

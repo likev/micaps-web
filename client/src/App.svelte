@@ -33,6 +33,7 @@
   import { applyBasemapScheme } from "./map/pmtilesLayers.js";
   import { updateGraticuleScheme } from "./map/graticule.js";
   import { hovmollerController, lineHeightController } from "./layers/lineprofile/lineProfileLayer.js";
+  import { syncProfilePanelsForWindow } from "./lib/services/profileVisibility.js";
 
   let activeTab = $derived(tabsState.tabs.find((t) => t.id === tabsState.activeTabId) || tabsState.tabs[0] || null);
   let activeWin = $derived(activeTab && activeTab.windows ? (activeTab.windows[activeTab.activeWinIdx] || activeTab.windows[0]) : null);
@@ -205,6 +206,11 @@
 
     const hasData = Boolean(win.activeGroup);
     ui.timelineVisible = hasData && !shouldHideTimelineForGroup(win.activeGroup);
+    // Auto hide/show floating profile panels (T-LogP, Time-Height, Line-Height,
+    // Time-Line) so toggling window tabs swaps diagrams instead of sticking.
+    try {
+      syncProfilePanelsForWindow(win, getMapInstance(win.id));
+    } catch {}
     if (hasData && !win.isObservation) refreshForecastTimeline(win, true);
   }
 

@@ -140,7 +140,9 @@ export class HovmollerCanvasRenderer {
     }
     const ls = this.leads();
     if (this.options.showRH) {
-      renderHovRHFill(ctx, this.matrix, this.layout, this.distKm, this.rhColorResolver, (li, pi) => this.cellBounds(li, pi));
+      const coords = !this.swapped ? { u: this.distKm, v: ls } : { u: ls, v: this.distKm };
+      renderHovRHFill(ctx, this.matrix, this.layout, this.distKm, this.rhColorResolver,
+        (a, b) => this.uFn(a, b), (a, b) => this.vFn(a, b), coords, this.swapped);
     }
     this._renderAxes(ctx);
     if (this.options.showTemp) {

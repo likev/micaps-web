@@ -115,9 +115,10 @@ describe("Hovmoller canvas views", () => {
       save: () => calls.push("save"),
       restore: () => calls.push("restore"),
       beginPath: () => {}, rect: () => {}, clip: () => {},
-      moveTo: () => {}, lineTo: () => {},
+      moveTo: () => {}, lineTo: () => {}, closePath: () => {},
       stroke: () => calls.push("stroke"),
       strokeRect: () => {}, clearRect: () => {},
+      fill: () => calls.push("fill"),
       fillRect: () => calls.push("fillRect"),
       fillText: () => {}, measureText: () => ({ width: 10 }),
       setLineDash: () => {},
@@ -141,9 +142,9 @@ describe("Hovmoller canvas views", () => {
     calls.length = 0;
     r.render();
     const strokesAll = calls.filter((c) => c === "stroke").length;
-    const fillsAll = calls.filter((c) => c === "fillRect").length;
+    const fillsAll = calls.filter((c) => c === "fill").length;
     expect(strokesAll).toBeGreaterThan(0);
-    expect(fillsAll).toBeGreaterThan(1); // background + RH cells
+    expect(fillsAll).toBeGreaterThan(0); // smooth RH contour-fill bands
 
     r.setOptions({ showTemp: false, showVVel: false, showWind: false, showRH: false });
     calls.length = 0;
@@ -151,12 +152,13 @@ describe("Hovmoller canvas views", () => {
     // Only axes gridlines stroke now; only the background fillRect remains
     const strokesNone = calls.filter((c) => c === "stroke").length;
     expect(strokesNone).toBeLessThan(strokesAll);
+    expect(calls.filter((c) => c === "fill").length).toBe(0);
     expect(calls.filter((c) => c === "fillRect").length).toBe(1);
 
     r.setOptions({ showTemp: true, showVVel: true, showWind: true, showRH: true });
     calls.length = 0;
     r.render();
     expect(calls.filter((c) => c === "stroke").length).toBe(strokesAll);
-    expect(calls.filter((c) => c === "fillRect").length).toBe(fillsAll);
+    expect(calls.filter((c) => c === "fill").length).toBe(fillsAll);
   });
 });

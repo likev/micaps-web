@@ -352,7 +352,10 @@ export function getElementLevels(element = "TMP", zMin, zMax, colormap = null) {
 }
 
 export function getCSSGradient(element = "TMP", colormap = null) {
-  const palette = getColormap(colormap, element);
+  let palette = getColormap(colormap, element);
+  if (!palette || palette.length === 0) {
+    palette = getColormap(null, "TMP");
+  }
   const stops = palette.map((stop) => `rgb(${stop.color.slice(0, 3).join(",")})`).join(", ");
   return `linear-gradient(to right, ${stops})`;
 }

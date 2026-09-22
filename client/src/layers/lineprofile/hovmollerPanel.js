@@ -81,7 +81,7 @@ export class HovmollerPanel {
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="hov-cb-rh" checked /> <span style="color:#56d4dd;">RH</span></label>
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="hov-cb-temp" checked /> <span style="color:#f85149;">T</span></label>
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="hov-cb-vvel" checked /> <span style="color:#39c5bb;">VVEL</span></label>
-          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="hov-cb-wind" checked /> <span style="color:#58a6ff;">Wind</span></label>
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="hov-cb-wind" checked /> <span style="color:#e3b341;">Wind</span></label>
         </div>
       </div>
       <div class="hov-line-row" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 12px;background:#161b22;border-bottom:1px solid #21262d;font-size:11px;color:#c9d1d9;flex-shrink:0;">

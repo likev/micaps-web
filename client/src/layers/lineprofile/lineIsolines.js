@@ -6,33 +6,65 @@ import { getTempLevels, getVVelLevels } from "../timeheight/timeHeightIsolines.j
 
 export { pressureToFy };
 
-// Section RH fill over [level][pt]: x=distKm linear, y=log-p
+// RH fill bands: values below 50 stay transparent (background shows through)
+export const RH_FILL_LEVELS = [50, 60, 70, 80, 90, 100];
+
+export function rhBandFill(rhColorResolver, level) {
+  const mid = Array.isArray(level) ? (level[0] + level[1]) / 2 : Number(level) || 0;
+  const rgba = [0, 0, 0, 255];
+  rhColorResolver(mid, rgba);
+  return `rgba(${rgba[0]}, ${rgba[1]}, ${rgba[2]}, 0.82)`;
+}
+
+// Smooth filled contours for a rows×cols scalar grid in data coords.
+// px(u,v)/py(u,v) map data coords to pixels (axis-aware for swapped views).
+export function contourFillBands(ctx, layout, rows, flat, xs, ys, px, py, colorFor) {
+  const pRect = layout.plotRect;
+  let feats = [];
+  try {
+    feats = griddata.contourf({ data: flat, rows, cols: xs.length }, { x: xs, y: ys, levels: RH_FILL_LEVELS }) || [];
+  } catch { feats = []; }
+  if (!feats.length) return;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(pRect.x, pRect.y, pRect.width, pRect.height); ctx.clip();
+  for (const f of feats) {
+    ctx.fillStyle = colorFor(f.properties?.level);
+    const polys = f.geometry?.type === "Polygon" ? [f.geometry.coordinates] : (f.geometry?.coordinates || []);
+    for (const poly of polys) {
+      if (!poly?.length) continue;
+      ctx.beginPath();
+      for (const ring of poly) {
+        if (!ring || ring.length < 3) continue;
+        for (let i = 0; i < ring.length; i++) {
+          const [u, v] = ring[i];
+          const X = px(u, v), Y = py(u, v);
+          if (i === 0) ctx.moveTo(X, Y); else ctx.lineTo(X, Y);
+        }
+        ctx.closePath();
+      }
+      ctx.fill("evenodd");
+    }
+  }
+  ctx.restore();
+}
+
+// Section RH contour-fill over [level][pt]: x=distKm linear, y=log-p
 export function renderSectionRHFill(ctx, matrix, layout, distKm, xFn, yFn, rhColorResolver) {
   const pRect = layout.plotRect;
   const { levels, rh } = matrix;
   if (!rh?.length || !levels?.length || !distKm || distKm.length < 2) return;
-  ctx.save();
-  ctx.beginPath(); ctx.rect(pRect.x, pRect.y, pRect.width, pRect.height); ctx.clip();
   const nLevels = levels.length, nPts = distKm.length;
-  const rgba = [0, 0, 0, 255];
-  for (let li = 0; li < nLevels - 1; li++) {
-    const yTop = yFn(levels[li + 1]), yBot = yFn(levels[li]);
-    const cellH = yBot - yTop;
-    for (let pi = 0; pi < nPts - 1; pi++) {
-      const x0 = xFn(distKm[pi]), x1 = xFn(distKm[pi + 1]);
-      const cellW = Math.abs(x1 - x0), minX = Math.min(x0, x1);
-      let sum = 0, count = 0;
-      for (const v of [rh[li][pi], rh[li][pi + 1], rh[li + 1][pi], rh[li + 1][pi + 1]]) {
-        if (!Number.isNaN(v)) { sum += v; count++; }
-      }
-      if (count > 0) {
-        rhColorResolver(sum / count, rgba);
-        ctx.fillStyle = `rgba(${rgba[0]}, ${rgba[1]}, ${rgba[2]}, 0.82)`;
-        ctx.fillRect(minX, yTop, cellW + 0.5, cellH + 0.5);
-      }
+  const flat = new Float32Array(nLevels * nPts);
+  for (let li = 0; li < nLevels; li++) {
+    for (let pi = 0; pi < nPts; pi++) {
+      const v = rh[li][pi];
+      flat[li * nPts + pi] = v === null || v === undefined || Number.isNaN(v) ? NaN : v;
     }
   }
-  ctx.restore();
+  const fyList = levels.map((p) => pressureToFy(p));
+  contourFillBands(ctx, layout, nLevels, flat, distKm, fyList,
+    (d) => xFn(d), (u, v) => pRect.y + v * pRect.height,
+    (lvl) => rhBandFill(rhColorResolver, lvl));
 }
 
 // Section T/VVEL lines via contour in (dist, fy) coords
@@ -124,34 +156,28 @@ export function renderSectionBarbs(ctx, matrix, layout, distKm, xFn, yFn, stride
       if (Number.isNaN(uV) || Number.isNaN(vV)) continue;
       const speed = Math.hypot(uV, vV);
       const dir = ((Math.atan2(-uV, -vV) * 180) / Math.PI + 360) % 360;
-      drawWindBarbCanvas(ctx, xFn(distKm[pi]), py, speed, dir, 0.55);
+      drawWindBarbCanvas(ctx, xFn(distKm[pi]), py, speed, dir, 0.55, "#e3b341");
     }
   }
   ctx.restore();
 }
 
-// Hovmoller RH fill over [lead][pt]; cell geometry comes from cellBounds (axis-aware)
-export function renderHovRHFill(ctx, matrix, layout, distKm, rhColorResolver, cellBounds) {
-  const pRect = layout.plotRect;
+// Hovmoller RH contour-fill over [lead][pt]; u/v mapping is axis-aware
+// (coords + uFn/vFn mirror renderHovLines; swapped=true transposes the grid).
+export function renderHovRHFill(ctx, matrix, layout, distKm, rhColorResolver, uFn, vFn, coords, swapped = false) {
   const { leads, rh } = matrix;
-  if (!rh?.length || !leads?.length || distKm.length < 2) return;
-  ctx.save();
-  ctx.beginPath(); ctx.rect(pRect.x, pRect.y, pRect.width, pRect.height); ctx.clip();
-  const rgba = [0, 0, 0, 255];
-  for (let li = 0; li < leads.length - 1; li++) {
-    for (let pi = 0; pi < distKm.length - 1; pi++) {
-      let sum = 0, count = 0;
-      for (const v of [rh[li][pi], rh[li][pi + 1], rh[li + 1][pi], rh[li + 1][pi + 1]]) {
-        if (!Number.isNaN(v)) { sum += v; count++; }
-      }
-      if (count === 0) continue;
-      rhColorResolver(sum / count, rgba);
-      ctx.fillStyle = `rgba(${rgba[0]}, ${rgba[1]}, ${rgba[2]}, 0.82)`;
-      const b = cellBounds(li, pi);
-      ctx.fillRect(b.x, b.y, b.w + 0.5, b.h + 0.5);
+  if (!rh?.length || !leads?.length || !distKm || distKm.length < 2) return;
+  const xs = coords.u, ys = coords.v;
+  const rows = ys.length, cols = xs.length;
+  const flat = new Float32Array(rows * cols);
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const v = swapped ? rh[c]?.[r] : rh[r]?.[c];
+      flat[r * cols + c] = v === null || v === undefined || Number.isNaN(v) ? NaN : v;
     }
   }
-  ctx.restore();
+  contourFillBands(ctx, layout, rows, flat, xs, ys, uFn, vFn,
+    (lvl) => rhBandFill(rhColorResolver, lvl));
 }
 
 export function renderHovLines(ctx, matrix, layout, field, distKm, uFn, vFn, uCoords, kind) {
@@ -194,7 +220,7 @@ export function renderHovBarbs(ctx, matrix, layout, distKm, pxFn, stride = 2) {
       const [px, py] = pxFn(li, pi);
       const speed = Math.hypot(uV, vV);
       const dir = ((Math.atan2(-uV, -vV) * 180) / Math.PI + 360) % 360;
-      drawWindBarbCanvas(ctx, px, py, speed, dir, 0.55);
+      drawWindBarbCanvas(ctx, px, py, speed, dir, 0.55, "#e3b341");
     }
   }
   ctx.restore();

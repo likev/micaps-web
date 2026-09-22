@@ -15,6 +15,23 @@ export function setDefaultWinResolver(resolver) {
   defaultWinResolver = resolver;
 }
 
+// Change listeners for cross-module reactivity bridging (plain JS so both
+// legacy ui/legend.js and the Svelte store can share one notification path
+// without import cycles or .svelte.js runtime requirements).
+const legendListeners = new Set();
+
+export function onLegendChange(cb) {
+  if (typeof cb !== "function") return () => {};
+  legendListeners.add(cb);
+  return () => { legendListeners.delete(cb); };
+}
+
+export function notifyLegendChanged(winId = null) {
+  for (const cb of legendListeners) {
+    try { cb(winId); } catch {}
+  }
+}
+
 export function buildLegendItems(winOrId, legendsMap = windowLegends, winResolver = null) {
   const winId = typeof winOrId === "string" ? winOrId : (winOrId?.id || "default");
   const elMap = legendsMap.get(winId);
@@ -91,6 +108,7 @@ export function updateLegend(element = "TMP", colormap = null, zMin = undefined,
     if (m) winPrefix = `W${parseInt(m[1], 10) + 1}`;
   }
   elMap.set(element, { element, colormap, zMin, zMax, winPrefix });
+  notifyLegendChanged(winId);
 }
 
 export function removeLegend(element, win = null) {
@@ -98,6 +116,7 @@ export function removeLegend(element, win = null) {
   if (windowLegends.has(winId)) {
     windowLegends.get(winId).delete(element);
   }
+  notifyLegendChanged(winId);
 }
 
 export function clearLegends(win = null) {
@@ -105,4 +124,5 @@ export function clearLegends(win = null) {
   if (windowLegends.has(winId)) {
     windowLegends.get(winId).clear();
   }
+  notifyLegendChanged(winId);
 }

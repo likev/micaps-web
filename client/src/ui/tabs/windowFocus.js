@@ -7,6 +7,7 @@ import { applySplitVisibility } from "./windowReorder.js";
 import { updateWindowTitle } from "./windowTitles.js";
 import { pausePlayback } from "../timeline/playbackController.js";
 import { setTimelineMode, setTimeSliderVisible } from "../timeline/timeSliderView.js";
+import { syncProfilePanelsForWindow } from "../../lib/services/profileVisibility.js";
 
 function getPillElForWin(win) {
   if (!win) return null;
@@ -120,6 +121,7 @@ export function focusWindow(tabId, winIdx) {
   if (isTimeHeight || isHovmoller) {
     try { setTimeSliderVisible(false); } catch {}
   } else {
+    try { setTimeSliderVisible(true); } catch {}
     // Apply pending or cached observation timeline for active window
     if (activeWin._pendingTimeline) {
       const pt = activeWin._pendingTimeline;
@@ -144,6 +146,10 @@ export function focusWindow(tabId, winIdx) {
       try { setTimelineMode("nwp", nt); } catch {}
     }
   }
+
+  // Auto hide/show floating profile panels (T-LogP, Time-Height, Line-Height,
+  // Time-Line) so toggling window tabs swaps diagrams instead of sticking.
+  try { syncProfilePanelsForWindow(activeWin, activeWin.map || null); } catch {}
 
   callbacks.onWindowFocus?.(activeWin);
 }

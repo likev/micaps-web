@@ -1,11 +1,11 @@
 // stationSymbols.js - Wind barb and sky cover canvas symbol renderers (CMA & WMO compliant)
 
-export function drawWindBarbCanvas(ctx, cx, cy, speed, dir, scale = 1.0) {
+export function drawWindBarbCanvas(ctx, cx, cy, speed, dir, scale = 1.0, color = "#58a6ff") {
   if (speed < 1.5) {
     ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, 10 * scale, 0, Math.PI * 2);
-    ctx.strokeStyle = "#58a6ff";
+    ctx.strokeStyle = color;
     ctx.lineWidth = 1.3 * scale;
     if (typeof ctx.setLineDash === "function") {
       ctx.setLineDash([2.5 * scale, 2.5 * scale]);
@@ -28,8 +28,8 @@ export function drawWindBarbCanvas(ctx, cx, cy, speed, dir, scale = 1.0) {
   const barbAngle = angleRad + ((70 * Math.PI) / 180);
 
   ctx.save();
-  ctx.strokeStyle = "#58a6ff";
-  ctx.fillStyle = "#58a6ff";
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
   ctx.lineWidth = 2.2 * scale;
   ctx.lineCap = "round";
   ctx.lineJoin = "miter";

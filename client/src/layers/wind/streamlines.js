@@ -50,8 +50,8 @@ export function renderWindStreamlines(map, gridData, options = {}) {
   function resetParticle(p) {
     p.lng = spawnWest + Math.random() * (spawnEast - spawnWest);
     p.lat = spawnSouth + Math.random() * (spawnNorth - spawnSouth);
-    p.age = Math.random() * 40;
-    p.maxAge = 40 + Math.random() * 50;
+    p.age = Math.random() * 100;
+    p.maxAge = 100 + Math.random() * 100;
     if (typeof map.project === "function") {
       const pt = map.project([p.lng, p.lat]);
       p.x = pt ? pt.x : 0;
@@ -90,7 +90,7 @@ export function renderWindStreamlines(map, gridData, options = {}) {
     if (typeof ctx.setTransform === "function") {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
     }
-    ctx.fillStyle = "rgba(10, 13, 20, 0.92)";
+    ctx.fillStyle = "rgba(10, 13, 20, 0.965)";
     ctx.globalCompositeOperation = "destination-in";
     ctx.fillRect(0, 0, streamCanvas.width, streamCanvas.height);
     ctx.globalCompositeOperation = "source-over";
@@ -104,7 +104,7 @@ export function renderWindStreamlines(map, gridData, options = {}) {
     updateSpawnBounds();
     const currentZoom = typeof map.getZoom === "function" ? map.getZoom() : 4.5;
     const zoomFactor = Math.pow(2, (4.5 - currentZoom) * 0.85);
-    const dt = 0.11 * zoomFactor;
+    const dt = 0.22 * zoomFactor;
     const dtU = (dt * 1000) / 111320;
     const dtV = (dt * 1000) / 110574;
 

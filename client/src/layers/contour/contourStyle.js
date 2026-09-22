@@ -76,7 +76,9 @@ export function setLayerIsolineStyle(map, layerId, config = {}, parseBoldValuesF
     map.setPaintProperty(isolineLayerId, "line-width", lineWidthExp);
   }
   if (map.getLayer(isolineLabelLayerId)) {
-    map.setPaintProperty(isolineLabelLayerId, "text-color", lineColor);
+    map.setPaintProperty(isolineLabelLayerId, "text-color", "#ffffff");
+    map.setPaintProperty(isolineLabelLayerId, "text-halo-color", "rgba(0, 0, 0, 0.95)");
+    map.setPaintProperty(isolineLabelLayerId, "text-halo-width", 2.5);
     if (typeof config.labelSize === "number" && config.labelSize > 0) {
       map.setLayoutProperty(isolineLabelLayerId, "text-size", buildLabelSizeExp(config.labelSize));
     }

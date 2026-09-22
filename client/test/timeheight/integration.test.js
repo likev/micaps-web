@@ -390,7 +390,7 @@ describe("V5: Forecast Cycle Switch", () => {
 });
 
 describe("V6: Progress Tracking and Load Cancellation", () => {
-  it("aborts in-flight load when sequence counter advances", async () => {
+  it("aborts in-flight load when the caller cancels via isCancelled", async () => {
     clearDataCache();
     const win = { id: "test-v6-win", loadSeq: 1 };
     const leads = [0, 12, 24];
@@ -403,6 +403,7 @@ describe("V6: Progress Tracking and Load Cancellation", () => {
     };
 
     try {
+      let cancelledFlag = false;
       const loadPromise = loadTimeHeightMatrix({
         win,
         cycle: "26091808",
@@ -410,12 +411,42 @@ describe("V6: Progress Tracking and Load Cancellation", () => {
         levels,
         point: { lon: 121.5, lat: 31.4 },
         signalSeq: 1,
+        isCancelled: () => cancelledFlag,
       });
-      win.loadSeq = 2;
+      cancelledFlag = true;
 
       const res = await loadPromise;
       expect(res.cancelled).toBe(true);
       expect(res.matrix).toBeNull();
+    } finally {
+      global.fetch = originalFetch;
+      clearDataCache();
+    }
+  });
+
+  it("does not cancel when unrelated win.loadSeq advances (map clicks keep working)", async () => {
+    clearDataCache();
+    const win = { id: "test-v6-win-click", loadSeq: 1 };
+    const leads = [0, 12, 24];
+    const levels = [1000, 500];
+
+    const originalFetch = global.fetch;
+    global.fetch = async () => createSyntheticProfileStream(leads, levels);
+
+    try {
+      // App bumps win.loadSeq on every timeline step; a subsequent map-click
+      // load must NOT be treated as stale.
+      win.loadSeq = 2;
+      const res = await loadTimeHeightMatrix({
+        win,
+        cycle: "26091808",
+        leads,
+        levels,
+        point: { lon: 122.0, lat: 32.0 },
+        signalSeq: 1,
+      });
+      expect(res.cancelled).toBe(false);
+      expect(res.matrix).not.toBeNull();
     } finally {
       global.fetch = originalFetch;
       clearDataCache();

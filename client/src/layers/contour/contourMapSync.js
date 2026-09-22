@@ -89,12 +89,12 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
       }
       if (map.getLayer(isolineLabelLayerId)) {
         map.setLayoutProperty(isolineLabelLayerId, "visibility", visibleIsoline ? "visible" : "none");
-        map.setPaintProperty(isolineLabelLayerId, "text-color", lineColor);
+        map.setPaintProperty(isolineLabelLayerId, "text-color", "#ffffff");
         try {
           map.setLayoutProperty(isolineLabelLayerId, "text-size", labelTextSize);
           map.setLayoutProperty(isolineLabelLayerId, "symbol-spacing", 160);
           map.setLayoutProperty(isolineLabelLayerId, "symbol-sort-key", ["case", ["to-boolean", ["get", "isBold"]], 0, 10]);
-          map.setPaintProperty(isolineLabelLayerId, "text-halo-width", 2.0);
+          map.setPaintProperty(isolineLabelLayerId, "text-halo-width", 2.5);
         } catch {}
       }
     } else {
@@ -134,9 +134,9 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
           "visibility": visibleIsoline ? "visible" : "none",
         },
         paint: {
-          "text-color": lineColor,
-          "text-halo-color": "rgba(10, 15, 25, 0.95)",
-          "text-halo-width": 2.0,
+          "text-color": "#ffffff",
+          "text-halo-color": "rgba(0, 0, 0, 0.95)",
+          "text-halo-width": 2.5,
         },
       });
     }
