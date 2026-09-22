@@ -192,9 +192,22 @@
     }
   }
 
+  function findWindowIndex(windows, win) {
+    // Identity-proof lookup by stable window id. Svelte 5 $state wraps
+    // objects stored in reactive arrays, so a raw (never-rendered) window
+    // reference never matches Array#indexOf (always -1). Freshly created
+    // windows in handleAddWindow hit exactly this trap.
+    if (!Array.isArray(windows) || !win) return -1;
+    if (win.id !== undefined && win.id !== null) {
+      const byId = windows.findIndex((w) => w && w.id === win.id);
+      if (byId !== -1) return byId;
+    }
+    return windows.indexOf(win);
+  }
+
   function handleWindowFocus(win) {
     if (!activeTab || !win) return;
-    const idx = activeTab.windows.indexOf(win);
+    const idx = findWindowIndex(activeTab.windows, win);
     if (idx !== -1) {
       activeTab.activeWinIdx = idx;
     }
@@ -226,12 +239,15 @@
     winObj.id = `tab-${activeTab.id}-win-${uid}`;
     winObj.level = DEFAULT_LEVELS[posIdx] || 500;
     activeTab.windows.push(winObj);
+    // The pushed window is stored wrapped by $state: focus it by position
+    // id so the new tab-win is always selected, then sync the rest.
+    activeTab.activeWinIdx = posIdx;
     handleWindowFocus(winObj);
   }
 
   function handleCloseWindow(win) {
     if (!activeTab || activeTab.windows.length <= 1) return;
-    const idx = activeTab.windows.indexOf(win);
+    const idx = findWindowIndex(activeTab.windows, win);
     if (idx !== -1) {
       const wasActive = idx === activeTab.activeWinIdx;
       activeTab.windows.splice(idx, 1);
@@ -246,6 +262,10 @@
   }
 
   function handleReorderWindows(fromIndex, toIndex) {
+    // toIndex is a post-removal splice index: TabsBar converts its visual
+    // insert slot p (before pill p, p == n means append) via
+    // to = from < p ? p - 1 : p, so splice(to, 0, moved) lands exactly
+    // where the drop indicator pointed.
     if (!activeTab || fromIndex === toIndex) return;
     const windows = activeTab.windows;
     if (fromIndex < 0 || toIndex < 0 || fromIndex >= windows.length || toIndex >= windows.length) return;
@@ -260,7 +280,7 @@
       if (win.title) win.title = String(win.title).replace(/^W\d+:\s*/, "");
       if (win.baseTitle) win.baseTitle = String(win.baseTitle).replace(/^W\d+:\s*/, "");
     });
-    activeTab.activeWinIdx = Math.max(0, windows.indexOf(activeWindow));
+    activeTab.activeWinIdx = Math.max(0, findWindowIndex(windows, activeWindow));
   }
 
   function toggleTabsAndSplit() {

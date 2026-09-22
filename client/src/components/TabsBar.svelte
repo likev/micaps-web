@@ -21,6 +21,11 @@
   } = $props();
 
   let draggedIndex = $state(null);
+  // Live insert position while dragging: dragOverIndex is the pill under the
+  // cursor, dropAfter selects its left/right half. The vertical indicator
+  // renders at insert slot p = dropAfter ? dragOverIndex + 1 : dragOverIndex.
+  let dragOverIndex = $state(null);
+  let dropAfter = $state(false);
 
   let tabItems = $derived(
     windows && windows.length > 0
@@ -58,45 +63,131 @@
     if (onChangeLayout) onChangeLayout(l);
   }
 
+  // Insert slot p in current render coordinates (0..n, n = append at end).
+  let insertP = $derived(
+    dragOverIndex === null ? null : (dropAfter ? dragOverIndex + 1 : dragOverIndex)
+  );
+
+  // Post-removal splice index for App.handleReorderWindows: removing `from`
+  // first shifts later slots down by one, so `to = from < p ? p - 1 : p`.
+  let insertTo = $derived(
+    insertP === null || draggedIndex === null
+      ? null
+      : (draggedIndex < insertP ? insertP - 1 : insertP)
+  );
+
+  // Hide the indicator when the slot is a no-op (would land back on itself).
+  let showIndicator = $derived(insertTo !== null && insertTo !== draggedIndex);
+
+  function clearDragState() {
+    draggedIndex = null;
+    dragOverIndex = null;
+    dropAfter = false;
+  }
+
   function handleDragStart(event, idx) {
     draggedIndex = idx;
+    dragOverIndex = null;
+    dropAfter = false;
     event.dataTransfer?.setData("text/plain", String(idx));
     if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
   }
 
-  function handleDragOver(event) {
+  function handleDragOver(event, idx) {
     if (draggedIndex === null) return;
     event.preventDefault();
+    event.stopPropagation();
     if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+    // Left/right half of the pill selects insert-before / insert-after.
+    const target = event.currentTarget;
+    let after = false;
+    if (target && typeof target.getBoundingClientRect === "function" && typeof event.clientX === "number") {
+      const rect = target.getBoundingClientRect();
+      if (rect.width > 0) after = event.clientX - rect.left > rect.width / 2;
+    }
+    dragOverIndex = idx;
+    dropAfter = after;
   }
 
   function handleDrop(event, idx) {
     event.preventDefault();
+    event.stopPropagation();
     const encoded = event.dataTransfer?.getData("text/plain");
-    const from = encoded === "" ? draggedIndex : parseInt(encoded, 10);
-    if (Number.isInteger(from) && onReorder) onReorder(from, idx);
-    draggedIndex = null;
+    const from = encoded === "" || encoded === undefined ? draggedIndex : parseInt(encoded, 10);
+    if (Number.isInteger(from) && onReorder) {
+      // Prefer the indicator slot when the pointer hovered one; otherwise
+      // fall back to dropping onto the pill (insert before it).
+      let to = idx;
+      if (dragOverIndex !== null && insertTo !== null) {
+        to = insertTo;
+      } else if (from < idx) {
+        to = idx - 1;
+      }
+      if (to !== from) onReorder(from, to);
+    }
+    clearDragState();
+  }
+
+  // Dropping on the list's empty padding appends at the end.
+  function handleListDragOver(event) {
+    if (draggedIndex === null) return;
+    if (event.target !== event.currentTarget) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+    dragOverIndex = tabItems.length - 1;
+    dropAfter = true;
+  }
+
+  function handleListDrop(event) {
+    if (event.target !== event.currentTarget) return;
+    event.preventDefault();
+    const encoded = event.dataTransfer?.getData("text/plain");
+    const from = encoded === "" || encoded === undefined ? draggedIndex : parseInt(encoded, 10);
+    if (Number.isInteger(from) && onReorder && tabItems.length > 0) {
+      const to = from < tabItems.length - 1 ? tabItems.length - 1 : from;
+      if (to !== from) onReorder(from, to);
+    }
+    clearDragState();
   }
 
   function handleDragEnd() {
-    draggedIndex = null;
+    clearDragState();
+  }
+
+  function handleDragLeave(event) {
+    // Leaving the tabs strip entirely hides the indicator; entering
+    // another pill re-arms it via handleDragOver.
+    if (event.target && event.currentTarget && !event.currentTarget.contains(event.relatedTarget)) {
+      dragOverIndex = null;
+      dropAfter = false;
+    }
   }
 </script>
 
 <div id="tabs-bar" class="tabs-bar" role="tablist" aria-label="Workstation Tabs and Layout">
-  <div class="tabs-list" id="tabs-list">
+  <div
+    class="tabs-list"
+    id="tabs-list"
+    ondragover={handleListDragOver}
+    ondrop={handleListDrop}
+    ondragleave={handleDragLeave}
+  >
     {#each tabItems as item, idx (item.id || idx)}
+      {#if showIndicator && insertP === idx}
+        <div class="drop-indicator" aria-hidden="true"></div>
+      {/if}
       <div
         id={item.pillId || `tab-item-win-${item.uid ?? item.winIdx ?? idx}`}
         class="tab-item"
         class:active={(item.winIdx ?? idx) === activeWinIdx && !ui.configOpen}
+        class:dragging={draggedIndex === idx}
         role="tab"
         aria-selected={(item.winIdx ?? idx) === activeWinIdx && !ui.configOpen}
         tabindex="0"
         title="Drag to rearrange"
         draggable="true"
         ondragstart={(e) => handleDragStart(e, idx)}
-        ondragover={handleDragOver}
+        ondragover={(e) => handleDragOver(e, idx)}
         ondrop={(e) => handleDrop(e, idx)}
         ondragend={handleDragEnd}
         onclick={() => selectItem(item, item.winIdx ?? idx)}
@@ -120,6 +211,9 @@
         {/if}
       </div>
     {/each}
+    {#if showIndicator && insertP === tabItems.length}
+      <div class="drop-indicator" aria-hidden="true"></div>
+    {/if}
 
     {#if ui.configOpen}
       <div
@@ -340,5 +434,20 @@
 
   .tab-item[draggable="true"] {
     cursor: grab;
+  }
+
+  .tab-item.dragging {
+    opacity: 0.45;
+  }
+
+  .drop-indicator {
+    width: 3px;
+    align-self: stretch;
+    margin: 5px -1px;
+    border-radius: 2px;
+    background: #58a6ff;
+    box-shadow: 0 0 8px rgba(88, 166, 255, 0.9);
+    pointer-events: none;
+    flex-shrink: 0;
   }
 </style>

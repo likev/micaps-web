@@ -51,18 +51,13 @@ export function computeFullWindowTitle(win, baseText = null) {
 
 export function updateWindowTitle(win, text = null) {
   if (!win || typeof document === "undefined") return;
-  const fullTitle = computeFullWindowTitle(win, text);
-
-  const el = document.getElementById(win.titleId);
-  if (el) {
-    el.textContent = fullTitle;
-    el.title = fullTitle || "";
-  }
-
-  const labelId = win.labelId || `tab-label-${win.winIdx}`;
-  const tabLabel = document.getElementById(labelId);
-  if (tabLabel) {
-    tabLabel.textContent = fullTitle ? `W${win.winIdx + 1}: ${fullTitle}` : `Tab ${win.winIdx + 1}`;
-    tabLabel.title = fullTitle ? `W${win.winIdx + 1}: ${fullTitle}` : `Tab ${win.winIdx + 1}`;
-  }
+  // State-only: pill labels (TabsBar), window headers (WindowPanel), the
+  // layers badge, and the legend all derive reactively from win.title /
+  // win.winIdx, including on first mount. Direct DOM writes are banned here:
+  // Svelte renders pill labels with stable per-window ids
+  // (`tab-label-${uid}`), while win.winIdx is positional — after any
+  // drag-reorder or close, `tab-label-${win.winIdx}` addresses a DIFFERENT
+  // pill, so the old imperative write corrupted other tabs' titles
+  // (tab W5 vs win W1 mashups on every Load Data / time-step / reload).
+  computeFullWindowTitle(win, text);
 }
