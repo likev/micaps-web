@@ -26,8 +26,6 @@ import { formatElementUnit, formatContourLabel } from "../../src/utils/formatter
 import { getColormap, getElementLevels } from "../../src/utils/colormaps.js";
 import { getPaletteCategory } from "../../src/utils/paletteLoader.js";
 import {
-  renderStationDrawerHTML,
-  renderWindDrawerHTML,
   getLayersForWindow,
   clearWindowWeatherLayers,
   addOrUpdateLayer,

@@ -6,6 +6,7 @@ import { autoSaveLayerConfig } from "../../config/presets.js";
 import { showErrorToast } from "../../ui/toast.js";
 import { addOrUpdateLayer, getLayerById, getLayersForWindow, syncLayerControlForWindow } from "../../ui/layers/layerStore.js";
 import { getActiveWindow } from "../../ui/tabs/tabsStore.js";
+import { setProfileState, getProfileState, clearProfileState } from "../../lib/stores/profilesCore.js";
 
 class TLogPController {
   constructor() {
@@ -49,17 +50,11 @@ class TLogPController {
         onParcelLevelChange: (lvl, customP) => {
           this.setParcelLevel(lvl, customP, this.activeWin);
         },
-        onClose: () => {
-          this.hide();
-          if (this.activeWin) {
-            const layer = this._findTLogPLayer(this.activeWin);
-            if (layer) {
-              layer.visible = false;
-            }
-          }
-        },
+        onClose: () => this.handlePanelClose(map, win),
       });
     }
+
+    this._syncProfileStore();
 
     if (layerDef.visible === false) {
       this.hide();
@@ -130,6 +125,7 @@ class TLogPController {
           addOrUpdateLayer(layer, win);
         }
       }
+      this._syncProfileStore();
       return data;
     } catch (err) {
       console.warn(`[TLogPController] Failed to load sounding for station ${stn}:`, err);
@@ -182,6 +178,7 @@ class TLogPController {
         syncLayerControlForWindow(win);
       }
     }
+    this._syncProfileStore();
   }
 
   setParcelLevel(level, customPressure = null, win = this.activeWin) {
@@ -219,6 +216,7 @@ class TLogPController {
     }
 
     this._syncParcelSelectUI(level);
+    this._syncProfileStore();
   }
 
   updateCycle(file, win = this.activeWin, map = this.activeMap) {
@@ -318,11 +316,15 @@ class TLogPController {
     if (win) this.activeWin = win;
     if (this.panel) this.panel.show();
     this.setHighlightVisible(this.activeMap, true);
+    try { setProfileState("tlogp", "global", { visible: true, winId: this.activeWin?.id || null }); } catch {}
   }
 
   hide(map = this.activeMap, win = this.activeWin) {
     if (this.panel) this.panel.hide();
     this.setHighlightVisible(map || this.activeMap, false);
+    try {
+      if (getProfileState("tlogp")) setProfileState("tlogp", "global", { visible: false });
+    } catch {}
   }
 
   toggle() {
@@ -334,11 +336,43 @@ class TLogPController {
     }
   }
 
+  // Panel ✕ behaves like an eye-toggle: hide visuals AND persist visible=false
+  // to the layer store (with control sync) so the eye UI and window-focus
+  // auto-show stay consistent.
+  handlePanelClose(map = null, win = null) {
+    const targetWin = win || this.activeWin;
+    this.hide(map || undefined);
+    if (targetWin) {
+      const layer = this._findTLogPLayer(targetWin);
+      if (layer) {
+        layer.visible = false;
+        addOrUpdateLayer(layer, targetWin);
+        if (typeof getActiveWindow === "function" && getActiveWindow() === targetWin) {
+          try { syncLayerControlForWindow(targetWin); } catch {}
+        }
+      }
+    }
+  }
+
   destroy(map = this.activeMap, win = this.activeWin) {
+    const targetWin = win || this.activeWin;
+    // Singleton panel is shared by all windows: only the owning window may
+    // tear it down. Teardown requested for any other window (e.g. a preset
+    // reload or level change elsewhere, which clears all layer types for the
+    // loading window) must only clean that map's highlight, never the global
+    // panel / sounding / registry — otherwise T-LogP vanishes app-wide and
+    // can never re-show on focus.
+    if (targetWin && this.activeWin && targetWin.id !== this.activeWin.id) {
+      this.removeStationHighlight(map || targetWin.map || undefined);
+      return;
+    }
     this.isLayerActive = false;
     this.removeStationHighlight(map);
+    try { clearProfileState("tlogp"); } catch {}
     if (this.panel) {
-      this.panel.destroy();
+      if (typeof this.panel.destroy === "function") {
+        try { this.panel.destroy(); } catch {}
+      }
       this.panel = null;
     }
     this.sounding = null;
@@ -348,6 +382,21 @@ class TLogPController {
     this.customPressure = null;
     this.activeMap = null;
     this.activeWin = null;
+  }
+
+  // Record readiness + header meta into the shared profile registry.
+  // Visibility itself is owned by show()/hide() below.
+  _syncProfileStore() {
+    try {
+      const prev = getProfileState("tlogp");
+      setProfileState("tlogp", "global", {
+        stationId: this.activeStationId,
+        stationName: this.sounding?.stationName || null,
+        obsTime: this.sounding?.obsTime || this.obsFile || null,
+        parcelLevel: this.activeParcelLevel,
+        visible: prev ? prev.visible : false,
+      });
+    } catch {}
   }
 
   _findTLogPLayer(win) {

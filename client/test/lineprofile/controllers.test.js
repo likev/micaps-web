@@ -209,8 +209,10 @@ describe("G1 timeline follow", () => {
 });
 
 describe("M5 drawer window threading", () => {
-  test("drawer edit on B mutates B only; A line + cache untouched", async () => {
-    const { bindHovmollerDrawerEvents } = await import("../../src/ui/layers/lineProfileDrawerBindings.js");
+  test("line edit on B mutates B only; A line + cache untouched", async () => {
+    // Live path: Svelte drawer dispatches config/aux actions that reach
+    // hovmollerController.setLine with the owning window (legacy DOM binder
+    // removed); window threading is owned by the controller state map.
     const mapA = createMockMap(), mapB = createMockMap();
     const winA = { id: "hov-drawer-A", loadSeq: 0, period: 24 };
     const winB = { id: "hov-drawer-B", loadSeq: 0, period: 24 };
@@ -220,29 +222,8 @@ describe("M5 drawer window threading", () => {
     const lineABefore = JSON.stringify(hovmollerController._getState(winA).line);
     const cacheABefore = hovmollerController._getState(winA).matrixCache.size;
 
-    // Mock drawer DOM for window B (inputs carry value + change handler surface)
-    const handlers = {};
-    const mkInput = (value) => ({
-      value,
-      addEventListener(ev, cb) { handlers[ev] = cb; },
-    });
-    const inputs = {
-      ".input-hov-alon": mkInput("102"), ".input-hov-alat": mkInput("26"),
-      ".input-hov-blon": mkInput("122"), ".input-hov-blat": mkInput("36"),
-      ".sel-hov-n": mkInput("5"),
-    };
-    const btnHandlers = {};
-    const drawerB = {
-      querySelector(sel) {
-        if (inputs[sel]) return inputs[sel];
-        return { addEventListener(ev, cb) { btnHandlers[`${sel}:${ev}`] = cb; } };
-      },
-    };
-    const layerB = { type: "hovmoller", config: { ...cfg } };
-    bindHovmollerDrawerEvents(layerB, drawerB, winB);
-    // Fire B's Apply button
-    btnHandlers[".btn-hov-apply:click"]({ stopPropagation() {} });
-    await new Promise((r) => setTimeout(r, 50));
+    // B's line edit with explicit owning window (what the live action path passes)
+    await hovmollerController.setLine({ lon: 102, lat: 26 }, { lon: 122, lat: 36 }, 5, winB);
     const lineBAfter = hovmollerController._getState(winB).line;
     expect(lineBAfter.a.lon).toBeCloseTo(102, 2);
     // A untouched

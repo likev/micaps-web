@@ -6,7 +6,7 @@ import { getFieldValue, matchesStationFilters, renderStationPlotToCanvas } from 
 import { formatElementUnit } from "../../src/utils/formatters.js";
 import { getColormap, getColor, getElementLevels } from "../../src/utils/colormaps.js";
 import { getPaletteCategory } from "../../src/utils/paletteLoader.js";
-import { getLayersForWindow, clearWindowWeatherLayers, renderStationDrawerHTML, addOrUpdateLayer } from "../../src/ui/layerControl.js";
+import { getLayersForWindow, clearWindowWeatherLayers, addOrUpdateLayer } from "../../src/ui/layerControl.js";
 import fs from "fs";
 
 // Recording Canvas 2D context: captures fillText with active fillStyle for color assertions

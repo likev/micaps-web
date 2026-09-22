@@ -1,6 +1,17 @@
 <script>
+  import { onMount, onDestroy } from "svelte";
   import { fade } from "svelte/transition";
-  import { ui, hideToast } from "../lib/stores/ui.svelte.js";
+  import { ui, hideToast, showToast } from "../lib/stores/ui.svelte.js";
+  import { setToastBridge } from "../ui/toast.js";
+
+  onMount(() => {
+    // Claim toast display: legacy showErrorToast routes through the store
+    // instead of mutating #error-toast behind this component.
+    setToastBridge((msg) => showToast("error", msg));
+  });
+  onDestroy(() => {
+    setToastBridge(null);
+  });
 </script>
 
 {#if ui.toast}

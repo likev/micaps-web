@@ -1,5 +1,7 @@
 // timeHeightLoader.js - Single streaming NWP time-height profile fetcher & matrix builder
 import { createScalarSampler, createWindSampler, snapToGridNode } from "./timeHeightSampling.js";
+import { loadHovmollerMatrix } from "../lineprofile/hovmollerLoader.js";
+import { buildTransectNodes } from "../lineprofile/lineUtils.js";
 
 export const PROFILE_LEVELS = [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200];
 export const TH_GRID_CACHE_TTL_MS = 10 * 60 * 1000;
@@ -291,6 +293,173 @@ export async function loadTimeHeightMatrix({
       ok: ok || total - (resultObj.stats?.failed || 0),
       failed: resultObj.stats?.failed ?? failed,
       cacheHits: resultObj.stats?.cacheHits ?? cacheHits,
+    },
+  };
+}
+
+/**
+ * Averages per-level transect matrices ([lead][pt] each) into one time-height
+ * profile matrix ([level][lead]). Each cell is the mean of valid (non-NaN)
+ * transect nodes; U/V are averaged as vector components (true vector mean).
+ * All-NaN columns stay NaN (gap, never fabricated).
+ */
+export function averageLineProfiles(levelMats, { levels, leads, line, npoints, transect = null }) {
+  const nLevels = levels.length;
+  const nLeads = leads.length;
+  const mk = () => Array.from({ length: nLevels }, () => new Float32Array(nLeads).fill(NaN));
+  const rh = mk(), tmp = mk(), vvel = mk(), u = mk(), v = mk();
+  const missing = { rh: 0, tmp: 0, vvel: 0, wind: 0 };
+  let rhMin = Infinity, rhMax = -Infinity;
+  let tmpMin = Infinity, tmpMax = -Infinity;
+  let vvelMin = Infinity, vvelMax = -Infinity;
+
+  for (let li = 0; li < nLevels; li++) {
+    const lm = levelMats[li];
+    for (let ti = 0; ti < nLeads; ti++) {
+      const pick = (mat) => (mat && mat[ti] ? mat[ti] : null);
+      const rRow = pick(lm?.rh), tRow = pick(lm?.tmp), wRow = pick(lm?.vvel);
+      const uRow = pick(lm?.u), vRow = pick(lm?.v);
+      const nPts = Math.max(
+        rRow?.length || 0, tRow?.length || 0, wRow?.length || 0, uRow?.length || 0, vRow?.length || 0
+      );
+      const mean = (row) => {
+        if (!row) return NaN;
+        let sum = 0, count = 0;
+        for (let pi = 0; pi < nPts; pi++) {
+          const val = row[pi];
+          if (val !== null && val !== undefined && !Number.isNaN(val)) { sum += val; count++; }
+        }
+        return count > 0 ? sum / count : NaN;
+      };
+      const mRh = mean(rRow), mTmp = mean(tRow), mVv = mean(wRow);
+      const mU = mean(uRow), mV = mean(vRow);
+      rh[li][ti] = mRh; tmp[li][ti] = mTmp; vvel[li][ti] = mVv; u[li][ti] = mU; v[li][ti] = mV;
+      if (Number.isNaN(mRh)) missing.rh++; else { if (mRh < rhMin) rhMin = mRh; if (mRh > rhMax) rhMax = mRh; }
+      if (Number.isNaN(mTmp)) missing.tmp++; else { if (mTmp < tmpMin) tmpMin = mTmp; if (mTmp > tmpMax) tmpMax = mTmp; }
+      if (Number.isNaN(mVv)) missing.vvel++; else { if (mVv < vvelMin) vvelMin = mVv; if (mVv > vvelMax) vvelMax = mVv; }
+      if (Number.isNaN(mU) || Number.isNaN(mV)) missing.wind++;
+    }
+  }
+
+  const t = transect || buildTransectNodes(line.a, line.b, npoints);
+  const mid = {
+    lon: Math.round(((line.a.lon + line.b.lon) / 2) * 10000) / 10000,
+    lat: Math.round(((line.a.lat + line.b.lat) / 2) * 10000) / 10000,
+  };
+
+  return {
+    point: mid,
+    cycle: levelMats.find((lm) => lm?.cycle)?.cycle || null,
+    leads: [...leads],
+    levels: [...levels],
+    rh, tmp, vvel, u, v,
+    line: {
+      a: { ...line.a }, b: { ...line.b }, npoints,
+      totalKm: t.totalKm ?? 0, distKm: [...(t.distKm || [])],
+    },
+    missing,
+    stats: {
+      rhMin: Number.isFinite(rhMin) ? rhMin : 0,
+      rhMax: Number.isFinite(rhMax) ? rhMax : 100,
+      tmpMin: Number.isFinite(tmpMin) ? tmpMin : -40,
+      tmpMax: Number.isFinite(tmpMax) ? tmpMax : 40,
+      vvelMin: Number.isFinite(vvelMin) ? vvelMin : -100,
+      vvelMax: Number.isFinite(vvelMax) ? vvelMax : 100,
+    },
+  };
+}
+
+/**
+ * Line-averaged time-height load: one hovmoller transect fetch per profile
+ * level (same total grid cost as a single-point load), averaged over nodes.
+ * Progress aggregates across levels; cancellation via isCancelled + abort.
+ */
+export async function loadTimeHeightLineMatrix({
+  win = null,
+  model = "ECMWF_HR",
+  cycle,
+  leads = [0, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 132, 144],
+  levels = PROFILE_LEVELS,
+  line = { a: { lon: 115, lat: 28 }, b: { lon: 125, lat: 38 } },
+  npoints = 41,
+  onProgress = null,
+  isCancelled = null,
+  abortController = null,
+  concurrency = 4,
+} = {}) {
+  const total = leads.length * levels.length * 4;
+  let loaded = 0, failed = 0, cacheHits = 0;
+  const controller = abortController || new AbortController();
+  const cancelled = () => {
+    if (controller.signal.aborted) return true;
+    if (typeof isCancelled === "function" && isCancelled()) return true;
+    return false;
+  };
+  if (cancelled()) {
+    return { cancelled: true, matrix: null, stats: { total, loaded: 0, ok: 0, failed: 0 } };
+  }
+
+  const perLevel = new Array(levels.length).fill(null);
+  const progress = new Array(levels.length).fill(null).map(() => ({ loaded: 0, total: 0, failed: 0, cacheHits: 0 }));
+  const report = () => {
+    loaded = progress.reduce((s, p) => s + (p.loaded || 0), 0);
+    failed = progress.reduce((s, p) => s + (p.failed || 0), 0);
+    cacheHits = progress.reduce((s, p) => s + (p.cacheHits || 0), 0);
+    if (typeof onProgress === "function") {
+      onProgress({
+        loaded, total,
+        ok: Math.max(0, loaded - failed), failed,
+        pct: total > 0 ? Math.round((loaded / total) * 100) : 100,
+        cacheHits, lastSource: "cache", cancelled: cancelled(),
+      });
+    }
+  };
+
+  const runLevel = async (li) => {
+    const res = await loadHovmollerMatrix({
+      win, model, cycle, leads, level: levels[li], line, npoints,
+      abortController: controller,
+      isCancelled: cancelled,
+      onProgress: (p) => { progress[li] = p; report(); },
+    });
+    if (cancelled() || !res || res.cancelled) return null;
+    progress[li] = { loaded: res.stats?.total || 0, total: res.stats?.total || 0, failed: res.stats?.failed || 0, cacheHits: res.stats?.cacheHits || 0 };
+    report();
+    perLevel[li] = res.matrix;
+    return res.matrix;
+  };
+
+  // Bounded fan-out so 10 concurrent NDJSON streams don't stampede the server
+  const queue = levels.map((_, li) => li);
+  const workers = Array.from({ length: Math.max(1, Math.min(concurrency, queue.length)) }, async () => {
+    while (queue.length > 0) {
+      if (cancelled()) return;
+      const li = queue.shift();
+      const r = await runLevel(li);
+      if (r === null && !cancelled()) {
+        // Level hard-failed (not cancelled): keep null slot, continue others
+      }
+    }
+  });
+  await Promise.all(workers);
+
+  if (cancelled()) {
+    return { cancelled: true, matrix: null, stats: { total, loaded, ok: 0, failed } };
+  }
+  if (perLevel.every((m) => !m)) {
+    return { cancelled: false, matrix: null, stats: { total, loaded, ok: 0, failed, cacheHits } };
+  }
+
+  const matrix = averageLineProfiles(perLevel, { levels, leads, line, npoints });
+  matrix.cycle = matrix.cycle || cycle;
+  return {
+    cancelled: false,
+    matrix,
+    stats: {
+      total, loaded: loaded || total,
+      ok: Math.max(0, (loaded || total) - failed),
+      failed,
+      cacheHits,
     },
   };
 }

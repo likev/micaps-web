@@ -1,5 +1,4 @@
 // layerControl.js - Interactive per-window multi-layer management panel (Facade)
-// Note: "👁" : "🚫" and layer-hidden are used in ./layers/layerRowView.js and ./layers/layerRowBindings.js
 
 export {
   isWindRelated,
@@ -26,20 +25,3 @@ export {
 export {
   populatePaletteSelect,
 } from "./layers/palettePicker.js";
-
-export {
-  renderLayerRow,
-  renderWindDrawerHTML,
-  renderStationDrawerHTML,
-} from "./layers/layerRowView.js";
-
-export {
-  bindLayerRowEvents,
-  bindAuxCheckbox,
-  bindAuxCheckboxes,
-} from "./layers/layerRowBindings.js";
-
-export {
-  renderLayersManager,
-  initLayerControl,
-} from "./layers/layerListView.js";

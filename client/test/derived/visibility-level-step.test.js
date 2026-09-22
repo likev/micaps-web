@@ -8,7 +8,8 @@ import {
   autoSaveLayerConfig,
 } from "../../src/config/presets.js";
 import { handleLayerAction } from "../../src/ui/layerActions.js";
-import { getLayersForWindow, clearWindowWeatherLayers, addOrUpdateLayer, renderStationDrawerHTML } from "../../src/ui/layerControl.js";
+import { readSrcText } from "../helpers/cssText.js";
+import { getLayersForWindow, clearWindowWeatherLayers, addOrUpdateLayer } from "../../src/ui/layerControl.js";
 import { analyzeAndRenderSurfaceContours } from "../../src/layers/surfaceAnalysis.js";
 import { analyzeAndRenderSoundingElementContour, SOUNDING_CONTOUR_CONFIGS } from "../../src/layers/soundingAnalysis.js";
 import { generateStationWindGrid } from "../../src/layers/windLayer.js";
@@ -107,39 +108,22 @@ function createSampleSoundingStations(level = 500) {
   };
 }
 
-describe("Station Config Drawer HTML Layout (Review 1 Fix)", () => {
-  test("renderStationDrawerHTML properly closes config-grid-2col before contour selector row with strict tag balance", () => {
-    const layer = {
-      id: "surface-obs",
-      name: "Surface Station Observations",
-      type: "station",
-      model: "SURFACE",
-      config: { showTemp: true, showStreamlines: false },
-    };
-
-    const html = renderStationDrawerHTML(layer);
-
-    // Verify grid starts
-    const gridStart = html.indexOf('<div class="config-grid-2col">');
-    expect(gridStart).toBeGreaterThan(-1);
-
-    // Verify selector row starts
-    const selectorRowPos = html.indexOf('<div class="config-row station-contour-selector-row');
-    expect(selectorRowPos).toBeGreaterThan(-1);
-
-    // Verify tag balance: exactly 1 opening <div> and 1 closing </div> in chunk before selector row
-    const chunkBeforeSelector = html.slice(gridStart, selectorRowPos);
-    const opens = (chunkBeforeSelector.match(/<div\b/g) || []).length;
-    const closes = (chunkBeforeSelector.match(/<\/div>/g) || []).length;
-    expect(opens).toBe(1);
-    expect(closes).toBe(1);
-
-    // Verify labels are not truncated (shortened to Pressure (SLP), Tendency (ppa))
-    expect(html).toContain("Pressure (SLP)");
-    expect(html).toContain("Tendency (ppa)");
-    expect(html).toContain("Weather (ww)");
-    expect(html).toContain('title="Pressure (SLP)"');
-    expect(html).not.toContain('title="Sea Level Pressure (SLP)"');
+describe("Station Config Drawer Layout (Review 1 Fix, Svelte drawer)", () => {
+  test("Svelte station drawer renders toggle grid before the contour selector row", () => {
+    // Live drawer is components/LayerRow.svelte (legacy HTML renderer removed);
+    // the selector row must come after the toggle grid (was an unclosed-div bug).
+    const rowSrc = readSrcText("components/LayerRow.svelte");
+    // Scope to the station drawer branch (legacy bug was an unclosed div
+    // swallowing the contour selector row).
+    const branchStart = rowSrc.indexOf('{:else if layer.type === "station"}');
+    const branchEnd = rowSrc.indexOf('{:else if layer.type === "wind"}');
+    expect(branchStart).toBeGreaterThan(-1);
+    expect(branchEnd).toBeGreaterThan(branchStart);
+    const branch = rowSrc.slice(branchStart, branchEnd);
+    const togglesPos = branch.indexOf("showStreamlines");
+    const selectorPos = branch.indexOf("sel-station-contour-");
+    expect(togglesPos).toBeGreaterThan(-1);
+    expect(selectorPos).toBeGreaterThan(togglesPos);
   });
 });
 

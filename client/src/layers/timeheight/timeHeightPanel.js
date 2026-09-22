@@ -17,10 +17,20 @@ export class TimeHeightPanel {
       endHour: 144,
       stepHours: 12,
       timeDirection: "ltr",
+      mode: "point",
+      lineA: { lon: 115, lat: 28 },
+      lineB: { lon: 125, lat: 38 },
+      npoints: 41,
       onRangeChange: null,
       onCycleChange: null,
       onDirectionChange: null,
       onToggleElement: null,
+      onModeChange: null,
+      onLineChange: null,
+      onDrawLine: null,
+      onSetA: null,
+      onSetB: null,
+      onNChange: null,
       onCancel: null,
       onClose: null,
       ...options,
@@ -34,6 +44,9 @@ export class TimeHeightPanel {
     this.height = DEFAULT_TH_HEIGHT;
     this.aspectRatio = TH_ASPECT_RATIO;
     this.activePoint = { ...this.options.defaultPoint };
+    this.mode = this.options.mode === "line" ? "line" : "point";
+    this.line = { a: { ...this.options.lineA }, b: { ...this.options.lineB } };
+    this.npoints = this.options.npoints || 41;
     this.activeCycle = null;
     this.availableCycles = [];
     this.timeDirection = this.options.timeDirection || "ltr";
@@ -121,6 +134,28 @@ export class TimeHeightPanel {
           <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;"><input type="checkbox" class="th-cb-temp" checked /> <span style="color: #f85149;">T</span></label>
           <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;"><input type="checkbox" class="th-cb-vvel" checked /> <span style="color: #39c5bb;">VVEL</span></label>
           <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;"><input type="checkbox" class="th-cb-wind" checked /> <span style="color: #e3b341;">Wind</span></label>
+        </div>
+      </div>
+
+      <!-- Mode + line transect row -->
+      <div class="th-mode-row" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 6px 12px; background: #161b22; border-bottom: 1px solid #21262d; font-size: 11px; color: #c9d1d9; flex-shrink: 0;">
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <span style="color: #8b949e; font-weight: 600;">Profile:</span>
+          <button class="th-btn-mode-point" title="Single grid-point profile (click map)" style="background: #1f6feb; border: 1px solid #388bfd; color: #fff; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer;">● Point</button>
+          <button class="th-btn-mode-line" title="Transect-averaged profile (draw a line on the map)" style="background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer;">⁄ Line avg</button>
+        </div>
+        <div class="th-line-controls" style="display: none; align-items: center; gap: 4px; flex-wrap: wrap;">
+          <span>A:</span>
+          <input type="number" class="th-input-alon" step="0.25" style="width: 58px; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 2px 4px; text-align: center; font-size: 11px;" />
+          <input type="number" class="th-input-alat" step="0.25" style="width: 58px; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 2px 4px; text-align: center; font-size: 11px;" />
+          <span>B:</span>
+          <input type="number" class="th-input-blon" step="0.25" style="width: 58px; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 2px 4px; text-align: center; font-size: 11px;" />
+          <input type="number" class="th-input-blat" step="0.25" style="width: 58px; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 2px 4px; text-align: center; font-size: 11px;" />
+          <select class="th-select-n" title="Transect nodes to average" style="background: #0d1117; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 2px 4px; font-size: 11px; cursor: pointer;"></select>
+          <button class="th-btn-lineapply" style="background: #21262d; border: 1px solid #30363d; color: #58a6ff; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer;">Apply</button>
+          <button class="th-btn-draw" title="Two-click draw: click map for A, again for B" style="background: #21262d; border: 1px solid #30363d; color: #e3b341; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer;">✏ Draw</button>
+          <button class="th-btn-seta" title="Next map click sets A" style="background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer;">A←map</button>
+          <button class="th-btn-setb" title="Next map click sets B" style="background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer;">B←map</button>
         </div>
       </div>
 
@@ -283,6 +318,27 @@ export class TimeHeightPanel {
       this.options.onToggleElement?.("WIND", e.target.checked);
     });
 
+    // Mode toggle
+    this.container.querySelector(".th-btn-mode-point")?.addEventListener("click", () => {
+      this.setMode("point");
+      this.options.onModeChange?.("point");
+    });
+    this.container.querySelector(".th-btn-mode-line")?.addEventListener("click", () => {
+      this.setMode("line");
+      this.options.onModeChange?.("line");
+    });
+
+    // Line transect controls
+    this._fillNSelect();
+    this._syncLineInputs();
+    this.container.querySelector(".th-btn-lineapply")?.addEventListener("click", () => this._fireLineApply());
+    this.container.querySelector(".th-select-n")?.addEventListener("change", (e) => {
+      this.options.onNChange?.(parseInt(e.target.value, 10) || this.npoints);
+    });
+    this.container.querySelector(".th-btn-draw")?.addEventListener("click", () => this.options.onDrawLine?.());
+    this.container.querySelector(".th-btn-seta")?.addEventListener("click", () => this.options.onSetA?.());
+    this.container.querySelector(".th-btn-setb")?.addEventListener("click", () => this.options.onSetB?.());
+
     // Progress Cancel
     this.container.querySelector(".th-btn-cancel")?.addEventListener("click", () => {
       this.options.onCancel?.();
@@ -411,6 +467,78 @@ export class TimeHeightPanel {
     }
   }
 
+  _fillNSelect() {
+    const sel = this.container?.querySelector(".th-select-n");
+    if (!sel) return;
+    const opts = [11, 21, 41, 61, 81];
+    sel.innerHTML = opts.map((n) => `<option value="${n}" ${n === this.npoints ? "selected" : ""}>N=${n}</option>`).join("");
+  }
+
+  _syncLineInputs() {
+    if (!this.container) return;
+    const q = (s) => this.container.querySelector(s);
+    if (q(".th-input-alon")) q(".th-input-alon").value = this.line.a.lon.toFixed(2);
+    if (q(".th-input-alat")) q(".th-input-alat").value = this.line.a.lat.toFixed(2);
+    if (q(".th-input-blon")) q(".th-input-blon").value = this.line.b.lon.toFixed(2);
+    if (q(".th-input-blat")) q(".th-input-blat").value = this.line.b.lat.toFixed(2);
+  }
+
+  _fireLineApply() {
+    const q = (s) => this.container.querySelector(s);
+    const a = { lon: parseFloat(q(".th-input-alon")?.value), lat: parseFloat(q(".th-input-alat")?.value) };
+    const b = { lon: parseFloat(q(".th-input-blon")?.value), lat: parseFloat(q(".th-input-blat")?.value) };
+    const n = parseInt(q(".th-select-n")?.value, 10) || this.npoints;
+    this.options.onLineChange?.(a, b, n);
+  }
+
+  setMode(mode) {
+    this.mode = mode === "line" ? "line" : "point";
+    if (!this.container) return;
+    const btnP = this.container.querySelector(".th-btn-mode-point");
+    const btnL = this.container.querySelector(".th-btn-mode-line");
+    const lineCtl = this.container.querySelector(".th-line-controls");
+    const on = { background: "#1f6feb", borderColor: "#388bfd", color: "#fff" };
+    const off = { background: "#21262d", borderColor: "#30363d", color: "#c9d1d9" };
+    const paint = (btn, st) => {
+      if (!btn) return;
+      btn.style.background = st.background;
+      btn.style.borderColor = st.borderColor;
+      btn.style.color = st.color;
+    };
+    paint(btnP, this.mode === "point" ? on : off);
+    paint(btnL, this.mode === "line" ? on : off);
+    if (lineCtl) lineCtl.style.display = this.mode === "line" ? "flex" : "none";
+    if (this.mode === "line") {
+      this._syncLineInputs();
+      const hdr = this.container.querySelector(".th-header-coords");
+      if (hdr) hdr.textContent = `A(${this.line.a.lon.toFixed(2)}°,${this.line.a.lat.toFixed(2)}°) → B(${this.line.b.lon.toFixed(2)}°,${this.line.b.lat.toFixed(2)}°) · avg N=${this.npoints}`;
+    }
+  }
+
+  setLine(a, b, npoints = null, totalKm = null) {
+    this.line = { a: { ...a }, b: { ...b } };
+    if (npoints) {
+      this.npoints = npoints;
+      this._fillNSelect();
+    }
+    this._syncLineInputs();
+    if (!this.container || this.mode !== "line") return;
+    const hdr = this.container.querySelector(".th-header-coords");
+    if (hdr) {
+      const L = totalKm !== null && totalKm !== undefined ? Math.round(totalKm) : "?";
+      hdr.textContent = `A(${a.lon.toFixed(2)}°,${a.lat.toFixed(2)}°) → B(${b.lon.toFixed(2)}°,${b.lat.toFixed(2)}°) · ${L} km · avg N=${this.npoints}`;
+    }
+  }
+
+  setPickHint(hintMode) {
+    if (!this.container) return;
+    const footerMeta = this.container.querySelector(".th-footer-meta");
+    if (!footerMeta) return;
+    if (hintMode === "draw") footerMeta.textContent = "Draw line: click map for A, click again for B (Esc/right-click cancels)";
+    else if (hintMode === "setA") footerMeta.textContent = "Set A: click map to place endpoint A";
+    else if (hintMode === "setB") footerMeta.textContent = "Set B: click map to place endpoint B";
+  }
+
   setRange(start, end, step) {
     this.options.startHour = start;
     this.options.endHour = end;
@@ -514,11 +642,16 @@ export class TimeHeightPanel {
 
     const footerMeta = this.container.querySelector(".th-footer-meta");
     if (footerMeta) {
-      const pt = matrix.point;
       const nLeads = matrix.leads.length;
       const nLevels = matrix.levels.length;
       const missCount = (matrix.missing?.rh || 0) + (matrix.missing?.tmp || 0) + (matrix.missing?.vvel || 0);
-      footerMeta.textContent = `Point: ${pt.lon.toFixed(2)}°E, ${pt.lat.toFixed(2)}°N | ${nLeads} leads (${matrix.leads[0]}–${matrix.leads[nLeads - 1]}h) × ${nLevels} levels${missCount > 0 ? ` | gaps: ${missCount}` : ""}`;
+      if (matrix.line) {
+        const L = matrix.line;
+        footerMeta.textContent = `Line avg A(${L.a.lon.toFixed(2)}°,${L.a.lat.toFixed(2)}°) → B(${L.b.lon.toFixed(2)}°,${L.b.lat.toFixed(2)}°) · ${Math.round(L.totalKm || 0)} km · N=${L.npoints} | ${nLeads} leads × ${nLevels} levels${missCount > 0 ? ` | gaps: ${missCount}` : ""}`;
+      } else {
+        const pt = matrix.point;
+        footerMeta.textContent = `Point: ${pt.lon.toFixed(2)}°E, ${pt.lat.toFixed(2)}°N | ${nLeads} leads (${matrix.leads[0]}–${matrix.leads[nLeads - 1]}h) × ${nLevels} levels${missCount > 0 ? ` | gaps: ${missCount}` : ""}`;
+      }
     }
   }
 
@@ -546,10 +679,12 @@ export class TimeHeightPanel {
     if (!this.container) return;
     const body = this.container.querySelector(".th-body");
     const controls = this.container.querySelector(".th-controls-row");
+    const modeRow = this.container.querySelector(".th-mode-row");
     const handles = this.container.querySelectorAll(".th-resize-handle");
     const btn = this.container.querySelector(".th-btn-min");
     if (body) body.style.display = this.isMinimized ? "none" : "flex";
     if (controls) controls.style.display = this.isMinimized ? "none" : "flex";
+    if (modeRow) modeRow.style.display = this.isMinimized ? "none" : "flex";
     if (btn) btn.textContent = this.isMinimized ? "□" : "—";
     this.container.style.height = this.isMinimized ? "auto" : `${this.height || DEFAULT_TH_HEIGHT}px`;
     handles.forEach((h) => (h.style.display = this.isMinimized ? "none" : "flex"));

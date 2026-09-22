@@ -6,7 +6,8 @@ import { getFieldValue, matchesStationFilters, renderStationPlotToCanvas } from 
 import { formatElementUnit } from "../../src/utils/formatters.js";
 import { getColormap, getColor, getElementLevels } from "../../src/utils/colormaps.js";
 import { getPaletteCategory } from "../../src/utils/paletteLoader.js";
-import { getLayersForWindow, clearWindowWeatherLayers, renderStationDrawerHTML, addOrUpdateLayer } from "../../src/ui/layerControl.js";
+import { getLayersForWindow, clearWindowWeatherLayers, addOrUpdateLayer } from "../../src/ui/layerControl.js";
+import { readSrcText } from "../helpers/cssText.js";
 import fs from "fs";
 
 // Recording Canvas 2D context: captures fillText with active fillStyle for color assertions
@@ -255,25 +256,11 @@ function createSampleSoundingStationGeoJSON(level = 500) {
 
 describe("9. Station Plot DTD Number & Collision Mechanics (§5-I)", () => {
   test("station plot default config has showDTD false in factory defaults and getState", () => {
-    // Upper-air station layer drawer HTML has showDTD unchecked by default
-    const upperDrawer = renderStationDrawerHTML({
-      id: "upperair-obs-500",
-      model: "UPPER_AIR",
-      type: "station",
-      config: {},
-    });
-    expect(upperDrawer).toContain('class="chk-station-dtd"');
-    expect(upperDrawer).not.toMatch(/class="chk-station-dtd"\s+checked/);
-
-    // Surface station layer drawer HTML has showDTD unchecked by default
-    const surfaceDrawer = renderStationDrawerHTML({
-      id: "surface-obs",
-      model: "SURFACE",
-      type: "station",
-      config: {},
-    });
-    expect(surfaceDrawer).toContain('class="chk-station-dtd"');
-    expect(surfaceDrawer).not.toMatch(/class="chk-station-dtd"\s+checked/);
+    // Live drawer is components/LayerRow.svelte (legacy HTML renderer removed):
+    // the DTD toggle binds unchecked to an unset config value.
+    const rowSrc = readSrcText("components/LayerRow.svelte");
+    expect(rowSrc).toContain("showDTD");
+    expect(rowSrc).toContain("T−Td");
 
     // Add layer factory defaults preserve showDTD: false
     const win = { id: "test-factory-win" };

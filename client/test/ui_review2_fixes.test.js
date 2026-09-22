@@ -90,11 +90,12 @@ describe("UI Review 2: CSS Overflow Verifications", () => {
 
 describe("UI Review 2: Operator & Interactive Status", () => {
   const styleCss = readStyleCss();
-  const layerControlJs = fs.readFileSync("./src/ui/layerControl.js", "utf8");
+  const layerRowSvelte = fs.readFileSync("./src/components/LayerRow.svelte", "utf8");
 
   test("S1: Eye icon uses 👁 / 🚫 and toggles layer-hidden class with strikethrough", () => {
-    expect(layerControlJs).toContain('"👁" : "🚫"');
-    expect(layerControlJs).toContain("layer-hidden");
+    // Live drawer is components/LayerRow.svelte (legacy string renderer removed)
+    expect(layerRowSvelte).toContain('{layer.visible ? "👁" : "🚫"}');
+    expect(layerRowSvelte).toContain("layer-hidden");
     expect(styleCss).toMatch(/\.layer-row\.layer-hidden\s*\.layer-name\s*\{[^}]*text-decoration:\s*line-through/);
   });
 

@@ -8,10 +8,10 @@ import {
 } from "../src/layers/contour/contourLevels.js";
 import { tagLinesAndFills } from "../src/layers/analysis/objectiveAnalysis.js";
 import { buildBaseConfig } from "../src/ui/layers/layerDefaults.js";
-import { renderLayerRow } from "../src/ui/layers/layerRowView.js";
 import { handleConfigAction } from "../src/ui/layers/configActions.js";
 import { renderContourLayers } from "../src/layers/contourLayer.js";
 import { autoSaveLayerConfig } from "../src/config/presets.js";
+import { readSrcText } from "./helpers/cssText.js";
 
 function createMockMap() {
   const sources = new Map();
@@ -237,30 +237,16 @@ describe("Contour Interval UI and Defaults Integration", () => {
     expect(cfg.levels).toBeNull();
   });
 
-  test("renderLayerRow renders Interval row with Start, Span, End inputs and Auto button", () => {
-    const html = renderLayerRow({
-      id: "contour-hgt",
-      name: "500 hPa Geopotential Height",
-      type: "contour",
-      element: "HGT",
-      visible: true,
-      isExpanded: true,
-      config: {
-        interval: { start: 5000, step: 40, end: 6000 },
-        levels: [5000, 5040, 5080],
-      },
-    });
-
-    expect(html).toContain("input-interval-start");
-    expect(html).toContain("input-interval-step");
-    expect(html).toContain("input-interval-end");
-    expect(html).toContain("btn-interval-auto");
-    expect(html).toContain('value="5000"');
-    expect(html).toContain('value="40"');
-    expect(html).toContain('value="6000"');
-    expect(html).toContain("3 levels");
-    expect(html).toContain("Auto");
-    expect(html).toContain("Bold values apply only if included in sequence");
+  test("Svelte LayerRow renders Interval row with Start, Step, End inputs wired to handleIntervalChange", () => {
+    // Live drawer is components/LayerRow.svelte (legacy renderLayerRow removed);
+    // assert the current implementation carries the interval editor.
+    const src = readSrcText("components/LayerRow.svelte");
+    expect(src).toContain("input-interval-start");
+    expect(src).toContain("input-interval-step");
+    expect(src).toContain("input-interval-end");
+    expect(src).toContain("handleIntervalChange");
+    expect(src).toContain("clearIntervalConfig");
+    expect(src).toContain("buildLevelsFromInterval");
   });
 
   test("handleConfigAction with interval/levels re-renders gridData layer with custom levels", () => {

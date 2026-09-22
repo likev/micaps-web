@@ -156,6 +156,12 @@ export function buildBaseConfig(layerDef) {
     return {
       lon: layerDef.config?.lon !== undefined ? layerDef.config.lon : 121.5,
       lat: layerDef.config?.lat !== undefined ? layerDef.config.lat : 31.4,
+      mode: layerDef.config?.mode === "line" ? "line" : "point",
+      lon0: layerDef.config?.lon0 !== undefined ? layerDef.config.lon0 : 115.0,
+      lat0: layerDef.config?.lat0 !== undefined ? layerDef.config.lat0 : 28.0,
+      lon1: layerDef.config?.lon1 !== undefined ? layerDef.config.lon1 : 125.0,
+      lat1: layerDef.config?.lat1 !== undefined ? layerDef.config.lat1 : 38.0,
+      npoints: layerDef.config?.npoints !== undefined ? layerDef.config.npoints : 41,
       initCycle: layerDef.config?.initCycle || null,
       startHour: layerDef.config?.startHour !== undefined ? layerDef.config.startHour : 0,
       endHour: layerDef.config?.endHour !== undefined ? layerDef.config.endHour : 144,

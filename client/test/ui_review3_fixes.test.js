@@ -3,7 +3,8 @@ import { test, expect, describe, beforeAll, beforeEach } from "bun:test";
 import fs from "fs";
 import path from "path";
 import { readStyleCss } from "./helpers/cssText.js";
-import { initTabWindowManager, getWindowById, getActiveWindow } from "../src/ui/tabWindowManager.js";
+import { getWindowById, getActiveWindow } from "../src/ui/tabWindowManager.js";
+import { tabsState } from "../src/ui/tabs/tabsStore.js";
 import { setStepLength } from "../src/ui/timeSlider.js";
 import { getLayersForWindow } from "../src/ui/layerControl.js";
 import { analyzeAndRenderSoundingElementContour } from "../src/layers/soundingAnalysis.js";
@@ -87,11 +88,20 @@ beforeAll(() => {
   };
   globalThis.document.body = createMockElement("body");
 
-  // Initialize tabs bar and workspace container
-  createMockElement("tabs-list");
-  createMockElement("btn-add-tab");
-  createMockElement("workspace-container");
-  initTabWindowManager();
+  // Seed live tab state directly (legacy DOM boot removed; windows are
+  // plain state — the Svelte app owns mounting/focus).
+  tabsState.tabs = [
+    {
+      id: 1, activeWinIdx: 0,
+      windows: [
+        { id: "tab-1-win-0", winIdx: 0 },
+        { id: "tab-1-win-1", winIdx: 1 },
+        { id: "tab-1-win-2", winIdx: 2 },
+        { id: "tab-1-win-3", winIdx: 3 },
+      ],
+    },
+  ];
+  tabsState.activeTabId = 1;
 });
 
 function createMockMap() {

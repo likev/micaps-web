@@ -26,13 +26,12 @@ import { formatElementUnit, formatContourLabel } from "../../src/utils/formatter
 import { getColormap, getElementLevels } from "../../src/utils/colormaps.js";
 import { getPaletteCategory } from "../../src/utils/paletteLoader.js";
 import {
-  renderStationDrawerHTML,
-  renderWindDrawerHTML,
   getLayersForWindow,
   clearWindowWeatherLayers,
   addOrUpdateLayer,
   removeLayer,
 } from "../../src/ui/layerControl.js";
+import { readSrcText } from "../helpers/cssText.js";
 import { handleLayerAction, triggerVortDivOverlay, triggerIsobandOverlay } from "../../src/ui/layerActions.js";
 import { armContourReRender } from "../../src/services/contourReRender.js";
 import { prefetchSurroundingData } from "../../src/services/prefetchService.js";
@@ -91,24 +90,13 @@ function createMockMap() {
 }
 
 describe("T6: UI Integration, Chrome, Formatters, & Palettes (§7-T6)", () => {
-  test("Drawer HTML includes VOR and DIV options for both upper and surface drawers", () => {
-    const upperDrawer = renderStationDrawerHTML({
-      id: "upperair-obs-500",
-      model: "UPPER_AIR",
-      type: "station",
-      config: {},
-    });
-    expect(upperDrawer).toContain('<option value="VOR">Relative Vorticity (VOR)</option>');
-    expect(upperDrawer).toContain('<option value="DIV">Divergence (DIV)</option>');
-
-    const surfaceDrawer = renderStationDrawerHTML({
-      id: "surface-obs",
-      model: "SURFACE",
-      type: "station",
-      config: {},
-    });
-    expect(surfaceDrawer).toContain('<option value="VOR">Relative Vorticity (VOR)</option>');
-    expect(surfaceDrawer).toContain('<option value="DIV">Divergence (DIV)</option>');
+  test("Svelte drawer includes VOR and DIV options for station and wind contour selectors", () => {
+    // Live drawer is components/LayerRow.svelte (legacy HTML renderer removed).
+    const rowSrc = readSrcText("components/LayerRow.svelte");
+    expect(rowSrc).toContain('<option value="VOR">Relative Vorticity (VOR)</option>');
+    expect(rowSrc).toContain('<option value="DIV">Divergence (DIV)</option>');
+    expect(rowSrc).toContain("sel-station-contour-");
+    expect(rowSrc).toContain("sel-wind-contour-");
   });
 
   test("formatElementUnit returns 1e-5/s for VOR and DIV", () => {

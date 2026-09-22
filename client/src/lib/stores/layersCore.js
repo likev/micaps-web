@@ -5,7 +5,6 @@ const windowLayersMap = new Map();
 let currentActiveWinId = "default";
 let currentActiveWinTitle = "";
 let onLayerActionCallback = null;
-let renderLayersManagerFn = null;
 
 let onLayersChangeCallback = null;
 
@@ -19,10 +18,6 @@ function notifyLayersChanged(winId) {
       onLayersChangeCallback(winId);
     } catch {}
   }
-}
-
-export function registerRenderLayersManager(fn) {
-  renderLayersManagerFn = fn;
 }
 
 export function getCurrentActiveWinId() {

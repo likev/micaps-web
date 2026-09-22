@@ -15,6 +15,19 @@ export function setDefaultWinResolver(resolver) {
   defaultWinResolver = resolver;
 }
 
+// True while the Svelte Legend component is mounted and owns #legend-panel.
+// Legacy direct-DOM writes must stand down then, or Svelte reconciliation
+// fights them (stale wipes / partial renders ~0.1s after load).
+let svelteOwner = false;
+
+export function setSvelteLegendOwner(v) {
+  svelteOwner = Boolean(v);
+}
+
+export function hasSvelteLegendOwner() {
+  return svelteOwner;
+}
+
 // Change listeners for cross-module reactivity bridging (plain JS so both
 // legacy ui/legend.js and the Svelte store can share one notification path
 // without import cycles or .svelte.js runtime requirements).
@@ -58,7 +71,12 @@ export function buildLegendItems(winOrId, legendsMap = windowLegends, winResolve
 
     let tickLabels = [];
     if (palette && palette.length > 0) {
-      if (zMin !== undefined && zMax !== undefined && zMax > zMin) {
+      // Fixed-physical-scale elements (RH 0..100%, TMP, WIND, RAIN, DTD) are
+      // rendered against an absolute palette, so the legend must show the
+      // palette scale — never transient data min/max (e.g. RH stats -1..115
+      // from supersaturation/overshoot would draw ticks past the scale).
+      const fixedScale = new Set(["RH", "TMP", "TD", "DTD", "WIND", "RAIN", "RAIN6"]);
+      if (!fixedScale.has(element) && zMin !== undefined && zMax !== undefined && zMax > zMin) {
         if (element === "HGT") {
           const isDam = zMax < 2500;
           const low = Math.round(zMin);

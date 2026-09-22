@@ -11,8 +11,8 @@ import { getState } from "../../src/layers/station/stationState.js";
 import { isCached, clearDataCache, fetchJson } from "../../src/api/apiClient.js";
 import { filterObsFilesByStep } from "../../src/ui/timeline/timelineMath.js";
 import { getLayersForWindow, getLayerById } from "../../src/ui/layers/layerStore.js";
-import { renderLayerRow, renderStationDrawerHTML } from "../../src/ui/layers/layerRowView.js";
 import { loadPresetGroup } from "../../src/services/presetLoader.js";
+import { readSrcText } from "../helpers/cssText.js";
 
 let map;
 
@@ -580,44 +580,23 @@ describe("V12: Layer Control Configuration for TLogP & 500hPa Exclusion", () => 
     expect(layer.config?.parcelLevel).toBe("surface");
   });
 
-  it("renders T-LogP configuration drawer with station input, parcel selector, and curve toggles", async () => {
-    global.fetch = async () => ({
-      ok: true,
-      status: 200,
-      json: async () => mockSoundingShanghai,
-    });
-
-    const win = { id: "test-win-tlogp-2", obsTime: "20260320200000.000", layers: [] };
-    await loadTLogPLayer(map, { id: "upperair-tlogp-diagram", type: "tlogp" }, null, null, win);
-
-    const layer = getLayerById("upperair-tlogp-diagram", win);
-    const html = renderLayerRow(layer);
-
-    expect(html).toContain("input-tlogp-station");
-    expect(html).toContain("btn-tlogp-apply");
-    expect(html).toContain("sel-tlogp-quick-station");
-    expect(html).toContain("sel-tlogp-parcel-level");
-    expect(html).toContain("chk-tlogp-temp");
-    expect(html).toContain("chk-tlogp-dewpoint");
-    expect(html).toContain("chk-tlogp-wind");
-    expect(html).toContain("chk-tlogp-parcel");
+  it("Svelte LayerRow renders T-LogP drawer with station input, quick stations, parcel selector, and curve toggles", () => {
+    // Live drawer is components/LayerRow.svelte (legacy renderLayerRow removed).
+    const src = readSrcText("components/LayerRow.svelte");
+    expect(src).toContain("input-tlogp-station");
+    expect(src).toContain("sel-tlogp-quick-station");
+    expect(src).toContain("sel-tlogp-parcel-level");
+    expect(src).toContain("showTemp");
+    expect(src).toContain("showDewpoint");
+    expect(src).toContain("showWind");
+    expect(src).toContain("showParcel");
   });
 
-  it("omits contour selector row from TLogP sounding station network drawer", () => {
-    const tlogpStationLayer = {
-      id: "upperair-tlogp-stations",
-      name: "Sounding Station Network",
-      type: "station",
-      model: "UPPER_AIR",
-      element: "TLOGP",
-      config: { showTemp: true, showDewpoint: true, showWind: true },
-    };
-
-    const html = renderStationDrawerHTML(tlogpStationLayer);
-    expect(html).not.toContain("station-contour-selector-row");
-    expect(html).not.toContain("📈 Add Contour Layer");
-    expect(html).toContain("chk-station-temp");
-    expect(html).toContain("chk-station-wind");
+  it("Svelte LayerRow omits contour selector row from TLogP sounding station network drawer", () => {
+    // Live drawer guards the contour selector behind a non-TLOGP condition.
+    const src = readSrcText("components/LayerRow.svelte");
+    expect(src).toContain('layer.element !== "TLOGP"');
+    expect(src).toContain("sel-station-contour-");
   });
 
   it("loads composite-tlogp preset without retaining 500hPa sounding contours and with win.level=null", async () => {

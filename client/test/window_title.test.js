@@ -122,7 +122,7 @@ describe("Window Title with Observation Time and Valid Time", () => {
     expect(title).toBe("TMP (ECMWF_HR) [Valid: +024h]");
   });
 
-  test("updateWindowTitle updates both header element and tab label DOM nodes", () => {
+  test("updateWindowTitle records the full title on window state (Svelte header derives from it)", () => {
     const win = {
       titleId: "win-title-1-0",
       winIdx: 0,
@@ -133,13 +133,9 @@ describe("Window Title with Observation Time and Valid Time", () => {
 
     updateWindowTitle(win, "500hPa Upper-Air Sounding");
 
-    const headerEl = document.getElementById("win-title-1-0");
-    const tabEl = document.getElementById("tab-label-0");
-
-    expect(headerEl?.textContent).toBe("500hPa Upper-Air Sounding [Obs: 2026-09-04 08:00 (UTC+8)]");
-    expect(headerEl?.title).toBe("500hPa Upper-Air Sounding [Obs: 2026-09-04 08:00 (UTC+8)]");
-    expect(tabEl?.textContent).toBe("W1: 500hPa Upper-Air Sounding [Obs: 2026-09-04 08:00 (UTC+8)]");
-    expect(tabEl?.title).toBe("W1: 500hPa Upper-Air Sounding [Obs: 2026-09-04 08:00 (UTC+8)]");
+    // Live effect: Svelte WindowPanel derives its header from win.title
+    expect(win.title).toBe("500hPa Upper-Air Sounding [Obs: 2026-09-04 08:00 (UTC+8)]");
+    expect(win.baseTitle).toBe("500hPa Upper-Air Sounding");
   });
 
   test("Selecting preset in navbar before real load data preserves window title and active group", () => {
@@ -154,8 +150,7 @@ describe("Window Title with Observation Time and Valid Time", () => {
     };
 
     updateWindowTitle(win, win.baseTitle);
-    const initialTitle = document.getElementById("win-title-1-0")?.textContent;
-    expect(initialTitle).toBe("ECMWF 500hPa HGT+WIND+TMP [Valid: 2026-09-05 08:00 (UTC+8) (+024h)]");
+    expect(win.title).toBe("ECMWF 500hPa HGT+WIND+TMP [Valid: 2026-09-05 08:00 (UTC+8) (+024h)]");
 
     // Simulating navbar onPresetSelect callback (user changed select-preset dropdown)
     // onPresetSelect must NOT modify active window or window title
@@ -164,8 +159,7 @@ describe("Window Title with Observation Time and Valid Time", () => {
     onPresetSelect(candidateGroup);
 
     // Verify window title and state are strictly unchanged
-    const preservedTitle = document.getElementById("win-title-1-0")?.textContent;
-    expect(preservedTitle).toBe(initialTitle);
+    expect(win.title).toBe("ECMWF 500hPa HGT+WIND+TMP [Valid: 2026-09-05 08:00 (UTC+8) (+024h)]");
     expect(win.activeGroup.id).toBe("ecmwf-500");
     expect(win.isObservation).toBe(false);
 
@@ -177,8 +171,7 @@ describe("Window Title with Observation Time and Valid Time", () => {
     };
     onLoadData(candidateGroup);
 
-    const updatedTitle = document.getElementById("win-title-1-0")?.textContent;
-    expect(updatedTitle).toBe("Surface Observations");
+    expect(win.title).toBe("Surface Observations");
     expect(win.activeGroup.id).toBe("surface-obs");
     expect(win.isObservation).toBe(true);
   });

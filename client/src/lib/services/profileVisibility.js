@@ -3,33 +3,39 @@
 // Regression: the Svelte refactor dropped the legacy bootstrap onWindowFocus
 // controller show/hide sequence. Toggling window tabs left T-LogP, Time-Height,
 // Line-Height and Time-Line (Hovmoller) panels stuck visible (or hidden).
-// Both App.svelte handleWindowFocus and legacy windowFocus.js focusWindow must
-// call syncProfilePanelsForWindow(win, map).
+// Both App.svelte handleWindowFocus and legacy callers must route through
+// syncProfilePanelsForWindow(win, map) on every window-tab toggle.
 import { getLayersForWindow } from "../stores/layersCore.js";
+import { hasProfilePanel } from "../stores/profilesCore.js";
 import { tlogpController } from "../../layers/tlogp/tlogpController.js";
 import { timeHeightController } from "../../layers/timeheight/timeHeightController.js";
 import { lineHeightController } from "../../layers/lineprofile/lineHeightController.js";
 import { hovmollerController } from "../../layers/lineprofile/hovmollerController.js";
 
-function collectCandidateLayers(win) {
-  const out = [];
-  if (!win) return out;
+function findStoreLayer(win, types, ids = []) {
   try {
     const stored = getLayersForWindow(win);
-    if (Array.isArray(stored)) out.push(...stored);
+    if (Array.isArray(stored)) {
+      return stored.find((l) => l && (types.includes(l.type) || (l.id && ids.includes(l.id)))) || null;
+    }
   } catch {}
-  try {
-    if (Array.isArray(win.activeGroup?.layers)) out.push(...win.activeGroup.layers);
-  } catch {}
-  try {
-    if (Array.isArray(win.layers)) out.push(...win.layers);
-  } catch {}
-  return out;
+  return null;
 }
 
 function findVisibleLayer(win, types, ids = []) {
-  const candidates = collectCandidateLayers(win);
-  for (const l of candidates) {
+  // The layer store is authoritative: an eye-hidden (visible === false) entry
+  // stays hidden even if a stale preset copy still claims visible.
+  const storeLayer = findStoreLayer(win, types, ids);
+  if (storeLayer) return storeLayer.visible === false ? null : storeLayer;
+  // No store record (never loaded in this session): fall back to preset copies.
+  const fallback = [];
+  try {
+    if (Array.isArray(win.activeGroup?.layers)) fallback.push(...win.activeGroup.layers);
+  } catch {}
+  try {
+    if (Array.isArray(win.layers)) fallback.push(...win.layers);
+  } catch {}
+  for (const l of fallback) {
     if (!l) continue;
     const typeMatch = types.includes(l.type);
     const idMatch = l.id && ids.includes(l.id);
@@ -40,30 +46,28 @@ function findVisibleLayer(win, types, ids = []) {
   return null;
 }
 
-function peekPanel(controller, win) {
+function hasPanel(type, win) {
+  // Readiness comes from the shared profile registry (maintained by the
+  // controllers on init/show/destroy) — never probe controller internals.
+  // Falls back to legacy probing for states seeded outside init (tests).
   try {
-    const winId = win?.id;
-    if (winId && controller?.windows instanceof Map) {
-      const s = controller.windows.get(winId);
-      if (s?.panel) return true;
-    }
+    if (hasProfilePanel(type, win?.id)) return true;
   } catch {}
   try {
-    if (winId === undefined || win?.id === undefined) {
-      if (controller?._defaultState?.panel) return true;
+    const map = { timeheight: timeHeightController, lineheight: lineHeightController, hovmoller: hovmollerController };
+    const controller = map[type];
+    if (controller) {
+      if (typeof controller.isActive === "function" && controller.isActive(win)) return true;
+      const winId = win?.id;
+      if (winId && controller?.windows instanceof Map) {
+        if (controller.windows.get(winId)?.panel) return true;
+      }
+    } else if (type === "tlogp") {
+      if (typeof tlogpController.isActive === "function" && tlogpController.isActive()) return true;
+      if (tlogpController.panel) return true;
     }
-  } catch {}
-  try {
-    if (controller?.panel) return true;
   } catch {}
   return false;
-}
-
-function hasPanel(controller, win) {
-  try {
-    if (typeof controller.isActive === "function" && controller.isActive(win)) return true;
-  } catch {}
-  return peekPanel(controller, win);
 }
 
 function targetStationForWin(win, layer) {
@@ -111,7 +115,7 @@ export function syncProfilePanelsForWindow(win, map = null) {
 
   // Time-Height (per-window state)
   try {
-    if (thLayer && hasPanel(timeHeightController, win)) {
+    if (thLayer && hasPanel("timeheight", win)) {
       timeHeightController.show(targetMap, win);
     } else {
       timeHeightController.hide();
@@ -120,7 +124,7 @@ export function syncProfilePanelsForWindow(win, map = null) {
 
   // Line-Height section (per-window state)
   try {
-    if (lhLayer && hasPanel(lineHeightController, win)) {
+    if (lhLayer && hasPanel("lineheight", win)) {
       lineHeightController.show(targetMap, win);
     } else {
       lineHeightController.hide();
@@ -129,7 +133,7 @@ export function syncProfilePanelsForWindow(win, map = null) {
 
   // Time-Line Hovmoller (per-window state)
   try {
-    if (hovLayer && hasPanel(hovmollerController, win)) {
+    if (hovLayer && hasPanel("hovmoller", win)) {
       hovmollerController.show(targetMap, win);
     } else {
       hovmollerController.hide();
@@ -138,7 +142,7 @@ export function syncProfilePanelsForWindow(win, map = null) {
 
   // T-LogP (global singleton: one floating panel shared by all windows)
   try {
-    if (tlogpLayer && hasPanel(tlogpController, win)) {
+    if (tlogpLayer && hasPanel("tlogp", win)) {
       tlogpController.show(targetMap, win);
       ensureTlogpHighlight(targetMap || tlogpController.activeMap);
       // A second window may carry a different sounding station. Reload so the

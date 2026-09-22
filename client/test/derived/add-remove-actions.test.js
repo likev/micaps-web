@@ -8,7 +8,7 @@ import {
   autoSaveLayerConfig,
 } from "../../src/config/presets.js";
 import { handleLayerAction } from "../../src/ui/layerActions.js";
-import { getLayersForWindow, clearWindowWeatherLayers, addOrUpdateLayer, renderStationDrawerHTML } from "../../src/ui/layerControl.js";
+import { getLayersForWindow, clearWindowWeatherLayers, addOrUpdateLayer } from "../../src/ui/layerControl.js";
 import { analyzeAndRenderSurfaceContours } from "../../src/layers/surfaceAnalysis.js";
 import { analyzeAndRenderSoundingElementContour, SOUNDING_CONTOUR_CONFIGS } from "../../src/layers/soundingAnalysis.js";
 import { generateStationWindGrid } from "../../src/layers/windLayer.js";

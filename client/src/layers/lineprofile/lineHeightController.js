@@ -9,6 +9,7 @@ import { autoSaveLayerConfig } from "../../config/presets.js";
 import { showErrorToast } from "../../ui/toast.js";
 import { addOrUpdateLayer, getLayersForWindow, syncLayerControlForWindow } from "../../ui/layers/layerStore.js";
 import { getActiveWindow } from "../../ui/tabs/tabsStore.js";
+import { setProfileState, getProfileState, clearProfileState, setAllProfilesHidden } from "../../lib/stores/profilesCore.js";
 
 class WindowState {
   constructor(winId) {
@@ -61,6 +62,20 @@ class LineHeightController {
     return buildTransectNodes(s.line.a, s.line.b, s.npoints);
   }
 
+  // Record readiness + header meta into the shared profile registry.
+  // Visibility itself is owned by show()/hide() below.
+  _syncProfileStore(win = null) {
+    const s = this._getState(win);
+    try {
+      const prev = getProfileState("lineheight", s.winId);
+      setProfileState("lineheight", s.winId, {
+        lineA: { ...s.line.a }, lineB: { ...s.line.b }, npoints: s.npoints,
+        cycle: s.cycle, lead: s.lead, flipDirection: s.flipDirection,
+        visible: prev ? prev.visible : false,
+      });
+    } catch {}
+  }
+
   async init(map, win, layerDef = {}) {
     const s = this._getState(win);
     s.activeMap = map; s.activeWin = win; s.isLayerActive = true;
@@ -93,7 +108,7 @@ class LineHeightController {
         onCycleChange: (c) => this.setCycle(c, win),
         onToggleElement: (el, checked) => this.syncDrawerCheckbox(el, checked, win),
         onCancel: () => this.cancelLoad(win),
-        onClose: () => { this.hide(map, win); const l = this._findLayer(win); if (l && win) l.visible = false; },
+        onClose: () => this.handlePanelClose(map, win),
       });
     }
     s.panel.setCycle(s.cycle, s.availableCycles);
@@ -103,6 +118,7 @@ class LineHeightController {
     this._redrawOverlay(win);
     s.transect = this.getTransect(win);
     s.panel.setLine(s.line.a, s.line.b, s.npoints, s.transect.totalKm);
+    this._syncProfileStore(win);
     return this.loadMatrix(win);
   }
 
@@ -249,6 +265,7 @@ class LineHeightController {
     s.panel?.setLine(s.line.a, s.line.b, s.npoints, s.transect.totalKm);
     this._redrawOverlay(win);
     this._persistConfig({ lon0: s.line.a.lon, lat0: s.line.a.lat, lon1: s.line.b.lon, lat1: s.line.b.lat, npoints: s.npoints }, win);
+    this._syncProfileStore(win);
     return this.loadMatrix(win);
   }
 
@@ -257,6 +274,7 @@ class LineHeightController {
     s.flipDirection = Boolean(flip);
     s.panel?.setFlip(s.flipDirection);
     this._persistConfig({ flipDirection: s.flipDirection }, win);
+    this._syncProfileStore(win);
     // display-only: re-render with same matrix
     if (s.matrix && s.transect) s.panel?.setData(s.matrix, s.transect.distKm, s.lead);
   }
@@ -267,6 +285,7 @@ class LineHeightController {
     s.cycle = cycle;
     s.panel?.setCycle(s.cycle, s.availableCycles);
     this._persistConfig({ initCycle: cycle }, win);
+    this._syncProfileStore(win);
     return this.loadMatrix(win);
   }
 
@@ -288,6 +307,7 @@ class LineHeightController {
       }
       s.lead = target;
       this._persistConfig({ lead: target }, win);
+      this._syncProfileStore(win);
       this.loadMatrix(win);
     }, 150);
   }
@@ -372,12 +392,13 @@ class LineHeightController {
     const tWin = win || this._activeWin;
     const tId = this._getWinId(tWin);
     for (const [id, st] of this.windows) {
-      if (id !== tId) { st.panel?.hide(); setLineHighlightVisible(st.activeMap, false); }
+      if (id !== tId) { st.panel?.hide(); setLineHighlightVisible(st.activeMap, false); try { setProfileState("lineheight", id, { visible: false }); } catch {} }
     }
     const s = this._getState(tWin);
     if (map) s.activeMap = map;
     if (win) this._activeWin = win;
     s.panel?.show();
+    try { setProfileState("lineheight", s.winId, { visible: true }); } catch {}
     setLineHighlightVisible(map || s.activeMap, true);
   }
   hide(map = null, win = null) {
@@ -385,11 +406,35 @@ class LineHeightController {
       const s = this._getState(win);
       s.panel?.hide();
       setLineHighlightVisible(map || s.activeMap, false);
+      try {
+        if (getProfileState("lineheight", s.winId)) {
+          setProfileState("lineheight", s.winId, { visible: false });
+        }
+      } catch {}
       return;
     }
     this._defaultState.panel?.hide();
     setLineHighlightVisible(map || this._defaultState.activeMap, false);
     for (const [, st] of this.windows) { st.panel?.hide(); setLineHighlightVisible(st.activeMap, false); }
+    try { setAllProfilesHidden("lineheight"); } catch {}
+  }
+  // Panel ✕ behaves like an eye-toggle: hide visuals AND persist visible=false
+  // to the layer store (with control sync) so the eye UI and window-focus
+  // auto-show stay consistent.
+  handlePanelClose(map = null, win = null) {
+    const targetWin = win || this.activeWin;
+    if (targetWin) this.hide(map, targetWin);
+    else this.hide(map || undefined);
+    if (targetWin) {
+      const l = this._findLayer(targetWin);
+      if (l) {
+        l.visible = false;
+        addOrUpdateLayer(l, targetWin);
+        if (typeof getActiveWindow === "function" && getActiveWindow() === targetWin) {
+          try { syncLayerControlForWindow(targetWin); } catch {}
+        }
+      }
+    }
   }
   _findLayer(win = this.activeWin) {
     if (!win) return null;
@@ -428,7 +473,8 @@ class LineHeightController {
       s.pickMode = "idle"; s.pendingA = null;
       this._detachMapListeners(tMap || s.activeMap, tWin);
       removeLineHighlight(tMap || s.activeMap);
-      if (s.panel) { s.panel.destroy(); s.panel = null; }
+      try { clearProfileState("lineheight", id); } catch {}
+      if (s.panel) { if (typeof s.panel.destroy === "function") { try { s.panel.destroy(); } catch {} } s.panel = null; }
       s.matrix = null; s.matrixCache.clear();
       s.activeMap = null; s.activeWin = null;
       if (id !== "default") this.windows.delete(id);

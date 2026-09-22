@@ -26,13 +26,12 @@ import { formatElementUnit, formatContourLabel } from "../../src/utils/formatter
 import { getColormap, getElementLevels } from "../../src/utils/colormaps.js";
 import { getPaletteCategory } from "../../src/utils/paletteLoader.js";
 import {
-  renderStationDrawerHTML,
-  renderWindDrawerHTML,
   getLayersForWindow,
   clearWindowWeatherLayers,
   addOrUpdateLayer,
   removeLayer,
 } from "../../src/ui/layerControl.js";
+import { readSrcText } from "../helpers/cssText.js";
 import { handleLayerAction, triggerVortDivOverlay, triggerIsobandOverlay } from "../../src/ui/layerActions.js";
 import { armContourReRender } from "../../src/services/contourReRender.js";
 import { prefetchSurroundingData } from "../../src/services/prefetchService.js";
@@ -91,27 +90,18 @@ function createMockMap() {
 }
 
   describe("NWP Wind Layer Add Contour Layer UI & Action", () => {
-    test("renderWindDrawerHTML generates drawer with Streamlines, Barbs, Raster, and Add Contour selector", () => {
-      const windLayer = {
-        id: "wind-850",
-        name: "850hPa Wind Streamlines",
-        type: "wind",
-        model: "ECMWF_HR",
-        element: "WIND",
-        level: 850,
-        config: { showWind: true, showBarbs: false, showRaster: false },
-      };
-      const html = renderWindDrawerHTML(windLayer);
-      expect(html).toContain("Wind Streamlines");
-      expect(html).toContain("Wind Barbs");
-      expect(html).toContain("Wind Magnitude Raster");
-      expect(html).toContain("📈 Add Contour Layer");
-      expect(html).toContain('<select class="sel-contour-element"');
-      expect(html).toContain('<option value="VOR">Relative Vorticity (VOR)</option>');
-      expect(html).toContain('<option value="DIV">Divergence (DIV)</option>');
-      expect(html).not.toContain('<option value="WIND">');
-      expect(html).toContain("btn-add-station-contour");
-      expect(html).toContain("btn-add-contour");
+    test("Svelte wind drawer has Streamlines, Barbs, Raster, and Add Contour selector (VOR/DIV, no WIND)", () => {
+      // Live drawer is components/LayerRow.svelte (legacy HTML renderer removed).
+      const rowSrc = readSrcText("components/LayerRow.svelte");
+      expect(rowSrc).toContain("Wind Streamlines");
+      expect(rowSrc).toContain("Wind Barbs");
+      expect(rowSrc).toContain("Wind Magnitude Raster");
+      expect(rowSrc).toContain("Add Contour Layer");
+      expect(rowSrc).toContain("sel-wind-contour-");
+      expect(rowSrc).toContain('<option value="VOR">Relative Vorticity (VOR)</option>');
+      expect(rowSrc).toContain('<option value="DIV">Divergence (DIV)</option>');
+      const windSel = rowSrc.slice(rowSrc.indexOf("sel-wind-contour-"));
+      expect(windSel.slice(0, windSel.indexOf("</select>"))).not.toContain('value="WIND"');
     });
 
     test("buildKinematicGridData computes scalar wind speed for WIND norm", () => {

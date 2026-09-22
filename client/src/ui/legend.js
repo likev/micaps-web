@@ -7,6 +7,7 @@ import {
   updateLegend as coreUpdateLegend,
   removeLegend as coreRemoveLegend,
   clearLegends as coreClearLegends,
+  hasSvelteLegendOwner,
 } from "../lib/stores/legendCore.js";
 import { getWindowById } from "./tabWindowManager.js";
 
@@ -39,6 +40,11 @@ export function syncLegendForWindow(win = null, panelId = "legend-panel") {
 }
 
 function renderLegendPanel(winId, panelId = "legend-panel") {
+  // Single-renderer rule: the mounted Svelte component owns #legend-panel
+  // (kept fresh via the store bridge); direct writes here would clobber
+  // Svelte-managed nodes and cause partial renders. Only write when no
+  // Svelte owner exists (tests, non-Svelte contexts).
+  if (hasSvelteLegendOwner()) return;
   if (typeof document === "undefined") return;
   const panel = document.getElementById(panelId);
   if (!panel) return;
@@ -66,7 +72,10 @@ function renderLegendPanel(winId, panelId = "legend-panel") {
 
     let tickLabels = [];
     if (palette && palette.length > 0) {
-      if (zMin !== undefined && zMax !== undefined && zMax > zMin) {
+      // Fixed-physical-scale elements use the palette scale, never transient
+      // data min/max (mirrors legendCore.buildLegendItems).
+      const fixedScale = new Set(["RH", "TMP", "TD", "DTD", "WIND", "RAIN", "RAIN6"]);
+      if (!fixedScale.has(element) && zMin !== undefined && zMax !== undefined && zMax > zMin) {
         if (element === "HGT") {
           const isDam = zMax < 2500;
           const low = Math.round(zMin);

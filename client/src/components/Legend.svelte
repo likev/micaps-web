@@ -1,9 +1,20 @@
 <script>
+  import { onMount, onDestroy } from "svelte";
   import { ui } from "../lib/stores/ui.svelte.js";
-  import { buildLegendItems } from "../lib/stores/legendCore.js";
-  import { legends } from "../lib/stores/legend.svelte.js";
+  import { buildLegendItems, setSvelteLegendOwner } from "../lib/stores/legendCore.js";
+  import { legends, syncLegendState } from "../lib/stores/legend.svelte.js";
 
   let { winId = "default" } = $props();
+
+  onMount(() => {
+    // Claim #legend-panel ownership so legacy direct-DOM writes stand down
+    // (single renderer: this component, fed by the store bridge).
+    setSvelteLegendOwner(true);
+    try { syncLegendState(winId); } catch {}
+  });
+  onDestroy(() => {
+    setSvelteLegendOwner(false);
+  });
 
   // Reactive trigger on legends store mutations
   let items = $derived.by(() => {

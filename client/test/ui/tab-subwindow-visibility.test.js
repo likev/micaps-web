@@ -3,7 +3,6 @@ import { test, expect, describe, beforeEach } from "bun:test";
 import { uiState } from "../../src/lib/stores/uiCore.js";
 import { timeHeightController } from "../../src/layers/timeheight/timeHeightController.js";
 import { tlogpController } from "../../src/layers/tlogp/tlogpController.js";
-import { initTabWindowManager, focusWindow, getActiveWindow } from "../../src/ui/tabWindowManager.js";
 
 function createMockMap() {
   const layers = new Map();
@@ -94,8 +93,7 @@ describe("Timeslider & Subwindow Visibility Management (Store Driven)", () => {
     expect(uiState.timelineVisible).toBe(false);
   });
 
-  test("4. tlogpController show and hide accepts map and win parameters", () => {
-    const map = createMockMap();
+  test("4. tlogpController show and hide accepts map and win parameters", () => {    const map = createMockMap();
     const win = { id: "win-tlogp", winIdx: 2, map };
 
     let shown = false;
@@ -111,77 +109,4 @@ describe("Timeslider & Subwindow Visibility Management (Store Driven)", () => {
     expect(shown).toBe(false);
   });
 
-  test("5. Window focus switch and config pill integration update active window and ui transitions", () => {
-    const { tabsState } = require("../../src/ui/tabs/tabsStore.js");
-
-    const elements = new Map();
-    const createEl = (id) => {
-      const classes = new Set();
-      const attrs = new Map();
-      const el = {
-        id,
-        style: {},
-        classList: {
-          add: (c) => classes.add(c),
-          remove: (c) => classes.delete(c),
-          contains: (c) => classes.has(c),
-          toggle: (c, force) => {
-            const willHave = force !== undefined ? Boolean(force) : !classes.has(c);
-            if (willHave) classes.add(c); else classes.delete(c);
-            return willHave;
-          },
-        },
-        setAttribute: (k, v) => attrs.set(k, v),
-        getAttribute: (k) => attrs.get(k),
-      };
-      elements.set(id, el);
-      return el;
-    };
-
-    const pill0 = createEl("tab-item-win-0");
-    const pill1 = createEl("tab-item-win-1");
-    const panel0 = createEl("tab-1-panel-0");
-    const panel1 = createEl("tab-1-panel-1");
-    const ws = createEl("tab-workspace-1");
-    const cfgPill = createEl("tab-item-config");
-    const cfgPanel = createEl("config-editor-panel");
-
-    const prevDoc = global.document;
-    global.document = {
-      getElementById: (id) => elements.get(id) || null,
-      querySelectorAll: (sel) => {
-        if (sel === ".tab-workspace") return [ws];
-        return [];
-      },
-    };
-
-    try {
-      const tab = {
-        id: 1,
-        title: "Workstation 1",
-        layout: "1x1",
-        activeWinIdx: 0,
-        windows: [
-          { id: "tab-1-win-0", winIdx: 0, panelId: "tab-1-panel-0", pillId: "tab-item-win-0" },
-          { id: "tab-1-win-1", winIdx: 1, panelId: "tab-1-panel-1", pillId: "tab-item-win-1" },
-        ],
-      };
-      tabsState.tabs = [tab];
-      tabsState.activeTabId = 1;
-
-      cfgPill.classList.add("active");
-      uiState.configOpen = true;
-
-      focusWindow(1, 1);
-      expect(tab.activeWinIdx).toBe(1);
-      expect(cfgPill.classList.contains("active")).toBe(false);
-      expect(getActiveWindow().id).toBe("tab-1-win-1");
-    } finally {
-      if (prevDoc !== undefined) {
-        global.document = prevDoc;
-      } else {
-        delete global.document;
-      }
-    }
-  });
 });

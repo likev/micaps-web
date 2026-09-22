@@ -9,7 +9,7 @@ import { loadTimeHeightLayer, removeTimeHeightLayer, timeHeightController } from
 import { loadLineHeightLayer, removeLineHeightLayer, lineHeightController, loadHovmollerLayer, removeHovmollerLayer, hovmollerController } from "../layers/lineprofile/lineProfileLayer.js";
 import { clearLegends } from "../ui/legend.js";
 import { getActiveWindow, updateWindowTitle, refreshPresetControls } from "../ui/tabWindowManager.js";
-import { setNavBarPreset, refreshNavBarPresets } from "../ui/navBar.js";
+import { setNavBarPreset } from "../ui/navBar.js";
 import { appState } from "../store/appState.js";
 import { resolveForecastCycles, syncObservationTimeline, invalidateForecastCyclesCache } from "../utils/timelineSync.js";
 import { setTimelineMode, setTimeSliderVisible } from "../ui/timeSlider.js";
@@ -337,7 +337,9 @@ export async function reloadConfiguration() {
   invalidateForecastCyclesCache();
   await loadPresetGroups();
   refreshPresetControls();
-  refreshNavBarPresets();
+  // NOTE: no legacy refreshNavBarPresets() here — it rewrites the Svelte-owned
+  // #select-preset innerHTML behind the component. App.svelte refreshes its
+  // presetGroups prop reactively after this call, which re-renders options.
   console.log("[Config] Preset configuration reloaded");
   const win = getActiveWindow();
   if (win?.map) {

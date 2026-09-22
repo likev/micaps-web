@@ -18,18 +18,16 @@ import { test, expect, describe } from "bun:test";
 import { readSrcText } from "../helpers/cssText.js";
 
 describe("ECMWF_HR group: chip-btn and keyboard shortkey regression", () => {
-  test("navBar.js: Load Data button blurs select after callback so Arrow keys work", () => {
-    const src = readSrcText("ui/navBar.js");
-    // Fix 4: The btnLoadData click handler must blur the select (and button) after loading
-    expect(src).toContain("select?.blur()");
-    expect(src).toContain("btnLoadData?.blur()");
+  test("navBar: Load Data button blurs select after callback so Arrow keys work", () => {
+    // Live navbar is components/NavBar.svelte (legacy initNavBar removed);
+    // the Svelte handler releases focus after loading.
+    const svelte = readSrcText("components/NavBar.svelte");
+    expect(svelte).toContain("currentTarget?.blur?.()");
+    expect(svelte).toContain('getElementById("select-preset")?.blur?.()');
   });
 
   test("global navbar selects blur after change so Arrow keys work (focused window)", () => {
-    const legacy = readSrcText("ui/navBar.js");
-    // Global select-preset / select-level drive the focused window; they must
-    // release focus after change so Arrow-key shortcuts keep working.
-    expect(legacy).toContain("e.target?.blur?.()");
+    // Live navbar is components/NavBar.svelte (legacy initNavBar removed).
     const svelte = readSrcText("components/NavBar.svelte");
     expect(svelte).toContain("e.target?.blur?.()");
   });
