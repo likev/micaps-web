@@ -94,9 +94,17 @@
   function applyPreset(key) {
     const preset = PRESETS[key];
     if (!preset) return;
-    rules = preset.map((rule, idx) => ({ ...rule, _id: `rule-${Date.now()}-${idx}` }));
-    // Keep the current match mode: under ViewOnly a preset gates each
-    // element separately, under AND/OR it filters whole stations.
+    const incoming = preset.map((rule, idx) => ({ ...rule, _id: `rule-${Date.now()}-${idx}` }));
+    // Presets ADD rules instead of clearing existing ones (dedupe exact
+    // matches so double-clicks don't stack identical rows). A lone empty
+    // placeholder row is replaced rather than kept.
+    const hasReal = rules.some((r) => r.field && r.field !== "none");
+    const base = hasReal ? rules : [];
+    const isDup = (r) => base.some((b) => b.field === r.field && b.op === r.op && String(b.val ?? "") === String(r.val ?? "") && String(b.val2 ?? "") === String(r.val2 ?? ""));
+    rules = [...base, ...incoming.filter((r) => !isDup(r))];
+    if (rules.length === 0) rules = incoming;
+    // Keep the current match mode (see update): presets gate per-element
+    // under ViewOnly, whole stations under AND/OR.
     update();
   }
 
@@ -283,6 +291,7 @@
     align-items: center;
     gap: 4px;
     font-size: 11px;
+    min-width: 0;
   }
 
   .filter-rule-row.hidden {
@@ -304,11 +313,26 @@
     border-radius: 4px;
     font-size: 10px;
     padding: 2px 4px;
+    min-width: 0;
+  }
+
+  /* The field select carries the longest option text — let it shrink so the
+     inputs and the remove-rule button are never pushed out of view. */
+  .sel-filter-field {
+    flex: 1 1 auto;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sel-filter-op {
+    flex-shrink: 0;
   }
 
   .input-filter-val,
   .input-filter-val2 {
-    width: 48px;
+    width: 44px;
+    flex-shrink: 0;
     background: #161b22;
     color: var(--text-primary, #e6edf3);
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
@@ -324,6 +348,7 @@
     cursor: pointer;
     font-size: 11px;
     padding: 2px 4px;
+    flex-shrink: 0;
   }
 
   .btn-remove-rule:hover {

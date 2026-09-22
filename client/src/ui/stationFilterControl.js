@@ -315,7 +315,15 @@ export function bindStationFilterEvents(configDrawer, layer, onAction, winId) {
       const pKey = e.currentTarget.dataset.preset;
       const presetRules = PRESETS[pKey];
       if (presetRules) {
-        layer.config.filterRules = presetRules.map((r) => ({ ...r }));
+        // Presets ADD rules instead of clearing existing ones (dedupe exact
+        // matches); a lone empty placeholder row is replaced, not kept.
+        const incoming = presetRules.map((r) => ({ ...r }));
+        const current = Array.isArray(layer.config.filterRules) ? layer.config.filterRules : [];
+        const hasReal = current.some((r) => r && r.field && r.field !== "none");
+        const base = hasReal ? current : [];
+        const isDup = (r) => base.some((b) => b.field === r.field && b.op === r.op && String(b.val ?? "") === String(r.val ?? "") && String(b.val2 ?? "") === String(r.val2 ?? ""));
+        const merged = [...base, ...incoming.filter((r) => !isDup(r))];
+        layer.config.filterRules = merged.length > 0 ? merged : incoming;
         Object.assign(layer.config, getViewAutoCheckPatch(layer.config));
         rerender();
       }
