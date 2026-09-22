@@ -1,4 +1,14 @@
 // apiClient.js - Unified REST and Binary fetch wrappers with 3-minute TTL prefetch cache
+//
+// NOTE (reviewed, intentional, do not "fix"):
+// - Eviction is expiry-only: there is no size cap on dataCache. With many
+//   windows x layers warming grids inside one TTL window, memory can spike
+//   until the 60s prune / lazy delete-on-read catches up. Acceptable because
+//   entries are short-lived (3 min) and grids are re-fetched per cycle/file;
+//   add an LRU/size cap only if heap pressure is ever observed.
+// - setCacheTTL(0) disables caching (writes are guarded by `ttl > 0`), it
+//   does NOT mean "expire immediately". No live callers set a custom TTL;
+//   effective TTL is always DEFAULT_CACHE_TTL_MS.
 
 // Same-origin by default (production dist is served by the Go server on :8088).
 // Dev (`vite`) uses vite.config.js server.proxy for /api; override with
@@ -40,6 +50,7 @@ function cloneJson(data) {
 }
 
 export function setCacheTTL(ttlMs) {
+  // NOTE: 0 disables caching (see module header); it does not mean "expire now".
   currentCacheTTLMs = typeof ttlMs === "number" && ttlMs >= 0 ? ttlMs : DEFAULT_CACHE_TTL_MS;
 }
 
