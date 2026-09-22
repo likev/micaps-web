@@ -39,7 +39,7 @@
       ...r,
       _id: r._id || `rule-${targetLayer.id || "default"}-${i}`,
     }));
-    logic = targetLayer.config?.filterLogic || "AND";
+    logic = targetLayer.config?.filterLogic || "VIEW";
   }
 
   $effect(() => {
@@ -89,7 +89,8 @@
     const preset = PRESETS[key];
     if (!preset) return;
     rules = preset.map((rule, idx) => ({ ...rule, _id: `rule-${Date.now()}-${idx}` }));
-    logic = "AND";
+    // Keep the current match mode: under ViewOnly a preset gates each
+    // element separately, under AND/OR it filters whole stations.
     update();
   }
 
@@ -121,13 +122,19 @@
         class="sel-filter-global-logic"
         bind:value={logic}
         onchange={update}
+        title="ViewOnly: each rule hides only its own element (others still show). AND/OR/Rule-1 hide whole stations."
       >
+        <option value="VIEW">ViewOnly (per-element)</option>
         <option value="AND">ALL (AND)</option>
         <option value="OR">ANY (OR)</option>
         <option value="none">Rule 1 Only</option>
       </select>
     </div>
   </div>
+
+  {#if logic === "VIEW"}
+    <div class="filter-hint">ViewOnly: a rule hides only its own element (e.g. Wind&gt;5 hides just the barb); elements without rules always show.</div>
+  {/if}
 
   <div class="filter-rules-list">
     {#each rules as rule, idx (rule._id || idx)}
@@ -240,6 +247,13 @@
     gap: 4px;
     font-size: 10px;
     color: var(--text-secondary, #8b949e);
+  }
+
+  .filter-hint {
+    font-size: 10px;
+    color: var(--text-secondary, #8b949e);
+    margin: 0 0 6px 0;
+    line-height: 1.4;
   }
 
   .sel-filter-global-logic {

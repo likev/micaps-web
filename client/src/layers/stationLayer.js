@@ -20,6 +20,11 @@ export {
   evaluateSingleRule,
   matchesStationFilters,
   compileStationFilter,
+  isViewOnly,
+  normalizeFilterField,
+  collectActiveRules,
+  isFieldVisibleInView,
+  VIEW_LOGIC,
 } from "./station/stationFilter.js";
 
 export {

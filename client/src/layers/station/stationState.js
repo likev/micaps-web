@@ -39,7 +39,7 @@ export function getState(map) {
         filterField1: "none",
         filterOp1: ">",
         filterVal1: "",
-        filterLogic: "none",
+        filterLogic: "VIEW",
         filterField2: "none",
         filterOp2: "<",
         filterVal2: "",

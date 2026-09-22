@@ -1,6 +1,91 @@
 // stationFilter.js - Station meteorological filter rules and JIT filter compiler
 import { getFieldValue } from "./stationExtract.js";
 
+// ViewOnly per-element match mode ("filterLogic": "VIEW"). Stations are
+// never hidden; each rule gates only its own plotted element, and elements
+// without rules default to visible.
+export const VIEW_LOGIC = "VIEW";
+
+export function isViewOnly(cfg) {
+  return String(cfg?.filterLogic ?? "").toUpperCase() === VIEW_LOGIC;
+}
+
+const VIEW_FIELD_ALIASES = {
+  TT: "TT",
+  TD: "Td",
+  DTD: "DTD",
+  WIND: "Wind",
+  RAIN: "Rain",
+  RAIN6: "Rain6",
+  RAIN6H: "Rain6",
+  VISIBILITY: "Visibility",
+  VIS: "Visibility",
+  VV: "Visibility",
+  SLP: "SLP",
+  HEIGHT: "Height",
+  HGT: "Height",
+};
+
+export function normalizeFilterField(field) {
+  if (field === undefined || field === null) return null;
+  const key = String(field).trim().toUpperCase();
+  if (!key || key === "NONE") return null;
+  return VIEW_FIELD_ALIASES[key] || null;
+}
+
+function ruleIsActive(r) {
+  return Boolean(
+    r && r.field && r.field !== "none" &&
+    r.val !== undefined && r.val !== null && r.val !== "" &&
+    !isNaN(Number(r.val))
+  );
+}
+
+// Active rules in normalized { field, op, val, val2 } shape, from either the
+// modern filterRules array or the legacy filterField1/filterField2 shape.
+export function collectActiveRules(cfg) {
+  const out = [];
+  if (!cfg) return out;
+  if (Array.isArray(cfg.filterRules)) {
+    for (const r of cfg.filterRules) {
+      if (ruleIsActive(r)) {
+        out.push({ field: r.field, op: r.op || ">", val: r.val, val2: r.val2 });
+      }
+    }
+    return out;
+  }
+  if (
+    cfg.filterField1 && cfg.filterField1 !== "none" &&
+    cfg.filterVal1 !== undefined && cfg.filterVal1 !== null && cfg.filterVal1 !== "" &&
+    !isNaN(Number(cfg.filterVal1))
+  ) {
+    out.push({ field: cfg.filterField1, op: cfg.filterOp1 || ">", val: cfg.filterVal1 });
+  }
+  if (
+    cfg.filterField2 && cfg.filterField2 !== "none" &&
+    cfg.filterVal2 !== undefined && cfg.filterVal2 !== null && cfg.filterVal2 !== "" &&
+    !isNaN(Number(cfg.filterVal2))
+  ) {
+    out.push({ field: cfg.filterField2, op: cfg.filterOp2 || "<", val: cfg.filterVal2 });
+  }
+  return out;
+}
+
+// ViewOnly element gate: an element is drawn iff every active rule on its
+// own field passes. Fields without rules (or unknown fields) default to
+// visible, so e.g. a Wind rule hides only wind barbs while visibility,
+// temperature, etc. keep showing.
+export function isFieldVisibleInView(p, cfg, field) {
+  const canonical = normalizeFilterField(field);
+  if (!canonical) return true;
+  const mine = collectActiveRules(cfg).filter((r) => normalizeFilterField(r.field) === canonical);
+  if (mine.length === 0) return true;
+  for (const r of mine) {
+    if (!evaluateSingleRule(p, r)) return false;
+  }
+  return true;
+}
+
 export function evaluateSingleRule(p, rule) {
   if (!rule || !rule.field || rule.field === "none") return true;
   const actual = getFieldValue(p, rule.field);
@@ -40,6 +125,8 @@ export function evaluateSingleRule(p, rule) {
 
 export function matchesStationFilters(p, cfg) {
   if (!cfg) return true;
+  // ViewOnly never hides stations; per-element gating happens at render.
+  if (isViewOnly(cfg)) return true;
 
   if (Array.isArray(cfg.filterRules)) {
     const activeRules = cfg.filterRules.filter(
@@ -85,6 +172,8 @@ export function matchesStationFilters(p, cfg) {
 
 export function compileStationFilter(cfg) {
   if (!cfg) return () => true;
+  // ViewOnly never hides stations; per-element gating happens at render.
+  if (isViewOnly(cfg)) return () => true;
 
   if (Array.isArray(cfg.filterRules)) {
     const active = [];

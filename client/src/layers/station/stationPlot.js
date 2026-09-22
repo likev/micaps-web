@@ -9,6 +9,10 @@ import {
   drawWindBarbCanvas,
   drawSkyCoverCanvas,
 } from "./stationSymbols.js";
+import {
+  isViewOnly,
+  isFieldVisibleInView,
+} from "./stationFilter.js";
 
 export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0) {
   const rawT = extractTemp(p, ["temperature", "temp", "TEM", "TT", "T", "TMP", "t", "temp_max", "tem"]);
@@ -62,11 +66,17 @@ export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0)
   const rain6 = rawRain6 !== null && rawRain6 > 0 ? (rawRain6 < 10 ? rawRain6.toFixed(1) : Math.round(rawRain6).toString()) : "";
 
   const ww = getWeatherSymbol(weatherCode);
-  const hasDTDPlot = Boolean(showDTD && dtd);
-  const hasVisPlot = Boolean(showVisibility && vis);
+  // ViewOnly match mode: each rule gates only its own plotted element;
+  // elements without rules default to visible. SLP/Height share the PPP
+  // slot (surface vs upper-air) and Rain/Rain6 share the R6 slot, so both
+  // aliases must pass for those slots to draw.
+  const viewMode = isViewOnly(cfg);
+  const allowField = (field) => !viewMode || isFieldVisibleInView(p, cfg, field);
+  const hasDTDPlot = Boolean(showDTD && dtd && allowField("DTD"));
+  const hasVisPlot = Boolean(showVisibility && vis && allowField("Visibility"));
 
   // 1. Wind Barb
-  if (showWind && ws !== null && ws >= 0) {
+  if (showWind && allowField("Wind") && ws !== null && ws >= 0) {
     if (ws < 1.5) {
       drawWindBarbCanvas(ctx, cx, cy, 0, 0, scale);
     } else if (wd !== null && wd >= 0 && wd <= 360) {
@@ -101,7 +111,7 @@ export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0)
   }
 
   // 3. TT (Temperature) - Top-Left in Bold Red
-  if (showTemp && tt) {
+  if (showTemp && allowField("TT") && tt) {
     drawPlotText(tt, cx - 8 * scale, cy - 12 * scale, "#f85149", 13, "right", "700");
   }
 
@@ -111,7 +121,7 @@ export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0)
   }
 
   // 5. TdTd (Dew Point) - Bottom-Left in Emerald Green
-  if (showDewpoint && td) {
+  if (showDewpoint && allowField("Td") && td) {
     drawPlotText(td, cx - 8 * scale, cy + 12 * scale, "#56d364", 13, "right", "700");
   }
 
@@ -132,12 +142,12 @@ export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0)
   }
 
   // 7. PPP (Pressure or Height) - Top-Right in Cyan/Blue
-  if (showPressure && ppp) {
+  if (showPressure && ppp && allowField("SLP") && allowField("Height")) {
     drawPlotText(ppp, cx + 8 * scale, cy - 12 * scale, "#79c0ff", 13, "left", "700");
   }
 
   // 8. R6 (6h Rain) - Middle-Right in Sky Blue
-  if (showRain6 && rain6) {
+  if (showRain6 && rain6 && allowField("Rain") && allowField("Rain6")) {
     drawPlotText(rain6, cx + 8 * scale, cy, "#38bdf8", 12, "left", "700");
   }
 

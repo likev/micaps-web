@@ -59,7 +59,7 @@ export function ensureLayerFilterRules(layer) {
     }
   }
   if (!layer.config.filterLogic) {
-    layer.config.filterLogic = "AND";
+    layer.config.filterLogic = "VIEW";
   }
 }
 
@@ -74,7 +74,7 @@ function isUpperAir(layer) {
 export function renderStationFilterSection(layer) {
   ensureLayerFilterRules(layer);
   const rules = layer.config.filterRules;
-  const logic = layer.config.filterLogic || "AND";
+  const logic = layer.config.filterLogic || "VIEW";
   const upper = isUpperAir(layer);
 
   return `
@@ -84,6 +84,7 @@ export function renderStationFilterSection(layer) {
         <div style="display: flex; align-items: center; gap: 4px;">
           <span style="font-size: 10px; color: #8b949e;">Match:</span>
           <select class="sel-filter-global-logic" style="background: #161b22; color: #58a6ff; font-weight: bold; border: 1px solid #388bfd; border-radius: 4px; font-size: 10px; padding: 1px 4px;">
+            <option value="VIEW" ${logic === "VIEW" ? "selected" : ""}>ViewOnly (per-element)</option>
             <option value="AND" ${logic === "AND" ? "selected" : ""}>ALL (AND)</option>
             <option value="OR" ${logic === "OR" ? "selected" : ""}>ANY (OR)</option>
             <option value="none" ${logic === "none" ? "selected" : ""}>Rule 1 Only</option>
@@ -301,8 +302,6 @@ export function bindStationFilterEvents(configDrawer, layer, onAction, winId) {
     btnClear.addEventListener("click", (e) => {
       e.stopPropagation();
       layer.config.filterRules = [{ field: "none", op: ">", val: "", val2: "" }];
-      layer.config.filterLogic = "AND";
-      if (logicSel) logicSel.value = "AND";
       rerender();
     });
   }
@@ -314,8 +313,6 @@ export function bindStationFilterEvents(configDrawer, layer, onAction, winId) {
       const presetRules = PRESETS[pKey];
       if (presetRules) {
         layer.config.filterRules = presetRules.map((r) => ({ ...r }));
-        layer.config.filterLogic = "AND";
-        if (logicSel) logicSel.value = "AND";
         rerender();
       }
     });
