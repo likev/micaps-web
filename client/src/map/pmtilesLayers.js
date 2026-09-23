@@ -1,84 +1,15 @@
-// pmtilesLayers.js - MapLibre GL style layers for local China vector tiles (matching likev/local-map)
-// Supports two beautiful basemap schemes: dark (midnight) and light (daybreak)
+import { THEME_TOKENS, getMapTokens, getPlotTokens } from "./themeTokens.js";
+import { getState } from "../layers/station/stationState.js";
+import { updateVisibleMarkersForMap } from "../layers/station/stationCanvas.js";
 
 export const BASEMAP_SCHEMES = {
-  // Professional cartographic schemes optimized for meteorological workstations (MICAPS/ECMWF/NOAA)
-  // Ensures zero clash with weather isolines (isobars/isotherms), radar reflectivity, and wind streamfields
-  dark: {
-    id: "dark",
-    name: "Midnight Slate",
-    background: "#0a0f19",
-    fills: {
-      world: "#101622",
-      china: "#121927",
-      provincesBoundary: "#131b2a",
-      provinces: "#151e2f",
-      citys: "#182236",
-      county: "#182236",
-    },
-    fillOpacity: 0.85,
-    boundaries: {
-      world: { color: "#334155", width: 0.85, opacity: 0.70 },
-      china: { color: "#cbd5e1", width: 1.5, opacity: 0.96 },
-      provinces: { color: "#94a3b8", width: 1.15, opacity: 0.88 },
-      provincesDetail: { color: "#8193aa", width: 1.0, opacity: 0.85 },
-      city: { color: "#52657e", width: 0.75, dasharray: [4, 3], opacity: 0.75 },
-      county: { color: "#38475c", width: 0.50, dasharray: [2, 3], opacity: 0.58 },
-    },
-    graticule: "rgba(148, 163, 184, 0.35)",
-  },
-  light: {
-    id: "light",
-    name: "Daybreak Neutral",
-    background: "#e2e8f0",
-    fills: {
-      world: "#f1f5f9",
-      china: "#f8fafc",
-      provincesBoundary: "#f4f7fa",
-      provinces: "#f1f5f9",
-      citys: "#edf2f7",
-      county: "#edf2f7",
-    },
-    fillOpacity: 1.0,
-    boundaries: {
-      world: { color: "#94a3b8", width: 0.85, opacity: 0.75 },
-      china: { color: "#1e293b", width: 1.5, opacity: 0.95 },
-      provinces: { color: "#475569", width: 1.15, opacity: 0.88 },
-      provincesDetail: { color: "#556880", width: 1.0, opacity: 0.85 },
-      city: { color: "#8092a8", width: 0.75, dasharray: [4, 3], opacity: 0.75 },
-      county: { color: "#b0c0d2", width: 0.50, dasharray: [2, 3], opacity: 0.60 },
-    },
-    graticule: "rgba(71, 85, 105, 0.30)",
-  },
-  micaps: {
-    id: "micaps",
-    name: "MICAPS Classic",
-    background: "#09111e",
-    fills: {
-      world: "#0b1626",
-      china: "#0f1b2e",
-      provincesBoundary: "#101e33",
-      provinces: "#13233c",
-      citys: "#162844",
-      county: "#162844",
-    },
-    fillOpacity: 0.85,
-    boundaries: {
-      world: { color: "#1e3a5f", width: 0.85, opacity: 0.75 },
-      china: { color: "#f8fafc", width: 1.6, opacity: 0.98 },
-      provinces: { color: "#38bdf8", width: 1.15, opacity: 0.92 },
-      provincesDetail: { color: "#38bdf8", width: 1.0, opacity: 0.90 },
-      city: { color: "#0284c7", width: 0.75, dasharray: [4, 3], opacity: 0.78 },
-      county: { color: "#0369a1", width: 0.50, dasharray: [2, 3], opacity: 0.60 },
-    },
-    graticule: "rgba(56, 189, 248, 0.35)",
-  },
+  dark: THEME_TOKENS.dark.map,
+  light: THEME_TOKENS.light.map,
+  micaps: THEME_TOKENS.micaps.map,
 };
 
 export function getBasemapScheme(name) {
-  if (!name) return BASEMAP_SCHEMES.dark;
-  const key = String(name).toLowerCase();
-  return BASEMAP_SCHEMES[key] || BASEMAP_SCHEMES.dark;
+  return getMapTokens(name);
 }
 
 export function getPMTilesStyle(pmtilesUrl, schemeName = "dark", projectionType = "mercator") {
@@ -298,6 +229,31 @@ export function applyBasemapScheme(map, schemeName) {
   if (map.getLayer("graticule-lines")) {
     map.setPaintProperty("graticule-lines", "line-color", scheme.graticule);
   }
+
+  // Update isoline label layers if present
+  try {
+    const isLight = scheme.id === "light";
+    const plotTokens = getPlotTokens(scheme.id);
+    const textColor = isLight ? plotTokens.ppp.color : "#ffffff";
+    const style = map.getStyle ? map.getStyle() : null;
+    if (style && Array.isArray(style.layers)) {
+      for (const lyr of style.layers) {
+        if (lyr.id && (lyr.id.endsWith("-isoline-label-layer") || lyr.id === "isoline-label-layer")) {
+          map.setPaintProperty(lyr.id, "text-color", textColor);
+          map.setPaintProperty(lyr.id, "text-halo-color", plotTokens.halo);
+        }
+      }
+    }
+  } catch {}
+
+  map.__basemapScheme = scheme.id;
+  try {
+    const state = getState(map);
+    if (state && state.config) {
+      state.config.__themeId = scheme.id;
+      updateVisibleMarkersForMap(map);
+    }
+  } catch {}
 
   // Persist choice for next load — does NOT touch UI chrome (web client unchanged)
   try { if (typeof localStorage !== "undefined") localStorage.setItem("micaps-basemap-scheme", scheme.id); } catch {}

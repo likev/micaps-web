@@ -65,7 +65,7 @@ export function extractPressureOrHeight(props) {
       if (typeof v === "string" && v.length === 3 && !isNaN(parseInt(v, 10))) {
         const enc = parseInt(v, 10);
         const dec = enc <= 600 ? enc / 10.0 + 1000.0 : enc / 10.0 + 900.0;
-        const rounded = Math.round(dec * 10) / 10;
+        const rounded = Math.round(dec);
         return rounded.toString();
       }
       let num = typeof v === "number" ? v : parseFloat(v);
@@ -73,7 +73,7 @@ export function extractPressureOrHeight(props) {
         if (num > 8000 && num < 110000) num = num / 100.0;
         else if (num > 8000 && num < 11000) num = num / 10.0;
         if (num >= 800 && num <= 1100) {
-          const rounded = Math.round(num * 10) / 10;
+          const rounded = Math.round(num);
           return rounded.toString();
         }
       }

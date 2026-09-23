@@ -43,6 +43,7 @@ export function getState(map) {
         filterField2: "none",
         filterOp2: "<",
         filterVal2: "",
+        __themeId: "dark",
       },
       moveListener: null,
       mouseMoveListener: null,

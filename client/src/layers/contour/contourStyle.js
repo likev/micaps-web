@@ -1,5 +1,6 @@
 // contourStyle.js - MapLibre style expressions, DOM ID helpers, and visibility/style setters for contours
 import { parseBoldValues, isFeatureBold } from "./contourCompute.js";
+import { getPlotTokens } from "../../map/themeTokens.js";
 
 export function getLayerDOMIds(layerId = "default") {
   const isDefault = layerId === "default" || layerId === "contour-TMP-850" || layerId === "contour-ECMWF_HR-TMP-850";
@@ -76,9 +77,12 @@ export function setLayerIsolineStyle(map, layerId, config = {}, parseBoldValuesF
     map.setPaintProperty(isolineLayerId, "line-width", lineWidthExp);
   }
   if (map.getLayer(isolineLabelLayerId)) {
-    map.setPaintProperty(isolineLabelLayerId, "text-color", "#ffffff");
-    map.setPaintProperty(isolineLabelLayerId, "text-halo-color", "rgba(0, 0, 0, 0.95)");
-    map.setPaintProperty(isolineLabelLayerId, "text-halo-width", 2.5);
+    const scheme = map.__basemapScheme || "dark";
+    const plotTokens = getPlotTokens(scheme);
+    const textColor = scheme === "light" ? plotTokens.ppp.color : "#ffffff";
+    map.setPaintProperty(isolineLabelLayerId, "text-color", textColor);
+    map.setPaintProperty(isolineLabelLayerId, "text-halo-color", plotTokens.halo);
+    map.setPaintProperty(isolineLabelLayerId, "text-halo-width", plotTokens.haloWidth || 2.5);
     if (typeof config.labelSize === "number" && config.labelSize > 0) {
       map.setLayoutProperty(isolineLabelLayerId, "text-size", buildLabelSizeExp(config.labelSize));
     }

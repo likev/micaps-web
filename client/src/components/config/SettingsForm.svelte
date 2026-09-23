@@ -84,7 +84,7 @@
               onchange={() => setScheme("dark")}
             />
             <span class="radio-card-icon">🌙</span>
-            <span class="radio-card-title">Midnight Slate</span>
+            <span class="radio-card-title">Ink</span>
             <span class="radio-card-sub">Dark</span>
           </label>
           <label class="radio-card" class:selected={scheme === "light"}>
@@ -96,7 +96,7 @@
               onchange={() => setScheme("light")}
             />
             <span class="radio-card-icon">☀️</span>
-            <span class="radio-card-title">Daybreak Neutral</span>
+            <span class="radio-card-title">Paper</span>
             <span class="radio-card-sub">Light</span>
           </label>
           <label class="radio-card" class:selected={scheme === "micaps"}>
@@ -108,7 +108,7 @@
               onchange={() => setScheme("micaps")}
             />
             <span class="radio-card-icon">🌐</span>
-            <span class="radio-card-title">MICAPS Classic</span>
+            <span class="radio-card-title">Slate Blue</span>
             <span class="radio-card-sub">Navy</span>
           </label>
         </div>

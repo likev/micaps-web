@@ -543,9 +543,9 @@
             value={layer.config?.scheme || "dark"}
             onchange={(e) => handleConfigChange("scheme", e.target.value)}
           >
-            <option value="dark">🌙 Midnight Slate (Dark)</option>
-            <option value="light">☀️ Daybreak Neutral (Light)</option>
-            <option value="micaps">🌐 MICAPS Classic (Navy)</option>
+            <option value="dark">🌙 Ink (Dark)</option>
+            <option value="light">☀️ Paper (Light)</option>
+            <option value="micaps">🌐 Slate Blue (Navy)</option>
           </select>
         </div>
 

@@ -113,7 +113,7 @@
 
 <header id="navbar" class="navbar">
   <div class="nav-brand">
-    <a href="https://github.com/likev/micaps-web" target="_blank" rel="noopener noreferrer" class="brand-link" title="MICAPS-Web on GitHub (client v1.6.1)">MICAPS-Web</a>
+    <a href="https://github.com/likev/micaps-web" target="_blank" rel="noopener noreferrer" class="brand-link" title="MICAPS-Web on GitHub (client v1.7.0)">MICAPS-Web</a>
     <span class="brand-badge">PRO</span>
   </div>
 

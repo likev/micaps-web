@@ -21,6 +21,7 @@ import {
 } from "./contourCompute.js";
 import { resolveRenderLevels } from "./contourLevels.js";
 import { clipFeatureCollectionToBBox } from "../../utils/geometry/clip.js";
+import { getPlotTokens } from "../../map/themeTokens.js";
 
 export function updateMapLibreContour(map, isobands, isolines, options = {}) {
   const layerId = options.layerId || "default";
@@ -88,13 +89,17 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
         map.setPaintProperty(isolineLayerId, "line-width", lineWidthExp);
       }
       if (map.getLayer(isolineLabelLayerId)) {
+        const scheme = map.__basemapScheme || "dark";
+        const plotTokens = getPlotTokens(scheme);
+        const textColor = scheme === "light" ? plotTokens.ppp.color : "#ffffff";
         map.setLayoutProperty(isolineLabelLayerId, "visibility", visibleIsoline ? "visible" : "none");
-        map.setPaintProperty(isolineLabelLayerId, "text-color", "#ffffff");
+        map.setPaintProperty(isolineLabelLayerId, "text-color", textColor);
+        map.setPaintProperty(isolineLabelLayerId, "text-halo-color", plotTokens.halo);
         try {
           map.setLayoutProperty(isolineLabelLayerId, "text-size", labelTextSize);
           map.setLayoutProperty(isolineLabelLayerId, "symbol-spacing", 160);
           map.setLayoutProperty(isolineLabelLayerId, "symbol-sort-key", ["case", ["to-boolean", ["get", "isBold"]], 0, 10]);
-          map.setPaintProperty(isolineLabelLayerId, "text-halo-width", 2.5);
+          map.setPaintProperty(isolineLabelLayerId, "text-halo-width", plotTokens.haloWidth || 2.5);
         } catch {}
       }
     } else {
@@ -119,6 +124,9 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
         },
       });
 
+      const scheme = map.__basemapScheme || "dark";
+      const plotTokens = getPlotTokens(scheme);
+      const textColor = scheme === "light" ? plotTokens.ppp.color : "#ffffff";
       map.addLayer({
         id: isolineLabelLayerId,
         type: "symbol",
@@ -134,9 +142,9 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
           "visibility": visibleIsoline ? "visible" : "none",
         },
         paint: {
-          "text-color": "#ffffff",
-          "text-halo-color": "rgba(0, 0, 0, 0.95)",
-          "text-halo-width": 2.5,
+          "text-color": textColor,
+          "text-halo-color": plotTokens.halo,
+          "text-halo-width": plotTokens.haloWidth || 2.5,
         },
       });
     }

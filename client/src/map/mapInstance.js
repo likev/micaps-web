@@ -3,6 +3,7 @@ import maplibregl from "maplibre-gl";
 import * as pmtiles from "pmtiles";
 import { getPMTilesStyle, applyBasemapScheme, getBasemapScheme } from "./pmtilesLayers.js";
 import { addGraticuleLayers, updateGraticuleScheme } from "./graticule.js";
+import { getState } from "../layers/station/stationState.js";
 
 /**
  * Disarms MapLibre GL v5's internal ProjectionErrorMeasurement subsystem.
@@ -76,7 +77,7 @@ export function resolveInitialProjection() {
 export function resolveInitialBasemapScheme() {
   try {
     const stored = typeof localStorage !== "undefined" ? localStorage.getItem("micaps-basemap-scheme") : null;
-    if (stored && (stored === "dark" || stored === "light")) return stored;
+    if (stored && (stored === "dark" || stored === "light" || stored === "micaps")) return stored;
   } catch {}
   try {
     // also check CURRENT_CONFIG if already loaded (dynamic import to avoid circular dep)
@@ -143,6 +144,13 @@ export function createMapInstance(containerIdOrEl, options = {}) {
   // expose scheme and projection helpers on instance
   mapInstance.__basemapScheme = schemeName;
   mapInstance.__mapProjection = projectionType;
+
+  try {
+    const state = getState(mapInstance);
+    if (state && state.config) {
+      state.config.__themeId = schemeName;
+    }
+  } catch {}
 
   return mapInstance;
 }

@@ -1,11 +1,13 @@
 // stationSymbols.js - Wind barb and sky cover canvas symbol renderers (CMA & WMO compliant)
+import { getPlotTokens } from "../../map/themeTokens.js";
 
-export function drawWindBarbCanvas(ctx, cx, cy, speed, dir, scale = 1.0, color = "#58a6ff") {
+export function drawWindBarbCanvas(ctx, cx, cy, speed, dir, scale = 1.0, color = null, themeId = "dark") {
+  const windColor = color || (getPlotTokens(themeId)?.wind?.color ?? "#dee2e6");
   if (speed < 1.5) {
     ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, 10 * scale, 0, Math.PI * 2);
-    ctx.strokeStyle = color;
+    ctx.strokeStyle = windColor;
     ctx.lineWidth = 1.3 * scale;
     if (typeof ctx.setLineDash === "function") {
       ctx.setLineDash([2.5 * scale, 2.5 * scale]);
@@ -28,8 +30,8 @@ export function drawWindBarbCanvas(ctx, cx, cy, speed, dir, scale = 1.0, color =
   const barbAngle = angleRad + ((70 * Math.PI) / 180);
 
   ctx.save();
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
+  ctx.strokeStyle = windColor;
+  ctx.fillStyle = windColor;
   ctx.lineWidth = 2.2 * scale;
   ctx.lineCap = "round";
   ctx.lineJoin = "miter";
@@ -92,21 +94,35 @@ export function drawWindBarbCanvas(ctx, cx, cy, speed, dir, scale = 1.0, color =
   ctx.restore();
 }
 
-export function drawSkyCoverCanvas(ctx, cx, cy, octas = 0, scale = 1.0) {
+export function drawSkyCoverCanvas(ctx, cx, cy, octas = 0, scale = 1.0, themeOrTokens = "dark") {
   const r = 8 * scale;
   ctx.save();
 
-  // Background dark circle + white border
+  let sky = null;
+  if (typeof themeOrTokens === "string") {
+    sky = getPlotTokens(themeOrTokens)?.sky;
+  } else if (themeOrTokens && typeof themeOrTokens === "object") {
+    sky = themeOrTokens.sky || themeOrTokens;
+  }
+  if (!sky) {
+    sky = getPlotTokens("dark").sky;
+  }
+
+  const bg = sky.bg || "rgba(8, 9, 13, 0.90)";
+  const border = sky.border || "#dee2e6";
+  const fill = sky.fill || "#dee2e6";
+
+  // Background circle + border
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(13, 17, 23, 0.85)";
+  ctx.fillStyle = bg;
   ctx.fill();
-  ctx.strokeStyle = "#e6edf3";
+  ctx.strokeStyle = border;
   ctx.lineWidth = 2.0 * scale;
   ctx.stroke();
 
   const o = isNaN(octas) ? 9 : Math.min(9, Math.max(0, Math.round(octas)));
-  ctx.fillStyle = "#e6edf3";
+  ctx.fillStyle = fill;
 
   switch (o) {
     case 0:
@@ -150,7 +166,7 @@ export function drawSkyCoverCanvas(ctx, cx, cy, octas = 0, scale = 1.0) {
     default: {
       // Obscured / missing: X cross
       const d = r * 0.707;
-      ctx.strokeStyle = "#e6edf3";
+      ctx.strokeStyle = border;
       ctx.lineWidth = 2.0 * scale;
       ctx.beginPath();
       ctx.moveTo(cx - d, cy - d);

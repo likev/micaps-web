@@ -73,6 +73,9 @@ export function renderStationWeatherPlots(map, geojson, visible = true, config =
   const state = getState(map);
   state.geojson = geojson;
   if (visible !== undefined) state.visible = Boolean(visible);
+  if (map.__basemapScheme && !config?.__themeId) {
+    state.config.__themeId = map.__basemapScheme;
+  }
   if (config) {
     state.config = { ...state.config, ...config };
   }
@@ -144,6 +147,10 @@ export function drawStationCanvas(map) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
   ctx.clearRect(0, 0, w, h);
+
+  if (map.__basemapScheme && (!state.config.__themeId || state.config.__themeId !== map.__basemapScheme)) {
+    state.config.__themeId = map.__basemapScheme;
+  }
 
   if (!state.visible || !state.geojson || !state.geojson.features || state.geojson.features.length === 0) {
     state.activeVisibleStations = [];

@@ -7,6 +7,7 @@ import { formatElementUnit } from "../../src/utils/formatters.js";
 import { getColormap, getColor, getElementLevels } from "../../src/utils/colormaps.js";
 import { getPaletteCategory } from "../../src/utils/paletteLoader.js";
 import { getLayersForWindow, clearWindowWeatherLayers, addOrUpdateLayer } from "../../src/ui/layerControl.js";
+import { getPlotTokens } from "../../src/map/themeTokens.js";
 import { readSrcText } from "../helpers/cssText.js";
 import fs from "fs";
 
@@ -276,18 +277,19 @@ describe("9. Station Plot DTD Number & Collision Mechanics (§5-I)", () => {
   });
 
   test("renderStationPlotToCanvas plots orange integer DTD when showDTD is true and blanks when missing", () => {
+    const dtdColor = getPlotTokens("dark").dtd.color;
     const p1 = { temperature: 24.6, dewpoint: 19.2 }; // DTD = 5.4 -> round 5
     const p2 = { temperature: 20.0, dewpoint: null }; // missing Td
 
     // When showDTD is false: no orange DTD text on canvas
     let ctx = createMockCtx();
     renderStationPlotToCanvas(ctx, p1, 100, 100, { showDTD: false }, 1.0);
-    expect(ctx.texts.some((t) => t.text === "5" && t.fillStyle === "#f0883e")).toBe(false);
+    expect(ctx.texts.some((t) => t.text === "5" && t.fillStyle === dtdColor)).toBe(false);
 
     // When showDTD is true: station 1 draws "5" in orange at middle-left (cx-8, cy)
     ctx = createMockCtx();
     renderStationPlotToCanvas(ctx, p1, 100, 100, { showDTD: true }, 1.0);
-    const dtd = ctx.texts.find((t) => t.text === "5" && t.fillStyle === "#f0883e");
+    const dtd = ctx.texts.find((t) => t.text === "5" && t.fillStyle === dtdColor);
     expect(dtd).toBeDefined();
     expect(dtd.x).toBe(92);
     expect(dtd.y).toBe(100);
@@ -295,10 +297,12 @@ describe("9. Station Plot DTD Number & Collision Mechanics (§5-I)", () => {
     // Station 2 (missing dewpoint) draws no orange DTD
     ctx = createMockCtx();
     renderStationPlotToCanvas(ctx, p2, 100, 100, { showDTD: true }, 1.0);
-    expect(ctx.texts.some((t) => t.fillStyle === "#f0883e")).toBe(false);
+    expect(ctx.texts.some((t) => t.fillStyle === dtdColor)).toBe(false);
   });
 
   test("collision rule: DTD displaces ww to cx-22 when VIS is off; ww dropped when VIS is on", () => {
+    const dtdColor = getPlotTokens("dark").dtd.color;
+    const visColor = getPlotTokens("dark").vis.color;
     const props = {
       temperature: 25.0,
       dewpoint: 20.0, // DTD = 5
@@ -324,7 +328,7 @@ describe("9. Station Plot DTD Number & Collision Mechanics (§5-I)", () => {
       showWeather: true,
       showVisibility: false,
     }, 1.0);
-    const dtd = ctx.texts.find((t) => t.text === "5" && t.fillStyle === "#f0883e");
+    const dtd = ctx.texts.find((t) => t.text === "5" && t.fillStyle === dtdColor);
     expect(dtd).toBeDefined();
     expect(dtd.x).toBe(92);
     ww = ctx.texts.find((t) => t.text === "✶");
@@ -338,8 +342,8 @@ describe("9. Station Plot DTD Number & Collision Mechanics (§5-I)", () => {
       showWeather: true,
       showVisibility: true,
     }, 1.0);
-    expect(ctx.texts.some((t) => t.text === "5" && t.fillStyle === "#f0883e" && t.x === 92)).toBe(true);
-    const vis = ctx.texts.find((t) => t.fillStyle === "#ffd33d");
+    expect(ctx.texts.some((t) => t.text === "5" && t.fillStyle === dtdColor && t.x === 92)).toBe(true);
+    const vis = ctx.texts.find((t) => t.fillStyle === visColor);
     expect(vis).toBeDefined();
     expect(vis.x).toBe(78);
     expect(ctx.texts.some((t) => t.text === "✶")).toBe(false);
