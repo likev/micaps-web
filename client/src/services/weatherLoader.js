@@ -51,15 +51,18 @@ export async function loadWeatherField(map, model, element, level, period, custo
     }
   }
   const file = `${cycle}.${String(period).padStart(3, "0")}`;
-  const path = `${model}/${element}/${level}`;
-  const dataPath = isVortDiv ? `${model}/WIND/${level}` : path;
+  const hasLevel = level !== null && level !== undefined && level !== "null" && level !== "";
+  const defaultPath = hasLevel ? `${model}/${element}/${level}` : `${model}/${element}`;
+  const path = customOptions?.path || defaultPath;
+  const dataPath = isVortDiv ? (hasLevel ? `${model}/WIND/${level}` : `${model}/WIND`) : path;
   const isWind = (element === "WIND" && !isDerivedWind) || customOptions?.isWind;
-  const layerId = customOptions?.id || (isWind ? `wind-${element}` : (isVortDiv ? `contour-${model}-${element.toLowerCase()}-${level}` : `contour-${element}`));
-  const name = isWind
-    ? `${level} hPa Wind Field (${model})`
+  const layerId = customOptions?.id || (isWind ? `wind-${element}` : (isVortDiv ? (hasLevel ? `contour-${model}-${element.toLowerCase()}-${level}` : `contour-${model}-${element.toLowerCase()}`) : `contour-${element}`));
+  const defaultName = isWind
+    ? (hasLevel ? `${level} hPa Wind Field (${model})` : `Wind Field (${model})`)
     : (isVortDiv
-      ? `${level} hPa Derived ${isVOR ? "Relative Vorticity" : (isDIV ? "Divergence" : "Wind Speed")} (${model})`
-      : `${level} hPa ${element} (${model})`);
+      ? `${hasLevel ? `${level} hPa ` : ""}Derived ${isVOR ? "Relative Vorticity" : (isDIV ? "Divergence" : "Wind Speed")} (${model})`
+      : (hasLevel ? `${level} hPa ${element} (${model})` : `${element} (${model})`));
+  const name = customOptions?.name || defaultName;
 
   const existingLayer = getLayerById(layerId, win);
   const snap = win?.layerSnapshots?.find((s) => s.id === layerId || (s.element === element && s.model === model));
@@ -108,7 +111,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
   try {
     let gridData;
     if (isVortDiv) {
-      const cacheKey = `${model}/WIND/${level}/${file}`;
+      const cacheKey = hasLevel ? `${model}/WIND/${level}/${file}` : `${model}/WIND/${file}`;
       let windData = null;
       if (win?._windGridCache?.has(cacheKey)) {
         windData = win._windGridCache.get(cacheKey);
@@ -132,7 +135,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
     } else {
       gridData = await fetchGridData(path, file);
       if (isWind) {
-        const cacheKey = `${model}/WIND/${level}/${file}`;
+        const cacheKey = hasLevel ? `${model}/WIND/${level}/${file}` : `${model}/WIND/${file}`;
         if (win) {
           if (!win._windGridCache) win._windGridCache = new Map();
           win._windGridCache.set(cacheKey, gridData);
@@ -206,7 +209,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
       colormap,
       color: lineColor,
       visible: isVisible,
-      derivedFrom: customOptions?.derivedFrom || (isVortDiv ? `wind-${model}-${level}` : undefined),
+      derivedFrom: customOptions?.derivedFrom || (isVortDiv ? (hasLevel ? `wind-${model}-${level}` : `wind-${model}`) : undefined),
       config: isWind ? {
         showWind,
         showBarbs,
@@ -235,10 +238,11 @@ export async function loadWeatherField(map, model, element, level, period, custo
     if (!isWind || showRaster) {
       const layerObj = getLayerById(layerId, win) || {
         id: layerId,
+        name,
         element,
         level,
         model,
-        path,
+        path: dataPath,
         file,
         gridData,
         colormap,
@@ -305,6 +309,6 @@ export async function loadWeatherField(map, model, element, level, period, custo
     }
   } catch (err) {
     console.error(`[Bootstrap] Field load failed for ${path}/${file}:`, err);
-    showErrorToast(`Failed to load ${element} ${level}hPa: ${err.message || err}`);
+    showErrorToast(`Failed to load ${element}${hasLevel ? ` ${level}hPa` : ""}: ${err.message || err}`);
   }
 }

@@ -75,11 +75,12 @@ func (h *GridHandler) fetchGrid(r *http.Request) (*model.GridResponse, error) {
 		return nil, fmt.Errorf("missing query parameter 'path' or 'file' (or CQL client not connected)")
 	}
 
+	dataPath = sanitizeGridPath(dataPath)
 	if h.MockMode {
 		return h.getFallbackGrid(r), nil
 	}
 
-	cleanDir := strings.Trim(dataPath, "/")
+	cleanDir := dataPath
 	parts := strings.Split(cleanDir, "/")
 	table := parts[0]
 	var subDataPath string
@@ -138,8 +139,26 @@ func (h *GridHandler) fetchGrid(r *http.Request) (*model.GridResponse, error) {
 	return parser.ParseGridData(decompressed)
 }
 
+func sanitizeGridPath(p string) string {
+	clean := strings.Trim(p, "/")
+	for {
+		if strings.HasSuffix(clean, "/null") {
+			clean = strings.TrimSuffix(clean, "/null")
+			clean = strings.Trim(clean, "/")
+			continue
+		}
+		if strings.HasSuffix(clean, "/undefined") {
+			clean = strings.TrimSuffix(clean, "/undefined")
+			clean = strings.Trim(clean, "/")
+			continue
+		}
+		break
+	}
+	return clean
+}
+
 func (h *GridHandler) getFallbackGrid(r *http.Request) *model.GridResponse {
-	dataPath := r.URL.Query().Get("path")
+	dataPath := sanitizeGridPath(r.URL.Query().Get("path"))
 	file := r.URL.Query().Get("file")
 	element := "TMP"
 	var level float32 = 850

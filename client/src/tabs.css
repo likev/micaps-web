@@ -142,6 +142,49 @@
   display: none !important;
 }
 
+.auto-alloc-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.auto-alloc-container.hidden {
+  display: none !important;
+}
+
+.alloc-label {
+  font-size: 11px;
+  color: var(--text-secondary, #8b949e);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.layout-select {
+  padding: 3px 6px;
+  background: #21262d;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-secondary, #8b949e);
+  cursor: pointer;
+  font-family: var(--font-mono, monospace);
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.layout-select:hover,
+.layout-select:focus {
+  border-color: #58a6ff;
+  color: var(--text-primary, #c9d1d9);
+}
+
+.layout-select.active {
+  background: rgba(56, 139, 253, 0.2);
+  border-color: #58a6ff;
+  color: #58a6ff;
+  font-weight: 600;
+}
+
 /* Workspace Container */
 #workspace-container {
   position: absolute;
@@ -216,6 +259,38 @@
 }
 
 .windows-grid.layout-2x2 .window-panel.slot-visible {
+  display: flex;
+}
+
+/* 2x3 6-Split Windows Mode (2 rows x 3 columns) */
+.windows-grid.layout-2x3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 2px;
+}
+
+.windows-grid.layout-2x3 .window-panel {
+  display: none;
+}
+
+.windows-grid.layout-2x3 .window-panel.slot-visible {
+  display: flex;
+}
+
+/* 3x2 6-Split Windows Mode (3 rows x 2 columns) */
+.windows-grid.layout-3x2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 2px;
+}
+
+.windows-grid.layout-3x2 .window-panel {
+  display: none;
+}
+
+.windows-grid.layout-3x2 .window-panel.slot-visible {
   display: flex;
 }
 

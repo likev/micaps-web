@@ -161,4 +161,86 @@ describe("Hovmoller canvas views", () => {
     expect(calls.filter((c) => c === "stroke").length).toBe(strokesAll);
     expect(calls.filter((c) => c === "fill").length).toBe(fillsAll);
   });
+
+  test("showRain renders rectangle-tile-fill (not contour lines) where rain12 represents past 12 hour rain", () => {
+    const calls = [];
+    const fillRects = [];
+    const ctx = {
+      save: () => calls.push("save"),
+      restore: () => calls.push("restore"),
+      beginPath: () => {}, rect: () => {}, clip: () => {},
+      moveTo: () => {}, lineTo: () => {}, closePath: () => {},
+      stroke: () => calls.push("stroke"),
+      strokeRect: () => {}, clearRect: () => {},
+      fill: () => calls.push("fill"),
+      fillRect: (x, y, w, h) => {
+        calls.push("fillRect");
+        fillRects.push({ x, y, w, h });
+      },
+      fillText: () => {}, measureText: () => ({ width: 10 }),
+      setLineDash: () => {},
+    };
+    const canvas = {
+      getContext: () => ctx,
+      addEventListener: () => {},
+      getBoundingClientRect: () => ({ width: 800, height: 600, left: 0, top: 0 }),
+      clientWidth: 800, clientHeight: 480,
+    };
+    const r = new HovmollerCanvasRenderer(canvas);
+    r.layout.plotRect = { x: 50, y: 30, width: 700, height: 420 };
+    const n = 5;
+    const m = hovMatrix();
+    // leads: [0, 12, 24] with RAIN12 accumulation
+    m.leads = [0, 12, 24];
+    m.rainStep = "RAIN12";
+    m.rain = [
+      new Float32Array([0, 0, 0, 0, 0]),           // lead 0: no past forecast rain (skipped)
+      new Float32Array([0, 2.5, 5.0, 12.0, 25.0]), // lead 12: past 12h rain [0, 12]
+      new Float32Array([1.0, 8.0, 15.0, 30.0, 60.0]),// lead 24: past 12h rain [12, 24]
+    ];
+    r.setData(m, [0, 250, 500, 750, 1000]);
+
+    // 1. dist-x mode: rain rendered as rectangle tiles (fillRect), NOT contour lines (fill/stroke)
+    r.setOptions({ showRH: false, showTemp: false, showVVel: false, showWind: false, showRain: true, axisSwap: "dist-x" });
+    calls.length = 0;
+    fillRects.length = 0;
+    r.render();
+
+    // Background fillRect (1) + rain tiles for values >= 0.1 mm
+    const tileFills = fillRects.slice(1);
+    expect(tileFills.length).toBeGreaterThan(0);
+    // No contour polygon fill calls were made
+    expect(calls.filter((c) => c === "fill").length).toBe(0);
+
+    // Verify lead 12 tile covers [0, 12] on Y axis: y starts at plotRect.y (30)
+    // lead 24 tile covers [12, 24]: y starts at plotRect.y + height/2 (240)
+    const lead12Tile = tileFills.find((tf) => Math.abs(tf.y - 30) < 1);
+    expect(lead12Tile).toBeDefined();
+    expect(lead12Tile.h).toBeCloseTo(420 / 2 + 0.5, 1); // spans 12h out of 24h total = half height + 0.5 subpixel
+
+    const lead24Tile = tileFills.find((tf) => Math.abs(tf.y - (30 + 210)) < 1);
+    expect(lead24Tile).toBeDefined();
+    expect(lead24Tile.h).toBeCloseTo(420 / 2 + 0.5, 1);
+
+    // 2. time-x swapped mode: time is on X axis
+    r.setOptions({ axisSwap: "time-x" });
+    calls.length = 0;
+    fillRects.length = 0;
+    r.render();
+    const swappedTiles = fillRects.slice(1);
+    expect(swappedTiles.length).toBe(tileFills.length);
+    // On X axis, lead 12 tile covers [0, 12] -> x starts at plotRect.x (50), width is 700 / 2 + 0.5
+    const swappedLead12 = swappedTiles.find((tf) => Math.abs(tf.x - 50) < 1);
+    expect(swappedLead12).toBeDefined();
+    expect(swappedLead12.w).toBeCloseTo(700 / 2 + 0.5, 1);
+
+    // 3. Hover sampling resolves rain accurately within the [T - 12, T] tile interval
+    // Hover at lead=6 (within [0, 12]): should sample from lead 12 data (index 1)
+    const hoverAt6 = r._sampleAtHover(6, 500);
+    expect(hoverAt6.rain).toBeCloseTo(5.0, 1);
+
+    // Hover at lead=18 (within [12, 24]): should sample from lead 24 data (index 2)
+    const hoverAt18 = r._sampleAtHover(18, 500);
+    expect(hoverAt18.rain).toBeCloseTo(15.0, 1);
+  });
 });

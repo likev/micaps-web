@@ -16,6 +16,8 @@ class WindowState {
     this.winId = winId;
     this.line = { a: { lon: 115.0, lat: 28.0 }, b: { lon: 125.0, lat: 38.0 } };
     this.npoints = 41;
+    this.model = "ECMWF_HR";
+    this.rainStep = "auto";
     this.cycle = null; this.availableCycles = [];
     this.startHour = 0; this.endHour = 144; this.stepHours = 12;
     this.leads = buildLeads(0, 144, 12);
@@ -91,8 +93,10 @@ class HovmollerController {
     s.leads = buildLeads(s.startHour, s.endHour, s.stepHours);
     s.axisSwap = cfg.axisSwap === "time-x" ? "time-x" : "dist-x";
     s.timeDir = cfg.timeDir === "rev" ? "rev" : "fwd";
+    s.model = cfg.model || win?.model || "ECMWF_HR";
+    s.rainStep = cfg.rainStep || "auto";
     try {
-      const cycles = await resolveForecastCycles("ECMWF_HR", "TMP", 500);
+      const cycles = await resolveForecastCycles(s.model, "TMP", s.level || 850);
       if (cycles?.length) { s.availableCycles = cycles; s.cycle = cfg.initCycle || win?.initCycle || cycles[0]; }
     } catch { s.cycle = cfg.initCycle || "latest"; }
     if (!s.cycle) s.cycle = "latest";
@@ -100,7 +104,7 @@ class HovmollerController {
       s.panel = new HovmollerPanel({
         windowId: s.winId, a: s.line.a, b: s.line.b, npoints: s.npoints,
         level: s.level, startHour: s.startHour, endHour: s.endHour, stepHours: s.stepHours,
-        axisSwap: s.axisSwap, timeDir: s.timeDir,
+        axisSwap: s.axisSwap, timeDir: s.timeDir, model: s.model, rainStep: s.rainStep,
         onLineChange: (a, b, n) => this.setLine(a, b, n, win),
         onDrawLine: () => this.startDraw(win),
         onSetA: () => this.setAFromMap(win),
@@ -111,11 +115,15 @@ class HovmollerController {
         onAxisSwap: () => this.setAxisSwap(s.axisSwap === "dist-x" ? "time-x" : "dist-x", win),
         onTimeDir: () => this.setTimeDir(s.timeDir === "fwd" ? "rev" : "fwd", win),
         onCycleChange: (c) => this.setCycle(c, win),
+        onModelChange: (m) => this.setModel(m, win),
+        onRainStepChange: (st) => this.setRainStep(st, win),
         onToggleElement: (el, checked) => this.syncDrawerCheckbox(el, checked, win),
         onCancel: () => this.cancelLoad(win),
         onClose: () => this.handlePanelClose(map, win),
       });
     }
+    s.panel.setModel(s.model);
+    s.panel.setRainStep(s.rainStep);
     s.panel.setCycle(s.cycle, s.availableCycles);
     s.panel.setSpan(s.startHour, s.endHour, s.stepHours);
     s.panel.setLevel(s.level);
@@ -289,13 +297,39 @@ class HovmollerController {
     this._persistConfig({ timeDir: dir }, win);
     this._syncProfileStore(win);
   }
+  async setModel(model, win = null) {
+    const s = this._getState(win);
+    if (!model || model === s.model) return;
+    s.model = model;
+    try {
+      const cycles = await resolveForecastCycles(s.model, "TMP", s.level || 850);
+      if (cycles?.length) {
+        s.availableCycles = cycles;
+        if (!cycles.includes(s.cycle)) s.cycle = cycles[0];
+      }
+    } catch {}
+    s.panel?.setModel(s.model);
+    s.panel?.setCycle(s.cycle, s.availableCycles);
+    this._persistConfig({ model: s.model, initCycle: s.cycle }, win);
+    this._syncProfileStore(win);
+    return this.loadMatrix(win);
+  }
+  setRainStep(rainStep, win = null) {
+    const s = this._getState(win);
+    if (!rainStep || rainStep === s.rainStep) return;
+    s.rainStep = rainStep;
+    s.panel?.setRainStep(s.rainStep);
+    this._persistConfig({ rainStep: s.rainStep }, win);
+    this._syncProfileStore(win);
+    return this.loadMatrix(win);
+  }
   syncDrawerCheckbox(element, checked, win = null) {
-    const propMap = { RH: "showRH", TMP: "showTemp", VVEL: "showVVel", WIND: "showWind" };
+    const propMap = { RH: "showRH", TMP: "showTemp", VVEL: "showVVel", WIND: "showWind", RAIN: "showRain" };
     if (propMap[element]) this._persistConfig({ [propMap[element]]: Boolean(checked) }, win || this.activeWin);
   }
 
   _cacheKey(s) {
-    return `${s.cycle}|lv${s.level}|${s.leads.join(",")}|${s.line.a.lon},${s.line.a.lat}|${s.line.b.lon},${s.line.b.lat}|n${s.npoints}`;
+    return `${s.model}|${s.rainStep}|${s.cycle}|lv${s.level}|${s.leads.join(",")}|${s.line.a.lon},${s.line.a.lat}|${s.line.b.lon},${s.line.b.lat}|n${s.npoints}`;
   }
   _setMatrixCache(s, key, m) {
     if (s.matrixCache.has(key)) s.matrixCache.delete(key);
@@ -326,10 +360,11 @@ class HovmollerController {
     const seq = ++s.loadingSeq;
     if (s.abortController) { try { s.abortController.abort(); } catch {} }
     s.abortController = new AbortController();
-    s.panel?.setProgress({ loaded: 0, total: s.leads.length * 4, pct: 0 });
+    s.panel?.setProgress({ loaded: 0, total: s.leads.length * 5, pct: 0 });
     try {
       const res = await loadHovmollerMatrix({
-        win, model: "ECMWF_HR", cycle: s.cycle, leads: s.leads, level: s.level,
+        win, model: s.model || "ECMWF_HR", cycle: s.cycle, leads: s.leads, level: s.level,
+        rainStep: s.rainStep || "auto",
         line: s.line, npoints: s.npoints,
         abortController: s.abortController,
         isCancelled: () => s.loadingSeq !== seq,

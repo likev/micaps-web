@@ -1,6 +1,7 @@
 <script>
   import { ui } from "../lib/stores/ui.svelte.js";
   import { tabsState } from "../lib/stores/tabs.svelte.js";
+  import { isProfilePanelWindow } from "../lib/services/appWorkflow.js";
 
   let {
     tabs = tabsState.tabs,
@@ -9,6 +10,7 @@
     activeTabId = tabsState.activeTabId,
     layout = "1x1",
     syncMap = true,
+    autoAllocation = "none",
     onSelectTab = null,
     onSelectWin = null,
     onAddTab = null,
@@ -18,6 +20,8 @@
     onReorder = null,
     onChangeLayout = null,
     onToggleSync = null,
+    onSelectAutoAlloc = null,
+    onToggleAutoAlloc = null,
   } = $props();
 
   let draggedIndex = $state(null);
@@ -31,6 +35,26 @@
     windows && windows.length > 0
       ? windows
       : (tabs && tabs[0]?.windows && tabs[0].windows.length > 0 ? tabs[0].windows : tabs)
+  );
+
+  let activeWindow = $derived(
+    windows && windows.length > 0
+      ? (windows[activeWinIdx] || windows[0] || null)
+      : (tabs && tabs[0]?.windows ? (tabs[0].windows[activeWinIdx] || tabs[0].windows[0] || null) : null)
+  );
+  let isProfile = $derived(Boolean(activeWindow && isProfilePanelWindow(activeWindow)));
+  let allocDisabled = $derived(layout !== "1x1" || isProfile);
+  let allocTitle = $derived(
+    isProfile
+      ? "Auto-Allocation is disabled for profile panel products"
+      : (layout !== "1x1"
+        ? "Auto-Allocation can only be selected in tab-mode before splitting"
+        : "Auto-Allocation mode across split windows")
+  );
+  let effectiveAlloc = $derived(
+    isProfile
+      ? "none"
+      : (typeof autoAllocation === "string" ? autoAllocation : (autoAllocation ? "level" : "none"))
   );
 
   function selectItem(item, idx) {
@@ -277,6 +301,14 @@
       onclick={() => setLayout("2x2")}
     >⊞ 4-Split</button>
     <button
+      id="btn-layout-6"
+      type="button"
+      class="layout-btn"
+      class:active={layout === "2x3" || layout === "3x2"}
+      title="6-Split Mode (2x3 grid)"
+      onclick={() => setLayout("2x3")}
+    >▦ 6-Split</button>
+    <button
       id="btn-sync-toggle"
       type="button"
       class="layout-btn"
@@ -290,6 +322,32 @@
     >
       {syncMap ? "Sync 🔗" : "Sync ✕"}
     </button>
+    <div
+      class="auto-alloc-container"
+      title={allocTitle}
+    >
+      <label for="sel-auto-alloc" class="alloc-label">Alloc:</label>
+      <select
+        id="sel-auto-alloc"
+        data-testid="sel-auto-alloc"
+        class="layout-select"
+        class:active={effectiveAlloc && effectiveAlloc !== "none"}
+        disabled={allocDisabled}
+        title={allocTitle}
+        value={effectiveAlloc}
+        onchange={(e) => {
+          const val = e.currentTarget.value;
+          if (onSelectAutoAlloc) onSelectAutoAlloc(val);
+          else if (onToggleAutoAlloc) onToggleAutoAlloc(val);
+        }}
+      >
+        <option value="none">none</option>
+        <option value="time">time</option>
+        <option value="step">step</option>
+        <option value="level">level</option>
+        <option value="model">model</option>
+      </select>
+    </div>
   </div>
 </div>
 
@@ -430,6 +488,55 @@
 
   .layout-btn.hidden {
     display: none !important;
+  }
+
+  .auto-alloc-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .auto-alloc-container.hidden {
+    display: none !important;
+  }
+
+  .alloc-label {
+    font-size: 11px;
+    color: var(--text-secondary, #8b949e);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .layout-select {
+    padding: 3px 6px;
+    background: #21262d;
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--text-secondary, #8b949e);
+    cursor: pointer;
+    font-family: var(--font-mono, monospace);
+    outline: none;
+    transition: all 0.15s ease;
+  }
+
+  .layout-select:hover,
+  .layout-select:focus {
+    border-color: #58a6ff;
+    color: var(--text-primary, #c9d1d9);
+  }
+
+  .layout-select.active {
+    background: rgba(56, 139, 253, 0.2);
+    border-color: #58a6ff;
+    color: #58a6ff;
+    font-weight: 600;
+  }
+
+  .layout-select:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    border-color: rgba(255, 255, 255, 0.08);
   }
 
   .tab-item[draggable="true"] {

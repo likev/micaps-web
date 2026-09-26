@@ -1,6 +1,7 @@
 // timeHeightPanel.js - Dockable / floating time-height profile diagram window with controls and progress bar
 import { TimeHeightCanvasRenderer } from "./timeHeightCanvas.js";
 import { SUPPORTED_STEPS } from "./timeHeightLoader.js";
+import { DEFAULT_MODELS } from "../../lib/stores/tabsCore.js";
 
 export const DEFAULT_TH_WIDTH = 680;
 export const DEFAULT_TH_HEIGHT = 520;
@@ -12,6 +13,7 @@ export class TimeHeightPanel {
   constructor(options = {}) {
     this.options = {
       windowId: "default",
+      model: "ECMWF_HR",
       defaultPoint: { lon: 121.5, lat: 31.4 },
       startHour: 0,
       endHour: 144,
@@ -21,6 +23,7 @@ export class TimeHeightPanel {
       lineA: { lon: 115, lat: 28 },
       lineB: { lon: 125, lat: 38 },
       npoints: 41,
+      onModelChange: null,
       onRangeChange: null,
       onCycleChange: null,
       onDirectionChange: null,
@@ -43,6 +46,7 @@ export class TimeHeightPanel {
     this.width = DEFAULT_TH_WIDTH;
     this.height = DEFAULT_TH_HEIGHT;
     this.aspectRatio = TH_ASPECT_RATIO;
+    this.model = this.options.model || "ECMWF_HR";
     this.activePoint = { ...this.options.defaultPoint };
     this.mode = this.options.mode === "line" ? "line" : "point";
     this.line = { a: { ...this.options.lineA }, b: { ...this.options.lineB } };
@@ -90,8 +94,8 @@ export class TimeHeightPanel {
       <!-- Header -->
       <div class="th-panel-header" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #161b22; border-bottom: 1px solid #30363d; cursor: move; user-select: none; flex-shrink: 0;">
         <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 12px; color: #e6edf3;">
-          <span style="background: #1f6feb; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px;">ECMWF_HR</span>
-          <span class="th-header-title">EC Time-Height Cross-Section</span>
+          <span class="th-header-model" style="background: #1f6feb; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px;">${this.model}</span>
+          <span class="th-header-title">Time-Height Cross-Section</span>
           <span class="th-header-coords" style="font-size: 11px; color: #8b949e; font-weight: 400;">(${this.activePoint.lon.toFixed(2)}°E, ${this.activePoint.lat.toFixed(2)}°N)</span>
           <span class="th-header-cycle" style="font-size: 11px; color: #3fb950; font-weight: 500;"></span>
         </div>
@@ -110,7 +114,11 @@ export class TimeHeightPanel {
 
       <!-- Controls row -->
       <div class="th-controls-row" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 6px 12px; background: #161b22; border-bottom: 1px solid #21262d; font-size: 11px; color: #c9d1d9; flex-shrink: 0;">
-        <div style="display: flex; align-items: center; gap: 6px;">
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+          <span>Model:</span>
+          <select class="th-select-model" style="background: #0d1117; border: 1px solid #30363d; color: #58a6ff; border-radius: 4px; padding: 2px 6px; font-size: 11px; cursor: pointer;">
+            ${DEFAULT_MODELS.map((m) => `<option value="${m}" ${m === this.model ? "selected" : ""}>${m}</option>`).join("")}
+          </select>
           <span>Init:</span>
           <select class="th-select-cycle" style="background: #0d1117; border: 1px solid #30363d; color: #58a6ff; border-radius: 4px; padding: 2px 6px; font-size: 11px; cursor: pointer;"></select>
           <span style="margin-left: 6px;">Span:</span>
@@ -281,6 +289,14 @@ export class TimeHeightPanel {
     inputStart?.addEventListener("keydown", (e) => { if (e.key === "Enter") fireRange(); });
     inputEnd?.addEventListener("keydown", (e) => { if (e.key === "Enter") fireRange(); });
     selectStep?.addEventListener("change", fireRange);
+
+    // Model select
+    this.container.querySelector(".th-select-model")?.addEventListener("change", (e) => {
+      this.model = e.target.value;
+      const badge = this.container.querySelector(".th-header-model");
+      if (badge) badge.textContent = this.model;
+      this.options.onModelChange?.(this.model);
+    });
 
     // Cycle select
     this.container.querySelector(".th-select-cycle")?.addEventListener("change", (e) => {
@@ -578,6 +594,15 @@ export class TimeHeightPanel {
     if (coordsEl) {
       coordsEl.textContent = `(${lon.toFixed(2)}°E, ${lat.toFixed(2)}°N${i !== null ? ` node: ${i},${j}` : ""})`;
     }
+  }
+
+  setModel(model) {
+    this.model = model;
+    if (!this.container) return;
+    const badge = this.container.querySelector(".th-header-model");
+    if (badge) badge.textContent = model;
+    const select = this.container.querySelector(".th-select-model");
+    if (select && select.value !== model) select.value = model;
   }
 
   setCycle(cycle, availableCycles = []) {

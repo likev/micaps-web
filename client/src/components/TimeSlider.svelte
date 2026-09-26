@@ -56,8 +56,9 @@
   // itself is corrected on next load/change.
   let stepValue = $derived.by(() => {
     const valid = timeline.isUpperAirMode ? [12, 24, 6] : [1, 3, 6, 12, 24];
+    const defaultStep = timeline.isUpperAirMode ? 12 : (isObs ? 3 : 6);
     const cur = parseInt(timeline.currentStepLength, 10);
-    return String(valid.includes(cur) ? cur : valid[0]);
+    return String(valid.includes(cur) ? cur : defaultStep);
   });
   let speedValue = $derived.by(() => {
     const valid = [3000, 1500, 750];

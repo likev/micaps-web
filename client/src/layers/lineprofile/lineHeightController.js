@@ -14,6 +14,7 @@ import { setProfileState, getProfileState, clearProfileState, setAllProfilesHidd
 class WindowState {
   constructor(winId) {
     this.winId = winId;
+    this.model = "ECMWF_HR";
     this.line = { a: { lon: 115.0, lat: 28.0 }, b: { lon: 125.0, lat: 38.0 } };
     this.npoints = 41;
     this.flipDirection = false;
@@ -70,6 +71,7 @@ class LineHeightController {
       const prev = getProfileState("lineheight", s.winId);
       setProfileState("lineheight", s.winId, {
         lineA: { ...s.line.a }, lineB: { ...s.line.b }, npoints: s.npoints,
+        model: s.model,
         cycle: s.cycle, lead: s.lead, flipDirection: s.flipDirection,
         visible: prev ? prev.visible : false,
       });
@@ -81,6 +83,7 @@ class LineHeightController {
     s.activeMap = map; s.activeWin = win; s.isLayerActive = true;
     this.activeWin = win;
     const cfg = layerDef.config || {};
+    s.model = cfg.model || win?.model || "ECMWF_HR";
     if (cfg.lon0 !== undefined && cfg.lat0 !== undefined) s.line.a = { lon: cfg.lon0, lat: cfg.lat0 };
     if (cfg.lon1 !== undefined && cfg.lat1 !== undefined) s.line.b = { lon: cfg.lon1, lat: cfg.lat1 };
     if (cfg.npoints !== undefined) s.npoints = Math.max(2, Math.min(81, cfg.npoints));
@@ -92,25 +95,28 @@ class LineHeightController {
     const initLead = win?.period ?? cfg.lead ?? 24;
     s.lead = initLead;
     try {
-      const cycles = await resolveForecastCycles("ECMWF_HR", "TMP", 500);
+      const cycles = await resolveForecastCycles(s.model, "TMP", 500);
       if (cycles?.length) { s.availableCycles = cycles; s.cycle = cfg.initCycle || win?.initCycle || cycles[0]; }
     } catch { s.cycle = cfg.initCycle || "latest"; }
     if (!s.cycle) s.cycle = "latest";
     if (!s.panel) {
       s.panel = new LineHeightPanel({
         windowId: s.winId, a: s.line.a, b: s.line.b, npoints: s.npoints, flipDirection: s.flipDirection,
+        model: s.model,
         onLineChange: (a, b, n) => this.setLine(a, b, n, win),
         onDrawLine: () => this.startDraw(win),
         onSetA: () => this.setAFromMap(win),
         onSetB: () => this.setBFromMap(win),
         onFlip: () => this.setFlip(!s.flipDirection, win),
         onNChange: (n) => this.setLine(s.line.a, s.line.b, n, win),
+        onModelChange: (m) => this.setModel(m, win),
         onCycleChange: (c) => this.setCycle(c, win),
         onToggleElement: (el, checked) => this.syncDrawerCheckbox(el, checked, win),
         onCancel: () => this.cancelLoad(win),
         onClose: () => this.handlePanelClose(map, win),
       });
     }
+    s.panel.setModel(s.model);
     s.panel.setCycle(s.cycle, s.availableCycles);
     s.panel.setFlip(s.flipDirection);
     if (layerDef.visible === false) this.hide(map, win); else this.show(map, win);
@@ -289,6 +295,24 @@ class LineHeightController {
     return this.loadMatrix(win);
   }
 
+  async setModel(model, win = null) {
+    const s = this._getState(win);
+    if (!model || model === s.model) return;
+    s.model = model;
+    try {
+      const cycles = await resolveForecastCycles(s.model, "TMP", 500);
+      if (cycles?.length) {
+        s.availableCycles = cycles;
+        if (!cycles.includes(s.cycle)) s.cycle = cycles[0];
+      }
+    } catch {}
+    s.panel?.setModel(s.model);
+    s.panel?.setCycle(s.cycle, s.availableCycles);
+    this._persistConfig({ model: s.model, initCycle: s.cycle }, win);
+    this._syncProfileStore(win);
+    return this.loadMatrix(win);
+  }
+
   // Timeline follow: full section reload, debounced 150ms + abort-in-flight.
   // Contract: shipped config keeps lead:null (= follow win.period at init); the first
   // step persists the concrete lead on the WINDOW layer copy only (autoSaveLayerConfig
@@ -318,7 +342,7 @@ class LineHeightController {
   }
 
   _cacheKey(s) {
-    return `${s.cycle}|lead${s.lead}|${s.line.a.lon},${s.line.a.lat}|${s.line.b.lon},${s.line.b.lat}|n${s.npoints}|${s.levels.join(",")}`;
+    return `${s.model || "ECMWF_HR"}|${s.cycle}|lead${s.lead}|${s.line.a.lon},${s.line.a.lat}|${s.line.b.lon},${s.line.b.lat}|n${s.npoints}|${s.levels.join(",")}`;
   }
   _setMatrixCache(s, key, m) {
     if (s.matrixCache.has(key)) s.matrixCache.delete(key);
@@ -355,7 +379,7 @@ class LineHeightController {
     s.panel?.setProgress({ loaded: 0, total: s.levels.length * 4, pct: 0 });
     try {
       const res = await loadLineHeightMatrix({
-        win, model: "ECMWF_HR", cycle: s.cycle, lead: s.lead, levels: s.levels,
+        win, model: s.model || "ECMWF_HR", cycle: s.cycle, lead: s.lead, levels: s.levels,
         line: s.line, npoints: s.npoints,
         abortController: s.abortController,
         isCancelled: () => s.loadingSeq !== seq,

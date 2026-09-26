@@ -221,14 +221,15 @@ function collectNwpItems(win, targetPeriod, cycle, hasRasterActive, direction, o
         }
         // NWP VOR/DIV derived layers: prefetch parent WIND field
         const elem = (layer.element || "").toUpperCase();
+        const isNoLevel = activeGroup.hasLevel === false;
         if (elem === "VOR" || elem === "DIV") {
           const model = layer.model || win.model || "ECMWF_HR";
           const lvl =
             overrideLevel !== null
               ? overrideLevel
-              : (win.level || layer.level || (activeGroup.hasLevel ? activeGroup.defaultLevel : 500));
+              : (isNoLevel ? null : (win.level ?? layer.level ?? (activeGroup.hasLevel ? activeGroup.defaultLevel : 500)));
 
-          const path = lvl ? `${model}/WIND/${lvl}` : `${model}/WIND`;
+          const path = layer.path || (lvl ? `${model}/WIND/${lvl}` : `${model}/WIND`);
           items.push({ type: "grid", path, file, direction, level: lvl, period: targetPeriod });
           // Note: VOR/DIV rasters are computed client-side from the parent wind vector grid (JSON),
           // so no server-side binary stream fetch is required or consumed for derived kinematic rasters.
@@ -238,13 +239,14 @@ function collectNwpItems(win, targetPeriod, cycle, hasRasterActive, direction, o
       if (layer.type === "contour" || layer.type === "wind") {
         const model = layer.model || win.model || "ECMWF_HR";
         const element = layer.element || win.element || "TMP";
+        const isNoLevel = activeGroup.hasLevel === false;
         let lvl =
           overrideLevel !== null
             ? overrideLevel
-            : (win.level || layer.level || (activeGroup.hasLevel ? activeGroup.defaultLevel : 500));
-        if (layer.model === "SURFACE" || layer.level === 0) lvl = null;
+            : (isNoLevel ? null : (win.level ?? layer.level ?? (activeGroup.hasLevel ? activeGroup.defaultLevel : 500)));
+        if (layer.model === "SURFACE" || layer.level === 0 || isNoLevel) lvl = null;
 
-        const path = lvl ? `${model}/${element}/${lvl}` : `${model}/${element}`;
+        const path = layer.path || (lvl ? `${model}/${element}/${lvl}` : `${model}/${element}`);
         items.push({ type: "grid", path, file, direction, level: lvl, period: targetPeriod });
 
         if (layer.render?.showRaster || hasRasterActive(element, model)) {
@@ -257,7 +259,8 @@ function collectNwpItems(win, targetPeriod, cycle, hasRasterActive, direction, o
     const model = win.model || "ECMWF_HR";
     const element = win.element || "TMP";
     const isVortDiv = element === "VOR" || element === "DIV";
-    const lvl = overrideLevel !== null ? overrideLevel : (win.level || 500);
+    const isNoLevel = win?.activeGroup?.hasLevel === false || win?.model === "SURFACE" || win?.level === null;
+    const lvl = overrideLevel !== null ? overrideLevel : (isNoLevel ? null : (win.level ?? 500));
     const path = isVortDiv
       ? (lvl ? `${model}/WIND/${lvl}` : `${model}/WIND`)
       : (lvl ? `${model}/${element}/${lvl}` : `${model}/${element}`);

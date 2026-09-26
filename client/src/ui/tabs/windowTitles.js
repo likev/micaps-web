@@ -1,5 +1,7 @@
 // windowTitles.js - Window title formatting with observation time and valid forecast time
 import { formatObsTimestamp, formatForecastValidTime } from "../../utils/formatters.js";
+import { getActiveTab } from "./tabsStore.js";
+import { DEFAULT_MODELS } from "../../lib/stores/tabsCore.js";
 
 export function computeFullWindowTitle(win, baseText = null) {
   if (!win) return "";
@@ -13,7 +15,6 @@ export function computeFullWindowTitle(win, baseText = null) {
   base = String(base).replace(/^W\d+:\s*/, "").trim();
   // Strip any existing timestamp suffix to prevent duplicate accumulation
   base = base.replace(/\s*[\(\[](Obs|Valid).*?[\)\]]$/i, "").trim();
-  win.baseTitle = base;
 
   const isObs = Boolean(
     win.isObservation ||
@@ -23,6 +24,16 @@ export function computeFullWindowTitle(win, baseText = null) {
     base.toLowerCase().includes("sounding") ||
     base.toLowerCase().includes("observation")
   );
+
+  const tab = typeof getActiveTab === "function" ? getActiveTab() : null;
+  const isModelAlloc = tab?.autoAllocation === "model" || win.autoAllocation === "model";
+  if (isModelAlloc && win.model && !isObs) {
+    for (const m of DEFAULT_MODELS) {
+      base = base.replace(new RegExp(`\\s*\\(${m}\\)`, "gi"), "").trim();
+    }
+    base = `${base} (${win.model})`;
+  }
+  win.baseTitle = base;
 
   let timeSuffix = "";
   if (isObs) {

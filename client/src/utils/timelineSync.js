@@ -81,7 +81,8 @@ function extractCyclesFromFiles(fileEntries) {
 
 export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP", level = 500, forceRefresh = false) {
   const elem = (element === "VOR" || element === "DIV") ? "WIND" : element;
-  const path = `${model}/${elem}/${level || 500}`;
+  const hasLevel = level !== null && level !== undefined && level !== "null" && level !== "";
+  const path = hasLevel ? `${model}/${elem}/${level}` : `${model}/${elem}`;
   const shortPath = `${model}/${elem}`;
 
   if (!forceRefresh) {
@@ -161,7 +162,13 @@ export async function resolveLatestForecastCycle(model = "ECMWF_HR", element = "
 export async function syncObservationTimeline(path, currentFile = null, winTitle = "", win = null, options = {}) {
   const forceLatest = options === true || Boolean(options?.forceLatest);
   const isUpper = path.includes("UPPER_AIR") || path.includes("TLOGP") || winTitle.toLowerCase().includes("upper") || winTitle.toLowerCase().includes("sounding") || winTitle.toLowerCase().includes("tlogp");
-  const stepLength = (win && win.stepLength) ? win.stepLength : (isUpper ? 12 : 3);
+  const defaultStep = isUpper ? 12 : 3;
+  const validSteps = isUpper ? [12, 24, 6] : [1, 3, 6, 12, 24];
+  let stepLength = (win && win.stepLength && validSteps.includes(win.stepLength)) ? win.stepLength : defaultStep;
+  if (forceLatest) {
+    stepLength = defaultStep;
+    if (win) win.stepLength = defaultStep;
+  }
   const applyTimeline = (file, files) => {
     const timelineData = { file, files, winTitle, stepLength, path, isUpper };
     if (win) {

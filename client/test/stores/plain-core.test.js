@@ -1,7 +1,17 @@
 import { describe, it, expect } from "bun:test";
 import { createInitialAppState } from "../../src/lib/stores/appCore.js";
 import { createInitialUIState, clampTooltipPosition } from "../../src/lib/stores/uiCore.js";
-import { getVisibleWindows, isWindowVisible, getNumVisible } from "../../src/lib/stores/tabsCore.js";
+import {
+  getVisibleWindows,
+  isWindowVisible,
+  getNumVisible,
+  createDefaultTab,
+  applyAutoAllocation,
+  revertAutoAllocation,
+  DEFAULT_LEVELS,
+  DEFAULT_MODELS,
+  stepCycleHours,
+} from "../../src/lib/stores/tabsCore.js";
 import { createTimelineState, getAdjacentTimeSteps } from "../../src/lib/stores/timelineCore.js";
 import { buildLegendItems, updateLegend, getWindowLegendsMap, clearLegends } from "../../src/lib/stores/legendCore.js";
 import {
@@ -139,10 +149,18 @@ describe("Plain-Core Stores (Phase 1 Foundations)", () => {
       windows: [{ id: "w1" }, { id: "w2" }, { id: "w3" }, { id: "w4" }, { id: "w5" }],
     };
 
+    const tab2x3 = {
+      layout: "2x3",
+      activeWinIdx: 4,
+      windows: [{ id: "w1" }, { id: "w2" }, { id: "w3" }, { id: "w4" }, { id: "w5" }, { id: "w6" }, { id: "w7" }],
+    };
+
     it("getNumVisible returns correct split capacities", () => {
       expect(getNumVisible("1x1")).toBe(1);
       expect(getNumVisible("1x2")).toBe(2);
       expect(getNumVisible("2x2")).toBe(4);
+      expect(getNumVisible("2x3")).toBe(6);
+      expect(getNumVisible("3x2")).toBe(6);
     });
 
     it("getVisibleWindows enforces active window inclusion in split views", () => {
@@ -158,6 +176,84 @@ describe("Plain-Core Stores (Phase 1 Foundations)", () => {
       // In 2x2 with active = w2 (index 1 < 4), visible is first 4
       const vis2x2 = getVisibleWindows(tab2x2);
       expect(vis2x2.map((w) => w.id)).toEqual(["w1", "w2", "w3", "w4"]);
+
+      // In 2x3 with active = w5 (index 4 < 6), visible is first 6
+      const vis2x3 = getVisibleWindows(tab2x3);
+      expect(vis2x3.map((w) => w.id)).toEqual(["w1", "w2", "w3", "w4", "w5", "w6"]);
+      expect(isWindowVisible(tab2x3, tab2x3.windows[4])).toBe(true);
+      expect(isWindowVisible(tab2x3, tab2x3.windows[6])).toBe(false);
+    });
+
+    it("defaults autoAllocation to 'none' and supports stepCycleHours helper", () => {
+      const tab = createDefaultTab(1);
+      expect(tab.autoAllocation).toBe("none");
+
+      expect(stepCycleHours("26092608", -12)).toBe("26092520");
+      expect(stepCycleHours("26092608", -24)).toBe("26092508");
+      expect(stepCycleHours("26092608.024", -12)).toBe("26092520");
+    });
+
+    it("supports all 5 Auto-Allocation modes: none, level, model, step, time", () => {
+      const tab = createDefaultTab(1);
+      tab.layout = "2x3";
+      tab.windows = [
+        { id: "w1", level: 500, model: "ECMWF_HR", period: 24, forecastCycle: "26092608", obsTime: "26092608" },
+        { id: "w2", level: 500, model: "ECMWF_HR", period: 24, forecastCycle: "26092608", obsTime: "26092608" },
+        { id: "w3", level: 500, model: "ECMWF_HR", period: 24, forecastCycle: "26092608", obsTime: "26092608" },
+        { id: "w4", level: 500, model: "ECMWF_HR", period: 24, forecastCycle: "26092608", obsTime: "26092608" },
+        { id: "w5", level: 500, model: "ECMWF_HR", period: 24, forecastCycle: "26092608", obsTime: "26092608" },
+        { id: "w6", level: 500, model: "ECMWF_HR", period: 24, forecastCycle: "26092608", obsTime: "26092608" },
+      ];
+
+      // 1. Level allocation
+      applyAutoAllocation(tab, "level");
+      expect(tab.autoAllocation).toBe("level");
+      expect(tab.windows.map((w) => w.level)).toEqual([500, 850, 1000, 200, 700, 925]);
+
+      // 2. Model allocation (NWP comparison: ECMWF, GRAPES_GFS, BEIJING_MR, GRAPES_3KM, JAPAN_MR, SHANGHAI_MR)
+      applyAutoAllocation(tab, "model");
+      expect(tab.autoAllocation).toBe("model");
+      expect(tab.windows.map((w) => w.model)).toEqual([
+        "ECMWF_HR",
+        "GRAPES_GFS",
+        "BEIJING_MR",
+        "GRAPES_3KM",
+        "JAPAN_MR",
+        "SHANGHAI_MR",
+      ]);
+
+      // 3. Step allocation (same cycle, increasing forecast leads: 24h, 36h, 48h, 60h, 72h, 84h)
+      applyAutoAllocation(tab, "step", { period: 24, stepLength: 12 });
+      expect(tab.autoAllocation).toBe("step");
+      expect(tab.windows.map((w) => w.period)).toEqual([24, 36, 48, 60, 72, 84]);
+
+      // 4. Time allocation for NWP (run-to-run dProg/dt consistency: 26092608.024, 26092520.036, 26092508.048...)
+      applyAutoAllocation(tab, "time", { forecastCycle: "26092608", period: 24, isObservation: false });
+      expect(tab.autoAllocation).toBe("time");
+      expect(tab.windows.map((w) => `${w.forecastCycle}.${String(w.period).padStart(3, "0")}`)).toEqual([
+        "26092608.024",
+        "26092520.036",
+        "26092508.048",
+        "26092420.060",
+        "26092408.072",
+        "26092320.084",
+      ]);
+
+      // 5. Time allocation for Observation (stepping backwards: 26092608, 26092520, 26092508...)
+      applyAutoAllocation(tab, "time", { obsTime: "26092608", isObservation: true });
+      expect(tab.windows.map((w) => w.obsTime)).toEqual([
+        "26092608",
+        "26092520",
+        "26092508",
+        "26092420",
+        "26092408",
+        "26092320",
+      ]);
+
+      // 6. Revert to 'none' unifying to active window level
+      revertAutoAllocation(tab, 850);
+      expect(tab.autoAllocation).toBe("none");
+      expect(tab.windows.map((w) => w.level)).toEqual([850, 850, 850, 850, 850, 850]);
     });
   });
 

@@ -315,9 +315,13 @@ export async function loadUpperAirComposite(map, level = 500, obsTime = "2026082
 }
 
 export async function loadObservationProduct(map, model, element, level, file, win = getActiveWindow(), customPath = null, expectedSeq = null, customStationLayerId = null) {
+  let targetFile = file;
+  if (typeof targetFile === "string" && targetFile.length === 14 && !targetFile.includes(".")) {
+    targetFile = `${targetFile}.000`;
+  }
   const path = customPath || (model === "SURFACE" ? `SURFACE/${element}` : (model === "UPPER_AIR" ? `UPPER_AIR/${element}/${level || 500}` : `${model}/${element}`));
   try {
-    const stations = await fetchStationObservations(path, file);
+    const stations = await fetchStationObservations(path, targetFile);
     if (win && expectedSeq !== null && expectedSeq !== undefined && win.loadSeq !== expectedSeq) {
       return; // Discard stale in-flight response from fast navigation
     }

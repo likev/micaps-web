@@ -6,10 +6,12 @@ import { selectObsChipsWindow, filterObsFilesByStep } from "./timelineMath.js";
 export const DEFAULT_PLAYBACK_MS = 1500;
 
 export function createTimelineState(winId = "default", overrides = {}) {
+  const isUpper = overrides.isUpperAirMode ?? false;
+  const isObs = overrides.currentMode === "obs";
+  const defaultStep = isObs ? (isUpper ? 12 : 3) : 6;
+  const step = overrides.currentStepLength ?? defaultStep;
   const cycles = overrides.forecastCycles || generateDynamicForecastCycles(null, 10);
   const rawObs = overrides.rawObsFiles || [...DEFAULT_MOCK_OBS_FILES];
-  const step = overrides.currentStepLength ?? 6;
-  const isUpper = overrides.isUpperAirMode ?? false;
   const obs = selectObsChipsWindow(filterObsFilesByStep(rawObs, step, isUpper));
 
   return {

@@ -75,3 +75,32 @@ func TestGridHandlerMockMode_RH(t *testing.T) {
 		t.Errorf("expected RH in [0, 100], got min=%f, max=%f", resp.Stats.Min, resp.Stats.Max)
 	}
 }
+
+func TestGridHandlerMockMode_RAIN12_SanitizesNull(t *testing.T) {
+	h := &handler.GridHandler{
+		Client:   nil,
+		MockMode: true,
+	}
+
+	for _, p := range []string{"ECMWF_HR/RAIN12", "ECMWF_HR/RAIN12/null", "ECMWF_HR/RAIN12/null/null", "ECMWF_HR/RAIN12/undefined"} {
+		req := httptest.NewRequest("GET", "/api/data/grid?path="+p+"&file=26092608.024", nil)
+		w := httptest.NewRecorder()
+		h.JSONHandler(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK for %s, got %d", p, w.Code)
+		}
+
+		var resp model.GridResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to decode JSON response for %s: %v", p, err)
+		}
+
+		if resp.Header.Element != "RAIN" {
+			t.Errorf("expected Element RAIN for %s, got %s", p, resp.Header.Element)
+		}
+		if resp.Header.Level != 0 {
+			t.Errorf("expected Level 0 for %s, got %f", p, resp.Header.Level)
+		}
+	}
+}

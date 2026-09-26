@@ -1,6 +1,7 @@
 // hovmollerPanel.js - Group 2 floating Time-Line window (level + span + swap/reverse)
 import { HovmollerCanvasRenderer } from "./hovmollerCanvas.js";
 import { PROFILE_LEVELS, SUPPORTED_STEPS } from "./lineUtils.js";
+import { DEFAULT_MODELS } from "../../lib/stores/tabsCore.js";
 
 export const DEFAULT_HOV_WIDTH = 680;
 export const DEFAULT_HOV_HEIGHT = 520;
@@ -13,10 +14,11 @@ export class HovmollerPanel {
     this.options = {
       windowId: "default", a: { lon: 115, lat: 28 }, b: { lon: 125, lat: 38 },
       npoints: 41, level: 850, startHour: 0, endHour: 144, stepHours: 12,
-      axisSwap: "dist-x", timeDir: "fwd",
+      axisSwap: "dist-x", timeDir: "fwd", model: "ECMWF_HR", rainStep: "auto",
       onLineChange: null, onDrawLine: null, onSetA: null, onSetB: null,
       onNChange: null, onLevelChange: null, onSpanChange: null,
       onAxisSwap: null, onTimeDir: null, onCycleChange: null,
+      onModelChange: null, onRainStepChange: null,
       onToggleElement: null, onCancel: null, onClose: null,
       ...options,
     };
@@ -26,6 +28,8 @@ export class HovmollerPanel {
     this.line = { a: { ...this.options.a }, b: { ...this.options.b } };
     this.npoints = this.options.npoints;
     this.level = this.options.level;
+    this.model = this.options.model || "ECMWF_HR";
+    this.rainStep = this.options.rainStep || "auto";
     this.span = { start: this.options.startHour, end: this.options.endHour, step: this.options.stepHours };
     this.axisSwap = this.options.axisSwap; this.timeDir = this.options.timeDir;
     this.activeCycle = null; this.availableCycles = [];
@@ -46,8 +50,8 @@ export class HovmollerPanel {
     el.innerHTML = `
       <div class="hov-panel-header" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#161b22;border-bottom:1px solid #30363d;cursor:move;user-select:none;flex-shrink:0;">
         <div style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:12px;color:#e6edf3;">
-          <span style="background:#8250df;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:0.5px;">ECMWF_HR</span>
-          <span class="hov-header-title">EC Time-Line Hovmoller</span>
+          <span class="hov-header-model" style="background:#8250df;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:0.5px;">${this.model}</span>
+          <span class="hov-header-title">Time-Line Hovmoller</span>
           <span class="hov-header-meta" style="font-size:11px;color:#8b949e;font-weight:400;"></span>
         </div>
         <div style="display:flex;align-items:center;gap:4px;">
@@ -59,6 +63,10 @@ export class HovmollerPanel {
       <div class="hov-hint" style="padding:4px 12px;background:#161b22;border-bottom:1px solid #21262d;font-size:10px;color:#e3b341;flex-shrink:0;">Time controlled here — timeline parked</div>
       <div class="hov-controls-row" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:6px 12px;background:#161b22;border-bottom:1px solid #21262d;font-size:11px;color:#c9d1d9;flex-shrink:0;">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span>Model:</span>
+          <select class="hov-select-model" style="background:#0d1117;border:1px solid #30363d;color:#58a6ff;border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer;">
+            ${DEFAULT_MODELS.map((m) => `<option value="${m}" ${m === this.model ? "selected" : ""}>${m}</option>`).join("")}
+          </select>
           <span>Init:</span>
           <select class="hov-select-cycle" style="background:#0d1117;border:1px solid #30363d;color:#58a6ff;border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer;"></select>
           <span>Level:</span>
@@ -82,6 +90,14 @@ export class HovmollerPanel {
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="hov-cb-temp" checked /> <span style="color:#f85149;">T</span></label>
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="hov-cb-vvel" checked /> <span style="color:#39c5bb;">VVEL</span></label>
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="hov-cb-wind" checked /> <span style="color:#e3b341;">Wind</span></label>
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="hov-cb-rain" /> <span style="color:#3fb950;">Rain</span></label>
+          <select class="hov-select-rain-step" title="Precipitation accumulation interval" style="background:#0d1117;border:1px solid #30363d;color:#3fb950;border-radius:4px;padding:1px 4px;font-size:10px;cursor:pointer;">
+            <option value="auto" ${this.rainStep === "auto" ? "selected" : ""}>Auto</option>
+            <option value="RAIN03" ${this.rainStep === "RAIN03" ? "selected" : ""}>3h</option>
+            <option value="RAIN06" ${this.rainStep === "RAIN06" ? "selected" : ""}>6h</option>
+            <option value="RAIN12" ${this.rainStep === "RAIN12" ? "selected" : ""}>12h</option>
+            <option value="RAIN24" ${this.rainStep === "RAIN24" ? "selected" : ""}>24h</option>
+          </select>
         </div>
       </div>
       <div class="hov-line-row" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 12px;background:#161b22;border-bottom:1px solid #21262d;font-size:11px;color:#c9d1d9;flex-shrink:0;">
@@ -187,9 +203,25 @@ export class HovmollerPanel {
     q(".hov-btn-swap")?.addEventListener("click", () => this.options.onAxisSwap?.());
     q(".hov-btn-rev")?.addEventListener("click", () => this.options.onTimeDir?.());
     q(".hov-select-cycle")?.addEventListener("change", (e) => this.options.onCycleChange?.(e.target.value));
-    for (const [sel, el] of [[".hov-cb-rh", "RH"], [".hov-cb-temp", "TMP"], [".hov-cb-vvel", "VVEL"], [".hov-cb-wind", "WIND"]]) {
+    q(".hov-select-model")?.addEventListener("change", (e) => {
+      this.model = e.target.value;
+      const badge = this.container?.querySelector(".hov-header-model");
+      if (badge) badge.textContent = this.model;
+      this.options.onModelChange?.(this.model);
+    });
+    q(".hov-select-rain-step")?.addEventListener("change", (e) => {
+      this.rainStep = e.target.value;
+      this.options.onRainStepChange?.(this.rainStep);
+    });
+    for (const [sel, el] of [
+      [".hov-cb-rh", "RH"],
+      [".hov-cb-temp", "TMP"],
+      [".hov-cb-vvel", "VVEL"],
+      [".hov-cb-wind", "WIND"],
+      [".hov-cb-rain", "RAIN"],
+    ]) {
       q(sel)?.addEventListener("change", (e) => {
-        const map = { RH: "showRH", TMP: "showTemp", VVEL: "showVVel", WIND: "showWind" };
+        const map = { RH: "showRH", TMP: "showTemp", VVEL: "showVVel", WIND: "showWind", RAIN: "showRain" };
         this.canvasRenderer.setOptions({ [map[el]]: e.target.checked });
         this.options.onToggleElement?.(el, e.target.checked);
       });
@@ -368,9 +400,22 @@ export class HovmollerPanel {
     this._syncViewButtons();
   }
   syncElementCheckbox(element, checked) {
-    const map = { RH: ".hov-cb-rh", TMP: ".hov-cb-temp", VVEL: ".hov-cb-vvel", WIND: ".hov-cb-wind" };
+    const map = { RH: ".hov-cb-rh", TMP: ".hov-cb-temp", VVEL: ".hov-cb-vvel", WIND: ".hov-cb-wind", RAIN: ".hov-cb-rain" };
     const cb = this.container?.querySelector(map[element]);
     if (cb) cb.checked = Boolean(checked);
+  }
+  setModel(model) {
+    this.model = model;
+    const sel = this.container?.querySelector(".hov-select-model");
+    if (sel && sel.value !== model) sel.value = model;
+    const badge = this.container?.querySelector(".hov-header-model");
+    if (badge) badge.textContent = model;
+    this._refreshHeader();
+  }
+  setRainStep(step) {
+    this.rainStep = step;
+    const sel = this.container?.querySelector(".hov-select-rain-step");
+    if (sel && sel.value !== step) sel.value = step;
   }
   setProgress({ loaded, total, pct, cacheHits = 0, cancelled = false } = {}) {
     if (!this.container) return;

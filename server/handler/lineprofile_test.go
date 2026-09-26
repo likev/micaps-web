@@ -154,7 +154,7 @@ func TestHovmoller_Validation(t *testing.T) {
 
 func TestHovmoller_MockStream(t *testing.T) {
 	h := &handler.HovmollerHandler{MockMode: true}
-	// leads=0,12,24 & level=850 & npoints=5 -> 3*4=12 progress + result[3][5]
+	// leads=0,12,24 & level=850 & npoints=5 -> 3*5=15 progress + result[3][5]
 	req := httptest.NewRequest("GET", "/api/data/hovmoller/profile?cycle=26091808&leads=0,12,24&level=850&lon0=100&lat0=25&lon1=120&lat1=35&npoints=5", nil)
 	w := httptest.NewRecorder()
 	h.Handler(w, req)
@@ -162,8 +162,8 @@ func TestHovmoller_MockStream(t *testing.T) {
 		t.Fatalf("want 200 got %d %s", w.Code, w.Body.String())
 	}
 	prog, res := decodeNDJSON(t, w.Body.String())
-	if len(prog) != 12 {
-		t.Errorf("want 12 progress got %d", len(prog))
+	if len(prog) != 15 {
+		t.Errorf("want 15 progress got %d", len(prog))
 	}
 	for i, p := range prog {
 		if int(p["loaded"].(float64)) != i+1 {
@@ -176,6 +176,10 @@ func TestHovmoller_MockStream(t *testing.T) {
 	rh, _ := res["rh"].([]interface{})
 	if len(rh) != 3 || len(rh[0].([]interface{})) != 5 {
 		t.Errorf("rh dims want 3x5 got %dx%d", len(rh), len(rh[0].([]interface{})))
+	}
+	rain, _ := res["rain"].([]interface{})
+	if len(rain) != 3 || len(rain[0].([]interface{})) != 5 {
+		t.Errorf("rain dims want 3x5 got %dx%d", len(rain), len(rain[0].([]interface{})))
 	}
 	leads, _ := res["leads"].([]interface{})
 	if len(leads) != 3 {

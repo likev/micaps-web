@@ -32,6 +32,7 @@ import { setProfileState, getProfileState, clearProfileState, setAllProfilesHidd
 class WindowState {
   constructor(winId) {
     this.winId = winId;
+    this.model = "ECMWF_HR";
     this.activePoint = { lon: 121.5, lat: 31.4, i: 0, j: 0 };
     this.mode = "point"; // "point" | "line" (line = transect-averaged profile)
     this.line = { a: { lon: 115.0, lat: 28.0 }, b: { lon: 125.0, lat: 38.0 } };
@@ -82,6 +83,7 @@ class TimeHeightController {
     let state = this.windows.get(winId);
     if (!state) {
       state = new WindowState(winId);
+      if (this._defaultState.model) state.model = this._defaultState.model;
       if (this._defaultState.cycle) state.cycle = this._defaultState.cycle;
       if (this._defaultState.leads) state.leads = [...this._defaultState.leads];
       if (this._defaultState.levels) state.levels = [...this._defaultState.levels];
@@ -91,6 +93,8 @@ class TimeHeightController {
     return state;
   }
 
+  get model() { return this._getState().model; }
+  set model(m) { this._getState().model = m; }
   get activePoint() { return this._getState().activePoint; }
   set activePoint(pt) { this._getState().activePoint = pt; }
   get mode() { return this._getState().mode; }
@@ -158,6 +162,7 @@ class TimeHeightController {
     this.activeWin = win;
 
     const config = layerDef.config || {};
+    state.model = config.model || win?.model || "ECMWF_HR";
     if (config.lon !== undefined && config.lat !== undefined) {
       state.activePoint = { lon: config.lon, lat: config.lat, i: 0, j: 0 };
     }
@@ -181,7 +186,7 @@ class TimeHeightController {
 
     // Resolve available forecast cycles
     try {
-      const cycles = await resolveForecastCycles("ECMWF_HR", "TMP", 500);
+      const cycles = await resolveForecastCycles(state.model, "TMP", 500);
       if (cycles && cycles.length > 0) {
         state.availableCycles = cycles;
         state.cycle = config.initCycle || win?.initCycle || cycles[0];
@@ -198,6 +203,7 @@ class TimeHeightController {
     if (!state.panel) {
       state.panel = new TimeHeightPanel({
         windowId: state.winId,
+        model: state.model,
         defaultPoint: state.activePoint,
         startHour: state.startHour,
         endHour: state.endHour,
@@ -207,6 +213,7 @@ class TimeHeightController {
         lineA: state.line.a,
         lineB: state.line.b,
         npoints: state.npoints,
+        onModelChange: (model) => this.setModel(model, win),
         onRangeChange: (start, end, step) => this.setRange(start, end, step, win),
         onCycleChange: (cycle) => this.setCycle(cycle, win),
         onDirectionChange: (dir) => this.setTimeDirection(dir, win),
@@ -225,6 +232,7 @@ class TimeHeightController {
       });
     }
 
+    state.panel.setModel(state.model);
     state.panel.setCycle(state.cycle, state.availableCycles);
     state.panel.setPoint(state.activePoint.lon, state.activePoint.lat);
     state.panel.setTimeDirection(state.timeDirection);
@@ -261,6 +269,7 @@ class TimeHeightController {
     try {
       const prev = getProfileState("timeheight", s.winId);
       setProfileState("timeheight", s.winId, {
+        model: s.model,
         mode: s.mode,
         lon: s.activePoint.lon, lat: s.activePoint.lat,
         lineA: { ...s.line.a }, lineB: { ...s.line.b }, npoints: s.npoints,
@@ -457,10 +466,16 @@ class TimeHeightController {
     // Check fast-path resample from per-point matrixCache
     const leadsKey = state.leads.join(",");
     const levelsKey = state.levels.join(",");
-    const matrixKey = `${state.cycle}|${leadsKey}|${levelsKey}|${snapped.i},${snapped.j}`;
+    const matrixKey = `${state.model || "ECMWF_HR"}|${state.cycle}|${leadsKey}|${levelsKey}|${snapped.i},${snapped.j}`;
+    const legacyKey = `${state.cycle}|${leadsKey}|${levelsKey}|${snapped.i},${snapped.j}`;
 
     if (state.matrixCache.has(matrixKey)) {
       state.matrix = state.matrixCache.get(matrixKey);
+      state.panel?.setData(state.matrix);
+      return state.matrix;
+    }
+    if (state.matrixCache.has(legacyKey)) {
+      state.matrix = state.matrixCache.get(legacyKey);
       state.panel?.setData(state.matrix);
       return state.matrix;
     }
@@ -503,7 +518,7 @@ class TimeHeightController {
   }
 
   _lineCacheKey(s) {
-    return `${s.cycle}|${s.leads.join(",")}|${s.levels.join(",")}|line:${s.line.a.lon},${s.line.a.lat}|${s.line.b.lon},${s.line.b.lat}|n${s.npoints}`;
+    return `${s.model || "ECMWF_HR"}|${s.cycle}|${s.leads.join(",")}|${s.levels.join(",")}|line:${s.line.a.lon},${s.line.a.lat}|${s.line.b.lon},${s.line.b.lat}|n${s.npoints}`;
   }
 
   setRange(start, end, step, win = this.activeWin) {
@@ -528,6 +543,24 @@ class TimeHeightController {
     state.panel?.setRange(state.startHour, state.endHour, state.stepHours);
     this._syncProfileStore(win);
 
+    return this.loadMatrix(win);
+  }
+
+  async setModel(model, win = this.activeWin) {
+    const state = this._getState(win);
+    if (!model || model === state.model) return;
+    state.model = model;
+    try {
+      const cycles = await resolveForecastCycles(state.model, "TMP", 500);
+      if (cycles?.length) {
+        state.availableCycles = cycles;
+        if (!cycles.includes(state.cycle)) state.cycle = cycles[0];
+      }
+    } catch {}
+    state.panel?.setModel(state.model);
+    state.panel?.setCycle(state.cycle, state.availableCycles);
+    this._persistConfig({ model: state.model, initCycle: state.cycle }, win);
+    this._syncProfileStore(win);
     return this.loadMatrix(win);
   }
 
@@ -619,7 +652,7 @@ class TimeHeightController {
     try {
       const res = await loadTimeHeightMatrix({
         win,
-        model: "ECMWF_HR",
+        model: state.model || "ECMWF_HR",
         cycle: state.cycle,
         leads: state.leads,
         levels: state.levels,
@@ -645,7 +678,7 @@ class TimeHeightController {
 
         const leadsKey = state.leads.join(",");
         const levelsKey = state.levels.join(",");
-        const matrixKey = `${state.cycle}|${leadsKey}|${levelsKey}|${state.activePoint.i},${state.activePoint.j}`;
+        const matrixKey = `${state.model || "ECMWF_HR"}|${state.cycle}|${leadsKey}|${levelsKey}|${state.activePoint.i},${state.activePoint.j}`;
         this._setMatrixCache(state, matrixKey, state.matrix);
 
         state.panel?.setData(state.matrix);
@@ -694,7 +727,7 @@ class TimeHeightController {
     try {
       const res = await loadTimeHeightLineMatrix({
         win,
-        model: "ECMWF_HR",
+        model: state.model || "ECMWF_HR",
         cycle: state.cycle,
         leads: state.leads,
         levels: state.levels,

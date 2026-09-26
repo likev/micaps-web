@@ -312,6 +312,16 @@ func (f *lineFetcher) processTask(ctx context.Context, task lineBlobTask, nodes 
 		}
 	default:
 	}
+	if task.element == "RAIN" && task.lead == 0 {
+		n := len(nodes.Lons)
+		values := make([]float64, n)
+		valid := make([]bool, n)
+		for i := range valid {
+			valid[i] = true
+			values[i] = 0.0
+		}
+		return lineBlobResult{task: task, values: values, valid: valid, source: "zero"}
+	}
 	dec, source, err := f.fetchDecompressed(task)
 	if err != nil {
 		return lineBlobResult{task: task, err: err, source: source}

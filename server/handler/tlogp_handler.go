@@ -120,6 +120,12 @@ func (h *TLogPHandler) getDecompressedData(file string) ([]byte, string, error) 
 
 	// Fetch from Cassandra
 	blob, err := db.GetBlob(h.Client, "UPPER_AIR/TLOGP", file)
+	if err != nil && !strings.HasSuffix(file, ".000") && len(file) == 14 {
+		blob, err = db.GetBlob(h.Client, "UPPER_AIR/TLOGP", file+".000")
+		if err == nil {
+			file = file + ".000"
+		}
+	}
 	if err != nil {
 		return nil, file, fmt.Errorf("GetBlob failed for UPPER_AIR/TLOGP file %s: %w", file, err)
 	}

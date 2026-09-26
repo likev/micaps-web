@@ -76,6 +76,9 @@ func (h *StationHandler) fetchStations(r *http.Request) (*model.GeoJSONFeatureCo
 	}
 
 	rawBlob, err := db.GetBlob(h.Client, dataPath, file)
+	if err != nil && !strings.HasSuffix(file, ".000") && len(file) == 14 {
+		rawBlob, err = db.GetBlob(h.Client, dataPath, file+".000")
+	}
 	if err != nil {
 		return nil, err
 	}

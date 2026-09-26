@@ -1,5 +1,6 @@
 // lineHeightPanel.js - Group 1 floating section window (distance x pressure, one lead)
 import { LineHeightCanvasRenderer } from "./lineHeightCanvas.js";
+import { DEFAULT_MODELS } from "../../lib/stores/tabsCore.js";
 
 export const DEFAULT_LH_WIDTH = 680;
 export const DEFAULT_LH_HEIGHT = 520;
@@ -11,9 +12,9 @@ export class LineHeightPanel {
   constructor(options = {}) {
     this.options = {
       windowId: "default", a: { lon: 115, lat: 28 }, b: { lon: 125, lat: 38 },
-      npoints: 41, flipDirection: false,
+      npoints: 41, flipDirection: false, model: "ECMWF_HR",
       onLineChange: null, onDrawLine: null, onSetA: null, onSetB: null, onFlip: null,
-      onNChange: null, onCycleChange: null, onToggleElement: null, onCancel: null, onClose: null,
+      onNChange: null, onCycleChange: null, onModelChange: null, onToggleElement: null, onCancel: null, onClose: null,
       ...options,
     };
     this.container = null; this.canvasRenderer = null;
@@ -22,6 +23,7 @@ export class LineHeightPanel {
     this.line = { a: { ...this.options.a }, b: { ...this.options.b } };
     this.npoints = this.options.npoints;
     this.flipDirection = this.options.flipDirection;
+    this.model = this.options.model || "ECMWF_HR";
     this.activeCycle = null; this.availableCycles = [];
     this.effectiveLead = null;
     this._initDOM();
@@ -41,8 +43,8 @@ export class LineHeightPanel {
     el.innerHTML = `
       <div class="lh-panel-header" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#161b22;border-bottom:1px solid #30363d;cursor:move;user-select:none;flex-shrink:0;">
         <div style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:12px;color:#e6edf3;">
-          <span style="background:#9a6700;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:0.5px;">ECMWF_HR</span>
-          <span class="lh-header-title">EC Line-Height Cross-Section</span>
+          <span class="lh-header-model" style="background:#9a6700;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:0.5px;">${this.model}</span>
+          <span class="lh-header-title">Line-Height Cross-Section</span>
           <span class="lh-header-lead" style="font-size:11px;color:#e3b341;font-weight:600;"></span>
           <span class="lh-header-line" style="font-size:11px;color:#8b949e;font-weight:400;"></span>
         </div>
@@ -54,6 +56,10 @@ export class LineHeightPanel {
       </div>
       <div class="lh-controls-row" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:6px 12px;background:#161b22;border-bottom:1px solid #21262d;font-size:11px;color:#c9d1d9;flex-shrink:0;">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span>Model:</span>
+          <select class="lh-select-model" style="background:#0d1117;border:1px solid #30363d;color:#58a6ff;border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer;">
+            ${DEFAULT_MODELS.map((m) => `<option value="${m}" ${m === this.model ? "selected" : ""}>${m}</option>`).join("")}
+          </select>
           <span>Init:</span>
           <select class="lh-select-cycle" style="background:#0d1117;border:1px solid #30363d;color:#58a6ff;border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer;"></select>
           <span>A:</span>
@@ -143,6 +149,12 @@ export class LineHeightPanel {
     q(".lh-btn-setb")?.addEventListener("click", () => this.options.onSetB?.());
     q(".lh-btn-flip")?.addEventListener("click", () => this.options.onFlip?.());
     q(".lh-select-cycle")?.addEventListener("change", (e) => this.options.onCycleChange?.(e.target.value));
+    q(".lh-select-model")?.addEventListener("change", (e) => {
+      this.model = e.target.value;
+      const badge = this.container?.querySelector(".lh-header-model");
+      if (badge) badge.textContent = this.model;
+      this.options.onModelChange?.(this.model);
+    });
     const pairs = [[".lh-cb-rh", "RH"], [".lh-cb-temp", "TMP"], [".lh-cb-vvel", "VVEL"], [".lh-cb-wind", "WIND"]];
     for (const [sel, el] of pairs) {
       q(sel)?.addEventListener("change", (e) => {
@@ -332,6 +344,13 @@ export class LineHeightPanel {
     const map = { RH: ".lh-cb-rh", TMP: ".lh-cb-temp", VVEL: ".lh-cb-vvel", WIND: ".lh-cb-wind" };
     const cb = this.container?.querySelector(map[element]);
     if (cb) cb.checked = Boolean(checked);
+  }
+  setModel(model) {
+    this.model = model;
+    const sel = this.container?.querySelector(".lh-select-model");
+    if (sel && sel.value !== model) sel.value = model;
+    const badge = this.container?.querySelector(".lh-header-model");
+    if (badge) badge.textContent = model;
   }
   setProgress({ loaded, total, pct, cacheHits = 0, cancelled = false } = {}) {
     if (!this.container) return;

@@ -116,14 +116,14 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
   }
 
   const curPeriod = period !== null ? period : (win?.period ?? 24);
-  const curLevel = level !== null ? level : (group.defaultLevel || win?.level || 500);
+  const curLevel = group.hasLevel === false ? null : (level !== null ? level : (group.defaultLevel || win?.level || 500));
   const prevPeriod = win?.period;
   // Fresh observation loads must land on latest even when re-clicking the same
   // preset (applyPresetToWindow only clears on group-id change). Capture before
   // the first per-layer sync sets _obsTimeline, so every station layer in this
   // Load uses bypassCache + latest instead of the second layer downgrading via
   // stale cache. Level steps keep _obsTimeline and preserve the selected chip.
-  const freshObsLoad = !isTimeStep && Boolean(group.isObservation) && !win?._obsTimeline;
+  const freshObsLoad = !isTimeStep && Boolean(group.isObservation) && !win?._obsTimeline && !win?.obsTime;
 
   // Rewrite derived/station ids to the requested level so Load Data at a
   // non-default level (e.g. 850 preset opened at 700) does not load stale
@@ -241,6 +241,8 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
         await loadWeatherField(map, layer.model, layer.element, targetLevel, curPeriod, {
           ...render,
           id: layer.id,
+          name: layer.name,
+          path: layer.path,
           keepWind: true,
           visible: layer.visible !== false,
           colormap: resolveColormap(group, render, targetLevel),
@@ -255,11 +257,15 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
               ? `UPPER_AIR/${layer.element || "PLOT"}/${targetLevel || 500}`
               : `${layer.model}/${layer.element}`));
         let file = win?.obsTime;
+        if (typeof file === "string" && file.length === 14 && !file.includes(".")) {
+          file = `${file}.000`;
+          if (win) win.obsTime = file;
+        }
         // Fresh Load Data always lands on latest (bypassCache). Level steps
         // preserve the selected chip: sync for new level path if path changed or no timeline,
         // and keep the current file when still valid.
         const levelChanged = !isTimeStep && Boolean(group.isObservation) && level !== null && (!win?._obsTimeline || win?._obsTimelinePath !== obsPath);
-        if (!file || freshObsLoad || levelChanged) {
+        if (!file || freshObsLoad || !win?._obsTimeline || levelChanged) {
           file = await syncObservationTimeline(obsPath, freshObsLoad ? null : (win?.obsTime || file), winTitle, win, { forceLatest: freshObsLoad });
           if (win) {
             win.obsTime = file;
@@ -272,8 +278,12 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
         await loadObservationProduct(map, layer.model, layer.element, targetLevel, file, win, obsPath, expectedSeq, stationLayerId);
       } else if (layer.type === "tlogp") {
         let file = win?.obsTime;
-        if (!file || freshObsLoad || (!isTimeStep && group.isObservation && !win?.obsTime)) {
-          file = await syncObservationTimeline(layer.path || "UPPER_AIR/TLOGP", freshObsLoad ? null : win?.obsTime, winTitle, win, { forceLatest: freshObsLoad });
+        if (typeof file === "string" && file.length === 14 && !file.includes(".")) {
+          file = `${file}.000`;
+          if (win) win.obsTime = file;
+        }
+        if (!file || freshObsLoad || !win?._obsTimeline || (!isTimeStep && group.isObservation && !win?.obsTime)) {
+          file = await syncObservationTimeline(layer.path || "UPPER_AIR/TLOGP", freshObsLoad ? null : (win?.obsTime || file), winTitle, win, { forceLatest: freshObsLoad });
           if (win) {
             win.obsTime = file;
             updateWindowTitle(win);

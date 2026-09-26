@@ -5,10 +5,102 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"strings"
+	"sync"
 
 	"micaps-web/db"
 	"micaps-web/filecache"
 )
+
+var modelRainStepsCache sync.Map // modelName -> []string
+
+// resolveRainStep chooses the best rain step (RAIN03, RAIN06, RAIN12, RAIN24) for a given model
+func resolveRainStep(client *db.CQLClient, modelName string, requestedStep string, leads []int, mockMode bool) string {
+	requestedStep = strings.ToUpper(strings.TrimSpace(requestedStep))
+	if requestedStep != "" && requestedStep != "AUTO" {
+		if !strings.HasPrefix(requestedStep, "RAIN") {
+			requestedStep = "RAIN" + requestedStep
+		}
+	} else {
+		requestedStep = ""
+	}
+
+	defaultStep := "RAIN12"
+	if len(leads) >= 2 {
+		diff := leads[1] - leads[0]
+		if diff <= 3 {
+			defaultStep = "RAIN03"
+		} else if diff <= 6 {
+			defaultStep = "RAIN06"
+		} else if diff <= 12 {
+			defaultStep = "RAIN12"
+		} else {
+			defaultStep = "RAIN24"
+		}
+	}
+
+	if mockMode || client == nil {
+		if requestedStep != "" {
+			return requestedStep
+		}
+		return defaultStep
+	}
+
+	var avail []string
+	if val, ok := modelRainStepsCache.Load(modelName); ok {
+		avail = val.([]string)
+	} else {
+		allSteps := []string{"RAIN03", "RAIN06", "RAIN12", "RAIN24"}
+		for _, s := range allSteps {
+			dp := fmt.Sprintf("%s/%s", modelName, s)
+			q := fmt.Sprintf(`SELECT column1 FROM micapsdataserver.treeview WHERE "dataPath" = '%s' LIMIT 1`, dp)
+			rows, err := client.Query(q)
+			if err == nil && len(rows) > 0 {
+				avail = append(avail, s)
+			}
+		}
+		modelRainStepsCache.Store(modelName, avail)
+	}
+
+	if len(avail) == 0 {
+		if requestedStep != "" {
+			return requestedStep
+		}
+		return defaultStep
+	}
+
+	if requestedStep != "" {
+		for _, a := range avail {
+			if a == requestedStep {
+				return a
+			}
+		}
+	}
+
+	for _, a := range avail {
+		if a == defaultStep {
+			return a
+		}
+	}
+
+	prefOrder := []string{"RAIN12", "RAIN06", "RAIN03", "RAIN24"}
+	if defaultStep == "RAIN03" {
+		prefOrder = []string{"RAIN03", "RAIN06", "RAIN12", "RAIN24"}
+	} else if defaultStep == "RAIN06" {
+		prefOrder = []string{"RAIN06", "RAIN03", "RAIN12", "RAIN24"}
+	} else if defaultStep == "RAIN24" {
+		prefOrder = []string{"RAIN24", "RAIN12", "RAIN06", "RAIN03"}
+	}
+	for _, p := range prefOrder {
+		for _, a := range avail {
+			if a == p {
+				return a
+			}
+		}
+	}
+
+	return avail[0]
+}
 
 // HovmollerHandler streams time-line hovmoller (leads x nodes at one level) as NDJSON
 type HovmollerHandler struct {
@@ -18,20 +110,22 @@ type HovmollerHandler struct {
 }
 
 type hovmollerResultEvent struct {
-	Type    string                 `json:"type"`
-	PointA  map[string]interface{} `json:"pointA"`
-	PointB  map[string]interface{} `json:"pointB"`
-	DistKm  float64                `json:"distKm"`
-	Cycle   string                 `json:"cycle"`
-	Leads   []int                  `json:"leads"`
-	Level   int                    `json:"level"`
-	RH      [][]*float64           `json:"rh"`
-	TMP     [][]*float64           `json:"tmp"`
-	VVEL    [][]*float64           `json:"vvel"`
-	U       [][]*float64           `json:"u"`
-	V       [][]*float64           `json:"v"`
-	Missing map[string]int         `json:"missing"`
-	Stats   map[string]interface{} `json:"stats"`
+	Type     string                 `json:"type"`
+	PointA   map[string]interface{} `json:"pointA"`
+	PointB   map[string]interface{} `json:"pointB"`
+	DistKm   float64                `json:"distKm"`
+	Cycle    string                 `json:"cycle"`
+	Leads    []int                  `json:"leads"`
+	Level    int                    `json:"level"`
+	RainStep string                 `json:"rainStep,omitempty"`
+	RH       [][]*float64           `json:"rh"`
+	TMP      [][]*float64           `json:"tmp"`
+	VVEL     [][]*float64           `json:"vvel"`
+	U        [][]*float64           `json:"u"`
+	V        [][]*float64           `json:"v"`
+	Rain     [][]*float64           `json:"rain"`
+	Missing  map[string]int         `json:"missing"`
+	Stats    map[string]interface{} `json:"stats"`
 }
 
 func (h *HovmollerHandler) Handler(w http.ResponseWriter, r *http.Request) {
@@ -75,7 +169,10 @@ func (h *HovmollerHandler) Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	level := lvls[0]
 
-	elements := []string{"RH", "TMP", "VVEL", "WIND"}
+	rainStepReq := q.Get("rain_step")
+	rainStep := resolveRainStep(h.Client, modelName, rainStepReq, leads, h.MockMode)
+
+	elements := []string{"RH", "TMP", "VVEL", "WIND", "RAIN"}
 	totalTasks := len(leads) * len(elements)
 
 	nodes := buildTransectNodes(lon0, lat0, lon1, lat1, npoints)
@@ -85,6 +182,9 @@ func (h *HovmollerHandler) Handler(w http.ResponseWriter, r *http.Request) {
 		fileName := fmt.Sprintf("%s.%03d", cycle, lead)
 		for ei, el := range elements {
 			dataPath := fmt.Sprintf("%s/%s/%d", modelName, el, level)
+			if el == "RAIN" {
+				dataPath = fmt.Sprintf("%s/%s", modelName, rainStep)
+			}
 			tasks = append(tasks, lineBlobTask{
 				elementIdx: ei, element: el,
 				rowIdx: ti, pressure: level, lead: lead,
@@ -114,12 +214,14 @@ func (h *HovmollerHandler) Handler(w http.ResponseWriter, r *http.Request) {
 	vvelMat := make([][]*float64, nLeads)
 	uMat := make([][]*float64, nLeads)
 	vMat := make([][]*float64, nLeads)
+	rainMat := make([][]*float64, nLeads)
 	for i := 0; i < nLeads; i++ {
 		rhMat[i] = make([]*float64, nPts)
 		tmpMat[i] = make([]*float64, nPts)
 		vvelMat[i] = make([]*float64, nPts)
 		uMat[i] = make([]*float64, nPts)
 		vMat[i] = make([]*float64, nPts)
+		rainMat[i] = make([]*float64, nPts)
 	}
 
 	var snappedA, snappedB map[string]interface{}
@@ -187,6 +289,14 @@ func (h *HovmollerHandler) Handler(w http.ResponseWriter, r *http.Request) {
 						perNodeOk++
 					}
 				}
+			case 4:
+				for pi := 0; pi < nPts; pi++ {
+					if res.valid[pi] {
+						v := res.values[pi]
+						rainMat[ti][pi] = &v
+						perNodeOk++
+					}
+				}
 			}
 			if perNodeOk > 0 {
 				okCount++
@@ -208,10 +318,11 @@ func (h *HovmollerHandler) Handler(w http.ResponseWriter, r *http.Request) {
 		snappedB = map[string]interface{}{"lon": lon1, "lat": lat1, "i": 0, "j": 0}
 	}
 
-	missing := map[string]int{"rh": 0, "tmp": 0, "vvel": 0, "wind": 0}
+	missing := map[string]int{"rh": 0, "tmp": 0, "vvel": 0, "wind": 0, "rain": 0}
 	rhMin, rhMax := math.MaxFloat64, -math.MaxFloat64
 	tmpMin, tmpMax := math.MaxFloat64, -math.MaxFloat64
 	vvelMin, vvelMax := math.MaxFloat64, -math.MaxFloat64
+	rainMin, rainMax := math.MaxFloat64, -math.MaxFloat64
 	for ti := 0; ti < nLeads; ti++ {
 		for pi := 0; pi < nPts; pi++ {
 			if rhMat[ti][pi] == nil {
@@ -250,6 +361,17 @@ func (h *HovmollerHandler) Handler(w http.ResponseWriter, r *http.Request) {
 			if uMat[ti][pi] == nil || vMat[ti][pi] == nil {
 				missing["wind"]++
 			}
+			if rainMat[ti][pi] == nil {
+				missing["rain"]++
+			} else {
+				v := *rainMat[ti][pi]
+				if v < rainMin {
+					rainMin = v
+				}
+				if v > rainMax {
+					rainMax = v
+				}
+			}
 		}
 	}
 	if rhMin > rhMax {
@@ -261,15 +383,20 @@ func (h *HovmollerHandler) Handler(w http.ResponseWriter, r *http.Request) {
 	if vvelMin > vvelMax {
 		vvelMin, vvelMax = -100, 100
 	}
+	if rainMin > rainMax {
+		rainMin, rainMax = 0, 50
+	}
 	stats := map[string]interface{}{
 		"total": totalTasks, "failed": failedCount, "cacheHits": cacheHits,
 		"rhMin": rhMin, "rhMax": rhMax, "tmpMin": tmpMin, "tmpMax": tmpMax,
 		"vvelMin": vvelMin, "vvelMax": vvelMax,
+		"rainMin": rainMin, "rainMax": rainMax,
 	}
 	resultEvt := hovmollerResultEvent{
 		Type: "result", PointA: snappedA, PointB: snappedB,
 		DistKm: nodes.TotalKm, Cycle: cycle, Leads: leads, Level: level,
-		RH: rhMat, TMP: tmpMat, VVEL: vvelMat, U: uMat, V: vMat,
+		RainStep: rainStep,
+		RH: rhMat, TMP: tmpMat, VVEL: vvelMat, U: uMat, V: vMat, Rain: rainMat,
 		Missing: missing, Stats: stats,
 	}
 	if b, err := json.Marshal(resultEvt); err == nil {

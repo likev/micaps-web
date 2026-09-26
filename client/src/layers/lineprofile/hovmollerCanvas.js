@@ -1,17 +1,18 @@
 // hovmollerCanvas.js - Time-Line diagram with swappable axes + revertible time (display-only)
 import { createColorResolver } from "../../utils/colormaps.js";
 import { decimateStride } from "./lineUtils.js";
-import { renderHovRHFill, renderHovLines, renderHovBarbs } from "./lineIsolines.js";
+import { renderHovRHFill, renderHovLines, renderHovBarbs, renderHovRainTiles } from "./lineIsolines.js";
 
 export class HovmollerCanvasRenderer {
   constructor(canvas, options = {}) {
     this.canvas = canvas;
     this.ctx = canvas ? canvas.getContext("2d") : null;
-    this.options = { showRH: true, showTemp: true, showVVel: true, showWind: true, axisSwap: "dist-x", timeDir: "fwd", ...options };
+    this.options = { showRH: true, showTemp: true, showVVel: true, showWind: true, showRain: false, axisSwap: "dist-x", timeDir: "fwd", ...options };
     this.matrix = null; this.distKm = []; this.totalKm = 0;
     this.hoverInfo = null; this.width = 640; this.height = 480;
     this.layout = { paddingLeft: 56, paddingRight: 32, paddingTop: 28, paddingBottom: 40, plotRect: { x: 0, y: 0, width: 0, height: 0 } };
     this.rhColorResolver = createColorResolver("RH");
+    this.rainColorResolver = createColorResolver("RAIN");
     this._setupEvents();
   }
   setOptions(o) { this.options = { ...this.options, ...o }; this.render(); }
@@ -144,14 +145,19 @@ export class HovmollerCanvasRenderer {
       renderHovRHFill(ctx, this.matrix, this.layout, this.distKm, this.rhColorResolver,
         (a, b) => this.uFn(a, b), (a, b) => this.vFn(a, b), coords, this.swapped);
     }
+    if (this.options.showRain && this.matrix.rain) {
+      renderHovRainTiles(ctx, this.matrix, this.layout, this.distKm, this.totalKm,
+        (d) => this.distFrac(d), (ld) => this.leadFrac(ld), this.rainColorResolver,
+        this.swapped, this.options.rainStep);
+    }
     this._renderAxes(ctx);
     if (this.options.showTemp) {
       const coords = !this.swapped ? { u: this.distKm, v: ls } : { u: ls, v: this.distKm };
-      renderHovLines(ctx, this.matrix, this.layout, this.matrix.tmp, this.distKm, (a, b) => this.uFn(a, b), (a, b) => this.vFn(a, b), coords, "tmp");
+      renderHovLines(ctx, this.matrix, this.layout, this.matrix.tmp, this.distKm, (a, b) => this.uFn(a, b), (a, b) => this.vFn(a, b), coords, "tmp", this.swapped);
     }
     if (this.options.showVVel) {
       const coords = !this.swapped ? { u: this.distKm, v: ls } : { u: ls, v: this.distKm };
-      renderHovLines(ctx, this.matrix, this.layout, this.matrix.vvel, this.distKm, (a, b) => this.uFn(a, b), (a, b) => this.vFn(a, b), coords, "vvel");
+      renderHovLines(ctx, this.matrix, this.layout, this.matrix.vvel, this.distKm, (a, b) => this.uFn(a, b), (a, b) => this.vFn(a, b), coords, "vvel", this.swapped);
     }
     if (this.options.showWind) {
       const stride = decimateStride(this.distKm.length, ls.length);
@@ -228,6 +234,7 @@ export class HovmollerCanvasRenderer {
     if (r.rh !== null) tooltip += ` | RH: ${Math.round(r.rh)}%`;
     if (r.vvel !== null) tooltip += ` | ω: ${r.vvel.toFixed(1)} cPa/s`;
     if (r.wind !== null) tooltip += ` | Wind: ${r.wind.dir}° ${r.wind.speed.toFixed(1)} m/s`;
+    if (r.rain !== null && r.rain !== undefined) tooltip += ` | Rain: ${r.rain.toFixed(1)} mm`;
     ctx.font = "11px -apple-system, sans-serif";
     const textW = ctx.measureText(tooltip).width;
     const badgeX = Math.max(pRect.x + 4, Math.min(pRect.x + pRect.width - textW - 16, x - textW / 2));
@@ -241,7 +248,7 @@ export class HovmollerCanvasRenderer {
     ctx.restore();
   }
   _sampleAtHover(lead, dist) {
-    const { leads, tmp, rh, vvel, u, v } = this.matrix;
+    const { leads, tmp, rh, vvel, u, v, rain } = this.matrix;
     let li = 0, bd = Infinity;
     for (let i = 0; i < leads.length; i++) { const d = Math.abs(leads[i] - lead); if (d < bd) { bd = d; li = i; } }
     let pi = 0, bdd = Infinity;
@@ -252,7 +259,27 @@ export class HovmollerCanvasRenderer {
     if (uu !== null && uu !== undefined && vv !== null && vv !== undefined && !Number.isNaN(uu) && !Number.isNaN(vv)) {
       wind = { speed: Math.hypot(uu, vv), dir: Math.round(((Math.atan2(-uu, -vv) * 180) / Math.PI + 360) % 360) };
     }
-    return { t: pick(tmp), rh: pick(rh), vvel: pick(vvel), wind };
+    let rainVal = null;
+    if (rain) {
+      const stepStr = String(this.matrix?.rainStep || this.options?.rainStep || "");
+      const match = stepStr.match(/\d+/);
+      const deltaT = match ? parseInt(match[0], 10) : (leads.length >= 2 ? leads[1] - leads[0] : 12);
+      let rainLi = -1;
+      for (let i = 0; i < leads.length; i++) {
+        const tEnd = leads[i];
+        const tStart = tEnd - deltaT;
+        if (lead >= tStart && lead <= tEnd) {
+          rainLi = i;
+          break;
+        }
+      }
+      if (rainLi !== -1 && rain[rainLi] && !Number.isNaN(rain[rainLi][pi])) {
+        rainVal = rain[rainLi][pi];
+      } else {
+        rainVal = pick(rain);
+      }
+    }
+    return { t: pick(tmp), rh: pick(rh), vvel: pick(vvel), wind, rain: rainVal };
   }
   exportPNG(filename = "ec_hovmoller.png") {
     if (!this.canvas) return;

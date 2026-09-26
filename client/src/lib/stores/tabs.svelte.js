@@ -1,6 +1,10 @@
 import {
   tabsState as coreTabsState,
   DEFAULT_LEVELS,
+  DEFAULT_MODELS,
+  stepCycleHours,
+  applyAutoAllocation,
+  revertAutoAllocation,
   getNumVisible,
   getVisibleWindows,
   isWindowVisible,
@@ -54,10 +58,14 @@ export function setMapInstance(winId, map) {
 
 export {
   DEFAULT_LEVELS,
+  DEFAULT_MODELS,
+  stepCycleHours,
   getNumVisible,
   getVisibleWindows,
   isWindowVisible,
   getCallbacks,
   setCallbacks,
   getSyncingTabs,
+  applyAutoAllocation,
+  revertAutoAllocation,
 };

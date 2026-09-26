@@ -7,13 +7,14 @@ export async function loadHovmollerMatrix({
   cycle,
   leads = [0, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 132, 144],
   level = 850,
+  rainStep = "auto",
   line = { a: { lon: 115, lat: 28 }, b: { lon: 125, lat: 38 } },
   npoints = 41,
   onProgress = null,
   isCancelled = null,
   abortController = null,
 } = {}) {
-  let total = leads.length * 4;
+  let total = leads.length * 5;
   let loaded = 0, ok = 0, failed = 0, cacheHits = 0, lastSource = "cache";
   const controller = abortController || new AbortController();
   const signal = controller.signal;
@@ -30,6 +31,9 @@ export async function loadHovmollerMatrix({
     lon1: String(line.b.lon), lat1: String(line.b.lat),
     npoints: String(npoints),
   });
+  if (rainStep && rainStep !== "auto") {
+    query.set("rain_step", rainStep);
+  }
   const url = `/api/data/hovmoller/profile?${query.toString()}`;
   let response;
   try {
@@ -65,13 +69,15 @@ export async function loadHovmollerMatrix({
     pointA: resultObj.pointA || line.a, pointB: resultObj.pointB || line.b,
     distKm: resultObj.distKm ?? 0,
     cycle: resultObj.cycle || cycle, leads: [...(resultObj.leads || leads)], level: resultObj.level ?? level,
+    rainStep: resultObj.rainStep || rainStep || "RAIN12",
     rh: toArr(resultObj.rh), tmp: toArr(resultObj.tmp), vvel: toArr(resultObj.vvel),
-    u: toArr(resultObj.u), v: toArr(resultObj.v),
-    missing: resultObj.missing || { rh: 0, tmp: 0, vvel: 0, wind: 0 },
+    u: toArr(resultObj.u), v: toArr(resultObj.v), rain: toArr(resultObj.rain),
+    missing: resultObj.missing || { rh: 0, tmp: 0, vvel: 0, wind: 0, rain: 0 },
     stats: {
       rhMin: resultObj.stats?.rhMin ?? 0, rhMax: resultObj.stats?.rhMax ?? 100,
       tmpMin: resultObj.stats?.tmpMin ?? -40, tmpMax: resultObj.stats?.tmpMax ?? 40,
       vvelMin: resultObj.stats?.vvelMin ?? -100, vvelMax: resultObj.stats?.vvelMax ?? 100,
+      rainMin: resultObj.stats?.rainMin ?? 0, rainMax: resultObj.stats?.rainMax ?? 50,
     },
   };
   return {

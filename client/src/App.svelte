@@ -29,10 +29,26 @@
   import { changeVerticalLevel } from "./services/levelController.js";
   import { handleLayerAction as serviceHandleLayerAction } from "./ui/layerActions.js";
   import { resolveForecastCycles } from "./utils/timelineSync.js";
-  import { DEFAULT_LEVELS, createDefaultTab, createDefaultWindow, getNumVisible } from "./lib/stores/tabsCore.js";
+  import {
+    DEFAULT_LEVELS,
+    DEFAULT_MODELS,
+    stepCycleHours,
+    createDefaultTab,
+    createDefaultWindow,
+    getNumVisible,
+    isWindowVisible,
+    applyAutoAllocation,
+    revertAutoAllocation,
+  } from "./lib/stores/tabsCore.js";
   import { stopWindAnimation, removeGridWindBarbs } from "./layers/windLayer.js";
   import { removeRasterLayer } from "./layers/rasterLayer.js";
-  import { shouldHideTimelineForGroup, applyPresetToWindow, stepWindowTimeline } from "./lib/services/appWorkflow.js";
+  import {
+    shouldHideTimelineForGroup,
+    isProfilePanelGroup,
+    isProfilePanelWindow,
+    applyPresetToWindow,
+    stepWindowTimeline,
+  } from "./lib/services/appWorkflow.js";
   import { isTextInput } from "./actions/keyboardShortcuts.js";
   import { registerWindowMapSync, syncTabCameras } from "./ui/tabs/windowMaps.js";
   import { setMapProjection } from "./map/mapInstance.js";
@@ -58,12 +74,13 @@
   const syncCleanups = new Map();
   let forecastRefreshTimer = null;
 
-  async function waitForMapStyle(map, timeoutMs = 15000) {
+  async function waitForMapStyle(map, timeoutMs = 2500) {
     if (!map) return false;
     const isReady = () => {
       try {
         return Boolean(
           (typeof map.isStyleLoaded === "function" && map.isStyleLoaded()) ||
+          map._loaded ||
           (typeof map.loaded === "function" && map.loaded())
         );
       } catch {
@@ -71,20 +88,33 @@
       }
     };
     if (isReady()) return true;
-    if (typeof map.once !== "function") return false;
+    if (typeof map.once !== "function") return true;
 
     return await new Promise((resolve) => {
       let settled = false;
       let timer = null;
-      const finish = (ready) => {
+      const finish = () => {
         if (settled) return;
         settled = true;
         if (timer) clearTimeout(timer);
-        resolve(Boolean(ready) && isReady());
+        resolve(isReady() || true);
       };
-      timer = setTimeout(() => finish(false), timeoutMs);
-      map.once("load", () => finish(true));
+      timer = setTimeout(finish, timeoutMs);
+      if (typeof map.once === "function") {
+        map.once("load", finish);
+        map.once("styledata", finish);
+      }
     });
+  }
+
+  async function waitForMapInstance(winId, timeoutMs = 3000) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const map = getMapInstance(winId);
+      if (map) return map;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return getMapInstance(winId);
   }
 
   const unsubConfig = onConfigLoaded((cfg, groups) => {
@@ -111,16 +141,10 @@
     const tab = tabsState.tabs[0];
     if (tab) {
       if (tab._nextWinSeq == null) tab._nextWinSeq = tab.windows?.length || 0;
-      while (tab.windows.length < 4) {
-        const uid = tab._nextWinSeq++;
-        const posIdx = tab.windows.length;
-        const winObj = createDefaultWindow(posIdx, tab.id);
-        winObj.uid = uid;
-        winObj.id = `tab-${tab.id}-win-${uid}`;
-        winObj.level = DEFAULT_LEVELS[posIdx] || 500;
-        tab.windows.push(winObj);
+      if (!tab.windows || tab.windows.length === 0) {
+        tab.windows = [createDefaultWindow(0, tab.id)];
       }
-      syncLayersState(tab.windows[tab.activeWinIdx || 0].id);
+      syncLayersState(tab.windows[tab.activeWinIdx || 0]?.id);
     }
   }
 
@@ -171,7 +195,8 @@
     const element = ["VOR", "DIV"].includes(layer?.element) ? "WIND" : (layer?.element || "TMP");
     const refreshSeq = (win._forecastRefreshSeq || 0) + 1;
     win._forecastRefreshSeq = refreshSeq;
-    const cycles = await resolveForecastCycles(model, element, win.level || 500, forceRefresh);
+    const targetLevel = win.activeGroup?.hasLevel === false ? null : (win.level || 500);
+    const cycles = await resolveForecastCycles(model, element, targetLevel, forceRefresh);
     if (win._forecastRefreshSeq !== refreshSeq) return;
     if (!cycles.length) return;
 
@@ -243,7 +268,7 @@
     const winObj = createDefaultWindow(posIdx, activeTab.id);
     winObj.uid = uid;
     winObj.id = `tab-${activeTab.id}-win-${uid}`;
-    winObj.level = DEFAULT_LEVELS[posIdx] || 500;
+    winObj.level = (activeTab.autoAllocation && activeTab.autoAllocation !== "none") ? (DEFAULT_LEVELS[posIdx] ?? 500) : (activeWin?.level ?? 500);
     activeTab.windows.push(winObj);
     // The pushed window is stored wrapped by $state: focus it by position
     // id so the new tab-win is always selected, then sync the rest.
@@ -291,28 +316,89 @@
 
   function toggleTabsAndSplit() {
     if (!activeTab) return;
-    const newLayout = activeTab.layout === "1x1" ? "2x2" : "1x1";
+    const newLayout = activeTab.layout === "1x1" ? (activeTab._lastSplitLayout || "2x2") : "1x1";
+    if (activeTab.layout !== "1x1") {
+      activeTab._lastSplitLayout = activeTab.layout;
+    }
     handleChangeLayout(newLayout);
   }
 
-  function handleChangeLayout(layout) {
+  async function handleChangeLayout(layout) {
     if (!activeTab) return;
+    const prevLayout = activeTab.layout;
     activeTab.layout = layout;
     const numNeeded = getNumVisible(layout);
-    while (activeTab.windows.length < numNeeded) {
-      const uid = activeTab._nextWinSeq++;
-      const posIdx = activeTab.windows.length;
-      const winObj = createDefaultWindow(posIdx, activeTab.id);
-      winObj.uid = uid;
-      winObj.id = `tab-${activeTab.id}-win-${uid}`;
-      winObj.level = DEFAULT_LEVELS[posIdx] || 500;
-      activeTab.windows.push(winObj);
-      syncLayersState(winObj.id);
+    const isSplit = layout !== "1x1";
+    const wasTab = prevLayout === "1x1";
+
+    const baseWin = (activeWin && activeWin.activeGroup)
+      ? activeWin
+      : (activeTab.windows.find((w) => w && w.activeGroup) || activeWin || activeTab.windows[0]);
+
+    if (isProfilePanelWindow(baseWin)) {
+      activeTab.autoAllocation = "none";
     }
-    if (layout !== "1x1" && activeTab.syncMap !== false) {
+
+    if (!isSplit || activeTab.autoAllocation === "none") {
+      // Prior logic: load already-existed tab-windows
+      while (activeTab.windows.length < numNeeded) {
+        const uid = activeTab._nextWinSeq++;
+        const posIdx = activeTab.windows.length;
+        const winObj = createDefaultWindow(posIdx, activeTab.id);
+        winObj.uid = uid;
+        winObj.id = `tab-${activeTab.id}-win-${uid}`;
+        activeTab.windows.push(winObj);
+        syncLayersState(winObj.id);
+      }
+      if (wasTab && isSplit) {
+        setTimeout(async () => {
+          const visible = getVisibleWindows(activeTab);
+          for (const w of visible) {
+            let map = getMapInstance(w.id);
+            if (!map) map = await waitForMapInstance(w.id, 2000);
+            if (map) {
+              if (typeof map.resize === "function") {
+                try { map.resize(); } catch {}
+              }
+              if (w.activeGroup && (!w.layers || w.layers.length === 0)) {
+                const loadSeq = (w.loadSeq || 0) + 1;
+                w.loadSeq = loadSeq;
+                await loadPresetGroup(map, w.activeGroup, w.period, w.level, w, false, loadSeq).catch(console.error);
+                syncLayersState(w.id);
+                syncLegendState(w.id);
+              }
+            }
+          }
+        }, 60);
+      }
+    } else {
+      // Other alloc mode (level, model, step, time):
+      // Alloc new wins related to our focused tab-win when toggling to split mode
+      if (baseWin) {
+        const fIdx = activeTab.windows.indexOf(baseWin);
+        if (fIdx > 0) {
+          const [f] = activeTab.windows.splice(fIdx, 1);
+          activeTab.windows.unshift(f);
+          activeTab.windows.forEach((w, i) => { w.winIdx = i; });
+        }
+        activeTab.activeWinIdx = 0;
+      }
+      while (activeTab.windows.length < numNeeded) {
+        const uid = activeTab._nextWinSeq++;
+        const posIdx = activeTab.windows.length;
+        const winObj = createDefaultWindow(posIdx, activeTab.id);
+        winObj.uid = uid;
+        winObj.id = `tab-${activeTab.id}-win-${uid}`;
+        activeTab.windows.push(winObj);
+        syncLayersState(winObj.id);
+      }
+      await applyAutoAllocationModeToTab(activeTab, activeTab.autoAllocation);
+    }
+
+    if (isSplit && activeTab.syncMap !== false) {
       setTimeout(() => {
         syncTabCameras(activeTab, { getMap: (id) => getMapInstance(id) });
-      }, 50);
+      }, 80);
     }
   }
 
@@ -322,6 +408,226 @@
     if (activeTab.syncMap) {
       syncTabCameras(activeTab, { getMap: (id) => getMapInstance(id) });
     }
+  }
+
+  async function applyAutoAllocationModeToTab(tab, mode) {
+    if (!tab) return;
+    tab.autoAllocation = mode;
+    const baseWin = (activeWin && activeWin.activeGroup) ? activeWin : (tab.windows.find((w) => w && w.activeGroup) || activeWin || tab.windows[0]);
+
+    if (isProfilePanelWindow(baseWin)) {
+      tab.autoAllocation = "none";
+      return;
+    }
+
+    if (baseWin) {
+      const tl = getOrCreateTimeline(baseWin.id);
+      if (tl) {
+        if (!baseWin.stepLength && tl.currentStepLength) {
+          baseWin.stepLength = tl.currentStepLength;
+        }
+        if (!baseWin.discretePeriods && Array.isArray(tl.discretePeriods) && tl.discretePeriods.length > 0) {
+          baseWin.discretePeriods = tl.discretePeriods;
+        }
+        if (!baseWin.forecastCycles && Array.isArray(tl.forecastCycles) && tl.forecastCycles.length > 0) {
+          baseWin.forecastCycles = tl.forecastCycles;
+        }
+        if (!baseWin.obsTime && tl.obsFiles && tl.currentObsIdx !== undefined && tl.obsFiles[tl.currentObsIdx]) {
+          baseWin.obsTime = tl.obsFiles[tl.currentObsIdx];
+        }
+      }
+    }
+    applyAutoAllocation(tab, mode, baseWin);
+    const visible = getVisibleWindows(tab);
+
+    await new Promise((r) => setTimeout(r, 60));
+
+    const loadTasks = visible.map(async (w, i) => {
+      let map = getMapInstance(w.id);
+      if (!map) {
+        map = await waitForMapInstance(w.id, 2500);
+      }
+      if (!map) {
+        console.warn(`[AutoAlloc] Map instance not ready for window ${w.id}`);
+        return;
+      }
+      if (typeof map.resize === "function") {
+        try { map.resize(); } catch {}
+      }
+      await waitForMapStyle(map, 2500);
+      if (typeof map.resize === "function") {
+        try { map.resize(); } catch {}
+      }
+
+      const loadSeq = (w.loadSeq || 0) + 1;
+      w.loadSeq = loadSeq;
+      const isInitial = !w.layers || w.layers.length === 0;
+
+      if (w === baseWin && !isInitial && mode === "level" && w.level === baseWin.level && w.layers.length > 0) {
+        return;
+      }
+      if (w === baseWin && !isInitial && mode === "model" && w.model === baseWin.model && w.layers.length > 0) {
+        return;
+      }
+
+      if (mode === "level") {
+        if (w.activeGroup && w.activeGroup.hasLevel !== false) {
+          const groupCopy = JSON.parse(JSON.stringify(w.activeGroup));
+          groupCopy.defaultLevel = w.level;
+          if (Array.isArray(groupCopy.layers)) {
+            for (const l of groupCopy.layers) {
+              if (l.model === "UPPER_AIR" || l.type === "contour" || l.type === "wind" || l.type === "station") {
+                if (l.model !== "SURFACE" && l.level !== 0) {
+                  l.level = w.level;
+                }
+              }
+            }
+          }
+          w.activeGroup = groupCopy;
+          await loadPresetGroup(map, groupCopy, w.period, w.level, w, false, loadSeq).catch((e) =>
+            console.error("[AutoAlloc] level failed:", e)
+          );
+        }
+      } else if (mode === "model") {
+        if (w.activeGroup) {
+          const groupCopy = JSON.parse(JSON.stringify(w.activeGroup));
+          if (Array.isArray(groupCopy.layers)) {
+            for (const l of groupCopy.layers) {
+              if (l.type === "contour" || l.type === "wind" || l.type === "raster") {
+                l.model = w.model;
+                if (typeof l.path === "string" && l.path.includes("/")) {
+                  l.path = l.path.replace(/^[^\/]+/, w.model);
+                }
+              }
+            }
+          }
+          w.activeGroup = groupCopy;
+          await loadPresetGroup(map, groupCopy, w.period, w.level, w, false, loadSeq).catch((e) =>
+            console.error("[AutoAlloc] model failed:", e)
+          );
+        }
+      } else if (mode === "step") {
+        const tl = getOrCreateTimeline(w.id);
+        if (w.isObservation) {
+          stopWindAnimation(map);
+          removeGridWindBarbs(map);
+          removeRasterLayer(map);
+          if (baseWin?._obsTimeline) {
+            w._obsTimeline = { ...baseWin._obsTimeline, file: w.obsTime, stepLength: w.stepLength };
+          }
+          const baseTl = baseWin ? getOrCreateTimeline(baseWin.id) : null;
+          if (baseTl && tl) {
+            tl.currentMode = "obs";
+            tl.currentStepLength = w.stepLength || baseTl.currentStepLength;
+            tl.isUpperAirMode = baseTl.isUpperAirMode;
+            tl.currentWinTitle = baseTl.currentWinTitle;
+            if (baseTl.rawObsFiles) tl.rawObsFiles = [...baseTl.rawObsFiles];
+            if (baseTl.obsFiles) tl.obsFiles = [...baseTl.obsFiles];
+            if (tl.obsFiles && w.obsTime) {
+              const idx = tl.obsFiles.indexOf(w.obsTime);
+              if (idx !== -1) tl.currentObsIdx = idx;
+            }
+          }
+          if (w.activeGroup) {
+            await loadPresetGroup(map, w.activeGroup, w.period, w.level, w, true, loadSeq).catch((e) =>
+              console.error("[AutoAlloc] obs step failed:", e)
+            );
+          }
+        } else {
+          if (tl) {
+            if (w.stepLength) tl.currentStepLength = w.stepLength;
+            if (w.discretePeriods) tl.discretePeriods = w.discretePeriods;
+            if (Array.isArray(tl.discretePeriods)) {
+              const idx = tl.discretePeriods.indexOf(w.period);
+              if (idx !== -1) tl.currentPeriodIdx = idx;
+            }
+          }
+          if (w.activeGroup) {
+            await loadPresetGroup(map, w.activeGroup, w.period, w.level, w, true, loadSeq).catch((e) =>
+              console.error("[AutoAlloc] step failed:", e)
+            );
+          }
+        }
+      } else if (mode === "time") {
+        const tl = getOrCreateTimeline(w.id);
+        if (w.isObservation) {
+          stopWindAnimation(map);
+          removeGridWindBarbs(map);
+          removeRasterLayer(map);
+          if (baseWin?._obsTimeline) {
+            w._obsTimeline = { ...baseWin._obsTimeline, file: w.obsTime, stepLength: w.stepLength };
+          }
+          const baseTl = baseWin ? getOrCreateTimeline(baseWin.id) : null;
+          if (baseTl && tl) {
+            tl.currentMode = "obs";
+            tl.currentStepLength = w.stepLength || baseTl.currentStepLength;
+            tl.isUpperAirMode = baseTl.isUpperAirMode;
+            tl.currentWinTitle = baseTl.currentWinTitle;
+            if (baseTl.rawObsFiles) tl.rawObsFiles = [...baseTl.rawObsFiles];
+            if (baseTl.obsFiles) tl.obsFiles = [...baseTl.obsFiles];
+            if (tl.obsFiles && w.obsTime) {
+              const idx = tl.obsFiles.indexOf(w.obsTime);
+              if (idx !== -1) tl.currentObsIdx = idx;
+            }
+          }
+          if (w.activeGroup) {
+            await loadPresetGroup(map, w.activeGroup, w.period, w.level, w, true, loadSeq).catch((e) =>
+              console.error("[AutoAlloc] obs time failed:", e)
+            );
+          }
+        } else {
+          if (tl) {
+            if (w.forecastCycle) tl.currentInitCycle = w.forecastCycle;
+            if (w.stepLength) tl.currentStepLength = w.stepLength;
+            if (Array.isArray(tl.discretePeriods)) {
+              const idx = tl.discretePeriods.indexOf(w.period);
+              if (idx !== -1) tl.currentPeriodIdx = idx;
+            }
+          }
+          if (w.activeGroup) {
+            await loadPresetGroup(map, w.activeGroup, w.period, w.level, w, true, loadSeq).catch((e) =>
+              console.error("[AutoAlloc] nwp time failed:", e)
+            );
+          }
+        }
+      } else if (mode === "none") {
+        if (w.activeGroup) {
+          await loadPresetGroup(map, w.activeGroup, w.period, w.level, w, false, loadSeq).catch((e) =>
+            console.error("[AutoAlloc] none revert failed:", e)
+          );
+        }
+      }
+    });
+
+    if (loadTasks.length > 0) {
+      await Promise.allSettled(loadTasks);
+    }
+    for (let i = 0; i < visible.length; i++) {
+      syncLayersState(visible[i].id);
+      syncLegendState(visible[i].id);
+    }
+  }
+
+  async function handleSelectAutoAlloc(mode) {
+    if (!activeTab) return;
+    if (isProfilePanelWindow(activeWin)) {
+      activeTab.autoAllocation = "none";
+      return;
+    }
+    activeTab.autoAllocation = mode;
+    if (activeTab.layout !== "1x1") {
+      await applyAutoAllocationModeToTab(activeTab, mode);
+    }
+  }
+
+  async function handleToggleAutoAlloc(modeOrState) {
+    if (!activeTab) return;
+    if (isProfilePanelWindow(activeWin)) {
+      activeTab.autoAllocation = "none";
+      return;
+    }
+    const mode = typeof modeOrState === "string" ? modeOrState : (activeTab.autoAllocation === "none" ? "level" : "none");
+    await handleSelectAutoAlloc(mode);
   }
 
   async function handleLoadData(group, overrideLevel = null, targetWin = activeWin) {
@@ -345,6 +651,7 @@
     const loadSeq = (win.loadSeq || 0) + 1;
     win.loadSeq = loadSeq;
     win._forecastRefreshSeq = (win._forecastRefreshSeq || 0) + 1;
+    const previousGroupId = win.activeGroup?.id;
     applyPresetToWindow(win, group, overrideLevel);
     const groupCopy = win.activeGroup;
     if (!groupCopy || !Array.isArray(groupCopy.layers)) {
@@ -353,6 +660,9 @@
       return;
     }
     ui.timelineVisible = !shouldHideTimelineForGroup(groupCopy);
+    if (isProfilePanelGroup(groupCopy) && activeTab) {
+      activeTab.autoAllocation = "none";
+    }
 
     const effectiveLevel = overrideLevel || win.level || groupCopy.defaultLevel || 500;
     const isSpecialProfile = shouldHideTimelineForGroup(groupCopy);
@@ -373,9 +683,11 @@
         /upper|tlogp/i.test(groupCopy.id || "") ||
         (Array.isArray(groupCopy.layers) && groupCopy.layers.some((l) =>
           l?.model === "UPPER_AIR" || String(l?.path || "").includes("TLOGP") || l?.element === "TLOGP"));
+      const defaultStep = isUpperLoad ? 12 : 3;
       const validSteps = isUpperLoad ? [12, 24, 6] : [1, 3, 6, 12, 24];
       let coercedStep = parseInt(win.stepLength, 10);
-      if (!validSteps.includes(coercedStep)) coercedStep = isUpperLoad ? 12 : 3;
+      if (!validSteps.includes(coercedStep)) coercedStep = defaultStep;
+      if (previousGroupId !== groupCopy.id) coercedStep = defaultStep;
       win.stepLength = coercedStep;
       const tl = getOrCreateTimeline(win.id);
       tl.currentMode = "obs";
@@ -383,7 +695,8 @@
       tl.isUpperAirMode = isUpperLoad;
     } else if (!isSpecialProfile) {
       const pLayer = groupCopy.layers?.find((l) => l.type === "contour" || l.type === "wind");
-      const cycles = await resolveForecastCycles(pLayer?.model || "ECMWF_HR", pLayer?.element || "TMP", win.level || 500, true);
+      const targetLevel = groupCopy.hasLevel === false ? null : (win.level || 500);
+      const cycles = await resolveForecastCycles(pLayer?.model || "ECMWF_HR", pLayer?.element || "TMP", targetLevel, true);
       win.forecastCycle = cycles[0];
       const tl = getOrCreateTimeline(win.id);
       tl.currentMode = "nwp";
@@ -392,7 +705,7 @@
       // v1.1.0 setTimelineMode(nwp): init step + rebuild periods from it so
       // the step select and chips always have coherent init values.
       let nwpStep = parseInt(win.stepLength, 10);
-      if (![1, 3, 6, 12, 24].includes(nwpStep)) nwpStep = 6;
+      if (![1, 3, 6, 12, 24].includes(nwpStep) || previousGroupId !== groupCopy.id) nwpStep = 6;
       win.stepLength = nwpStep;
       tl.currentStepLength = nwpStep;
       tl.discretePeriods = getPeriodsForStep(nwpStep);
@@ -401,7 +714,8 @@
     }
 
     try {
-      await loadPresetGroup(map, groupCopy, win.period, overrideLevel, win, false, loadSeq);
+      const targetLevel = groupCopy.hasLevel === false ? null : overrideLevel;
+      await loadPresetGroup(map, groupCopy, win.period, targetLevel, win, false, loadSeq);
     } catch (err) {
       console.error("[App] Load Data failed:", err);
       showToast("error", `Load Data failed: ${err?.message || err}`);
@@ -417,10 +731,12 @@
         const tl = getOrCreateTimeline(win.id);
         tl.currentMode = "obs";
         tl.isUpperAirMode = Boolean(t.isUpper);
+        const defaultStep = tl.isUpperAirMode ? 12 : 3;
         const validSteps = tl.isUpperAirMode ? [12, 24, 6] : [1, 3, 6, 12, 24];
         let step = parseInt(win.stepLength, 10);
         if (!validSteps.includes(step)) step = parseInt(t.stepLength, 10);
-        if (!validSteps.includes(step)) step = tl.isUpperAirMode ? 12 : 3;
+        if (!validSteps.includes(step)) step = defaultStep;
+        if (previousGroupId !== groupCopy.id) step = defaultStep;
         win.stepLength = step;
         tl.currentStepLength = step;
         if (win._obsTimeline) win._obsTimeline.stepLength = step;
@@ -442,47 +758,192 @@
     }
     syncLayersState(win.id);
     syncLegendState(win.id);
+    if (activeTab?.autoAllocation && activeTab.autoAllocation !== "none" && activeTab.layout !== "1x1" && win === activeWin) {
+      await applyAutoAllocationModeToTab(activeTab, activeTab.autoAllocation);
+    }
   }
 
   async function handleTimeChange(payload) {
-    const win = payload?.winId ? getWindowById(payload.winId) : activeWin;
-    const map = win ? getMapInstance(win.id) : null;
-    if (!win || !map) return;
-    const loadSeq = (win.loadSeq || 0) + 1;
-    win.loadSeq = loadSeq;
+    if (!payload) return;
 
-    // v1.1.0: per-event prefetch hint (keyboard steps pass prev/next,
-    // chip/cycle jumps carry none) — consumed by loadPresetGroup prefetch.
-    win.prefetchDirections = payload.prefetchDirections || payload.directions || null;
+    if (activeTab?.layout !== "1x1" && activeTab?.autoAllocation === "step" && !payload.isObs) {
+      const visible = getVisibleWindows(activeTab);
+      const win0 = visible[0] || activeWin;
+      const tl0 = win0 ? getOrCreateTimeline(win0.id) : null;
+      const stepLen = payload.stepLength || win0?.stepLength || tl0?.currentStepLength || 6;
+      const periods = getPeriodsForStep(stepLen);
+      const baseCycle = payload.cycle || win0?.forecastCycle;
 
-    if (payload.isObs) {
-      win.obsTime = payload.file;
-      if (win._obsTimeline) win._obsTimeline.file = payload.file;
-      if (payload.stepLength) {
-        win.stepLength = payload.stepLength;
-        if (win._obsTimeline) win._obsTimeline.stepLength = payload.stepLength;
+      const targetWin = (payload.winId ? getWindowById(payload.winId) : activeWin) || win0;
+      const targetPos = Math.max(0, visible.indexOf(targetWin));
+      let targetPeriod = payload.period !== undefined ? payload.period : (targetWin.period ?? 24);
+      let targetIdx = Array.isArray(periods) ? periods.indexOf(targetPeriod) : -1;
+      if (targetIdx === -1 && Array.isArray(periods) && periods.length > 0) {
+        let minDiff = Infinity;
+        periods.forEach((p, idx) => {
+          const diff = Math.abs(p - targetPeriod);
+          if (diff < minDiff) { minDiff = diff; targetIdx = idx; }
+        });
       }
-      stopWindAnimation(map);
-      removeGridWindBarbs(map);
-      removeRasterLayer(map);
+      const startIdx = Math.max(0, (targetIdx !== -1 ? targetIdx : 0) - targetPos);
 
-      if (win.activeGroup) {
-        await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, true, loadSeq);
+      for (let i = 0; i < visible.length; i++) {
+        const win = visible[i];
+        const map = getMapInstance(win.id);
+        if (!map) continue;
+        const loadSeq = (win.loadSeq || 0) + 1;
+        win.loadSeq = loadSeq;
+        win.prefetchDirections = payload.prefetchDirections || payload.directions || null;
+
+        if (baseCycle) {
+          win.forecastCycle = baseCycle;
+        }
+        win.stepLength = stepLen;
+        win.discretePeriods = periods;
+
+        let periodForWin;
+        const pIdx = startIdx + i;
+        if (Array.isArray(periods) && pIdx < periods.length) {
+          periodForWin = periods[pIdx];
+        } else {
+          const lastP = (periods && periods.length > 0 ? periods[periods.length - 1] : 0);
+          periodForWin = lastP + (pIdx - (periods ? periods.length - 1 : 0)) * stepLen;
+        }
+        win.period = periodForWin;
+
+        const tl = getOrCreateTimeline(win.id);
+        if (tl) {
+          tl.currentStepLength = stepLen;
+          tl.discretePeriods = periods;
+          const idx = periods.indexOf(periodForWin);
+          if (idx !== -1) tl.currentPeriodIdx = idx;
+          if (baseCycle) tl.currentInitCycle = baseCycle;
+        }
+
+        if (win === activeWin) {
+          app.period = periodForWin;
+          if (baseCycle) app.cycle = baseCycle;
+        }
+
+        if (win.activeGroup) {
+          await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, true, loadSeq);
+        }
+        syncLayersState(win.id);
+        syncLegendState(win.id);
       }
-    } else {
-      if (payload.cycle) {
-        win.forecastCycle = payload.cycle;
-        const timeline = getOrCreateTimeline(win.id);
-        timeline.currentInitCycle = payload.cycle;
-      }
-      win.period = payload.period;
-      app.period = payload.period;
-      if (win.activeGroup) {
-        await loadPresetGroup(map, win.activeGroup, payload.period, win.level, win, true, loadSeq);
-      }
+      return;
     }
-    syncLayersState(win.id);
-    syncLegendState(win.id);
+
+    if (activeTab?.layout !== "1x1" && activeTab?.autoAllocation === "step" && payload.isObs) {
+      const visible = getVisibleWindows(activeTab);
+      const win0 = visible[0] || activeWin;
+      const tl0 = win0 ? getOrCreateTimeline(win0.id) : null;
+      const stepLen = payload.stepLength || win0?.stepLength || tl0?.currentStepLength || 12;
+      const baseFile = payload.file || win0?.obsTime;
+
+      for (let i = 0; i < visible.length; i++) {
+        const win = visible[i];
+        const map = getMapInstance(win.id);
+        if (!map) continue;
+        const loadSeq = (win.loadSeq || 0) + 1;
+        win.loadSeq = loadSeq;
+        win.prefetchDirections = payload.prefetchDirections || payload.directions || null;
+
+        const stepped = stepCycleHours(baseFile, -i * stepLen);
+        win.obsTime = (typeof baseFile === "string" && baseFile.endsWith(".000") && !stepped.endsWith(".000"))
+          ? `${stepped}.000`
+          : stepped;
+        win.stepLength = stepLen;
+        if (win._obsTimeline) {
+          win._obsTimeline.file = win.obsTime;
+          win._obsTimeline.stepLength = stepLen;
+        }
+        const tl = getOrCreateTimeline(win.id);
+        if (tl) {
+          tl.currentStepLength = stepLen;
+          if (Array.isArray(tl.obsFiles)) {
+            const idx = tl.obsFiles.indexOf(win.obsTime);
+            if (idx !== -1) tl.currentObsIdx = idx;
+          }
+        }
+        stopWindAnimation(map);
+        removeGridWindBarbs(map);
+        removeRasterLayer(map);
+        if (win.activeGroup) {
+          await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, true, loadSeq);
+        }
+        syncLayersState(win.id);
+        syncLegendState(win.id);
+      }
+      return;
+    }
+
+    const isShared = activeTab?.layout !== "1x1" &&
+      (activeTab?.autoAllocation === "level" || activeTab?.autoAllocation === "model");
+
+    const targets = isShared
+      ? getVisibleWindows(activeTab)
+      : (payload?.winId ? [getWindowById(payload.winId)].filter(Boolean) : (activeWin ? [activeWin] : []));
+
+    for (const win of targets) {
+      const map = getMapInstance(win.id);
+      if (!map) continue;
+      const loadSeq = (win.loadSeq || 0) + 1;
+      win.loadSeq = loadSeq;
+      win.prefetchDirections = payload.prefetchDirections || payload.directions || null;
+
+      if (payload.isObs) {
+        win.obsTime = payload.file;
+        if (win._obsTimeline) win._obsTimeline.file = payload.file;
+        if (payload.stepLength) {
+          win.stepLength = payload.stepLength;
+          if (win._obsTimeline) win._obsTimeline.stepLength = payload.stepLength;
+        }
+        const tl = getOrCreateTimeline(win.id);
+        if (tl) {
+          if (payload.stepLength) tl.currentStepLength = payload.stepLength;
+          if (Array.isArray(tl.obsFiles)) {
+            const idx = tl.obsFiles.indexOf(payload.file);
+            if (idx !== -1) tl.currentObsIdx = idx;
+          }
+        }
+        stopWindAnimation(map);
+        removeGridWindBarbs(map);
+        removeRasterLayer(map);
+
+        if (win.activeGroup) {
+          await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, true, loadSeq);
+        }
+      } else {
+        if (payload.cycle) {
+          win.forecastCycle = payload.cycle;
+          const timeline = getOrCreateTimeline(win.id);
+          timeline.currentInitCycle = payload.cycle;
+        }
+        if (payload.stepLength) {
+          win.stepLength = payload.stepLength;
+          const tl = getOrCreateTimeline(win.id);
+          if (tl) {
+            tl.currentStepLength = payload.stepLength;
+            tl.discretePeriods = getPeriodsForStep(payload.stepLength);
+          }
+        }
+        win.period = payload.period;
+        const tl = getOrCreateTimeline(win.id);
+        if (tl && Array.isArray(tl.discretePeriods)) {
+          const idx = tl.discretePeriods.indexOf(payload.period);
+          if (idx !== -1) tl.currentPeriodIdx = idx;
+        }
+        if (win === activeWin) {
+          app.period = payload.period;
+        }
+        if (win.activeGroup) {
+          await loadPresetGroup(map, win.activeGroup, payload.period, win.level, win, true, loadSeq);
+        }
+      }
+      syncLayersState(win.id);
+      syncLegendState(win.id);
+    }
   }
 
   function handleLayerAction(event) {
@@ -552,6 +1013,30 @@
       getVisible: (tab) => getVisibleWindows(tab),
     });
     syncCleanups.set(win.id, cleanup);
+
+    const tab = tabsState.tabs.find((t) => t.id === winTabId) || activeTab;
+    if (tab && isWindowVisible(tab, win)) {
+      if (win.activeGroup && (!win.layers || win.layers.length === 0)) {
+        setTimeout(async () => {
+          try {
+            if (typeof map.resize === "function") {
+              try { map.resize(); } catch {}
+            }
+            await waitForMapStyle(map, 2500);
+            if (typeof map.resize === "function") {
+              try { map.resize(); } catch {}
+            }
+            const loadSeq = (win.loadSeq || 0) + 1;
+            win.loadSeq = loadSeq;
+            await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, false, loadSeq);
+            syncLayersState(win.id);
+            syncLegendState(win.id);
+          } catch (e) {
+            console.error("[AutoAlloc] handleMapCreated fallback load failed:", e);
+          }
+        }, 100);
+      }
+    }
   }
 
   function handleMapDestroyed(win) {
@@ -564,6 +1049,9 @@
   }
 
   function handlePresetSelect(group) {
+    if (isProfilePanelGroup(group) && activeTab) {
+      activeTab.autoAllocation = "none";
+    }
     if (group && (group.defaultLevel != null || group.hasLevel)) {
       const nextLvl = group.defaultLevel != null ? group.defaultLevel : app.level;
       if (nextLvl != null) {
@@ -603,7 +1091,7 @@
   async function handleLevelSelect(lvl, targetWin = activeWin) {
     const win = targetWin;
     if (!win) return;
-    app.level = lvl;
+    if (win === activeWin) app.level = lvl;
     const map = getMapInstance(win.id);
     if (map) {
       try {
@@ -640,6 +1128,15 @@
     }
     syncLayersState(win.id);
     syncLegendState(win.id);
+
+    if (targetWin === activeWin && activeTab?.layout !== "1x1" && activeTab?.autoAllocation === "model") {
+      const visible = getVisibleWindows(activeTab);
+      for (const w of visible) {
+        if (w !== activeWin) {
+          handleLevelSelect(lvl, w).catch((err) => console.error("[AutoAlloc] Model level sync error:", err));
+        }
+      }
+    }
   }
 
   async function stepVerticalLevel(delta) {
@@ -656,7 +1153,25 @@
     if (idx === -1) return;
     const nextIdx = Math.max(0, Math.min(levels.length - 1, idx + delta));
     if (nextIdx !== idx) {
-      await handleLevelSelect(levels[nextIdx]);
+      const isSharedModel = activeTab?.layout !== "1x1" && activeTab?.autoAllocation === "model";
+      const isSharedLevel = activeTab?.layout !== "1x1" && activeTab?.autoAllocation === "level";
+      if (isSharedModel) {
+        const visible = getVisibleWindows(activeTab);
+        for (const w of visible) {
+          await handleLevelSelect(levels[nextIdx], w);
+        }
+      } else if (isSharedLevel) {
+        const visible = getVisibleWindows(activeTab);
+        for (const w of visible) {
+          const wIdx = levels.indexOf(w.level || 500);
+          if (wIdx !== -1) {
+            const shifted = Math.max(0, Math.min(levels.length - 1, wIdx + delta));
+            await handleLevelSelect(levels[shifted], w);
+          }
+        }
+      } else {
+        await handleLevelSelect(levels[nextIdx]);
+      }
     }
   }
 
@@ -666,7 +1181,8 @@
 
 
   async function stepTimelineDelta(delta) {
-    const win = activeWin;
+    const isStepAlloc = activeTab?.layout !== "1x1" && activeTab?.autoAllocation === "step";
+    const win = isStepAlloc ? (getVisibleWindows(activeTab)[0] || activeWin) : activeWin;
     if (!win) return;
     // v1.1.0: Hovmöller panel owns its time axis — global ←/→ are swallowed.
     try {
@@ -689,9 +1205,13 @@
   }
 
   function cycleLayout() {
-    // v1.1.0: F4 toggles split 1x1 <-> 2x2 (1x2 reachable via layout buttons).
+    // F4 toggles split 1x1 <-> split layout (1x2 / 2x2 / 2x3 reachable via layout buttons).
     if (!activeTab) return;
-    handleChangeLayout(activeTab.layout === "1x1" ? "2x2" : "1x1");
+    const newLayout = activeTab.layout === "1x1" ? (activeTab._lastSplitLayout || "2x2") : "1x1";
+    if (activeTab.layout !== "1x1") {
+      activeTab._lastSplitLayout = activeTab.layout;
+    }
+    handleChangeLayout(newLayout);
   }
 
   function handleToggleConfig() {
@@ -799,12 +1319,15 @@
     activeWinIdx={activeTab?.activeWinIdx ?? 0}
     layout={activeTab?.layout || "1x1"}
     syncMap={activeTab?.syncMap !== false}
+    autoAllocation={activeTab?.autoAllocation || "none"}
     onSelectWin={handleWindowFocus}
     onAddWin={handleAddWindow}
     onCloseWin={handleCloseWindow}
     onReorder={handleReorderWindows}
     onChangeLayout={handleChangeLayout}
     onToggleSync={handleToggleSync}
+    onSelectAutoAlloc={handleSelectAutoAlloc}
+    onToggleAutoAlloc={handleToggleAutoAlloc}
   />
 
   <main id="main-content" class="main-content">
@@ -832,7 +1355,10 @@
     <ConfigEditor onConfigSaved={handleConfigSaved} />
   </main>
 
-  <TimeSlider winId={activeWin?.id} onTimeChange={handleTimeChange} />
+  <TimeSlider
+    winId={activeWin?.id}
+    onTimeChange={handleTimeChange}
+  />
 </div>
 
 <style>
@@ -881,6 +1407,20 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-template-rows: 1fr 1fr;
+    gap: 2px;
+  }
+
+  .windows-grid.layout-2x3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 2px;
+  }
+
+  .windows-grid.layout-3x2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(3, 1fr);
     gap: 2px;
   }
 </style>
