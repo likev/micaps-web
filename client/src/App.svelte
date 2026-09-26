@@ -434,6 +434,7 @@
           tl.currentObsIdx = idx !== -1 ? idx : Math.max(0, tl.obsFiles.length - 1);
           const latest = tl.obsFiles[tl.currentObsIdx];
           if (latest && win.obsTime !== latest) win.obsTime = latest;
+          if (latest && win._obsTimeline) win._obsTimeline.file = latest;
         }
       } catch (e) {
         console.warn("[App] Obs timeline bridge failed:", e);
@@ -456,6 +457,7 @@
 
     if (payload.isObs) {
       win.obsTime = payload.file;
+      if (win._obsTimeline) win._obsTimeline.file = payload.file;
       if (payload.stepLength) {
         win.stepLength = payload.stepLength;
         if (win._obsTimeline) win._obsTimeline.stepLength = payload.stepLength;
@@ -621,10 +623,16 @@
         if (Array.isArray(t.files) && t.files.length > 0) {
           tl.rawObsFiles = [...t.files];
           const filtered = filterObsFilesByStep(tl.rawObsFiles, tl.currentStepLength, tl.isUpperAirMode);
-          const chips = selectObsChipsWindow(filtered, t.file);
+          const currentFile = win.obsTime || t.file;
+          const chips = selectObsChipsWindow(filtered, currentFile);
           tl.obsFiles = chips.length > 0 ? chips : filtered;
-          const idx = t.file ? tl.obsFiles.indexOf(t.file) : -1;
+          const idx = currentFile ? tl.obsFiles.indexOf(currentFile) : -1;
           tl.currentObsIdx = idx !== -1 ? idx : Math.max(0, tl.obsFiles.length - 1);
+          const activeFile = tl.obsFiles[tl.currentObsIdx];
+          if (activeFile) {
+            win.obsTime = activeFile;
+            if (win._obsTimeline) win._obsTimeline.file = activeFile;
+          }
         }
       } catch (e) {
         console.warn("[App] Obs timeline bridge (level) failed:", e);
@@ -634,12 +642,13 @@
     syncLegendState(win.id);
   }
 
-  function stepVerticalLevel(delta) {
+  async function stepVerticalLevel(delta) {
     // v1.1.0: line-profile diagrams own the vertical axis — Up/Down never
     // touch win.level while they are active.
     try {
       const win = activeWin;
       if (win && (lineHeightController.isActive(win) || hovmollerController.isActive(win))) return;
+      if (win && (win.model === "SURFACE" || win.level === 0) && !win.activeGroup?.hasLevel) return;
     } catch {}
     const levels = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
     const cur = app.level || activeWin?.level || 500;
@@ -647,7 +656,7 @@
     if (idx === -1) return;
     const nextIdx = Math.max(0, Math.min(levels.length - 1, idx + delta));
     if (nextIdx !== idx) {
-      handleLevelSelect(levels[nextIdx]);
+      await handleLevelSelect(levels[nextIdx]);
     }
   }
 
@@ -761,10 +770,10 @@
       await stepTimelineDelta(1);
     } else if (isUp) {
       e.preventDefault();
-      stepVerticalLevel(1);
+      await stepVerticalLevel(1);
     } else if (isDown) {
       e.preventDefault();
-      stepVerticalLevel(-1);
+      await stepVerticalLevel(-1);
     } else if (isSplit) {
       e.preventDefault();
       cycleLayout();

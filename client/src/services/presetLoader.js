@@ -256,18 +256,14 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
               : `${layer.model}/${layer.element}`));
         let file = win?.obsTime;
         // Fresh Load Data always lands on latest (bypassCache). Level steps
-        // preserve the selected chip: _obsTimeline exists so freshObsLoad is
-        // false and the current file is kept when still valid.
-        if (!file || freshObsLoad || (!isTimeStep && group.isObservation && level !== null && !win?._obsTimeline)) {
-          file = await syncObservationTimeline(obsPath, freshObsLoad ? null : win?.obsTime, winTitle, win, { forceLatest: freshObsLoad });
+        // preserve the selected chip: sync for new level path if path changed or no timeline,
+        // and keep the current file when still valid.
+        const levelChanged = !isTimeStep && Boolean(group.isObservation) && level !== null && (!win?._obsTimeline || win?._obsTimelinePath !== obsPath);
+        if (!file || freshObsLoad || levelChanged) {
+          file = await syncObservationTimeline(obsPath, freshObsLoad ? null : (win?.obsTime || file), winTitle, win, { forceLatest: freshObsLoad });
           if (win) {
             win.obsTime = file;
-            updateWindowTitle(win);
-          }
-        } else if (freshObsLoad) {
-          file = await syncObservationTimeline(obsPath, null, winTitle, win, { forceLatest: true });
-          if (win) {
-            win.obsTime = file;
+            if (getActiveWindow() === win) appState.set("obsTime", file);
             updateWindowTitle(win);
           }
         }
