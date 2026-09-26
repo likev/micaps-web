@@ -235,12 +235,52 @@ describe("Hovmoller canvas views", () => {
     expect(swappedLead12.w).toBeCloseTo(700 / 2 + 0.5, 1);
 
     // 3. Hover sampling resolves rain accurately within the [T - 12, T] tile interval
+    // Lead 0 has no past accumulation -> hover must return null
+    const hoverAt0 = r._sampleAtHover(0, 500);
+    expect(hoverAt0.rain).toBeNull();
+
     // Hover at lead=6 (within [0, 12]): should sample from lead 12 data (index 1)
     const hoverAt6 = r._sampleAtHover(6, 500);
     expect(hoverAt6.rain).toBeCloseTo(5.0, 1);
 
+    // Exact boundary at lead=12: belongs to past 12h accumulation [0, 12] (index 1)
+    const hoverAt12 = r._sampleAtHover(12, 500);
+    expect(hoverAt12.rain).toBeCloseTo(5.0, 1);
+
     // Hover at lead=18 (within [12, 24]): should sample from lead 24 data (index 2)
     const hoverAt18 = r._sampleAtHover(18, 500);
     expect(hoverAt18.rain).toBeCloseTo(15.0, 1);
+
+    // 4. Gap coverage: RAIN03 with 12h leads [0, 12, 24] -> [9, 12] and [21, 24]
+    r.setOptions({ rainStep: "RAIN03" });
+    const hoverInGap = r._sampleAtHover(6, 500);
+    expect(hoverInGap.rain).toBeNull();
+
+    // 5. Overlap coverage: RAIN12 over 6h leads
+    const mOverlap = {
+      leads: [0, 6, 12, 18, 24],
+      rainStep: "RAIN12",
+      rain: [
+        new Float32Array([0, 0, 0]),
+        new Float32Array([1.0, 1.0, 1.0]), // lead 6 [0, 6]
+        new Float32Array([4.0, 4.0, 4.0]), // lead 12 [0, 12] (painted over lead 6)
+        new Float32Array([8.0, 8.0, 8.0]), // lead 18 [6, 18]
+        new Float32Array([16.0, 16.0, 16.0]), // lead 24 [12, 24]
+      ],
+      tmp: [new Float32Array([10, 10, 10]), new Float32Array([10, 10, 10]), new Float32Array([10, 10, 10]), new Float32Array([10, 10, 10]), new Float32Array([10, 10, 10])],
+    };
+    r.setData(mOverlap, [0, 500, 1000]);
+    r.setOptions({ rainStep: "RAIN12" });
+    // At lead=5: tile 2 [0, 12] was painted over tile 1 [0, 6], so lead 12 value (4.0) must be returned
+    const hoverOverlap = r._sampleAtHover(5, 500);
+    expect(hoverOverlap.rain).toBeCloseTo(4.0, 1);
+
+    // 6. Reverse time direction
+    r.setView("dist-x", "rev");
+    calls.length = 0;
+    fillRects.length = 0;
+    r.render();
+    const revTiles = fillRects.slice(1);
+    expect(revTiles.length).toBeGreaterThan(0);
   });
 });

@@ -29,8 +29,8 @@ type TLogPHandler struct {
 func (h *TLogPHandler) Handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	file := strings.TrimSpace(r.URL.Query().Get("file"))
-	station := strings.TrimSpace(r.URL.Query().Get("station"))
+	file := SanitizeFile(r.URL.Query().Get("file"))
+	station := strings.TrimSpace(strings.ReplaceAll(r.URL.Query().Get("station"), "\x00", ""))
 
 	if h.MockMode {
 		h.handleMock(w, station, file)
@@ -39,7 +39,7 @@ func (h *TLogPHandler) Handler(w http.ResponseWriter, r *http.Request) {
 
 	decompressed, resolvedFile, err := h.getDecompressedData(file)
 	if err != nil {
-		if h.Client == nil || h.MockMode {
+		if h.MockMode {
 			h.handleMock(w, station, file)
 			return
 		}

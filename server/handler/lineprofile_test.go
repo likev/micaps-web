@@ -139,6 +139,10 @@ func TestHovmoller_Validation(t *testing.T) {
 		{"bad npoints", "cycle=26091808&leads=0,12&level=850&lon0=115&lat0=28&lon1=125&lat1=38&npoints=1", 400},
 		{"degenerate", "cycle=26091808&leads=0,12&level=850&lon0=115&lat0=28&lon1=115.01&lat1=28.01", 400},
 		{"fully out", "cycle=26091808&leads=0,12&level=850&lon0=-150&lat0=-60&lon1=-140&lat1=-50", 400},
+		{"bad model traversal", "model=../../etc&cycle=26091808&leads=0,12&level=850&lon0=115&lat0=28&lon1=125&lat1=38", 400},
+		{"bad model encoded traversal", "model=%2e%2e%2fetc&cycle=26091808&leads=0,12&level=850&lon0=115&lat0=28&lon1=125&lat1=38", 400},
+		{"bad model encoded null byte", "model=ECMWF%00_HR&cycle=26091808&leads=0,12&level=850&lon0=115&lat0=28&lon1=125&lat1=38", 400},
+		{"bad model dots", "model=..&cycle=26091808&leads=0,12&level=850&lon0=115&lat0=28&lon1=125&lat1=38", 400},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -149,6 +153,50 @@ func TestHovmoller_Validation(t *testing.T) {
 				t.Errorf("want %d got %d body=%s", tt.want, w.Code, w.Body.String())
 			}
 		})
+	}
+}
+
+func TestHovmoller_RainStepAndLeadZero(t *testing.T) {
+	h := &handler.HovmollerHandler{MockMode: true}
+
+	// 1. Valid rain_step=RAIN06 with leads starting at 0
+	req := httptest.NewRequest("GET", "/api/data/hovmoller/profile?cycle=26091808&leads=0,6,12&level=850&rain_step=RAIN06&lon0=100&lat0=25&lon1=120&lat1=35&npoints=5", nil)
+	w := httptest.NewRecorder()
+	h.Handler(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("want 200 got %d %s", w.Code, w.Body.String())
+	}
+	_, res := decodeNDJSON(t, w.Body.String())
+	if res == nil {
+		t.Fatalf("missing result")
+	}
+	if res["rainStep"] != "RAIN06" {
+		t.Errorf("rainStep want RAIN06 got %v", res["rainStep"])
+	}
+	rain, _ := res["rain"].([]interface{})
+	if len(rain) != 3 {
+		t.Fatalf("rain rows want 3 got %d", len(rain))
+	}
+	// Lead 0 must be zero-filled across all npoints
+	row0, _ := rain[0].([]interface{})
+	for pi, val := range row0 {
+		if val == nil {
+			t.Errorf("lead 0 point %d should not be nil", pi)
+		} else if f, ok := val.(float64); !ok || f != 0.0 {
+			t.Errorf("lead 0 point %d want 0.0 got %v", pi, val)
+		}
+	}
+
+	// 2. Injected / invalid rain_step falls back safely and does not crash or reflect raw injection
+	reqBad := httptest.NewRequest("GET", "/api/data/hovmoller/profile?cycle=26091808&leads=0,12&level=850&rain_step=RAIN99;DROP&lon0=100&lat0=25&lon1=120&lat1=35&npoints=5", nil)
+	wBad := httptest.NewRecorder()
+	h.Handler(wBad, reqBad)
+	if wBad.Code != http.StatusOK {
+		t.Fatalf("want 200 got %d %s", wBad.Code, wBad.Body.String())
+	}
+	_, resBad := decodeNDJSON(t, wBad.Body.String())
+	if resBad["rainStep"] == "RAIN99;DROP" {
+		t.Errorf("rainStep should not allow arbitrary injected value")
 	}
 }
 

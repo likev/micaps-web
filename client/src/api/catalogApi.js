@@ -31,8 +31,13 @@ export async function fetchGridBinaryStream(path, file) {
 
 export async function fetchStationObservations(path = "SURFACE/PLOT_10MIN", file = "") {
   let normalizedFile = file;
-  if (typeof file === "string" && file.length === 14 && !file.includes(".")) {
-    normalizedFile = `${file}.000`;
+  if (typeof file === "string") {
+    normalizedFile = file.trim();
+    if (normalizedFile === "null" || normalizedFile === "undefined") {
+      normalizedFile = "";
+    } else if (normalizedFile.length === 14 && !normalizedFile.includes(".")) {
+      normalizedFile = `${normalizedFile}.000`;
+    }
   }
   return await fetchJson("/api/data/station", { path, file: normalizedFile });
 }

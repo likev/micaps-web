@@ -260,23 +260,36 @@ export class HovmollerCanvasRenderer {
       wind = { speed: Math.hypot(uu, vv), dir: Math.round(((Math.atan2(-uu, -vv) * 180) / Math.PI + 360) % 360) };
     }
     let rainVal = null;
-    if (rain) {
-      const stepStr = String(this.matrix?.rainStep || this.options?.rainStep || "");
+    if (rain && leads && leads.length >= 2) {
+      const stepStr = String(this.options?.rainStep || this.matrix?.rainStep || "");
       const match = stepStr.match(/\d+/);
-      const deltaT = match ? parseInt(match[0], 10) : (leads.length >= 2 ? leads[1] - leads[0] : 12);
+      let deltaT = match ? parseInt(match[0], 10) : 0;
+      if (!deltaT || Number.isNaN(deltaT) || deltaT <= 0) {
+        deltaT = (leads.length >= 2 && leads[1] > leads[0]) ? leads[1] - leads[0] : 12;
+      }
+      const sLead = leads[0];
+      const eLead = leads[leads.length - 1];
+
       let rainLi = -1;
-      for (let i = 0; i < leads.length; i++) {
-        const tEnd = leads[i];
-        const tStart = tEnd - deltaT;
-        if (lead >= tStart && lead <= tEnd) {
-          rainLi = i;
-          break;
+      if (lead > sLead && lead <= eLead) {
+        // Iterate backwards so the last-painted tile in painter's algorithm order is sampled on overlap
+        for (let i = leads.length - 1; i >= 0; i--) {
+          const tEnd = leads[i];
+          if (tEnd <= sLead) continue;
+          const tStart = tEnd - deltaT;
+          const clampedStart = Math.max(sLead, tStart);
+          const clampedEnd = Math.min(eLead, tEnd);
+          if (clampedStart >= clampedEnd) continue;
+          if (lead > clampedStart && lead <= clampedEnd) {
+            rainLi = i;
+            break;
+          }
         }
       }
       if (rainLi !== -1 && rain[rainLi] && !Number.isNaN(rain[rainLi][pi])) {
         rainVal = rain[rainLi][pi];
       } else {
-        rainVal = pick(rain);
+        rainVal = null;
       }
     }
     return { t: pick(tmp), rh: pick(rh), vvel: pick(vvel), wind, rain: rainVal };

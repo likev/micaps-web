@@ -1,7 +1,7 @@
 <script>
   import { ui } from "../lib/stores/ui.svelte.js";
   import { tabsState } from "../lib/stores/tabs.svelte.js";
-  import { isProfilePanelWindow } from "../lib/services/appWorkflow.js";
+  import { isProfilePanelWindow, isSurfaceWindow, isUpperAirWindow } from "../lib/services/appWorkflow.js";
 
   let {
     tabs = tabsState.tabs,
@@ -43,19 +43,34 @@
       : (tabs && tabs[0]?.windows ? (tabs[0].windows[activeWinIdx] || tabs[0].windows[0] || null) : null)
   );
   let isProfile = $derived(Boolean(activeWindow && isProfilePanelWindow(activeWindow)));
+  let isSurface = $derived(Boolean(activeWindow && isSurfaceWindow(activeWindow)));
+  let isUpperAir = $derived(Boolean(activeWindow && isUpperAirWindow(activeWindow)));
   let allocDisabled = $derived(layout !== "1x1" || isProfile);
   let allocTitle = $derived(
     isProfile
       ? "Auto-Allocation is disabled for profile panel products"
       : (layout !== "1x1"
         ? "Auto-Allocation can only be selected in tab-mode before splitting"
-        : "Auto-Allocation mode across split windows")
+        : (isSurface
+          ? "Auto-Allocation (time only for Surface)"
+          : (isUpperAir
+            ? "Auto-Allocation (time and level for Upper-Air)"
+            : "Auto-Allocation mode across split windows")))
   );
-  let effectiveAlloc = $derived(
-    isProfile
-      ? "none"
-      : (typeof autoAllocation === "string" ? autoAllocation : (autoAllocation ? "level" : "none"))
-  );
+  let effectiveAlloc = $derived.by(() => {
+    if (isProfile) return "none";
+    const cur = typeof autoAllocation === "string" ? autoAllocation : (autoAllocation ? "level" : "none");
+    if (isSurface && (cur === "step" || cur === "level" || cur === "model")) return "none";
+    if (isUpperAir && (cur === "step" || cur === "model")) return "none";
+    return cur;
+  });
+
+  $effect(() => {
+    if (effectiveAlloc === "none" && autoAllocation && autoAllocation !== "none") {
+      if (onSelectAutoAlloc) onSelectAutoAlloc("none");
+      else if (onToggleAutoAlloc) onToggleAutoAlloc("none");
+    }
+  });
 
   function selectItem(item, idx) {
     ui.configOpen = false;
@@ -337,15 +352,17 @@
         value={effectiveAlloc}
         onchange={(e) => {
           const val = e.currentTarget.value;
+          if (isSurface && (val === "step" || val === "level" || val === "model")) return;
+          if (isUpperAir && (val === "step" || val === "model")) return;
           if (onSelectAutoAlloc) onSelectAutoAlloc(val);
           else if (onToggleAutoAlloc) onToggleAutoAlloc(val);
         }}
       >
         <option value="none">none</option>
         <option value="time">time</option>
-        <option value="step">step</option>
-        <option value="level">level</option>
-        <option value="model">model</option>
+        <option value="step" disabled={isSurface || isUpperAir}>step</option>
+        <option value="level" disabled={isSurface}>level</option>
+        <option value="model" disabled={isSurface || isUpperAir}>model</option>
       </select>
     </div>
   </div>

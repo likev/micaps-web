@@ -104,3 +104,72 @@ func TestGridHandlerMockMode_RAIN12_SanitizesNull(t *testing.T) {
 		}
 	}
 }
+
+func TestSanitizeGridPath_Cases(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"ECMWF_HR/RAIN12", "ECMWF_HR/RAIN12"},
+		{"ECMWF_HR/RAIN12/null", "ECMWF_HR/RAIN12"},
+		{"ECMWF_HR/RAIN12/NULL", "ECMWF_HR/RAIN12"},
+		{"ECMWF_HR/null/RAIN12", "ECMWF_HR/RAIN12"},
+		{"ECMWF_HR/UNDEFINED/RAIN12", "ECMWF_HR/RAIN12"},
+		{"null", ""},
+		{"NULL", ""},
+		{"undefined", ""},
+		{"UNDEFINED", ""},
+		{"/null/ECMWF_HR/null/RAIN12/null/", "ECMWF_HR/RAIN12"},
+		{"../ECMWF_HR/../RAIN12", "ECMWF_HR/RAIN12"},
+		{"ECMWF_HR\x00/RAIN12", "ECMWF_HR/RAIN12"},
+		{"", ""},
+	}
+
+	for _, tc := range tests {
+		got := handler.SanitizeGridPath(tc.input)
+		if got != tc.expected {
+			t.Errorf("SanitizeGridPath(%q) = %q; want %q", tc.input, got, tc.expected)
+		}
+	}
+}
+
+func TestSanitizeFile_Cases(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"26091808.024", "26091808.024"},
+		{"null", ""},
+		{"NULL", ""},
+		{"undefined", ""},
+		{"UNDEFINED", ""},
+		{"../26091808.024", "26091808.024"},
+		{"../../26091808.024", "26091808.024"},
+		{"26091808\x00.024", "26091808.024"},
+		{"/26091808.024/", "26091808.024"},
+		{"", ""},
+	}
+
+	for _, tc := range tests {
+		got := handler.SanitizeFile(tc.input)
+		if got != tc.expected {
+			t.Errorf("SanitizeFile(%q) = %q; want %q", tc.input, got, tc.expected)
+		}
+	}
+}
+
+func TestGridHandlerNonMockMode_Error(t *testing.T) {
+	h := &handler.GridHandler{
+		Client:   nil,
+		MockMode: false,
+	}
+
+	req := httptest.NewRequest("GET", "/api/data/grid?path=ECMWF_HR/TMP/500&file=26091808.024", nil)
+	w := httptest.NewRecorder()
+	h.JSONHandler(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 StatusNotFound when Client is nil and MockMode is false, got %d", w.Code)
+	}
+}
+

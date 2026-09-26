@@ -39,6 +39,8 @@
     isWindowVisible,
     applyAutoAllocation,
     revertAutoAllocation,
+    getEligibleModelsForAllocation,
+    preloadModelLevels,
   } from "./lib/stores/tabsCore.js";
   import { stopWindAnimation, removeGridWindBarbs } from "./layers/windLayer.js";
   import { removeRasterLayer } from "./layers/rasterLayer.js";
@@ -46,6 +48,10 @@
     shouldHideTimelineForGroup,
     isProfilePanelGroup,
     isProfilePanelWindow,
+    isSurfaceGroup,
+    isUpperAirGroup,
+    isSurfaceWindow,
+    isUpperAirWindow,
     applyPresetToWindow,
     stepWindowTimeline,
   } from "./lib/services/appWorkflow.js";
@@ -56,6 +62,7 @@
   import { updateGraticuleScheme } from "./map/graticule.js";
   import { hovmollerController, lineHeightController } from "./layers/lineprofile/lineProfileLayer.js";
   import { syncProfilePanelsForWindow, hideAllProfilePanels } from "./lib/services/profileVisibility.js";
+  import { updateWindowTitle } from "./ui/tabs/windowTitles.js";
 
   let activeTab = $derived(tabsState.tabs.find((t) => t.id === tabsState.activeTabId) || tabsState.tabs[0] || null);
   let activeWin = $derived(activeTab && activeTab.windows ? (activeTab.windows[activeTab.activeWinIdx] || activeTab.windows[0]) : null);
@@ -74,7 +81,7 @@
   const syncCleanups = new Map();
   let forecastRefreshTimer = null;
 
-  async function waitForMapStyle(map, timeoutMs = 2500) {
+  async function waitForMapStyle(map, timeoutMs = 4000) {
     if (!map) return false;
     const isReady = () => {
       try {
@@ -195,7 +202,7 @@
     const element = ["VOR", "DIV"].includes(layer?.element) ? "WIND" : (layer?.element || "TMP");
     const refreshSeq = (win._forecastRefreshSeq || 0) + 1;
     win._forecastRefreshSeq = refreshSeq;
-    const targetLevel = win.activeGroup?.hasLevel === false ? null : (win.level || 500);
+    const targetLevel = win.activeGroup?.hasLevel === false ? null : (win.level ?? 500);
     const cycles = await resolveForecastCycles(model, element, targetLevel, forceRefresh);
     if (win._forecastRefreshSeq !== refreshSeq) return;
     if (!cycles.length) return;
@@ -267,8 +274,11 @@
     const posIdx = activeTab.windows.length;
     const winObj = createDefaultWindow(posIdx, activeTab.id);
     winObj.uid = uid;
-    winObj.id = `tab-${activeTab.id}-win-${uid}`;
-    winObj.level = (activeTab.autoAllocation && activeTab.autoAllocation !== "none") ? (DEFAULT_LEVELS[posIdx] ?? 500) : (activeWin?.level ?? 500);
+    winObj.level = (activeTab.autoAllocation === "level") ? (DEFAULT_LEVELS[posIdx] ?? 500) : (activeWin?.level ?? 500);
+    if (activeTab.autoAllocation === "model") {
+      const eligible = getEligibleModelsForAllocation(activeWin, winObj.level, DEFAULT_MODELS);
+      winObj.model = eligible[posIdx % eligible.length];
+    }
     activeTab.windows.push(winObj);
     // The pushed window is stored wrapped by $state: focus it by position
     // id so the new tab-win is always selected, then sync the rest.
@@ -336,6 +346,10 @@
       : (activeTab.windows.find((w) => w && w.activeGroup) || activeWin || activeTab.windows[0]);
 
     if (isProfilePanelWindow(baseWin)) {
+      activeTab.autoAllocation = "none";
+    } else if (isSurfaceWindow(baseWin) && (activeTab.autoAllocation === "step" || activeTab.autoAllocation === "level" || activeTab.autoAllocation === "model")) {
+      activeTab.autoAllocation = "none";
+    } else if (isUpperAirWindow(baseWin) && (activeTab.autoAllocation === "step" || activeTab.autoAllocation === "model")) {
       activeTab.autoAllocation = "none";
     }
 
@@ -412,10 +426,22 @@
 
   async function applyAutoAllocationModeToTab(tab, mode) {
     if (!tab) return;
+    const allocSeq = (tab._allocSeq || 0) + 1;
+    tab._allocSeq = allocSeq;
     tab.autoAllocation = mode;
     const baseWin = (activeWin && activeWin.activeGroup) ? activeWin : (tab.windows.find((w) => w && w.activeGroup) || activeWin || tab.windows[0]);
 
     if (isProfilePanelWindow(baseWin)) {
+      tab.autoAllocation = "none";
+      return;
+    }
+    const isSurf = isSurfaceWindow(baseWin);
+    const isUp = isUpperAirWindow(baseWin);
+    if (isSurf && (mode === "step" || mode === "level" || mode === "model")) {
+      tab.autoAllocation = "none";
+      return;
+    }
+    if (isUp && (mode === "step" || mode === "model")) {
       tab.autoAllocation = "none";
       return;
     }
@@ -436,6 +462,13 @@
           baseWin.obsTime = tl.obsFiles[tl.currentObsIdx];
         }
       }
+    }
+    if (mode === "model") {
+      const layers = (baseWin?.activeGroup?.layers && baseWin.activeGroup.layers.length > 0)
+        ? baseWin.activeGroup.layers
+        : (baseWin?.layers || []);
+      const elements = layers.map((l) => l.element || (l.type === "wind" ? "WIND" : null)).filter(Boolean);
+      await preloadModelLevels(DEFAULT_MODELS, elements.length > 0 ? elements : ["RH", "HGT", "WIND", "TMP"]);
     }
     applyAutoAllocation(tab, mode, baseWin);
     const visible = getVisibleWindows(tab);
@@ -577,8 +610,11 @@
           }
         } else {
           if (tl) {
+            tl.currentMode = "nwp";
             if (w.forecastCycle) tl.currentInitCycle = w.forecastCycle;
             if (w.stepLength) tl.currentStepLength = w.stepLength;
+            if (w.discretePeriods) tl.discretePeriods = [...w.discretePeriods];
+            if (w.forecastCycles) tl.forecastCycles = [...w.forecastCycles];
             if (Array.isArray(tl.discretePeriods)) {
               const idx = tl.discretePeriods.indexOf(w.period);
               if (idx !== -1) tl.currentPeriodIdx = idx;
@@ -602,7 +638,9 @@
     if (loadTasks.length > 0) {
       await Promise.allSettled(loadTasks);
     }
+    if (tab._allocSeq !== allocSeq) return;
     for (let i = 0; i < visible.length; i++) {
+      updateWindowTitle(visible[i]);
       syncLayersState(visible[i].id);
       syncLegendState(visible[i].id);
     }
@@ -611,6 +649,16 @@
   async function handleSelectAutoAlloc(mode) {
     if (!activeTab) return;
     if (isProfilePanelWindow(activeWin)) {
+      activeTab.autoAllocation = "none";
+      return;
+    }
+    const isSurf = isSurfaceWindow(activeWin);
+    const isUp = isUpperAirWindow(activeWin);
+    if (isSurf && (mode === "step" || mode === "level" || mode === "model")) {
+      activeTab.autoAllocation = "none";
+      return;
+    }
+    if (isUp && (mode === "step" || mode === "model")) {
       activeTab.autoAllocation = "none";
       return;
     }
@@ -626,7 +674,18 @@
       activeTab.autoAllocation = "none";
       return;
     }
-    const mode = typeof modeOrState === "string" ? modeOrState : (activeTab.autoAllocation === "none" ? "level" : "none");
+    const isSurf = isSurfaceWindow(activeWin);
+    const isUp = isUpperAirWindow(activeWin);
+    const defaultMode = isSurf ? "time" : "level";
+    const mode = typeof modeOrState === "string" ? modeOrState : (activeTab.autoAllocation === "none" ? defaultMode : "none");
+    if (isSurf && (mode === "step" || mode === "level" || mode === "model")) {
+      activeTab.autoAllocation = "none";
+      return;
+    }
+    if (isUp && (mode === "step" || mode === "model")) {
+      activeTab.autoAllocation = "none";
+      return;
+    }
     await handleSelectAutoAlloc(mode);
   }
 
@@ -662,6 +721,14 @@
     ui.timelineVisible = !shouldHideTimelineForGroup(groupCopy);
     if (isProfilePanelGroup(groupCopy) && activeTab) {
       activeTab.autoAllocation = "none";
+    }
+    if (activeTab && activeTab.autoAllocation && activeTab.autoAllocation !== "none") {
+      const curMode = activeTab.autoAllocation;
+      if (isSurfaceGroup(groupCopy) && (curMode === "step" || curMode === "level" || curMode === "model")) {
+        activeTab.autoAllocation = "none";
+      } else if (isUpperAirGroup(groupCopy) && (curMode === "step" || curMode === "model")) {
+        activeTab.autoAllocation = "none";
+      }
     }
 
     const effectiveLevel = overrideLevel || win.level || groupCopy.defaultLevel || 500;
@@ -1052,6 +1119,14 @@
     if (isProfilePanelGroup(group) && activeTab) {
       activeTab.autoAllocation = "none";
     }
+    if (activeTab && activeTab.autoAllocation && activeTab.autoAllocation !== "none") {
+      const curMode = activeTab.autoAllocation;
+      if (isSurfaceGroup(group) && (curMode === "step" || curMode === "level" || curMode === "model")) {
+        activeTab.autoAllocation = "none";
+      } else if (isUpperAirGroup(group) && (curMode === "step" || curMode === "model")) {
+        activeTab.autoAllocation = "none";
+      }
+    }
     if (group && (group.defaultLevel != null || group.hasLevel)) {
       const nextLvl = group.defaultLevel != null ? group.defaultLevel : app.level;
       if (nextLvl != null) {
@@ -1130,12 +1205,9 @@
     syncLegendState(win.id);
 
     if (targetWin === activeWin && activeTab?.layout !== "1x1" && activeTab?.autoAllocation === "model") {
-      const visible = getVisibleWindows(activeTab);
-      for (const w of visible) {
-        if (w !== activeWin) {
-          handleLevelSelect(lvl, w).catch((err) => console.error("[AutoAlloc] Model level sync error:", err));
-        }
-      }
+      applyAutoAllocationModeToTab(activeTab, "model").catch((err) =>
+        console.error("[AutoAlloc] Model level sync error:", err)
+      );
     }
   }
 
@@ -1148,7 +1220,7 @@
       if (win && (win.model === "SURFACE" || win.level === 0) && !win.activeGroup?.hasLevel) return;
     } catch {}
     const levels = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
-    const cur = app.level || activeWin?.level || 500;
+    const cur = app.level ?? activeWin?.level ?? 500;
     const idx = levels.indexOf(cur);
     if (idx === -1) return;
     const nextIdx = Math.max(0, Math.min(levels.length - 1, idx + delta));

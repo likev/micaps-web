@@ -110,7 +110,7 @@ export async function triggerIsobandOverlay(map, layer = null, win = null) {
     const isUp = model === "UPPER_AIR" || (layer.element && layer.element.includes("UPPER"));
     if (isUp) {
       path = `UPPER_AIR/${layer.element}/${level || 500}`;
-    } else if (level !== null && level !== undefined && level !== "null" && level !== "") {
+    } else if (level !== null && level !== undefined && level !== "null" && level !== "undefined" && String(level).trim().toLowerCase() !== "undefined" && String(level).trim().toLowerCase() !== "null" && level !== "") {
       path = `${model}/${layer.element}/${level}`;
     } else {
       path = `${model}/${layer.element}`;

@@ -3,7 +3,13 @@ import { formatObsTimestamp, formatForecastValidTime } from "../../utils/formatt
 import { getActiveTab } from "./tabsStore.js";
 import { DEFAULT_MODELS } from "../../lib/stores/tabsCore.js";
 
-export function computeFullWindowTitle(win, baseText = null) {
+let defaultTabResolver = null;
+
+export function setDefaultTabResolver(resolver) {
+  defaultTabResolver = resolver;
+}
+
+export function computeFullWindowTitle(win, baseText = null, isModelAlloc = null) {
   if (!win) return "";
   let base = (baseText !== null && baseText !== undefined) ? baseText : win.baseTitle;
   if (!base) {
@@ -25,9 +31,13 @@ export function computeFullWindowTitle(win, baseText = null) {
     base.toLowerCase().includes("observation")
   );
 
-  const tab = typeof getActiveTab === "function" ? getActiveTab() : null;
-  const isModelAlloc = tab?.autoAllocation === "model" || win.autoAllocation === "model";
-  if (isModelAlloc && win.model && !isObs) {
+  const tab = (typeof defaultTabResolver === "function" ? defaultTabResolver(win) : null) ||
+              (typeof getActiveTab === "function" ? getActiveTab() : null);
+  const effectiveModelAlloc = (isModelAlloc !== null && isModelAlloc !== undefined)
+    ? Boolean(isModelAlloc)
+    : Boolean(tab?.autoAllocation === "model" || win.autoAllocation === "model");
+
+  if (effectiveModelAlloc && win.model && !isObs) {
     for (const m of DEFAULT_MODELS) {
       base = base.replace(new RegExp(`\\s*\\(${m}\\)`, "gi"), "").trim();
     }
@@ -60,7 +70,7 @@ export function computeFullWindowTitle(win, baseText = null) {
   return full;
 }
 
-export function updateWindowTitle(win, text = null) {
+export function updateWindowTitle(win, text = null, isModelAlloc = null) {
   if (!win || typeof document === "undefined") return;
   // State-only: pill labels (TabsBar), window headers (WindowPanel), the
   // layers badge, and the legend all derive reactively from win.title /
@@ -70,5 +80,5 @@ export function updateWindowTitle(win, text = null) {
   // drag-reorder or close, `tab-label-${win.winIdx}` addresses a DIFFERENT
   // pill, so the old imperative write corrupted other tabs' titles
   // (tab W5 vs win W1 mashups on every Load Data / time-step / reload).
-  computeFullWindowTitle(win, text);
+  computeFullWindowTitle(win, text, isModelAlloc);
 }

@@ -65,8 +65,8 @@ func (h *GridHandler) BinaryHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *GridHandler) fetchGrid(r *http.Request) (*model.GridResponse, error) {
-	dataPath := r.URL.Query().Get("path")
-	file := r.URL.Query().Get("file")
+	dataPath := sanitizeGridPath(r.URL.Query().Get("path"))
+	file := sanitizeFile(r.URL.Query().Get("file"))
 
 	if h.Client == nil || dataPath == "" || file == "" {
 		if h.MockMode {
@@ -75,7 +75,6 @@ func (h *GridHandler) fetchGrid(r *http.Request) (*model.GridResponse, error) {
 		return nil, fmt.Errorf("missing query parameter 'path' or 'file' (or CQL client not connected)")
 	}
 
-	dataPath = sanitizeGridPath(dataPath)
 	if h.MockMode {
 		return h.getFallbackGrid(r), nil
 	}
@@ -139,27 +138,50 @@ func (h *GridHandler) fetchGrid(r *http.Request) (*model.GridResponse, error) {
 	return parser.ParseGridData(decompressed)
 }
 
+func SanitizeGridPath(p string) string {
+	clean := strings.TrimSpace(p)
+	clean = strings.ReplaceAll(clean, "\x00", "")
+	clean = strings.Trim(clean, "/")
+	for strings.Contains(clean, "..") {
+		clean = strings.ReplaceAll(clean, "..", "")
+		clean = strings.Trim(clean, "/")
+	}
+	parts := strings.Split(clean, "/")
+	validParts := make([]string, 0, len(parts))
+	for _, part := range parts {
+		lp := strings.ToLower(strings.TrimSpace(part))
+		if lp != "" && lp != "null" && lp != "undefined" {
+			validParts = append(validParts, part)
+		}
+	}
+	return strings.Join(validParts, "/")
+}
+
 func sanitizeGridPath(p string) string {
-	clean := strings.Trim(p, "/")
-	for {
-		if strings.HasSuffix(clean, "/null") {
-			clean = strings.TrimSuffix(clean, "/null")
-			clean = strings.Trim(clean, "/")
-			continue
-		}
-		if strings.HasSuffix(clean, "/undefined") {
-			clean = strings.TrimSuffix(clean, "/undefined")
-			clean = strings.Trim(clean, "/")
-			continue
-		}
-		break
+	return SanitizeGridPath(p)
+}
+
+func SanitizeFile(f string) string {
+	clean := strings.TrimSpace(f)
+	clean = strings.ReplaceAll(clean, "\x00", "")
+	for strings.Contains(clean, "..") {
+		clean = strings.ReplaceAll(clean, "..", "")
+	}
+	clean = strings.Trim(clean, "/")
+	lower := strings.ToLower(clean)
+	if lower == "null" || lower == "undefined" {
+		return ""
 	}
 	return clean
 }
 
+func sanitizeFile(f string) string {
+	return SanitizeFile(f)
+}
+
 func (h *GridHandler) getFallbackGrid(r *http.Request) *model.GridResponse {
 	dataPath := sanitizeGridPath(r.URL.Query().Get("path"))
-	file := r.URL.Query().Get("file")
+	file := sanitizeFile(r.URL.Query().Get("file"))
 	element := "TMP"
 	var level float32 = 850
 	var period int32 = 24

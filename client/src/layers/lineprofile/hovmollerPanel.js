@@ -416,6 +416,7 @@ export class HovmollerPanel {
     this.rainStep = step;
     const sel = this.container?.querySelector(".hov-select-rain-step");
     if (sel && sel.value !== step) sel.value = step;
+    this.canvasRenderer?.setOptions({ rainStep: step });
   }
   setProgress({ loaded, total, pct, cacheHits = 0, cancelled = false } = {}) {
     if (!this.container) return;
@@ -431,7 +432,13 @@ export class HovmollerPanel {
   hideProgress() { const w = this.container?.querySelector(".hov-progress-wrap"); if (w) w.style.display = "none"; }
   setData(matrix, distKm) {
     this.matrix = matrix;
-    this.canvasRenderer?.setData(matrix, distKm);
+    if (this.canvasRenderer) {
+      const step = matrix?.rainStep || this.rainStep;
+      if (step) {
+        this.canvasRenderer.setOptions({ rainStep: step });
+      }
+      this.canvasRenderer.setData(matrix, distKm);
+    }
     this._refreshHeader();
   }
   _refreshHeader() {

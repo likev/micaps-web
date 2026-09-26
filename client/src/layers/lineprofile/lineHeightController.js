@@ -240,7 +240,7 @@ class LineHeightController {
     if (cl.clamped) { toast = true; lon = cl.lon; lat = cl.lat; }
     const sn = snapToGridNode(null, lon, lat);
     const dom = clampEndpointsToDomain(sn, sn);
-    if (dom.outside) { showErrorToast?.("Point outside ECMWF_HR domain."); return null; }
+    if (dom.outside) { showErrorToast?.(`Point outside ${s.model || "ECMWF_HR"} domain.`); return null; }
     void s;
     if (toast) showErrorToast?.(`Endpoint clamped to model domain.`);
     return { lon: sn.lon, lat: sn.lat };
@@ -263,7 +263,7 @@ class LineHeightController {
       n = nv.value;
     }
     const cl = clampEndpointsToDomain({ lon: v.lon0, lat: v.lat0 }, { lon: v.lon1, lat: v.lat1 });
-    if (cl.outside) { showErrorToast?.("Line fully outside ECMWF_HR domain."); return null; }
+    if (cl.outside) { showErrorToast?.(`Line fully outside ${s.model || "ECMWF_HR"} domain.`); return null; }
     if (cl.clamped) showErrorToast?.("Endpoint(s) clamped to model domain.");
     s.line = { a: { lon: Math.round(cl.a.lon * 10000) / 10000, lat: Math.round(cl.a.lat * 10000) / 10000 }, b: { lon: Math.round(cl.b.lon * 10000) / 10000, lat: Math.round(cl.b.lat * 10000) / 10000 } };
     s.npoints = n;
@@ -304,8 +304,14 @@ class LineHeightController {
       if (cycles?.length) {
         s.availableCycles = cycles;
         if (!cycles.includes(s.cycle)) s.cycle = cycles[0];
+      } else {
+        s.availableCycles = [];
+        s.cycle = null;
       }
-    } catch {}
+    } catch {
+      s.availableCycles = [];
+      s.cycle = null;
+    }
     s.panel?.setModel(s.model);
     s.panel?.setCycle(s.cycle, s.availableCycles);
     this._persistConfig({ model: s.model, initCycle: s.cycle }, win);

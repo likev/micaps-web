@@ -168,9 +168,13 @@ func GetPressureLevels(client *CQLClient, dataPath string) ([]int, error) {
 		}
 	}
 
-	// If no custom levels configured in table, provide standard meteorological levels
+	// If no custom levels configured in table, provide default meteorological levels
 	if len(levels) == 0 {
-		levels = []int{1000, 925, 850, 700, 500, 400, 300, 250, 200, 100}
+		if strings.Contains(dataPath, "SHANGHAI_MR") || strings.Contains(dataPath, "GRAPES_3KM") {
+			levels = []int{1000, 925, 850}
+		} else {
+			levels = []int{1000, 925, 850, 700, 500, 400, 300, 250, 200, 100}
+		}
 	}
 
 	sort.Slice(levels, func(i, j int) bool {

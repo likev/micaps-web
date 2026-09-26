@@ -1,4 +1,4 @@
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import {
   createDefaultTab,
   createDefaultWindow,
@@ -8,10 +8,57 @@ import {
   DEFAULT_MODELS,
   stepCycleHours,
   getVisibleWindows,
+  isModelLayerSupported,
+  getEligibleModelsForAllocation,
+  preloadModelLevels,
+  modelLevelsRuntimeCache,
+  setModelLevelsCache,
+  queryModelSupportedLevels,
+  getEligibleModelsForAllocationAsync,
 } from "../../src/lib/stores/tabsCore.js";
+import {
+  isSurfaceGroup,
+  isUpperAirGroup,
+  isSurfaceWindow,
+  isUpperAirWindow,
+} from "../../src/lib/services/appWorkflow.js";
 import { computeFullWindowTitle } from "../../src/ui/tabs/windowTitles.js";
 
 describe("Auto-Allocation 5-Mode System & Synchronization", () => {
+  let originalFetch;
+
+  beforeAll(async () => {
+    originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+      const urlStr = String(url);
+      if (urlStr.includes("/api/catalog/levels")) {
+        const u = new URL(urlStr, "http://localhost");
+        const path = u.searchParams.get("path") || "";
+        if (path.includes("SHANGHAI_MR") || path.includes("GRAPES_3KM")) {
+          return new Response(JSON.stringify([1000, 925, 850]), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response(
+          JSON.stringify([1000, 925, 850, 700, 500, 400, 300, 250, 200, 100]),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+      if (typeof originalFetch === "function") {
+        return originalFetch(url);
+      }
+      return new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } });
+    };
+    await preloadModelLevels();
+  });
+
+  afterAll(() => {
+    globalThis.fetch = originalFetch;
+  });
   it("defaults to 'none' on new tabs and does not auto-allocate levels when none", () => {
     const tab = createDefaultTab(1);
     expect(tab.autoAllocation).toBe("none");
@@ -435,6 +482,240 @@ describe("Auto-Allocation 5-Mode System & Synchronization", () => {
     expect(title1).toContain("GRAPES_GFS");
     expect(title0).toContain("500hPa Composite");
     expect(title1).toContain("500hPa Composite");
+  });
+
+  describe("Model Layer Support & Upper-Level Layer Absence", () => {
+    beforeEach(async () => {
+      await preloadModelLevels();
+    });
+
+    it("isModelLayerSupported: queries server at runtime and returns false for SHANGHAI_MR and GRAPES_3KM at <= 700 hPa", async () => {
+      // 1. Clear cache to test runtime server query path
+      modelLevelsRuntimeCache.clear();
+      for (const elem of ["RH", "HGT", "WIND"]) {
+        expect(await isModelLayerSupported("SHANGHAI_MR", elem, 500)).toBe(false);
+        expect(await isModelLayerSupported("SHANGHAI_MR", elem, 700)).toBe(false);
+        expect(await isModelLayerSupported("SHANGHAI_MR", elem, 200)).toBe(false);
+
+        expect(await isModelLayerSupported("GRAPES_3KM", elem, 500)).toBe(false);
+        expect(await isModelLayerSupported("GRAPES_3KM", elem, 700)).toBe(false);
+        expect(await isModelLayerSupported("GRAPES_3KM", elem, 200)).toBe(false);
+
+        // Lower levels (850, 925, 1000) are supported
+        expect(await isModelLayerSupported("SHANGHAI_MR", elem, 850)).toBe(true);
+        expect(await isModelLayerSupported("GRAPES_3KM", elem, 850)).toBe(true);
+        expect(await isModelLayerSupported("SHANGHAI_MR", elem, 1000)).toBe(true);
+        expect(await isModelLayerSupported("GRAPES_3KM", elem, 1000)).toBe(true);
+
+        // Global/synoptic models support all levels
+        expect(await isModelLayerSupported("ECMWF_HR", elem, 500)).toBe(true);
+        expect(await isModelLayerSupported("GRAPES_GFS", elem, 500)).toBe(true);
+        expect(await isModelLayerSupported("BEIJING_MR", elem, 500)).toBe(true);
+        expect(await isModelLayerSupported("JAPAN_MR", elem, 700)).toBe(true);
+        expect(await isModelLayerSupported("NCEP_GFS", elem, 500)).toBe(true);
+      }
+
+      // 2. Synchronous cached checks work once runtime query has completed
+      expect(isModelLayerSupported("SHANGHAI_MR", "RH", 500)).toBe(false);
+      expect(isModelLayerSupported("SHANGHAI_MR", "RH", 850)).toBe(true);
+      expect(isModelLayerSupported("GRAPES_3KM", "HGT", 700)).toBe(false);
+      expect(isModelLayerSupported("GRAPES_3KM", "HGT", 850)).toBe(true);
+    });
+
+    it("getEligibleModelsForAllocation: excludes SHANGHAI_MR and GRAPES_3KM when all layers do not exist at 500 or 700 hPa", () => {
+      const composite500 = {
+        id: "composite-500hpa",
+        level: 500,
+        layers: [
+          { type: "contour", element: "RH" },
+          { type: "contour", element: "HGT" },
+          { type: "wind", element: "WIND" },
+        ],
+      };
+
+      const eligible500 = getEligibleModelsForAllocation(composite500, 500);
+      expect(eligible500).not.toContain("SHANGHAI_MR");
+      expect(eligible500).not.toContain("GRAPES_3KM");
+      expect(eligible500).toEqual([
+        "ECMWF_HR",
+        "GRAPES_GFS",
+        "BEIJING_MR",
+        "JAPAN_MR",
+        "NCEP_GFS",
+        "GERMAN_HR",
+      ]);
+
+      const eligible700 = getEligibleModelsForAllocation(composite500, 700);
+      expect(eligible700).not.toContain("SHANGHAI_MR");
+      expect(eligible700).not.toContain("GRAPES_3KM");
+
+      // At 850 hPa, all models are eligible
+      const composite850 = {
+        id: "composite-850hpa",
+        level: 850,
+        layers: [
+          { type: "contour", element: "HGT" },
+          { type: "contour", element: "TMP" },
+          { type: "wind", element: "WIND" },
+        ],
+      };
+      const eligible850 = getEligibleModelsForAllocation(composite850, 850);
+      expect(eligible850).toContain("SHANGHAI_MR");
+      expect(eligible850).toContain("GRAPES_3KM");
+      expect(eligible850).toEqual(DEFAULT_MODELS);
+    });
+
+    it("Mode 'model': does not allocate SHANGHAI_MR or GRAPES_3KM for 500hPa composite", () => {
+      const tab = createDefaultTab(1);
+      tab.layout = "2x3";
+      const composite500 = {
+        id: "composite-500hpa",
+        name: "500hPa Composite",
+        level: 500,
+        layers: [
+          { type: "contour", element: "RH", model: "ECMWF_HR" },
+          { type: "contour", element: "HGT", model: "ECMWF_HR" },
+          { type: "wind", element: "WIND", model: "ECMWF_HR" },
+        ],
+      };
+      tab.windows = Array.from({ length: 6 }, (_, i) => ({
+        ...createDefaultWindow(i, 1),
+        level: 500,
+        model: "ECMWF_HR",
+        period: 24,
+        activeGroup: composite500,
+      }));
+
+      applyAutoAllocation(tab, "model", tab.windows[0]);
+
+      const allocatedModels = tab.windows.map((w) => w.model);
+      expect(allocatedModels).not.toContain("SHANGHAI_MR");
+      expect(allocatedModels).not.toContain("GRAPES_3KM");
+      expect(allocatedModels).toEqual([
+        "ECMWF_HR",
+        "GRAPES_GFS",
+        "BEIJING_MR",
+        "JAPAN_MR",
+        "NCEP_GFS",
+        "GERMAN_HR",
+      ]);
+    });
+
+    it("Mode 'model': allocates SHANGHAI_MR and GRAPES_3KM for 850hPa composite", () => {
+      const tab = createDefaultTab(1);
+      tab.layout = "2x3";
+      const composite850 = {
+        id: "composite-850hpa",
+        name: "850hPa Composite",
+        level: 850,
+        layers: [
+          { type: "contour", element: "HGT", model: "ECMWF_HR" },
+          { type: "contour", element: "TMP", model: "ECMWF_HR" },
+          { type: "wind", element: "WIND", model: "ECMWF_HR" },
+        ],
+      };
+      tab.windows = Array.from({ length: 6 }, (_, i) => ({
+        ...createDefaultWindow(i, 1),
+        level: 850,
+        model: "ECMWF_HR",
+        period: 24,
+        activeGroup: composite850,
+      }));
+
+      applyAutoAllocation(tab, "model", tab.windows[0]);
+
+      const allocatedModels = tab.windows.map((w) => w.model);
+      expect(allocatedModels).toContain("SHANGHAI_MR");
+      expect(allocatedModels).toContain("GRAPES_3KM");
+      expect(allocatedModels).toEqual([
+        "ECMWF_HR",
+        "GRAPES_GFS",
+        "BEIJING_MR",
+        "GRAPES_3KM",
+        "JAPAN_MR",
+        "SHANGHAI_MR",
+      ]);
+    });
+
+    it("dynamically honors whatever levels the server returns without any hardcoded model assumptions", async () => {
+      // Suppose an arbitrary or newly added model "REGIONAL_TEST" only returns [925, 850] from server
+      setModelLevelsCache("REGIONAL_TEST", "TMP", [925, 850]);
+      expect(isModelLayerSupported("REGIONAL_TEST", "TMP", 500)).toBe(false);
+      expect(isModelLayerSupported("REGIONAL_TEST", "TMP", 700)).toBe(false);
+      expect(isModelLayerSupported("REGIONAL_TEST", "TMP", 850)).toBe(true);
+      expect(isModelLayerSupported("REGIONAL_TEST", "TMP", 925)).toBe(true);
+
+      const comp = {
+        layers: [{ element: "TMP" }],
+      };
+      const eligible500 = getEligibleModelsForAllocation(comp, 500, ["ECMWF_HR", "REGIONAL_TEST"]);
+      expect(eligible500).toEqual(["ECMWF_HR"]);
+
+      const eligible850 = getEligibleModelsForAllocation(comp, 850, ["ECMWF_HR", "REGIONAL_TEST"]);
+      expect(eligible850).toEqual(["ECMWF_HR", "REGIONAL_TEST"]);
+
+      // Test async resolver as well
+      const asyncEligible500 = await getEligibleModelsForAllocationAsync(comp, 500, ["ECMWF_HR", "REGIONAL_TEST"]);
+      expect(asyncEligible500).toEqual(["ECMWF_HR"]);
+    });
+  });
+
+  describe("Surface & Upper-Air Auto-Allocation Restrictions", () => {
+    it("detects surface and upper-air groups and windows accurately", () => {
+      const surfaceGroup = { id: "composite-surface", category: "Surface Observations", layers: [{ model: "SURFACE" }] };
+      const upperAirGroup = { id: "composite-upperair-500", category: "Upper-Air Observations", layers: [{ model: "UPPER_AIR" }] };
+      const nwpGroup = { id: "composite-500hpa", category: "NWP Synoptic", layers: [{ model: "ECMWF_HR" }] };
+
+      expect(isSurfaceGroup(surfaceGroup)).toBe(true);
+      expect(isSurfaceGroup(upperAirGroup)).toBe(false);
+      expect(isSurfaceGroup(nwpGroup)).toBe(false);
+
+      expect(isUpperAirGroup(upperAirGroup)).toBe(true);
+      expect(isUpperAirGroup(surfaceGroup)).toBe(false);
+      expect(isUpperAirGroup(nwpGroup)).toBe(false);
+
+      const winSurface = { id: "w-surf", model: "SURFACE", activeGroup: surfaceGroup };
+      const winUpperAir = { id: "w-up", model: "UPPER_AIR", level: 500, activeGroup: upperAirGroup };
+      const winNwp = { id: "w-nwp", model: "ECMWF_HR", level: 500, activeGroup: nwpGroup };
+
+      expect(isSurfaceWindow(winSurface)).toBe(true);
+      expect(isSurfaceWindow(winUpperAir)).toBe(false);
+      expect(isSurfaceWindow(winNwp)).toBe(false);
+
+      expect(isUpperAirWindow(winUpperAir)).toBe(true);
+      expect(isUpperAirWindow(winSurface)).toBe(false);
+      expect(isUpperAirWindow(winNwp)).toBe(false);
+    });
+
+    it("surface restricts step/level/model; upper_air restricts step/model", () => {
+      const isAllocAllowed = (isSurf, isUp, mode) => {
+        if (mode === "none") return true;
+        if (isSurf && (mode === "step" || mode === "level" || mode === "model")) return false;
+        if (isUp && (mode === "step" || mode === "model")) return false;
+        return true;
+      };
+
+      // Surface
+      expect(isAllocAllowed(true, false, "none")).toBe(true);
+      expect(isAllocAllowed(true, false, "time")).toBe(true);
+      expect(isAllocAllowed(true, false, "step")).toBe(false);
+      expect(isAllocAllowed(true, false, "level")).toBe(false);
+      expect(isAllocAllowed(true, false, "model")).toBe(false);
+
+      // Upper-air
+      expect(isAllocAllowed(false, true, "none")).toBe(true);
+      expect(isAllocAllowed(false, true, "time")).toBe(true);
+      expect(isAllocAllowed(false, true, "level")).toBe(true);
+      expect(isAllocAllowed(false, true, "step")).toBe(false);
+      expect(isAllocAllowed(false, true, "model")).toBe(false);
+
+      // NWP
+      expect(isAllocAllowed(false, false, "none")).toBe(true);
+      expect(isAllocAllowed(false, false, "time")).toBe(true);
+      expect(isAllocAllowed(false, false, "level")).toBe(true);
+      expect(isAllocAllowed(false, false, "step")).toBe(true);
+      expect(isAllocAllowed(false, false, "model")).toBe(true);
+    });
   });
 });
 

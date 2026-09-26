@@ -134,7 +134,7 @@ describe("Time-Height Controller & Map Interactions", () => {
       stats: {},
     };
 
-    const matrixKey = `26091808|0|850|240,120`;
+    const matrixKey = `${state.model || "ECMWF_HR"}|26091808|0|850|240,120`;
     state.matrixCache.set(matrixKey, mockMatrix);
 
     const matrix = await timeHeightController.setPoint(120.0, 30.0, win, mockMap);

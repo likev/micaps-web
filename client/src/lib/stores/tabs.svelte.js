@@ -5,6 +5,13 @@ import {
   stepCycleHours,
   applyAutoAllocation,
   revertAutoAllocation,
+  isModelLayerSupported,
+  getEligibleModelsForAllocation,
+  getEligibleModelsForAllocationAsync,
+  queryModelSupportedLevels,
+  preloadModelLevels,
+  setModelLevelsCache,
+  modelLevelsRuntimeCache,
   getNumVisible,
   getVisibleWindows,
   isWindowVisible,
@@ -16,6 +23,7 @@ import {
   setMapInstance as coreSetMapInstance,
 } from "./tabsCore.js";
 import { setDefaultWinResolver } from "./legendCore.js";
+import { setDefaultTabResolver } from "../../ui/tabs/windowTitles.js";
 
 export const tabsState = $state(coreTabsState);
 
@@ -28,6 +36,20 @@ export const mapInstances = coreMapInstances;
 
 export function getActiveTab() {
   return tabsState.tabs.find((t) => t.id === tabsState.activeTabId) || tabsState.tabs[0] || null;
+}
+
+export function getTabForWindow(win) {
+  if (!win) return getActiveTab();
+  if (win.tabId) {
+    const found = tabsState.tabs.find((t) => t.id === win.tabId);
+    if (found) return found;
+  }
+  for (const tab of tabsState.tabs) {
+    if (tab.windows?.some((w) => w === win || (w && win.id && w.id === win.id))) {
+      return tab;
+    }
+  }
+  return getActiveTab();
 }
 
 export function getActiveWindow() {
@@ -47,6 +69,8 @@ export function getWindowById(winId) {
 
 // Wire live window resolver for legend prefix
 setDefaultWinResolver(getWindowById);
+// Wire live tab resolver for window titles and model-alloc headers
+setDefaultTabResolver(getTabForWindow);
 
 export function getMapInstance(winId) {
   return coreGetMapInstance(winId);
@@ -68,4 +92,11 @@ export {
   getSyncingTabs,
   applyAutoAllocation,
   revertAutoAllocation,
+  isModelLayerSupported,
+  getEligibleModelsForAllocation,
+  getEligibleModelsForAllocationAsync,
+  queryModelSupportedLevels,
+  preloadModelLevels,
+  setModelLevelsCache,
+  modelLevelsRuntimeCache,
 };

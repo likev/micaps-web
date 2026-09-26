@@ -194,7 +194,7 @@ class HovmollerController {
 
   _handlePickClick(lon, lat, win, map) {
     const s = this._getState(win);
-    const sn = this._snapClamp(lon, lat);
+    const sn = this._snapClamp(lon, lat, win);
     if (!sn) return;
     if (s.pickMode === "draw") {
       if (!s.pendingA) { s.pendingA = sn; showPendingA(map, sn); }
@@ -217,13 +217,14 @@ class HovmollerController {
       this.setLine(s.line.a, sn, s.npoints, win);
     }
   }
-  _snapClamp(lon, lat) {
+  _snapClamp(lon, lat, win = null) {
+    const s = this._getState(win);
     const cl = clampToGridDomain(null, lon, lat);
     let toast = false;
     if (cl.clamped) { toast = true; lon = cl.lon; lat = cl.lat; }
     const sn = snapToGridNode(null, lon, lat);
     const dom = clampEndpointsToDomain(sn, sn);
-    if (dom.outside) { showErrorToast?.("Point outside ECMWF_HR domain."); return null; }
+    if (dom.outside) { showErrorToast?.(`Point outside ${s.model || "ECMWF_HR"} domain.`); return null; }
     if (toast) showErrorToast?.("Endpoint clamped to model domain.");
     return { lon: sn.lon, lat: sn.lat };
   }
@@ -240,7 +241,7 @@ class HovmollerController {
       n = nv.value;
     }
     const cl = clampEndpointsToDomain({ lon: v.lon0, lat: v.lat0 }, { lon: v.lon1, lat: v.lat1 });
-    if (cl.outside) { showErrorToast?.("Line fully outside ECMWF_HR domain."); return null; }
+    if (cl.outside) { showErrorToast?.(`Line fully outside ${s.model || "ECMWF_HR"} domain.`); return null; }
     if (cl.clamped) showErrorToast?.("Endpoint(s) clamped to model domain.");
     s.line = { a: { lon: Math.round(cl.a.lon * 10000) / 10000, lat: Math.round(cl.a.lat * 10000) / 10000 }, b: { lon: Math.round(cl.b.lon * 10000) / 10000, lat: Math.round(cl.b.lat * 10000) / 10000 } };
     s.npoints = n;
@@ -306,8 +307,14 @@ class HovmollerController {
       if (cycles?.length) {
         s.availableCycles = cycles;
         if (!cycles.includes(s.cycle)) s.cycle = cycles[0];
+      } else {
+        s.availableCycles = [];
+        s.cycle = null;
       }
-    } catch {}
+    } catch {
+      s.availableCycles = [];
+      s.cycle = null;
+    }
     s.panel?.setModel(s.model);
     s.panel?.setCycle(s.cycle, s.availableCycles);
     this._persistConfig({ model: s.model, initCycle: s.cycle }, win);

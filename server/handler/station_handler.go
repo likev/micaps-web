@@ -45,22 +45,26 @@ func (h *StationHandler) StationGeoJSONHandler(w http.ResponseWriter, r *http.Re
 }
 
 func (h *StationHandler) fetchStations(r *http.Request) (*model.GeoJSONFeatureCollection, error) {
-	dataPath := strings.Trim(r.URL.Query().Get("path"), "/")
-	file := strings.TrimSpace(r.URL.Query().Get("file"))
+	dataPath := SanitizeGridPath(r.URL.Query().Get("path"))
+	file := SanitizeFile(r.URL.Query().Get("file"))
 
 	if strings.Contains(dataPath, "TLOGP") {
 		dataPath = "UPPER_AIR/TLOGP"
 	}
 
-	if h.Client == nil || dataPath == "" || file == "" {
+	if dataPath == "" {
 		if h.MockMode {
 			return mock.GenerateMockStationsForPath(dataPath), nil
 		}
-		return nil, fmt.Errorf("missing query parameter 'path' or 'file' (or CQL client not connected)")
+		return nil, fmt.Errorf("missing query parameter 'path' (or CQL client not connected)")
 	}
 
 	if h.MockMode {
 		return mock.GenerateMockStationsForPath(dataPath), nil
+	}
+
+	if h.Client == nil {
+		return nil, fmt.Errorf("missing CQL client connection")
 	}
 
 	if file == "" || file == "latest" {
@@ -75,9 +79,16 @@ func (h *StationHandler) fetchStations(r *http.Request) (*model.GeoJSONFeatureCo
 		}
 	}
 
+	if file == "" {
+		return nil, fmt.Errorf("missing query parameter 'file'")
+	}
+
 	rawBlob, err := db.GetBlob(h.Client, dataPath, file)
 	if err != nil && !strings.HasSuffix(file, ".000") && len(file) == 14 {
 		rawBlob, err = db.GetBlob(h.Client, dataPath, file+".000")
+		if err == nil {
+			file = file + ".000"
+		}
 	}
 	if err != nil {
 		return nil, err

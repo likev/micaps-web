@@ -252,19 +252,19 @@ func (f *lineFetcher) fetchDecompressed(task lineBlobTask) ([]byte, string, erro
 	if len(parts) > 1 {
 		subPath = strings.Join(parts[1:], "/")
 	}
-	// 1. file cache
+	// 1. mock
+	if f.MockMode || f.Client == nil {
+		mr := mock.GenerateMockGrid(task.element, float32(task.pressure), int32(task.lead))
+		dec := parser.EncodeMICAPSDecompressed(mr)
+		return dec, "mock", nil
+	}
+	// 2. file cache
 	if f.Cache != nil {
 		if cachedBlob, _, ok := f.Cache.Get(task.table, subPath, task.file); ok {
 			if dec, err := parser.DecompressGzip(cachedBlob); err == nil {
 				return dec, "cache", nil
 			}
 		}
-	}
-	// 2. mock
-	if f.MockMode || f.Client == nil {
-		mr := mock.GenerateMockGrid(task.element, float32(task.pressure), int32(task.lead))
-		dec := parser.EncodeMICAPSDecompressed(mr)
-		return dec, "mock", nil
 	}
 	// 3. cassandra with singleflight
 	var rawBlob []byte

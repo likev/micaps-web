@@ -17,13 +17,7 @@
     // prefix is derived at render time so drag-reorder stays consistent.
     const stripPrefix = (t) => String(t || "").replace(/^W\d+:\s*/, "");
     if (win.title) return stripPrefix(win.title);
-    if (win.activeGroup?.name) {
-      let base = stripPrefix(win.activeGroup.name);
-      if (win.model && !base.includes(win.model) && !win.isObservation && win.model !== "SURFACE" && win.model !== "UPPER_AIR") {
-        return `${base} (${win.model})`;
-      }
-      return base;
-    }
+    if (win.activeGroup?.name) return stripPrefix(win.activeGroup.name);
     if (win.model && win.element) {
       const isUpper = win.model === "UPPER_AIR" || (typeof win.element === "string" && win.element.includes("UPPER"));
       if (win.isObservation) {

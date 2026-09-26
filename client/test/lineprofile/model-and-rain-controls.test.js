@@ -7,6 +7,8 @@ import { HovmollerPanel } from "../../src/layers/lineprofile/hovmollerPanel.js";
 import { LineHeightPanel } from "../../src/layers/lineprofile/lineHeightPanel.js";
 import { TimeHeightPanel } from "../../src/layers/timeheight/timeHeightPanel.js";
 import { DEFAULT_MODELS } from "../../src/lib/stores/tabsCore.js";
+import { validateNPoints } from "../../src/layers/lineprofile/lineUtils.js";
+import { loadHovmollerMatrix } from "../../src/layers/lineprofile/hovmollerLoader.js";
 
 function createMockMap() {
   const sources = new Map();
@@ -76,6 +78,95 @@ describe("Model & Rain Controls for Profile Panels", () => {
 
       hovmollerController.destroy(mockMap, win);
     });
+
+    test("loadHovmollerMatrix sends rain_step query param only when not auto", async () => {
+      const origFetch = globalThis.fetch;
+      const urls = [];
+      globalThis.fetch = async (url) => {
+        urls.push(String(url));
+        const dummyNdjson = JSON.stringify({ type: "result", result: { leads: [0, 12], rh: [[50], [55]] } }) + "\n";
+        return new Response(dummyNdjson, {
+          status: 200,
+          headers: { "Content-Type": "application/x-ndjson" },
+        });
+      };
+
+      try {
+        await loadHovmollerMatrix({
+          model: "ECMWF_HR",
+          cycle: "2026092600",
+          leads: [0, 12],
+          rainStep: "RAIN06",
+        });
+        expect(urls.length).toBe(1);
+        expect(urls[0]).toContain("rain_step=RAIN06");
+
+        await loadHovmollerMatrix({
+          model: "ECMWF_HR",
+          cycle: "2026092600",
+          leads: [0, 12],
+          rainStep: "auto",
+        });
+        expect(urls.length).toBe(2);
+        expect(urls[1]).not.toContain("rain_step");
+      } finally {
+        globalThis.fetch = origFetch;
+      }
+    });
+
+    test("HovmollerPanel forwards matrix.rainStep to canvasRenderer", () => {
+      const panel = new HovmollerPanel({ windowId: "test-hov-step" });
+      let forwardedOptions = null;
+      panel.canvasRenderer = {
+        setOptions(opts) { forwardedOptions = opts; },
+        setData() {},
+      };
+
+      panel.setData({ leads: [0, 12], rainStep: "RAIN12" }, 500);
+      expect(forwardedOptions).toEqual({ rainStep: "RAIN12" });
+
+      panel.destroy();
+    });
+
+    test("setAxisSwap is zero-fetch and updates state and persists config", () => {
+      const layer = { id: "ec-hovmoller-diagram", config: {} };
+      const win = { id: "axis-swap-test", layers: [layer] };
+      hovmollerController.init(mockMap, win, { config: layer.config });
+
+      const origFetch = globalThis.fetch;
+      let fetchCalled = false;
+      globalThis.fetch = () => {
+        fetchCalled = true;
+        return Promise.reject(new Error("Should not fetch"));
+      };
+
+      try {
+        hovmollerController.setAxisSwap("time-x", win);
+        const s = hovmollerController._getState(win);
+        expect(s.axisSwap).toBe("time-x");
+        expect(layer.config.axisSwap).toBe("time-x");
+        expect(fetchCalled).toBe(false);
+      } finally {
+        globalThis.fetch = origFetch;
+        hovmollerController.destroy(mockMap, win);
+      }
+    });
+
+    test("syncDrawerCheckbox persists element visibility without fetch", () => {
+      const layer = { id: "ec-hovmoller-diagram", config: {} };
+      const win = { id: "drawer-test", layers: [layer] };
+      hovmollerController.init(mockMap, win, { config: layer.config });
+
+      hovmollerController.syncDrawerCheckbox("RAIN", true, win);
+      const found1 = hovmollerController._findLayer(win);
+      expect(found1?.config.showRain).toBe(true);
+
+      hovmollerController.syncDrawerCheckbox("RH", false, win);
+      const found2 = hovmollerController._findLayer(win);
+      expect(found2?.config.showRH).toBe(false);
+
+      hovmollerController.destroy(mockMap, win);
+    });
   });
 
   describe("Line-Height Cross-Section Model Controls", () => {
@@ -127,4 +218,29 @@ describe("Model & Rain Controls for Profile Panels", () => {
       timeHeightController.destroy(mockMap, win);
     });
   });
+
+  describe("Transect Resolution & N-Points Validation", () => {
+    test("validateNPoints accepts all select options [11, 21, 41, 61, 81] and enforces 2..81 range", () => {
+      const selectOptions = [11, 21, 41, 61, 81];
+      for (const n of selectOptions) {
+        const res = validateNPoints(n);
+        expect(res.ok).toBe(true);
+        expect(res.value).toBe(n);
+      }
+
+      // Valid boundary values
+      expect(validateNPoints(2).ok).toBe(true);
+      expect(validateNPoints(2).value).toBe(2);
+      expect(validateNPoints(81).ok).toBe(true);
+      expect(validateNPoints(81).value).toBe(81);
+
+      // Invalid out-of-range values
+      expect(validateNPoints(1).ok).toBe(false);
+      expect(validateNPoints(82).ok).toBe(false);
+      expect(validateNPoints(0).ok).toBe(false);
+      expect(validateNPoints(-10).ok).toBe(false);
+      expect(validateNPoints("invalid").ok).toBe(false);
+    });
+  });
 });
+

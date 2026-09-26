@@ -10,9 +10,18 @@ import (
 
 	"micaps-web/db"
 	"micaps-web/filecache"
+	"micaps-web/parser"
 )
 
-var modelRainStepsCache sync.Map // modelName -> []string
+var (
+	modelRainStepsCache sync.Map // modelName -> []string
+	validRainSteps      = map[string]bool{
+		"RAIN03": true,
+		"RAIN06": true,
+		"RAIN12": true,
+		"RAIN24": true,
+	}
+)
 
 // resolveRainStep chooses the best rain step (RAIN03, RAIN06, RAIN12, RAIN24) for a given model
 func resolveRainStep(client *db.CQLClient, modelName string, requestedStep string, leads []int, mockMode bool) string {
@@ -20,6 +29,9 @@ func resolveRainStep(client *db.CQLClient, modelName string, requestedStep strin
 	if requestedStep != "" && requestedStep != "AUTO" {
 		if !strings.HasPrefix(requestedStep, "RAIN") {
 			requestedStep = "RAIN" + requestedStep
+		}
+		if !validRainSteps[requestedStep] {
+			requestedStep = ""
 		}
 	} else {
 		requestedStep = ""
@@ -40,7 +52,7 @@ func resolveRainStep(client *db.CQLClient, modelName string, requestedStep strin
 	}
 
 	if mockMode || client == nil {
-		if requestedStep != "" {
+		if requestedStep != "" && validRainSteps[requestedStep] {
 			return requestedStep
 		}
 		return defaultStep
@@ -59,11 +71,13 @@ func resolveRainStep(client *db.CQLClient, modelName string, requestedStep strin
 				avail = append(avail, s)
 			}
 		}
-		modelRainStepsCache.Store(modelName, avail)
+		if len(avail) > 0 {
+			modelRainStepsCache.Store(modelName, avail)
+		}
 	}
 
 	if len(avail) == 0 {
-		if requestedStep != "" {
+		if requestedStep != "" && validRainSteps[requestedStep] {
 			return requestedStep
 		}
 		return defaultStep
@@ -225,20 +239,25 @@ func (h *HovmollerHandler) Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var snappedA, snappedB map[string]interface{}
-	setSnapped := func() {
-		// Snapped endpoints come from the already-sampled first task (no refetch)
+	setSnapped := func(res *lineBlobResult) {
 		if snappedA != nil {
 			return
 		}
+		var srcA, srcB *parser.SampledPoint
 		if firstResult.snappedA != nil {
-			snappedA = map[string]interface{}{"lon": firstResult.snappedA.SnappedLon, "lat": firstResult.snappedA.SnappedLat, "i": firstResult.snappedA.GridI, "j": firstResult.snappedA.GridJ}
-		} else {
-			snappedA = map[string]interface{}{"lon": lon0, "lat": lat0, "i": 0, "j": 0}
+			srcA = firstResult.snappedA
+			srcB = firstResult.snappedB
+		} else if res != nil && res.snappedA != nil {
+			srcA = res.snappedA
+			srcB = res.snappedB
 		}
-		if firstResult.snappedB != nil {
-			snappedB = map[string]interface{}{"lon": firstResult.snappedB.SnappedLon, "lat": firstResult.snappedB.SnappedLat, "i": firstResult.snappedB.GridI, "j": firstResult.snappedB.GridJ}
-		} else {
-			snappedB = map[string]interface{}{"lon": lon1, "lat": lat1, "i": 0, "j": 0}
+		if srcA != nil {
+			snappedA = map[string]interface{}{"lon": srcA.SnappedLon, "lat": srcA.SnappedLat, "i": srcA.GridI, "j": srcA.GridJ}
+			if srcB != nil {
+				snappedB = map[string]interface{}{"lon": srcB.SnappedLon, "lat": srcB.SnappedLat, "i": srcB.GridI, "j": srcB.GridJ}
+			} else {
+				snappedB = map[string]interface{}{"lon": lon1, "lat": lat1, "i": 0, "j": 0}
+			}
 		}
 	}
 
@@ -251,7 +270,7 @@ func (h *HovmollerHandler) Handler(w http.ResponseWriter, r *http.Request) {
 		if res.err != nil {
 			failedCount++
 		} else {
-			setSnapped()
+			setSnapped(&res)
 			perNodeOk := 0
 			ti := res.task.rowIdx
 			switch res.task.elementIdx {

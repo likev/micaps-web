@@ -49,10 +49,9 @@ export function getWindBarbSVG(speed = 0, dir = 0, size = 100) {
 
   // Speed in m/s (CMA / Chinese Standard: 4 m/s full barb, 2 m/s half barb, 20 m/s pennant flag)
   if (speed < 1.5) {
-    // Calm: concentric light ring around center
+    // Calm: small circle removed per user request
     return `
       <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-        <circle cx="${cx}" cy="${cy}" r="10" fill="none" stroke="#58a6ff" stroke-width="1.3" stroke-dasharray="2.5,2.5"/>
       </svg>
     `;
   }

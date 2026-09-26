@@ -81,7 +81,7 @@ function extractCyclesFromFiles(fileEntries) {
 
 export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP", level = 500, forceRefresh = false) {
   const elem = (element === "VOR" || element === "DIV") ? "WIND" : element;
-  const hasLevel = level !== null && level !== undefined && level !== "null" && level !== "";
+  const hasLevel = level !== null && level !== undefined && level !== "null" && level !== "undefined" && String(level).trim().toLowerCase() !== "undefined" && String(level).trim().toLowerCase() !== "null" && level !== "";
   const path = hasLevel ? `${model}/${elem}/${level}` : `${model}/${elem}`;
   const shortPath = `${model}/${elem}`;
 

@@ -18,9 +18,9 @@ describe("WMO Meteorological Symbol & Wind Barb Verification", () => {
   });
 
   test("getWindBarbSVG generates standard 110-degree angled barbs with 20/4/2 m/s increments", () => {
-    // 0 m/s: Calm (< 1.5 m/s)
+    // 0 m/s: Calm (< 1.5 m/s) -> no circle drawn
     const calmSvg = getWindBarbSVG(1.0, 0, 100);
-    expect(calmSvg).toContain("<circle");
+    expect(calmSvg).not.toContain("<circle");
     expect(calmSvg).not.toContain("<line");
 
     // 2 m/s: 1 short barb (indented from staff tip)

@@ -89,6 +89,10 @@ func (h *CatalogHandler) LevelsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.MockMode {
+		if strings.Contains(dataPath, "SHANGHAI_MR") || strings.Contains(dataPath, "GRAPES_3KM") {
+			json.NewEncoder(w).Encode([]int{1000, 925, 850})
+			return
+		}
 		json.NewEncoder(w).Encode([]int{1000, 925, 850, 700, 500, 400, 300, 250, 200, 100})
 		return
 	}

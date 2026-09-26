@@ -1,4 +1,5 @@
 import { getPeriodsForStep } from "./timelineMath.js";
+import { fetchLevels } from "../../api/catalogApi.js";
 export const DEFAULT_LEVELS = [500, 850, 1000, 200, 700, 925, 400, 300, 100];
 
 export const DEFAULT_MODELS = [
@@ -12,10 +13,189 @@ export const DEFAULT_MODELS = [
   "GERMAN_HR",
 ];
 
+// Runtime cache of model levels queried from server (/api/catalog/levels)
+// key: "MODEL/ELEMENT" or "MODEL" -> Array<number> (e.g. "SHANGHAI_MR/RH" -> [1000, 925, 850])
+export const modelLevelsRuntimeCache = new Map();
+const inFlightLevelQueries = new Map();
+
+/**
+ * Queries the server at runtime for supported pressure levels of a model and element.
+ * Caches the response in modelLevelsRuntimeCache.
+ * @param {string} model
+ * @param {string} [element]
+ * @returns {Promise<number[]|null>}
+ */
+export async function queryModelSupportedLevels(model, element = "") {
+  if (!model) return null;
+  const m = String(model).trim().toUpperCase();
+  const el = element ? String(element).trim().toUpperCase() : "";
+  const key = el ? `${m}/${el}` : m;
+
+  if (modelLevelsRuntimeCache.has(key)) {
+    return modelLevelsRuntimeCache.get(key);
+  }
+  if (inFlightLevelQueries.has(key)) {
+    return await inFlightLevelQueries.get(key);
+  }
+
+  const queryPromise = (async () => {
+    try {
+      const dataPath = el ? `${m}/${el}` : m;
+      const res = await fetchLevels(dataPath);
+      if (Array.isArray(res)) {
+        const levels = res.map((n) => parseInt(n, 10)).filter((n) => !isNaN(n));
+        modelLevelsRuntimeCache.set(key, levels);
+        return levels;
+      }
+    } catch {
+      if (el) {
+        try {
+          const res = await fetchLevels(m);
+          if (Array.isArray(res)) {
+            const levels = res.map((n) => parseInt(n, 10)).filter((n) => !isNaN(n));
+            modelLevelsRuntimeCache.set(key, levels);
+            return levels;
+          }
+        } catch {}
+      }
+    } finally {
+      inFlightLevelQueries.delete(key);
+    }
+    return null;
+  })();
+
+  inFlightLevelQueries.set(key, queryPromise);
+  return await queryPromise;
+}
+
+/**
+ * Preloads supported levels from the server for models and layers at runtime.
+ */
+export async function preloadModelLevels(models = DEFAULT_MODELS, elements = ["RH", "HGT", "WIND", "TMP"]) {
+  const tasks = [];
+  for (const m of models) {
+    if (Array.isArray(elements) && elements.length > 0) {
+      for (const el of elements) {
+        tasks.push(queryModelSupportedLevels(m, el));
+      }
+    } else {
+      tasks.push(queryModelSupportedLevels(m));
+    }
+  }
+  await Promise.allSettled(tasks);
+}
+
+/**
+ * Sets or updates the cached levels for a model/element (useful for tests or custom server configs).
+ */
+export function setModelLevelsCache(model, element, levels) {
+  if (!model) return;
+  const m = String(model).trim().toUpperCase();
+  const el = element ? String(element).trim().toUpperCase() : "";
+  const key = el ? `${m}/${el}` : m;
+  if (Array.isArray(levels)) {
+    modelLevelsRuntimeCache.set(key, levels.map((n) => parseInt(n, 10)).filter((n) => !isNaN(n)));
+  } else {
+    modelLevelsRuntimeCache.delete(key);
+  }
+}
+
+/**
+ * Checks whether a given model supports a specific meteorological element at a given level.
+ * Queries the server at runtime (via /api/catalog/levels) and checks the runtime cache.
+ * Does NOT hardcode model names or level limits.
+ */
+export function isModelLayerSupported(model, element, level) {
+  if (!model || level == null) return true;
+  const numLevel = parseInt(level, 10);
+  if (isNaN(numLevel)) return true;
+
+  const m = String(model).trim().toUpperCase();
+  const el = element ? String(element).trim().toUpperCase() : "";
+  const key = el ? `${m}/${el}` : m;
+
+  // 1. If levels are already cached from a runtime server query, check against them:
+  const cached = (el && modelLevelsRuntimeCache.get(key)) || modelLevelsRuntimeCache.get(m);
+  if (Array.isArray(cached) && cached.length > 0) {
+    return cached.includes(numLevel);
+  }
+
+  // 2. If not yet cached, query the server at runtime
+  return queryModelSupportedLevels(m, el).then((levels) => {
+    if (Array.isArray(levels) && levels.length > 0) {
+      return levels.includes(numLevel);
+    }
+    return true;
+  });
+}
+
+/**
+ * Returns candidate models for auto-allocation Mode 'model', omitting models
+ * for which all layers in the preset/window do not exist at the given level.
+ */
+export function getEligibleModelsForAllocation(groupOrWin, level = 500, models = DEFAULT_MODELS) {
+  if (!Array.isArray(models) || models.length === 0) return DEFAULT_MODELS;
+
+  const layers = (Array.isArray(groupOrWin?.activeGroup?.layers) && groupOrWin.activeGroup.layers.length > 0)
+    ? groupOrWin.activeGroup.layers
+    : (Array.isArray(groupOrWin?.layers) && groupOrWin.layers.length > 0
+      ? groupOrWin.layers
+      : null);
+
+  if (!layers || layers.length === 0) {
+    return models;
+  }
+
+  const effectiveLevel = level !== null && level !== undefined
+    ? parseInt(level, 10)
+    : (groupOrWin?.level !== null && groupOrWin?.level !== undefined
+      ? parseInt(groupOrWin.level, 10)
+      : (groupOrWin?.defaultLevel ? parseInt(groupOrWin.defaultLevel, 10) : 500));
+
+  const fallbackElement = groupOrWin?.element || groupOrWin?.activeGroup?.element;
+
+  const eligible = models.filter((model) => {
+    const allLayersNotExist = layers.every((l) => {
+      const elem = l.element || (l.type === "wind" ? "WIND" : null) || (typeof l.id === "string" ? l.id.toUpperCase() : null) || fallbackElement || "TMP";
+      const lvl = l.level !== null && l.level !== undefined ? parseInt(l.level, 10) : effectiveLevel;
+      const res = isModelLayerSupported(model, elem, lvl);
+      return res === false;
+    });
+    return !allLayersNotExist;
+  });
+
+  return eligible.length > 0 ? eligible : models;
+}
+
+/**
+ * Asynchronous version that ensures all model level queries from server complete before evaluating eligibility.
+ */
+export async function getEligibleModelsForAllocationAsync(groupOrWin, level = 500, models = DEFAULT_MODELS) {
+  if (!Array.isArray(models) || models.length === 0) return DEFAULT_MODELS;
+
+  const layers = (Array.isArray(groupOrWin?.activeGroup?.layers) && groupOrWin.activeGroup.layers.length > 0)
+    ? groupOrWin.activeGroup.layers
+    : (Array.isArray(groupOrWin?.layers) && groupOrWin.layers.length > 0
+      ? groupOrWin.layers
+      : null);
+
+  if (!layers || layers.length === 0) {
+    return models;
+  }
+
+  const fallbackElement = groupOrWin?.element || groupOrWin?.activeGroup?.element;
+  const elements = layers.map((l) => l.element || (l.type === "wind" ? "WIND" : null) || (typeof l.id === "string" ? l.id.toUpperCase() : null) || fallbackElement || "TMP");
+
+  await preloadModelLevels(models, elements);
+  return getEligibleModelsForAllocation(groupOrWin, level, models);
+}
+
+
 export function stepCycleHours(cycleStr, deltaHours) {
   if (!cycleStr || typeof cycleStr !== "string") return cycleStr;
   const dotIdx = cycleStr.indexOf(".");
   const raw = dotIdx !== -1 ? cycleStr.slice(0, dotIdx) : cycleStr;
+  const ext = dotIdx !== -1 ? cycleStr.slice(dotIdx) : "";
   if (raw.length < 8) return cycleStr;
 
   let year, month, day, hour, tail = "", is4DigitYear = false;
@@ -26,12 +206,13 @@ export function stepCycleHours(cycleStr, deltaHours) {
     day = parseInt(raw.slice(6, 8), 10);
     hour = parseInt(raw.slice(8, 10), 10);
     tail = raw.slice(10);
-  } else if (raw.length === 8) {
+  } else if (raw.length >= 8) {
     const yy = parseInt(raw.slice(0, 2), 10);
     year = yy < 70 ? 2000 + yy : 1900 + yy;
     month = parseInt(raw.slice(2, 4), 10) - 1;
     day = parseInt(raw.slice(4, 6), 10);
     hour = parseInt(raw.slice(6, 8), 10);
+    tail = raw.slice(8);
   } else {
     return cycleStr;
   }
@@ -46,10 +227,10 @@ export function stepCycleHours(cycleStr, deltaHours) {
   const outDD = pad(d.getUTCDate());
   const outHH = pad(d.getUTCHours());
 
-  if (is4DigitYear) {
-    return `${outYYYY}${outMM}${outDD}${outHH}${tail}`;
-  }
-  return `${outYYYY.slice(-2)}${outMM}${outDD}${outHH}`;
+  const stepped = is4DigitYear
+    ? `${outYYYY}${outMM}${outDD}${outHH}${tail}`
+    : `${outYYYY.slice(-2)}${outMM}${outDD}${outHH}${tail}`;
+  return stepped;
 }
 
 export function createDefaultWindow(winIdx = 0, tabId = 1) {
@@ -238,7 +419,8 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {
       win.forecastCycle = baseCycle;
       win.obsTime = baseObsTime;
     } else if (mode === "model") {
-      win.model = DEFAULT_MODELS[i % DEFAULT_MODELS.length];
+      const eligibleModels = getEligibleModelsForAllocation(win0, baseLevel, DEFAULT_MODELS);
+      win.model = eligibleModels[i % eligibleModels.length];
       win.level = baseLevel;
       win.period = basePeriod;
       win.forecastCycle = baseCycle;
@@ -278,10 +460,14 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {
         const cycles = Array.isArray(win0.forecastCycles) && win0.forecastCycles.length > 0
           ? win0.forecastCycles
           : null;
+        win.forecastCycles = Array.isArray(cycles) ? [...cycles] : cycles;
+        if (Array.isArray(win0.discretePeriods)) {
+          win.discretePeriods = [...win0.discretePeriods];
+        }
         const cycleStep = (win0.model === "ECMWF_HR" && win0.stepLength === 6) ? 12 : (win0.stepLength || 12);
         if (cycles && i < cycles.length) {
           win.forecastCycle = cycles[i];
-          win.period = basePeriod + i * 12;
+          win.period = basePeriod + i * cycleStep;
         } else {
           win.forecastCycle = stepCycleHours(baseCycle, -i * cycleStep);
           win.period = basePeriod + i * cycleStep;
@@ -301,10 +487,11 @@ export function revertAutoAllocation(tab, baseWin = null) {
   if (!tab || !Array.isArray(tab.windows)) return;
   tab.autoAllocation = "none";
   const visible = getVisibleWindows(tab);
+  const isNumericLevelOnly = typeof baseWin === "number";
   const win0 = (baseWin && typeof baseWin === "object" && baseWin.activeGroup)
     ? baseWin
     : (tab.windows.find((w) => w && w.activeGroup) || (baseWin && typeof baseWin === "object" ? baseWin : null) || tab.windows[tab.activeWinIdx] || tab.windows[0] || {});
-  const baseLevel = typeof baseWin === "number" ? baseWin : (win0.level ?? 500);
+  const baseLevel = isNumericLevelOnly ? baseWin : (win0.level ?? 500);
   const baseModel = win0.model || "ECMWF_HR";
   const baseElement = win0.element || "TMP";
   const basePeriod = win0.period ?? 24;
@@ -315,19 +502,21 @@ export function revertAutoAllocation(tab, baseWin = null) {
   for (let i = 0; i < visible.length; i++) {
     const win = visible[i];
     win.level = baseLevel;
-    win.model = baseModel;
-    win.element = baseElement;
-    win.period = basePeriod;
-    const isSurface = win0.model === "SURFACE" || win0.model === "SURFACE_PLOT" || (typeof win0.element === "string" && win0.element.toLowerCase().includes("surface")) || win0.activeGroup?.id?.toLowerCase().includes("surface");
-    win.isObservation = isObs;
-    if (baseCycle) win.forecastCycle = baseCycle;
-    if (baseObsTime) win.obsTime = baseObsTime;
-    win.stepLength = win0.stepLength || (isObs ? (isSurface ? 3 : 12) : 6);
-    if (win0.activeGroup && (!win.activeGroup || win !== win0)) {
-      try {
-        win.activeGroup = JSON.parse(JSON.stringify(win0.activeGroup));
-      } catch {
-        win.activeGroup = win0.activeGroup;
+    if (!isNumericLevelOnly) {
+      win.model = baseModel;
+      win.element = baseElement;
+      win.period = basePeriod;
+      const isSurface = win0.model === "SURFACE" || win0.model === "SURFACE_PLOT" || (typeof win0.element === "string" && win0.element.toLowerCase().includes("surface")) || win0.activeGroup?.id?.toLowerCase().includes("surface");
+      win.isObservation = isObs;
+      if (baseCycle) win.forecastCycle = baseCycle;
+      if (baseObsTime) win.obsTime = baseObsTime;
+      win.stepLength = win0.stepLength || (isObs ? (isSurface ? 3 : 12) : 6);
+      if (win0.activeGroup && (!win.activeGroup || win !== win0)) {
+        try {
+          win.activeGroup = JSON.parse(JSON.stringify(win0.activeGroup));
+        } catch {
+          win.activeGroup = win0.activeGroup;
+        }
       }
     }
   }

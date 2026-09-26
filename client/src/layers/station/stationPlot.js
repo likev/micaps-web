@@ -81,10 +81,8 @@ export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0)
   const hasVisPlot = Boolean(showVisibility && vis && allowField("Visibility"));
 
   // 1. Wind Barb
-  if (showWind && allowField("Wind") && ws !== null && ws >= 0) {
-    if (ws < 1.5) {
-      drawWindBarbCanvas(ctx, cx, cy, 0, 0, scale, theme.wind.color);
-    } else if (wd !== null && wd >= 0 && wd <= 360) {
+  if (showWind && allowField("Wind") && ws !== null && ws >= 1.5) {
+    if (wd !== null && wd >= 0 && wd <= 360) {
       drawWindBarbCanvas(ctx, cx, cy, ws, wd, scale, theme.wind.color);
     }
   }

@@ -2,23 +2,11 @@
 import { getPlotTokens } from "../../map/themeTokens.js";
 
 export function drawWindBarbCanvas(ctx, cx, cy, speed, dir, scale = 1.0, color = null, themeId = "dark") {
-  const windColor = color || (getPlotTokens(themeId)?.wind?.color ?? "#dee2e6");
   if (speed < 1.5) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, 10 * scale, 0, Math.PI * 2);
-    ctx.strokeStyle = windColor;
-    ctx.lineWidth = 1.3 * scale;
-    if (typeof ctx.setLineDash === "function") {
-      ctx.setLineDash([2.5 * scale, 2.5 * scale]);
-    }
-    ctx.stroke();
-    if (typeof ctx.setLineDash === "function") {
-      ctx.setLineDash([]);
-    }
-    ctx.restore();
+    // Calm surface wind: small circle removed per user request
     return;
   }
+  const windColor = color || (getPlotTokens(themeId)?.wind?.color ?? "#dee2e6");
 
   const skyRadius = 8 * scale;
   const staffLength = 41 * scale;

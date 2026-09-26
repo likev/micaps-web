@@ -66,6 +66,58 @@ export function isProfilePanelWindow(win) {
   return false;
 }
 
+export function isSurfaceGroup(group) {
+  if (!group) return false;
+  if (group.category === "Surface Observations" || group.id === "composite-surface") return true;
+  if (group.model === "SURFACE" || group.model === "SURFACE_ANALYSIS") return true;
+  if (Array.isArray(group.layers)) {
+    return group.layers.some(
+      (l) => l?.model === "SURFACE" || l?.model === "SURFACE_ANALYSIS" || (typeof l?.id === "string" && (l.id.startsWith("surface-obs") || l.id.startsWith("contour-surface-")))
+    );
+  }
+  return false;
+}
+
+export function isUpperAirGroup(group) {
+  if (!group) return false;
+  if (group.category === "Upper-Air Observations" || (typeof group.id === "string" && group.id.startsWith("composite-upperair"))) return true;
+  if (group.model === "UPPER_AIR") return true;
+  if (Array.isArray(group.layers)) {
+    return group.layers.some(
+      (l) => l?.model === "UPPER_AIR" || (typeof l?.id === "string" && (l.id.startsWith("upperair-") || l.id.startsWith("contour-sounding-")))
+    );
+  }
+  return false;
+}
+
+export function isSurfaceWindow(win) {
+  if (!win) return false;
+  if (isSurfaceGroup(win.activeGroup)) return true;
+  if (win.model === "SURFACE" || win.model === "SURFACE_ANALYSIS") return true;
+  if (win.isObservation && win.activeGroup?.hasLevel === false) return true;
+  if (Array.isArray(win.layers)) {
+    return win.layers.some(
+      (l) => l?.model === "SURFACE" || l?.model === "SURFACE_ANALYSIS" || (typeof l?.id === "string" && (l.id.startsWith("surface-obs") || l.id.startsWith("contour-surface-")))
+    );
+  }
+  if (typeof win.title === "string" && (win.title.includes("地面") || win.title.includes("Surface"))) return true;
+  return false;
+}
+
+export function isUpperAirWindow(win) {
+  if (!win) return false;
+  if (isUpperAirGroup(win.activeGroup)) return true;
+  if (win.model === "UPPER_AIR") return true;
+  if (win.isObservation && (win.activeGroup?.hasLevel === true || (win.level !== null && win.level !== undefined && win.level > 0))) return true;
+  if (Array.isArray(win.layers)) {
+    return win.layers.some(
+      (l) => l?.model === "UPPER_AIR" || (typeof l?.id === "string" && (l.id.startsWith("upperair-") || l.id.startsWith("contour-sounding-")))
+    );
+  }
+  if (typeof win.title === "string" && (win.title.includes("高空") || win.title.includes("Upper"))) return true;
+  return false;
+}
+
 /**
  * Applies a preset group's metadata, levels, and timeline mode to a window object.
  * Synchronizes uiState.timelineVisible according to Section 1.5 specifications.

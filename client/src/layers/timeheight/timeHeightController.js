@@ -371,9 +371,22 @@ class TimeHeightController {
     s.panel?.setPickHint?.(null);
   }
 
+  _snapClamp(lon, lat, win = null) {
+    const s = this._getState(win);
+    const cl = clampToGridDomain(s.firstGridSample, lon, lat);
+    let toast = false;
+    if (cl.clamped) { toast = true; lon = cl.lon; lat = cl.lat; }
+    const sn = snapToGridNode(s.firstGridSample, lon, lat);
+    const dom = clampEndpointsToDomain(sn, sn);
+    if (dom.outside) { showErrorToast?.(`Point outside ${s.model || "ECMWF_HR"} domain.`); return null; }
+    if (toast) showErrorToast?.(`Endpoint clamped to model domain.`);
+    return { lon: sn.lon, lat: sn.lat };
+  }
+
   _handlePickClick(lon, lat, win, map) {
     const s = this._getState(win);
-    const pt = { lon: Math.round(lon * 10000) / 10000, lat: Math.round(lat * 10000) / 10000 };
+    const pt = this._snapClamp(lon, lat, win);
+    if (!pt) return;
     if (s.pickMode === "draw") {
       if (!s.pendingA) {
         s.pendingA = pt;
@@ -391,13 +404,13 @@ class TimeHeightController {
       }
     } else if (s.pickMode === "setA") {
       const chk = validateEndpoints(pt, s.line.b);
-      if (!chk.ok) { showErrorToast?.(chk.error); s.pickMode = "idle"; return; }
+      if (!chk.ok) { showErrorToast?.(chk.error); return; }
       s.pickMode = "idle";
       s.panel?.setPickHint?.(null);
       this.setLine(pt, s.line.b, s.npoints, win);
     } else if (s.pickMode === "setB") {
       const chk = validateEndpoints(s.line.a, pt);
-      if (!chk.ok) { showErrorToast?.(chk.error); s.pickMode = "idle"; return; }
+      if (!chk.ok) { showErrorToast?.(chk.error); return; }
       s.pickMode = "idle";
       s.panel?.setPickHint?.(null);
       this.setLine(s.line.a, pt, s.npoints, win);
@@ -467,15 +480,9 @@ class TimeHeightController {
     const leadsKey = state.leads.join(",");
     const levelsKey = state.levels.join(",");
     const matrixKey = `${state.model || "ECMWF_HR"}|${state.cycle}|${leadsKey}|${levelsKey}|${snapped.i},${snapped.j}`;
-    const legacyKey = `${state.cycle}|${leadsKey}|${levelsKey}|${snapped.i},${snapped.j}`;
 
     if (state.matrixCache.has(matrixKey)) {
       state.matrix = state.matrixCache.get(matrixKey);
-      state.panel?.setData(state.matrix);
-      return state.matrix;
-    }
-    if (state.matrixCache.has(legacyKey)) {
-      state.matrix = state.matrixCache.get(legacyKey);
       state.panel?.setData(state.matrix);
       return state.matrix;
     }
@@ -501,7 +508,7 @@ class TimeHeightController {
       n = nv.value;
     }
     const cl = clampEndpointsToDomain({ lon: v.lon0, lat: v.lat0 }, { lon: v.lon1, lat: v.lat1 });
-    if (cl.outside) { showErrorToast?.("Line fully outside ECMWF_HR domain."); return null; }
+    if (cl.outside) { showErrorToast?.(`Line fully outside ${s.model || "ECMWF_HR"} domain.`); return null; }
     if (cl.clamped) showErrorToast?.("Endpoint(s) clamped to model domain.");
     if (s.mode !== "line") this._applyMode("line", win);
     s.line = {
@@ -555,8 +562,14 @@ class TimeHeightController {
       if (cycles?.length) {
         state.availableCycles = cycles;
         if (!cycles.includes(state.cycle)) state.cycle = cycles[0];
+      } else {
+        state.availableCycles = [];
+        state.cycle = null;
       }
-    } catch {}
+    } catch {
+      state.availableCycles = [];
+      state.cycle = null;
+    }
     state.panel?.setModel(state.model);
     state.panel?.setCycle(state.cycle, state.availableCycles);
     this._persistConfig({ model: state.model, initCycle: state.cycle }, win);

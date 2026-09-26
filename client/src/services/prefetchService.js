@@ -160,7 +160,7 @@ export function getPrefetchTargets(win, options = {}) {
   }
 
   if (supportsLevels) {
-    const curLevel = win.level || (activeGroup?.hasLevel ? activeGroup.defaultLevel : 500);
+    const curLevel = win.level ?? (activeGroup?.hasLevel ? activeGroup.defaultLevel : 500);
     let idx = VERTICAL_LEVELS.indexOf(curLevel);
     if (idx === -1) idx = 4; // Default 500 hPa
 
@@ -229,7 +229,7 @@ function collectNwpItems(win, targetPeriod, cycle, hasRasterActive, direction, o
               ? overrideLevel
               : (isNoLevel ? null : (win.level ?? layer.level ?? (activeGroup.hasLevel ? activeGroup.defaultLevel : 500)));
 
-          const path = layer.path || (lvl ? `${model}/WIND/${lvl}` : `${model}/WIND`);
+          const path = lvl ? `${model}/WIND/${lvl}` : `${model}/WIND`;
           items.push({ type: "grid", path, file, direction, level: lvl, period: targetPeriod });
           // Note: VOR/DIV rasters are computed client-side from the parent wind vector grid (JSON),
           // so no server-side binary stream fetch is required or consumed for derived kinematic rasters.
@@ -284,7 +284,7 @@ function collectObsItems(win, targetObsFile, direction, overrideLevel = null) {
         const model = layer.model || win.model || "SURFACE";
         const element = layer.element || win.element || "PLOT";
         const isTLogP = element === "TLOGP" || (layer.path && layer.path.includes("TLOGP"));
-        let lvl = isTLogP ? null : (overrideLevel !== null ? overrideLevel : (win.level || layer.level));
+        let lvl = isTLogP ? null : (overrideLevel !== null ? overrideLevel : (win.level ?? layer.level));
 
         const obsPath = isTLogP
           ? (layer.path || "UPPER_AIR/TLOGP")

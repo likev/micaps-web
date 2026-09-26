@@ -51,7 +51,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
     }
   }
   const file = `${cycle}.${String(period).padStart(3, "0")}`;
-  const hasLevel = level !== null && level !== undefined && level !== "null" && level !== "";
+  const hasLevel = level !== null && level !== undefined && level !== "null" && level !== "undefined" && String(level).trim().toLowerCase() !== "undefined" && String(level).trim().toLowerCase() !== "null" && level !== "";
   const defaultPath = hasLevel ? `${model}/${element}/${level}` : `${model}/${element}`;
   const path = customOptions?.path || defaultPath;
   const dataPath = isVortDiv ? (hasLevel ? `${model}/WIND/${level}` : `${model}/WIND`) : path;

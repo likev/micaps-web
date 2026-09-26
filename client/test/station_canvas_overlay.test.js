@@ -192,14 +192,13 @@ describe("Direct HTML5 Canvas 2D Station Plotting (§8.9 & §8.8)", () => {
     expect(map.container.children.length).toBe(1);
   });
 
-  test("drawWindBarbCanvas renders calm circle (<1.5 m/s), full barbs (4 m/s), and pennants (20 m/s)", () => {
-    // 1. Calm wind (1.0 m/s) -> concentric dashed circle
+  test("drawWindBarbCanvas suppresses calm circle (<1.5 m/s); renders full barbs (4 m/s), and pennants (20 m/s)", () => {
+    // 1. Calm wind (1.0 m/s) -> no circle drawn
     ctx.calls.arc = [];
     ctx.calls.setLineDash = [];
     drawWindBarbCanvas(ctx, 100, 100, 1.0, 0, 1.0);
-    expect(ctx.calls.arc.length).toBe(1);
-    expect(ctx.calls.arc[0].r).toBe(10);
-    expect(ctx.calls.setLineDash.length).toBeGreaterThanOrEqual(1);
+    expect(ctx.calls.arc.length).toBe(0);
+    expect(ctx.calls.setLineDash.length).toBe(0);
 
     // 2. Gale wind (26 m/s, 270 deg westerly) -> 1 pennant (20) + 1 full barb (4) + 1 half barb (2)
     ctx.calls.moveTo = [];

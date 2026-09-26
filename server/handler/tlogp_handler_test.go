@@ -57,6 +57,49 @@ func TestTLogPHandlerMockMode(t *testing.T) {
 	}
 }
 
+func TestTLogPHandlerMock_EdgeCases(t *testing.T) {
+	h := &handler.TLogPHandler{
+		Client:   nil,
+		MockMode: true,
+	}
+
+	// 1. Test 14-digit file without .000
+	req1 := httptest.NewRequest("GET", "/api/data/tlogp?file=20260320200000&station=58362", nil)
+	w1 := httptest.NewRecorder()
+	h.Handler(w1, req1)
+	if w1.Code != http.StatusOK {
+		t.Errorf("Expected 200 OK for 14-digit file without .000, got %d", w1.Code)
+	}
+
+	// 2. Test file=latest
+	req2 := httptest.NewRequest("GET", "/api/data/tlogp?file=latest", nil)
+	w2 := httptest.NewRecorder()
+	h.Handler(w2, req2)
+	if w2.Code != http.StatusOK {
+		t.Errorf("Expected 200 OK for file=latest, got %d", w2.Code)
+	}
+
+	// 3. Test empty file
+	req3 := httptest.NewRequest("GET", "/api/data/tlogp?file=", nil)
+	w3 := httptest.NewRecorder()
+	h.Handler(w3, req3)
+	if w3.Code != http.StatusOK {
+		t.Errorf("Expected 200 OK for empty file, got %d", w3.Code)
+	}
+
+	// 4. Test non-mock mode returns 404 when Client is nil
+	hNonMock := &handler.TLogPHandler{
+		Client:   nil,
+		MockMode: false,
+	}
+	req4 := httptest.NewRequest("GET", "/api/data/tlogp?file=20260320200000.000&station=58362", nil)
+	w4 := httptest.NewRecorder()
+	hNonMock.Handler(w4, req4)
+	if w4.Code != http.StatusNotFound {
+		t.Errorf("Expected 404 StatusNotFound when Client is nil and MockMode is false, got %d", w4.Code)
+	}
+}
+
 func TestTLogPHandlerLiveCassandra(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping live Cassandra test in short mode")
