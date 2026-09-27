@@ -1033,6 +1033,9 @@
           presetLayer.config = { ...(presetLayer.config || {}), ...valPayload };
           presetLayer.render = { ...(presetLayer.render || {}), ...valPayload };
           if (valPayload.lineColor !== undefined) presetLayer.color = valPayload.lineColor;
+          if (valPayload.palettePath !== undefined) {
+            presetLayer.colormap = valPayload.palettePath ? `palette:${event.layer.id}` : (presetLayer.element || event.layer.element);
+          }
         }
       }
       autoSaveLayerConfig(event.layer);

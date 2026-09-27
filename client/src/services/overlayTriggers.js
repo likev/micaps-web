@@ -46,6 +46,26 @@ export function getSourceFeatures(src) {
 export async function triggerIsobandOverlay(map, layer = null, win = null) {
   if (!map || !layer || layer.type === "wind") return;
   const layerId = layer.id || (layer.element ? `contour-${layer.element}` : "default");
+
+  const palettePath = layer?.config?.palettePath || layer?.render?.palettePath;
+  let colormap = (layer?.colormap && String(layer.colormap).startsWith("palette:"))
+    ? layer.colormap
+    : (palettePath ? `palette:${layerId}` : (layer?.colormap || layer?.element || "TMP"));
+
+  if (palettePath) {
+    try {
+      const { loadXMLPalette } = await import("../utils/paletteLoader.js");
+      const { setColormaps, COLORMAPS } = await import("../utils/colormaps.js");
+      if (!COLORMAPS || !COLORMAPS[colormap]) {
+        const stops = await loadXMLPalette(palettePath);
+        if (stops) {
+          setColormaps({ ...COLORMAPS, [colormap]: stops, [palettePath]: stops });
+          if (layer) layer.colormap = colormap;
+        }
+      }
+    } catch {}
+  }
+
   const { isobandSrcId } = getLayerDOMIds(layerId);
   const isobandSrc = map.getSource(isobandSrcId);
   const features = getSourceFeatures(isobandSrc);
@@ -53,7 +73,6 @@ export async function triggerIsobandOverlay(map, layer = null, win = null) {
   if (features.length > 0) {
     setLayerIsobandVisibility(map, layerId, layer.visible !== false);
     if (layer.visible !== false && layer.element) {
-      const colormap = layer.colormap || layer.config?.palettePath || layer.element;
       updateLegend(layer.element, colormap, layer.gridData?.stats?.min, layer.gridData?.stats?.max, win);
     }
     return;
@@ -74,7 +93,7 @@ export async function triggerIsobandOverlay(map, layer = null, win = null) {
       lineWidth: layer.config?.lineWidth,
       boldValues: layer.config?.boldValues,
       boldLineWidth: layer.config?.boldLineWidth,
-      colormap: layer.colormap || layer.element,
+      colormap,
       smooth: layer.config?.smooth,
       smoothIterations: layer.config?.smoothIterations,
       labelSize: layer.config?.labelSize,
@@ -82,7 +101,6 @@ export async function triggerIsobandOverlay(map, layer = null, win = null) {
     });
     armContourReRender(map, layer, win);
     if (isVisible && layer.element) {
-      const colormap = layer.colormap || layer.config?.palettePath || layer.element;
       updateLegend(layer.element, colormap, layer.gridData?.stats?.min, layer.gridData?.stats?.max, win);
     }
     return;
@@ -138,7 +156,7 @@ export async function triggerIsobandOverlay(map, layer = null, win = null) {
           lineWidth: layer.config?.lineWidth,
           boldValues: layer.config?.boldValues,
           boldLineWidth: layer.config?.boldLineWidth,
-          colormap: layer.colormap || layer.element,
+          colormap,
           smooth: layer.config?.smooth,
           smoothIterations: layer.config?.smoothIterations,
           labelSize: layer.config?.labelSize,
@@ -146,7 +164,6 @@ export async function triggerIsobandOverlay(map, layer = null, win = null) {
         });
         armContourReRender(map, layer, win);
         if (isVisible && layer.element) {
-          const colormap = layer.colormap || layer.config?.palettePath || layer.element;
           updateLegend(layer.element, colormap, gridData.stats?.min, gridData.stats?.max, win);
         }
         return;
@@ -194,7 +211,7 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
       const { setColormaps, COLORMAPS } = await import("../utils/colormaps.js");
       const stops = await loadXMLPalette(palettePath);
       if (stops) {
-        setColormaps({ ...COLORMAPS, [paletteKey]: stops });
+        setColormaps({ ...COLORMAPS, [paletteKey]: stops, [palettePath]: stops });
         if (layer) layer.colormap = paletteKey;
         colormap = paletteKey;
       }
@@ -217,6 +234,7 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
     if (layer?.visible !== false) {
       updateLegend("WIND", colormap, 0, undefined, win);
     }
+    armContourReRender(map, layer, win);
     return;
   }
 

@@ -128,7 +128,9 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
       if (!hasShading) {
         removeLegend(layer.element, winObj);
       } else {
-        const colormap = layer.colormap || layer.config?.palettePath || layer.element;
+        const colormap = (layer.colormap && String(layer.colormap).startsWith("palette:"))
+          ? layer.colormap
+          : (layer.config?.palettePath ? `palette:${layer.id}` : (layer.colormap || layer.element));
         updateLegend(layer.element, colormap, layer.gridData?.stats?.min, layer.gridData?.stats?.max, winObj);
       }
     }
@@ -234,7 +236,9 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
           lineWidth: layer.config?.lineWidth,
           boldValues: layer.config?.boldValues,
           boldLineWidth: layer.config?.boldLineWidth,
-          colormap: layer.colormap,
+          colormap: (layer.colormap && String(layer.colormap).startsWith("palette:"))
+            ? layer.colormap
+            : (layer.config?.palettePath ? `palette:${layer.id}` : (layer.colormap || layer.element || "TMP")),
           viewportBounds: map && typeof map.getBounds === "function" ? map.getBounds().toArray() : null,
         });
         armContourReRender(map, layer, winObj);
@@ -259,9 +263,17 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
 
     // Palette change: load the XML palette file and update the live colormap for this layer
     if (value.palettePath !== undefined) {
-      const elem = (layer.element || "TMP").toUpperCase();
+      const elem = (layer.element || (layer.type === "wind" ? "WIND" : "TMP")).toUpperCase();
       if (!value.palettePath) {
         layer.colormap = null;
+        if (!layer.config) layer.config = {};
+        layer.config.palettePath = null;
+        const canonical = getLayerById(layer.id, winObj);
+        if (canonical) {
+          canonical.colormap = null;
+          if (!canonical.config) canonical.config = {};
+          canonical.config.palettePath = null;
+        }
         if (layer.type === "contour" && layer.gridData) {
           renderContourLayers(map, layer.gridData, elem, {
             ...layer.config,
@@ -286,8 +298,18 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
           } else {
             removeLegend(elem, winObj);
           }
+        } else if (layer.type === "wind") {
+          if (layer.config?.showRaster && layer.visible) {
+            triggerRasterOverlay(map, layer, winObj);
+          }
+          const hasShad = layer.visible !== false && Boolean(layer.config?.showRaster);
+          if (hasShad) {
+            updateLegend("WIND", "WIND", 0, undefined, winObj);
+          } else {
+            removeLegend("WIND", winObj);
+          }
         }
-        if (layer.config?.showRaster && layer.visible) {
+        if (layer.config?.showRaster && layer.visible && layer.type !== "wind") {
           triggerRasterOverlay(map, layer, winObj);
         }
       } else {
@@ -303,8 +325,18 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
               if (mySeq !== paletteSeq.get(layer.id)) return;
               try {
                 const key = `palette:${layer.id}`;
-                setColormaps({ ...COLORMAPS, [key]: stops });
+                setColormaps({ ...COLORMAPS, [key]: stops, [capturedPath]: stops });
                 layer.colormap = key;
+                if (!layer.config) layer.config = {};
+                layer.config.palettePath = capturedPath;
+
+                const canonical = getLayerById(layer.id, winObj);
+                if (canonical) {
+                  canonical.colormap = key;
+                  if (!canonical.config) canonical.config = {};
+                  canonical.config.palettePath = capturedPath;
+                }
+
                 const isUpper = layer.model === "UPPER_AIR" || (layer.id && layer.id.startsWith("contour-sounding-"));
                 const isSurface =
                   layer.model === "SURFACE" ||
@@ -340,8 +372,16 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
                   } else {
                     removeLegend(elem, winObj);
                   }
+                } else if (layer.type === "wind") {
+                  if (layer.config?.showRaster && layer.visible) {
+                    triggerRasterOverlay(map, layer, winObj);
+                  }
+                  const hasShad = layer.visible !== false && Boolean(layer.config?.showRaster);
+                  if (hasShad) {
+                    updateLegend("WIND", key, 0, undefined, winObj);
+                  }
                 }
-                if (layer.config?.showRaster && layer.visible && !isNwpKinematic) {
+                if (layer.config?.showRaster && layer.visible && !isNwpKinematic && layer.type !== "wind") {
                   triggerRasterOverlay(map, layer, winObj);
                 }
                 armContourReRender(map, layer, winObj);

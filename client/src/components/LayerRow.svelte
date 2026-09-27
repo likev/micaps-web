@@ -60,12 +60,23 @@
   let isUpperStation = $derived(isUpperAirStationLayer(layer));
   let isContour = $derived(layer.type === "contour");
   let paletteOptions = $state([]);
+  let currentPaletteValue = $derived(
+    layer.config?.palettePath
+      ? (layer.config.palettePath.startsWith("/") ? layer.config.palettePath : `/${layer.config.palettePath}`)
+      : ""
+  );
 
   $effect(() => {
     if (!expanded || (!isContour && layer.type !== "wind")) return;
-    const category = getPaletteCategory((layer.element || "TMP").toUpperCase()) || "TMP";
+    const rawElem = layer.element || (isWind || layer.type === "wind" ? "WIND" : "");
+    const elem = (rawElem || "").toUpperCase();
+    const category = getPaletteCategory(elem);
+    if (!category) {
+      paletteOptions = [];
+      return;
+    }
     let active = true;
-    listPaletteFiles(category)
+    listPaletteFiles(category, elem)
       .then((files) => {
         if (active) paletteOptions = Array.isArray(files) ? files.filter((file) => file.name?.endsWith(".xml")) : [];
       })
@@ -257,7 +268,7 @@
 
         <div class="config-row palette-row">
           <label for="sel-palette-{layer.id}">🎨 Palette</label>
-          <select id="sel-palette-{layer.id}" class="sel-palette" value={layer.config?.palettePath || ""} onchange={(e) => handleConfigChange("palettePath", e.target.value || null)}>
+          <select id="sel-palette-{layer.id}" class="sel-palette" value={currentPaletteValue} onchange={(e) => handleConfigChange("palettePath", e.target.value || null)}>
             <option value="">Built-in default</option>
             {#each paletteOptions as palette}
               <option value={palette.path}>{palette.name.replace(/\.xml$/i, "")}</option>
@@ -394,7 +405,7 @@
         </div>
         <div class="config-row palette-row">
           <label for="sel-wind-palette-{layer.id}">🎨 Palette</label>
-          <select id="sel-wind-palette-{layer.id}" class="sel-palette" value={layer.config?.palettePath || ""} onchange={(e) => handleConfigChange("palettePath", e.target.value || null)}>
+          <select id="sel-wind-palette-{layer.id}" class="sel-palette" value={currentPaletteValue} onchange={(e) => handleConfigChange("palettePath", e.target.value || null)}>
             <option value="">Built-in default</option>
             {#each paletteOptions as palette}
               <option value={palette.path}>{palette.name.replace(/\.xml$/i, "")}</option>

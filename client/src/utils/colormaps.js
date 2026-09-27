@@ -96,7 +96,15 @@ export function setColormaps(colormaps) {
     throw new Error("Preset config colormaps must be an object");
   }
 
-  const normalized = { ...DEFAULT_COLORMAPS };
+  // Preserve runtime custom palettes (e.g. "palette:layerId" or "/palettes/...")
+  const preserved = {};
+  for (const [k, v] of Object.entries(COLORMAPS)) {
+    if (k.startsWith("palette:") || k.startsWith("/palettes/") || k.startsWith("palettes/") || k.startsWith("palette/")) {
+      preserved[k] = v;
+    }
+  }
+
+  const normalized = { ...DEFAULT_COLORMAPS, ...preserved };
   for (const [name, palette] of Object.entries(colormaps)) {
     if (!name || !Array.isArray(palette) || palette.length < 2) {
       throw new Error(`Colormap "${name}" must contain at least two stops`);
@@ -125,6 +133,9 @@ export function getColormap(reference = null, element = "TMP") {
     if (COLORMAPS[reference]) return COLORMAPS[reference];
     const up = reference.toUpperCase();
     if (COLORMAPS[up]) return COLORMAPS[up];
+    const trimmed = reference.replace(/^\//, "");
+    if (COLORMAPS[trimmed]) return COLORMAPS[trimmed];
+    if (COLORMAPS["/" + trimmed]) return COLORMAPS["/" + trimmed];
   }
   const elUp = (element || "").toUpperCase();
   if (COLORMAPS[elUp]) return COLORMAPS[elUp];

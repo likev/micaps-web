@@ -6,6 +6,7 @@ import { renderGridRaster } from "../layers/rasterLayer.js";
 import { getLayerById } from "../ui/layerControl.js";
 import { COLORMAPS, setColormaps } from "../utils/colormaps.js";
 import { loadXMLPalette } from "../utils/paletteLoader.js";
+import { updateLegend } from "../ui/legend.js";
 
 const reRenderTimers = new Map();   // key: `${winKey}::${layerId}` -> timeout ID
 const reRenderHandlers = new Map(); // key -> handler function
@@ -95,8 +96,10 @@ function cleanupKey(key, map = null) {
  * @param {Object} [opts={}] - Optional overrides (maxEffectiveCells, onStats)
  */
 export function armContourReRender(map, layer, win = null, opts = {}) {
-  if (!map || !layer || !layer.id || !layer.gridData) return;
+  if (!map || !layer || !layer.id) return;
   if (layer.type === "wind" && !layer.config?.showRaster) return;
+  const gridData = layer.gridData || (layer.type === "wind" ? win?.windGridData : null);
+  if (!gridData) return;
 
   const winKey = getWinKey(win);
   const layerId = layer.id;
@@ -104,8 +107,6 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
 
   // Idempotent re-arm: disarm any existing registration for this key
   cleanupKey(key, map);
-
-  const gridData = layer.gridData;
   const h = gridData.header;
   const nLon = h?.n_lon || h?.LongitudeGridNumber || (gridData.values ? gridData.values[0]?.length : (gridData.u ? gridData.u[0]?.length : 0));
   const nLat = h?.n_lat || h?.LatitudeGridNumber || (gridData.values ? gridData.values.length : (gridData.u ? gridData.u.length : 0));
@@ -206,7 +207,9 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
         } else {
           liveLayer = layer;
         }
-        if (!liveLayer.gridData) return;
+        const isWindLayerInit = liveLayer.type === "wind" || liveLayer.element === "WIND";
+        let liveGridData = liveLayer.gridData || (isWindLayerInit ? win?.windGridData : null);
+        if (!liveGridData) return;
         if (reRenderBusy.has(key)) {
           pendingReRenders.set(key, true);
           return;
@@ -217,14 +220,16 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
 
         try {
           const palettePath = liveLayer.config?.palettePath || liveLayer.render?.palettePath;
-          let targetColormap = liveLayer.colormap || (palettePath ? `palette:${liveLayer.id}` : null) || liveLayer.element || "TMP";
+          let targetColormap = (liveLayer.colormap && String(liveLayer.colormap).startsWith("palette:"))
+            ? liveLayer.colormap
+            : (palettePath ? `palette:${liveLayer.id}` : (liveLayer.colormap || liveLayer.element || "TMP"));
 
           if (palettePath && (!COLORMAPS || !COLORMAPS[targetColormap])) {
             try {
               const stops = await loadXMLPalette(palettePath);
               if (stops) {
                 targetColormap = `palette:${liveLayer.id}`;
-                setColormaps({ ...COLORMAPS, [targetColormap]: stops });
+                setColormaps({ ...COLORMAPS, [targetColormap]: stops, [palettePath]: stops });
                 liveLayer.colormap = targetColormap;
               }
             } catch {}
@@ -242,7 +247,8 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
             }
             if (!stillThere) return;
             liveLayer = stillThere;
-            if (!liveLayer.gridData) return;
+            liveGridData = liveLayer.gridData || ((liveLayer.type === "wind" || liveLayer.element === "WIND") ? win?.windGridData : null);
+            if (!liveGridData) return;
           }
 
           if (liveLayer.type === "contour" && liveLayer.gridData?.values) {
@@ -303,11 +309,25 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
             } catch {}
           }
 
-          if (liveLayer.visible !== false && liveLayer.config?.showRaster && liveLayer.gridData) {
-            renderGridRaster(map, liveLayer.gridData, liveLayer.element || "TMP", targetColormap, {
+          const isWindLayer = liveLayer.type === "wind" || liveLayer.element === "WIND";
+          const effectiveElem = (liveLayer.element || (isWindLayer ? "WIND" : "TMP")).toUpperCase();
+
+          if (liveLayer.visible !== false && liveLayer.config?.showRaster && liveGridData) {
+            renderGridRaster(map, liveGridData, effectiveElem, targetColormap, {
               layerId: liveLayer.id,
               opacity: liveLayer.config?.opacity ?? 0.85,
             });
+          }
+
+          const hasShad = liveLayer.visible !== false && (Boolean(liveLayer.config?.showFill) || Boolean(liveLayer.config?.showRaster));
+          if (hasShad) {
+            try {
+              if (isWindLayer) {
+                updateLegend("WIND", targetColormap, 0, undefined, win);
+              } else {
+                updateLegend(effectiveElem, targetColormap, liveGridData?.stats?.min, liveGridData?.stats?.max, win);
+              }
+            } catch {}
           }
         } catch (err) {
           console.warn("[ContourReRender] Background re-render failed:", err);

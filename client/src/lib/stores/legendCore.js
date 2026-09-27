@@ -113,6 +113,7 @@ export function buildLegendItems(winOrId, legendsMap = windowLegends, winResolve
 }
 
 export function updateLegend(element = "TMP", colormap = null, zMin = undefined, zMax = undefined, win = null) {
+  const normElement = (element || "TMP").toUpperCase();
   const resolver = defaultWinResolver || getWindowById;
   const winObj = typeof win === "string" ? (typeof resolver === "function" ? resolver(win) : null) : win;
   const winId = typeof win === "string" ? win : (win?.id || "default");
@@ -125,14 +126,18 @@ export function updateLegend(element = "TMP", colormap = null, zMin = undefined,
     const m = winId.match(/win-(\d+)/);
     if (m) winPrefix = `W${parseInt(m[1], 10) + 1}`;
   }
-  elMap.set(element, { element, colormap, zMin, zMax, winPrefix });
+  elMap.set(normElement, { element: normElement, colormap, zMin, zMax, winPrefix });
   notifyLegendChanged(winId);
 }
 
 export function removeLegend(element, win = null) {
+  const normElement = (element || "").toUpperCase();
   const winId = typeof win === "string" ? win : (win?.id || "default");
   if (windowLegends.has(winId)) {
-    windowLegends.get(winId).delete(element);
+    windowLegends.get(winId).delete(normElement);
+    if (element && element !== normElement) {
+      windowLegends.get(winId).delete(element);
+    }
   }
   notifyLegendChanged(winId);
 }

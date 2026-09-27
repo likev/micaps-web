@@ -134,7 +134,9 @@ export function handleAuxAction(map, layerId, value, winObj, layer = null) {
       }
       const hasShading = l.visible !== false && (value || Boolean(l.config?.showRaster));
       if (hasShading) {
-        const colormap = l.colormap || l.config?.palettePath || l.element;
+        const colormap = (l.colormap && String(l.colormap).startsWith("palette:"))
+          ? l.colormap
+          : (l.config?.palettePath ? `palette:${l.id}` : (l.colormap || l.element));
         updateLegend(l.element, colormap, l.gridData?.stats?.min, l.gridData?.stats?.max, winObj);
       } else {
         removeLegend(l.element, winObj);

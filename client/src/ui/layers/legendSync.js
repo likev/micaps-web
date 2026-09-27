@@ -2,21 +2,26 @@
 import { updateLegend, removeLegend } from "../legend.js";
 
 export function syncLegendForLayer(layer, winObj, isVisible = true) {
-  if (!layer || !layer.element) return;
+  if (!layer) return;
+  const element = layer.element || (layer.type === "wind" ? "WIND" : null);
+  if (!element) return;
   if (layer.type !== "contour" && layer.type !== "wind") return;
   const hasShading = isVisible && (Boolean(layer.config?.showFill) || Boolean(layer.config?.showRaster));
   if (hasShading) {
-    const colormap = layer.colormap || layer.config?.palettePath || layer.element;
+    const colormap = (layer.colormap && String(layer.colormap).startsWith("palette:"))
+      ? layer.colormap
+      : (layer.config?.palettePath ? `palette:${layer.id}` : (layer.colormap || element));
     const min = layer.gridData?.stats?.min;
     const max = layer.gridData?.stats?.max;
-    updateLegend(layer.element, colormap, min, max, winObj);
+    updateLegend(element, colormap, min, max, winObj);
   } else {
-    removeLegend(layer.element, winObj);
+    removeLegend(element, winObj);
   }
 }
 
 export function removeLegendForLayer(layer, winObj) {
-  if (layer?.element) {
-    removeLegend(layer.element, winObj);
+  const element = layer?.element || (layer?.type === "wind" ? "WIND" : null);
+  if (element) {
+    removeLegend(element, winObj);
   }
 }

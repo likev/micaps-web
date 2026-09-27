@@ -13,12 +13,12 @@ export async function populatePaletteSelect(configDrawer, layer) {
   const seq = (paletteLoadSeq.get(layer.id) || 0) + 1;
   paletteLoadSeq.set(layer.id, seq);
 
-  const elem = (layer.element || "").toUpperCase();
+  const elem = (layer.element || (layer.type === "wind" ? "WIND" : "")).toUpperCase();
   const category = getPaletteCategory(elem) || elem;
   if (!category) return;
 
   try {
-    const files = await listPaletteFiles(category);
+    const files = await listPaletteFiles(category, elem);
     if (!paletteSel.isConnected || paletteLoadSeq.get(layer.id) !== seq) return;
 
     const xmlFiles = files.filter((f) => f.name.endsWith(".xml"));
