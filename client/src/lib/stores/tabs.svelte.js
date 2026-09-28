@@ -21,9 +21,18 @@ import {
   mapInstances as coreMapInstances,
   getMapInstance as coreGetMapInstance,
   setMapInstance as coreSetMapInstance,
+  hasWeatherLayers,
+  isWindowEmpty,
+  prepareSplitWindows,
+  setDefaultLayerResolver,
+  getNextWindowUid,
 } from "./tabsCore.js";
+import { getLayersForWindow as coreGetLayersForWindow } from "./layersCore.js";
 import { setDefaultWinResolver } from "./legendCore.js";
 import { setDefaultTabResolver } from "../../ui/tabs/windowTitles.js";
+
+// Wire live layer resolver for window emptiness checks
+setDefaultLayerResolver(coreGetLayersForWindow);
 
 export const tabsState = $state(coreTabsState);
 
@@ -99,4 +108,9 @@ export {
   preloadModelLevels,
   setModelLevelsCache,
   modelLevelsRuntimeCache,
+  hasWeatherLayers,
+  isWindowEmpty,
+  prepareSplitWindows,
+  setDefaultLayerResolver,
+  getNextWindowUid,
 };

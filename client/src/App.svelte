@@ -41,7 +41,12 @@
     revertAutoAllocation,
     getEligibleModelsForAllocation,
     preloadModelLevels,
+    prepareSplitWindows,
+    isWindowEmpty,
+    hasWeatherLayers,
+    getNextWindowUid,
   } from "./lib/stores/tabsCore.js";
+  import { getLayersForWindow } from "./lib/stores/layersCore.js";
   import { stopWindAnimation, removeGridWindBarbs } from "./layers/windLayer.js";
   import { removeRasterLayer } from "./layers/rasterLayer.js";
   import {
@@ -147,7 +152,8 @@
     }
     const tab = tabsState.tabs[0];
     if (tab) {
-      if (tab._nextWinSeq == null) tab._nextWinSeq = tab.windows?.length || 0;
+      const maxUid = (tab.windows || []).reduce((max, w) => Math.max(max, typeof w?.uid === "number" ? w.uid : -1), -1);
+      tab._nextWinSeq = Math.max(tab._nextWinSeq || 0, (tab.windows || []).length, maxUid + 1);
       if (!tab.windows || tab.windows.length === 0) {
         tab.windows = [createDefaultWindow(0, tab.id)];
       }
@@ -269,8 +275,7 @@
     if (!activeTab) return;
     // Leave the config editor so the newly created tab-win is visible.
     ui.configOpen = false;
-    if (activeTab._nextWinSeq == null) activeTab._nextWinSeq = activeTab.windows.length;
-    const uid = activeTab._nextWinSeq++;
+    const uid = getNextWindowUid(activeTab);
     const posIdx = activeTab.windows.length;
     const winObj = createDefaultWindow(posIdx, activeTab.id);
     winObj.uid = uid;
@@ -291,13 +296,21 @@
     const idx = findWindowIndex(activeTab.windows, win);
     if (idx !== -1) {
       const wasActive = idx === activeTab.activeWinIdx;
+      const currentActiveWin = activeTab.windows[activeTab.activeWinIdx];
       activeTab.windows.splice(idx, 1);
       activeTab.windows.forEach((w, i) => {
         w.winIdx = i;
+        if (w.title) w.title = String(w.title).replace(/^W\d+:\s*/, "");
+        if (w.baseTitle) w.baseTitle = String(w.baseTitle).replace(/^W\d+:\s*/, "");
       });
       if (wasActive) {
         const nextIdx = Math.max(0, Math.min(idx, activeTab.windows.length - 1));
         handleWindowFocus(activeTab.windows[nextIdx]);
+      } else {
+        activeTab.activeWinIdx = Math.max(0, findWindowIndex(activeTab.windows, currentActiveWin));
+      }
+      if (activeTab.windows.length <= 1 && activeTab.layout !== "1x1") {
+        activeTab.layout = "1x1";
       }
     }
   }
@@ -338,6 +351,7 @@
     const prevLayout = activeTab.layout;
     activeTab.layout = layout;
     const numNeeded = getNumVisible(layout);
+    const prevNumNeeded = getNumVisible(prevLayout);
     const isSplit = layout !== "1x1";
     const wasTab = prevLayout === "1x1";
 
@@ -356,7 +370,7 @@
     if (!isSplit || activeTab.autoAllocation === "none") {
       // Prior logic: load already-existed tab-windows
       while (activeTab.windows.length < numNeeded) {
-        const uid = activeTab._nextWinSeq++;
+        const uid = getNextWindowUid(activeTab);
         const posIdx = activeTab.windows.length;
         const winObj = createDefaultWindow(posIdx, activeTab.id);
         winObj.uid = uid;
@@ -387,24 +401,10 @@
       }
     } else {
       // Other alloc mode (level, model, step, time):
-      // Alloc new wins related to our focused tab-win when toggling to split mode
-      if (baseWin) {
-        const fIdx = activeTab.windows.indexOf(baseWin);
-        if (fIdx > 0) {
-          const [f] = activeTab.windows.splice(fIdx, 1);
-          activeTab.windows.unshift(f);
-          activeTab.windows.forEach((w, i) => { w.winIdx = i; });
-        }
-        activeTab.activeWinIdx = 0;
-      }
-      while (activeTab.windows.length < numNeeded) {
-        const uid = activeTab._nextWinSeq++;
-        const posIdx = activeTab.windows.length;
-        const winObj = createDefaultWindow(posIdx, activeTab.id);
-        winObj.uid = uid;
-        winObj.id = `tab-${activeTab.id}-win-${uid}`;
-        activeTab.windows.push(winObj);
-        syncLayersState(winObj.id);
+      // Don't add/clear layers to exist tab-win with layers: only add to empty tab-win or create new tab-win.
+      prepareSplitWindows(activeTab, numNeeded, baseWin, (w) => isWindowEmpty(w, getLayersForWindow), wasTab, prevNumNeeded);
+      for (const w of activeTab.windows) {
+        syncLayersState(w.id);
       }
       await applyAutoAllocationModeToTab(activeTab, activeTab.autoAllocation);
     }
@@ -463,6 +463,15 @@
         }
       }
     }
+    const prevBaseState = baseWin ? {
+      level: baseWin.level,
+      model: baseWin.model,
+      period: baseWin.period,
+      forecastCycle: baseWin.forecastCycle,
+      obsTime: baseWin.obsTime,
+      groupId: baseWin.activeGroup?.id,
+    } : null;
+
     if (mode === "model") {
       const layers = (baseWin?.activeGroup?.layers && baseWin.activeGroup.layers.length > 0)
         ? baseWin.activeGroup.layers
@@ -494,13 +503,16 @@
 
       const loadSeq = (w.loadSeq || 0) + 1;
       w.loadSeq = loadSeq;
-      const isInitial = !w.layers || w.layers.length === 0;
+      const isInitial = isWindowEmpty(w, getLayersForWindow);
 
-      if (w === baseWin && !isInitial && mode === "level" && w.level === baseWin.level && w.layers.length > 0) {
-        return;
-      }
-      if (w === baseWin && !isInitial && mode === "model" && w.model === baseWin.model && w.layers.length > 0) {
-        return;
+      if (w === baseWin && !isInitial && prevBaseState && w.activeGroup?.id === prevBaseState.groupId) {
+        if (mode === "level" && w.level === prevBaseState.level) return;
+        if (mode === "model" && w.model === prevBaseState.model) return;
+        if (mode === "step" && w.period === prevBaseState.period) return;
+        if (mode === "time") {
+          if (w.isObservation && w.obsTime === prevBaseState.obsTime) return;
+          if (!w.isObservation && w.forecastCycle === prevBaseState.forecastCycle && w.period === prevBaseState.period) return;
+        }
       }
 
       if (mode === "level") {
@@ -562,7 +574,7 @@
             }
           }
           if (w.activeGroup) {
-            await loadPresetGroup(map, w.activeGroup, w.period, w.level, w, true, loadSeq).catch((e) =>
+            await loadPresetGroup(map, w.activeGroup, w.period, w.level, w, false, loadSeq).catch((e) =>
               console.error("[AutoAlloc] obs step failed:", e)
             );
           }
@@ -576,7 +588,7 @@
             }
           }
           if (w.activeGroup) {
-            await loadPresetGroup(map, w.activeGroup, w.period, w.level, w, true, loadSeq).catch((e) =>
+            await loadPresetGroup(map, w.activeGroup, w.period, w.level, w, false, loadSeq).catch((e) =>
               console.error("[AutoAlloc] step failed:", e)
             );
           }
@@ -604,7 +616,7 @@
             }
           }
           if (w.activeGroup) {
-            await loadPresetGroup(map, w.activeGroup, w.period, w.level, w, true, loadSeq).catch((e) =>
+            await loadPresetGroup(map, w.activeGroup, w.period, w.level, w, false, loadSeq).catch((e) =>
               console.error("[AutoAlloc] obs time failed:", e)
             );
           }
@@ -621,7 +633,7 @@
             }
           }
           if (w.activeGroup) {
-            await loadPresetGroup(map, w.activeGroup, w.period, w.level, w, true, loadSeq).catch((e) =>
+            await loadPresetGroup(map, w.activeGroup, w.period, w.level, w, false, loadSeq).catch((e) =>
               console.error("[AutoAlloc] nwp time failed:", e)
             );
           }

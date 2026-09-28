@@ -238,7 +238,7 @@
             return raw ? `W${(item.winIdx ?? idx) + 1}: ${raw}` : `Tab ${(item.winIdx ?? idx) + 1}`;
           })()}
         </span>
-        {#if (item.winIdx ?? idx) >= 4}
+        {#if tabItems.length > 1}
           <button
             type="button"
             id={item.closeBtnId || `tab-close-${item.uid ?? item.winIdx ?? idx}`}

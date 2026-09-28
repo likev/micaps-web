@@ -522,3 +522,123 @@ export function revertAutoAllocation(tab, baseWin = null) {
   }
 }
 
+let defaultLayerResolver = null;
+export function setDefaultLayerResolver(fn) {
+  defaultLayerResolver = fn;
+}
+
+export function hasWeatherLayers(win, layerResolver = null) {
+  if (!win) return false;
+  if (win.activeGroup && Array.isArray(win.activeGroup.layers) && win.activeGroup.layers.length > 0) {
+    return true;
+  }
+  if (Array.isArray(win.layers) && win.layers.length > 0) {
+    return true;
+  }
+  const resolver = layerResolver || defaultLayerResolver;
+  if (typeof resolver === "function") {
+    try {
+      const layers = resolver(win.id || win);
+      if (Array.isArray(layers) && layers.some((l) => l.removable !== false || (l.type && l.type !== "pmtiles"))) {
+        return true;
+      }
+    } catch {}
+  }
+  return false;
+}
+
+export function isWindowEmpty(win, layerResolver = null) {
+  return !hasWeatherLayers(win, layerResolver);
+}
+
+export function getNextWindowUid(tab) {
+  if (!tab) return 0;
+  const maxUid = (tab.windows || []).reduce((max, w) => Math.max(max, typeof w?.uid === "number" ? w.uid : -1), -1);
+  const nextSeq = Math.max(tab._nextWinSeq || 0, (tab.windows || []).length, maxUid + 1);
+  tab._nextWinSeq = nextSeq + 1;
+  return nextSeq;
+}
+
+export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmptyFn = isWindowEmpty, wasTab = true, prevNumVisible = null) {
+  if (!tab || !Array.isArray(tab.windows)) return [];
+  if (numNeeded <= 1) return tab.windows;
+
+  const targetBase = baseWin || tab.windows[tab.activeWinIdx] || tab.windows[0];
+
+  if (wasTab) {
+    const emptyWins = [];
+    const busyWins = [];
+
+    for (const w of tab.windows) {
+      if (w === targetBase || (targetBase && w.id && w.id === targetBase.id)) {
+        continue;
+      }
+      if (isWindowEmptyFn(w)) {
+        emptyWins.push(w);
+      } else {
+        busyWins.push(w);
+      }
+    }
+
+    const neededExtra = numNeeded - 1;
+    const usedEmpty = emptyWins.slice(0, neededExtra);
+    const unusedEmpty = emptyWins.slice(neededExtra);
+
+    const createdWins = [];
+    while (usedEmpty.length + createdWins.length < neededExtra) {
+      const uid = getNextWindowUid(tab);
+      const posIdx = 1 + usedEmpty.length + createdWins.length;
+      const winObj = createDefaultWindow(posIdx, tab.id);
+      winObj.uid = uid;
+      winObj.id = `tab-${tab.id}-win-${uid}`;
+      createdWins.push(winObj);
+    }
+
+    const splitWins = [targetBase, ...usedEmpty, ...createdWins];
+    tab.windows = [...splitWins, ...busyWins, ...unusedEmpty];
+  } else {
+    // When already in split mode, only windows that were in the previous visible split
+    // are kept in currentSplit. Any windows outside the previous visible split that have
+    // layers (busyWins) must NOT be clobbered or drawn into new split slots.
+    const prevCount = prevNumVisible != null ? prevNumVisible : Math.min(tab.windows.length, numNeeded);
+    const currentSplit = tab.windows.slice(0, Math.min(prevCount, numNeeded));
+    const remaining = tab.windows.slice(Math.min(prevCount, numNeeded));
+
+    const emptyWins = [];
+    const busyWins = [];
+    for (const w of remaining) {
+      if (isWindowEmptyFn(w)) {
+        emptyWins.push(w);
+      } else {
+        busyWins.push(w);
+      }
+    }
+
+    const neededExtra = numNeeded - currentSplit.length;
+    const usedEmpty = emptyWins.slice(0, Math.max(0, neededExtra));
+    const unusedEmpty = emptyWins.slice(Math.max(0, neededExtra));
+
+    const createdWins = [];
+    while (currentSplit.length + usedEmpty.length + createdWins.length < numNeeded) {
+      const uid = getNextWindowUid(tab);
+      const posIdx = currentSplit.length + usedEmpty.length + createdWins.length;
+      const winObj = createDefaultWindow(posIdx, tab.id);
+      winObj.uid = uid;
+      winObj.id = `tab-${tab.id}-win-${uid}`;
+      createdWins.push(winObj);
+    }
+
+    const splitWins = [...currentSplit, ...usedEmpty, ...createdWins];
+    tab.windows = [...splitWins, ...busyWins, ...unusedEmpty];
+  }
+
+  tab.windows.forEach((w, idx) => {
+    w.winIdx = idx;
+    if (w.title) w.title = String(w.title).replace(/^W\d+:\s*/, "");
+    if (w.baseTitle) w.baseTitle = String(w.baseTitle).replace(/^W\d+:\s*/, "");
+  });
+
+  tab.activeWinIdx = Math.max(0, tab.windows.findIndex((w) => w === targetBase || (targetBase && w.id && w.id === targetBase.id)));
+  return tab.windows;
+}
+
