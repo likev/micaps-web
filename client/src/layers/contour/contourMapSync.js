@@ -5,7 +5,7 @@ import { removeRasterLayer } from "../rasterLayer.js";
 import { smoothGrid2D } from "../../utils/smoothContour.js";
 import { formatContourLabel } from "../../utils/formatters.js";
 import { isDebugMemEnabled, countGeoJSONPoints, estimateHeapMB } from "../../utils/memStats.js";
-import { disarmContourReRender, disarmAllContourReRenders } from "../../services/contourReRender.js";
+import * as contourReRender from "../../services/contourReRender.js";
 import {
   getLayerDOMIds,
   buildLineWidthExp,
@@ -208,7 +208,7 @@ export function flushContourSource(map, layerId = "default") {
 
 export function removeContourLayer(map, layerId) {
   flushContourSource(map, layerId);
-  disarmContourReRender(map, layerId);
+  contourReRender.disarmContourReRender?.(map, layerId);
 
   const { isobandSrcId, isobandLayerId, isolineSrcId, isolineLayerId, isolineLabelSrcId, isolineLabelLayerId } = getLayerDOMIds(layerId);
 
@@ -222,7 +222,7 @@ export function removeContourLayer(map, layerId) {
 }
 
 export function removeAllContourLayers(map) {
-  disarmAllContourReRenders(map);
+  contourReRender.disarmAllContourReRenders?.(map);
   if (!map || !map.getStyle) return;
   const style = map.getStyle();
   if (!style) return;

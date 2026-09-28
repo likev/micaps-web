@@ -44,7 +44,7 @@ export function getSourceFeatures(src) {
 }
 
 export async function triggerIsobandOverlay(map, layer = null, win = null) {
-  if (!map || !layer || layer.type === "wind") return;
+  if (!map || !layer || layer.type === "wind" || layer.visible === false) return;
   const layerId = layer.id || (layer.element ? `contour-${layer.element}` : "default");
 
   const palettePath = layer?.config?.palettePath || layer?.render?.palettePath;
@@ -180,6 +180,7 @@ export async function triggerIsobandOverlay(map, layer = null, win = null) {
 
 export async function triggerRasterOverlay(map, layer = null, win = null) {
   if (!map) return;
+  if (layer && layer.visible === false) return;
 
   // If no specific layer is supplied (e.g. global aux raster action), trigger for all active weather layers in window
   if (!layer) {

@@ -242,21 +242,25 @@ export function buildContourLayerMeta({ layerId, name, element, model, level, de
     model,
     level,
     derivedFrom,
+    file: options.file || options.obsTime || null,
+    obsTime: options.obsTime || options.file || null,
     visible: options.visible !== false,
     colormap,
-    gridData: gridData || {
-      header: {
-        start_lon: x[0],
-        end_lon: x[x.length - 1],
-        start_lat: y[0],
-        end_lat: y[y.length - 1],
-        n_lon: x.length,
-        n_lat: y.length,
-        d_lon: dDeg,
-        d_lat: dDeg,
-      },
-      values: interpolated,
-    },
+    gridData: (gridData !== null && gridData !== undefined)
+      ? gridData
+      : (Array.isArray(x) && Array.isArray(y) && x.length > 0 && y.length > 0 ? {
+          header: {
+            start_lon: x[0],
+            end_lon: x[x.length - 1],
+            start_lat: y[0],
+            end_lat: y[y.length - 1],
+            n_lon: x.length,
+            n_lat: y.length,
+            d_lon: dDeg,
+            d_lat: dDeg,
+          },
+          values: interpolated,
+        } : null),
     color: lineColor,
     removable: true,
     config: {

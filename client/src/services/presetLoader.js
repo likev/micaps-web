@@ -62,6 +62,7 @@ export function clearAllWeatherLayersFromMap(map, win = null, { resetVisibility 
     console.warn("[Main] Error cleaning up weather layers:", err);
   }
   if (win) {
+    win.windGridData = null;
     clearWindowWeatherLayers(win);
   }
 }

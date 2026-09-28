@@ -40,6 +40,7 @@ export async function changeVerticalLevel(map, direction, explicitLevel = null, 
 
   if (win) {
     win.loadSeq = (win.loadSeq || 0) + 1;
+    win.windGridData = null;
   }
   const currentSeq = win?.loadSeq;
 
@@ -168,9 +169,19 @@ export async function changeVerticalLevel(map, direction, explicitLevel = null, 
         gridData: null,
       };
       addOrUpdateLayer(restored, win);
-      await triggerVortDivOverlay(map, restored, win);
-      if (win && currentSeq !== null && currentSeq !== undefined && win.loadSeq !== currentSeq) {
-        return;
+      if (restored.visible !== false) {
+        await triggerVortDivOverlay(map, restored, win);
+        if (win && currentSeq !== null && currentSeq !== undefined && win.loadSeq !== currentSeq) {
+          return;
+        }
+      } else {
+        const { setLayerIsobandVisibility, setLayerIsolineVisibility } = await import("../layers/contourLayer.js");
+        const { flushContourSource } = await import("../layers/contour/contourMapSync.js");
+        if (map) {
+          flushContourSource(map, liveLayerId);
+          setLayerIsobandVisibility(map, liveLayerId, false);
+          setLayerIsolineVisibility(map, liveLayerId, false);
+        }
       }
     }
   }

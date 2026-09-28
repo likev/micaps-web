@@ -141,6 +141,7 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
   }
 
   const triggerReRender = () => {
+    if (layer.visible === false) return;
     if (reRenderTimers.has(key)) {
       clearTimeout(reRenderTimers.get(key));
     }
@@ -207,6 +208,7 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
         } else {
           liveLayer = layer;
         }
+        if (liveLayer.visible === false) return;
         const isWindLayerInit = liveLayer.type === "wind" || liveLayer.element === "WIND";
         let liveGridData = liveLayer.gridData || (isWindLayerInit ? win?.windGridData : null);
         if (!liveGridData) return;

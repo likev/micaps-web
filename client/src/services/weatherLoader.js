@@ -1,7 +1,8 @@
 // weatherLoader.js - Loads and renders NWP forecast weather fields and derived wind kinematics
 import { getActiveWindow, updateWindowTitle } from "../ui/tabWindowManager.js";
 import { getLayerById, addOrUpdateLayer, syncLayerControlForWindow } from "../ui/layerControl.js";
-import { renderContourLayers } from "../layers/contourLayer.js";
+import { renderContourLayers, setLayerIsobandVisibility, setLayerIsolineVisibility } from "../layers/contourLayer.js";
+import { flushContourSource } from "../layers/contour/contourMapSync.js";
 import { renderBinaryRaster, renderGridRaster } from "../layers/rasterLayer.js";
 import { renderWindStreamlines, stopWindAnimation, renderGridWindBarbs, removeGridWindBarbs } from "../layers/windLayer.js";
 import { fetchGridData, fetchGridBinaryStream } from "../api/catalogApi.js";
@@ -10,6 +11,7 @@ import { appState } from "../store/appState.js";
 import { resolveLatestForecastCycle } from "../utils/timelineSync.js";
 import { schedulePrefetch } from "./prefetchService.js";
 import { armContourReRender } from "./contourReRender.js";
+import * as contourReRenderModule from "./contourReRender.js";
 import { showErrorToast } from "../ui/toast.js";
 
 /**
@@ -109,6 +111,68 @@ export async function loadWeatherField(map, model, element, level, period, custo
   const interval = exCfg.interval ?? customOptions?.interval ?? snap?.config?.interval ?? null;
   const levels = exCfg.levels ?? customOptions?.levels ?? snap?.config?.levels ?? null;
 
+  if (!isVisible) {
+    if (map) {
+      flushContourSource(map, layerId);
+      setLayerIsobandVisibility(map, layerId, false);
+      setLayerIsolineVisibility(map, layerId, false);
+      if (isWind) {
+        stopWindAnimation(map);
+        removeGridWindBarbs(map);
+      }
+    }
+    contourReRenderModule.disarmContourReRender?.(map, layerId);
+    removeLegend(element, win);
+
+    addOrUpdateLayer({
+      id: layerId,
+      name,
+      type: isWind ? "wind" : "contour",
+      element,
+      level,
+      model,
+      path: dataPath,
+      file,
+      period,
+      stepLead: period,
+      forecastCycle: cycle,
+      gridData: null,
+      colormap: customOptions?.colormap || element,
+      color: lineColor,
+      visible: false,
+      derivedFrom: customOptions?.derivedFrom || (isVortDiv ? (hasLevel ? `wind-${model}-${level}` : `wind-${model}`) : undefined),
+      config: isWind ? {
+        showWind,
+        showBarbs,
+        showRaster,
+        palettePath: savedPalettePath,
+      } : {
+        showFill,
+        showLine,
+        showLabels,
+        lineColor,
+        opacity,
+        lineWidth,
+        boldValues: exCfg.boldValues ?? customOptions?.boldValues,
+        boldLineWidth: exCfg.boldLineWidth ?? customOptions?.boldLineWidth,
+        labelSize,
+        palettePath: savedPalettePath,
+        showRaster,
+        showWind: false,
+        showBarbs: false,
+        smooth,
+        smoothIterations,
+        interval,
+        levels,
+      },
+    }, win);
+
+    if (win && getActiveWindow() === win) {
+      syncLayerControlForWindow(win);
+    }
+    return;
+  }
+
   try {
     let gridData;
     if (isVortDiv) {
@@ -207,6 +271,9 @@ export async function loadWeatherField(map, model, element, level, period, custo
       model,
       path: dataPath,
       file,
+      period,
+      stepLead: period,
+      forecastCycle: cycle,
       gridData,
       colormap,
       color: lineColor,
@@ -247,6 +314,9 @@ export async function loadWeatherField(map, model, element, level, period, custo
         model,
         path: dataPath,
         file,
+        period,
+        stepLead: period,
+        forecastCycle: cycle,
         gridData,
         colormap,
         visible: isVisible,

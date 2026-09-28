@@ -8,9 +8,21 @@ export async function triggerVortDivOverlay(map, layer = null, win = null) {
   if (!map || !layer) return;
   const element = (layer.element || "VOR").toUpperCase();
   const model = layer.model || win?.model || "ECMWF_HR";
-  const level = layer.level !== undefined && layer.level !== null ? layer.level : (win?.level !== undefined ? win.level : 850);
-  const layerId = layer.id || `contour-${model}-${element.toLowerCase()}-${level}`;
+  const level = (win?.level !== undefined && win?.level !== null && (!win?.activeGroup || win?.activeGroup?.hasLevel !== false))
+    ? win.level
+    : (layer.level !== undefined && layer.level !== null ? layer.level : 850);
+  const layerId = (level !== undefined && level !== null)
+    ? `contour-${model}-${element.toLowerCase()}-${level}`
+    : (layer.id || `contour-${model}-${element.toLowerCase()}`);
+  if (layer.level !== level) {
+    layer.level = level;
+    layer.id = layerId;
+    layer.gridData = null;
+  }
   const isVisible = layer.visible !== false;
+  if (!isVisible) {
+    return;
+  }
 
   let colormap = layer.colormap || layer.render?.colormap || element;
   const palettePath = layer.config?.palettePath || layer.render?.palettePath;

@@ -5,6 +5,13 @@ import {
 } from "./analysis/contourConfigsSurface.js";
 import { clipLineFeatures } from "../utils/geometry/clip.js";
 import {
+  setLayerIsobandVisibility,
+  setLayerIsolineVisibility,
+} from "./contourLayer.js";
+import { flushContourSource } from "./contour/contourMapSync.js";
+import { addOrUpdateLayer } from "../ui/layerControl.js";
+import { removeLegend } from "../ui/legend.js";
+import {
   extractPointsAndValues,
   computeDomain,
   interpolateAndSmoothGrid,
@@ -34,6 +41,42 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
 
   try {
     const cfg = SURFACE_CONTOUR_CONFIGS[elementKey] || SURFACE_CONTOUR_CONFIGS.SLP;
+    const layerId = options.layerId || `contour-surface-${elementKey.toLowerCase()}`;
+    const lineColor = options.lineColor || cfg.defaultColor;
+    const { showFill, showLine, showRaster } = resolveShowFlags(options, cfg, elementKey);
+    const { palettePath, colormap } = resolveContourColormap(options, cfg, layerId);
+    const effectiveObsTime = options.obsTime || options.file || win?.obsTime || null;
+
+    if (options.visible === false) {
+      const layerMeta = buildContourLayerMeta({
+        layerId,
+        name: `${cfg.name} (Surface Analysis)`,
+        element: cfg.element,
+        model: "SURFACE",
+        level: null,
+        derivedFrom: options.derivedFrom || "surface-obs",
+        colormap,
+        lineColor,
+        gridData: null,
+        renderOptions: { ...options, layerId, visible: false },
+        showRaster,
+        palettePath,
+        options: {
+          ...options,
+          visible: false,
+          obsTime: effectiveObsTime,
+          file: effectiveObsTime,
+        },
+      });
+      if (map) {
+        flushContourSource(map, layerId);
+        setLayerIsobandVisibility(map, layerId, false);
+        setLayerIsolineVisibility(map, layerId, false);
+      }
+      removeLegend(cfg.element, win);
+      addOrUpdateLayer(layerMeta, win);
+      return { lines: [], fills: [], gridData: null };
+    }
 
     const { points, values } = extractPointsAndValues(stationsGeoJSON.features, cfg.extract, null);
     if (points.length < 3) {
@@ -79,12 +122,6 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
     const isolineFC = { type: "FeatureCollection", features: clippedLines };
     const isobandFC = { type: "FeatureCollection", features: fills || [] };
 
-    const layerId = options.layerId || `contour-surface-${elementKey.toLowerCase()}`;
-    const lineColor = options.lineColor || cfg.defaultColor;
-
-    const { showFill, showLine, showRaster } = resolveShowFlags(options, cfg, elementKey);
-    const { palettePath, colormap } = resolveContourColormap(options, cfg, layerId);
-
     const renderOptions = buildContourRenderOptions({
       layerId, element: cfg.element, colormap, lineColor, boldValues, showFill, showLine,
       options: { ...options, clipBounds: clipBBox },
@@ -101,7 +138,13 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
       lineColor,
       x, y, dDeg, interpolated,
       renderOptions, showRaster, palettePath,
-      options: { ...options, clipBounds: clipBBox, bounds: clipBBox },
+      options: {
+        ...options,
+        clipBounds: clipBBox,
+        bounds: clipBBox,
+        obsTime: effectiveObsTime,
+        file: effectiveObsTime,
+      },
     });
 
     registerContourLayer(map, isobandFC, isolineFC, renderOptions, layerMeta, win);

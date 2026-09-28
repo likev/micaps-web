@@ -6,6 +6,13 @@ import { SOUNDING_CONTOUR_CONFIGS, normalizeSoundingElementKey } from "./contour
 import { tagLinesAndFills, resolveShowFlags, registerContourLayer } from "./objectiveAnalysis.js";
 import { resolveRenderLevels } from "../contour/contourLevels.js";
 import { clipLineFeatures } from "../../utils/geometry/clip.js";
+import {
+  setLayerIsobandVisibility,
+  setLayerIsolineVisibility,
+} from "../contourLayer.js";
+import { flushContourSource } from "../contour/contourMapSync.js";
+import { addOrUpdateLayer } from "../../ui/layerControl.js";
+import { removeLegend } from "../../ui/legend.js";
 
 export function analyzeKinematicContours({
   map,
@@ -30,6 +37,52 @@ export function analyzeKinematicContours({
     const cfg = isSounding
       ? (SOUNDING_CONTOUR_CONFIGS[elementKey] || SOUNDING_CONTOUR_CONFIGS.VOR)
       : (SURFACE_CONTOUR_CONFIGS[elementKey] || SURFACE_CONTOUR_CONFIGS.VOR);
+
+    if (options.visible === false) {
+      const numLvl = isSounding ? (Number(level) || 500) : null;
+      const layerId = options.layerId || (isSounding
+        ? `contour-sounding-${elementKey.toLowerCase()}-${numLvl}`
+        : `contour-surface-${elementKey.toLowerCase()}`);
+      const lineColor = options.lineColor || cfg.defaultColor;
+      const { showFill, showLine, showRaster } = resolveShowFlags(options, cfg, elementKey);
+      const palettePath = options.palettePath || cfg.palettePath || null;
+      const colormap = options.colormap || (palettePath ? `palette:${layerId}` : (cfg.colormap || cfg.element));
+      const effectiveObsTime = options.obsTime || options.file || win?.obsTime || null;
+
+      const layerMeta = {
+        id: layerId,
+        name: isSounding ? `${numLvl} hPa Sounding ${cfg.name}` : `${cfg.name} (Surface Analysis)`,
+        type: "contour",
+        element: cfg.element,
+        model: isSounding ? "UPPER_AIR" : "SURFACE",
+        level: numLvl,
+        derivedFrom: options.derivedFrom || (isSounding ? `upperair-obs-${numLvl}` : "surface-obs"),
+        file: effectiveObsTime,
+        obsTime: effectiveObsTime,
+        visible: false,
+        colormap,
+        gridData: null,
+        color: lineColor,
+        config: {
+          showFill,
+          showLine,
+          showRaster,
+          lineColor,
+          palettePath,
+          colormap,
+          ...(options.config || options || {}),
+          visible: false,
+        },
+      };
+      if (map) {
+        flushContourSource(map, layerId);
+        setLayerIsobandVisibility(map, layerId, false);
+        setLayerIsolineVisibility(map, layerId, false);
+      }
+      removeLegend(cfg.element, win);
+      addOrUpdateLayer(layerMeta, win);
+      return { lines: [], fills: [], gridData: null };
+    }
 
     // 1. Generate regular station wind grid
     const windGrid = generateStationWindGrid(stationsGeoJSON, isSounding ? level : null);
@@ -138,6 +191,8 @@ export function analyzeKinematicContours({
       model: isSounding ? "UPPER_AIR" : "SURFACE",
       level: numLvl,
       derivedFrom: options.derivedFrom || (isSounding ? `upperair-obs-${numLvl}` : "surface-obs"),
+      file: options.file || options.obsTime || win?.obsTime || null,
+      obsTime: options.obsTime || options.file || win?.obsTime || null,
       visible: options.visible !== false,
       colormap,
       gridData: {

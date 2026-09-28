@@ -36,6 +36,8 @@ export async function renderSoundingDerivedContoursForStation(map, stations, cur
         cfg.layerId = targetId;
         cfg.visible = isVisible;
         cfg.derivedFrom = cLayer.derivedFrom || stationLayerId;
+        cfg.obsTime = win?.obsTime;
+        cfg.file = win?.obsTime;
         if (existingDerived?.colormap) cfg.colormap = existingDerived.colormap;
         else if (snap?.colormap) cfg.colormap = snap.colormap;
         if (cfg.lineColor == null && existingDerived?.color) cfg.lineColor = existingDerived.color;
@@ -97,6 +99,8 @@ export async function renderSoundingDerivedContoursForStation(map, stations, cur
           // (baked into renderOptions at creation); keep this level's values.
           cfg.layerId = targetId;
           cfg.visible = isVisible;
+          cfg.obsTime = win?.obsTime;
+          cfg.file = win?.obsTime;
           if (existingDerived?.colormap) cfg.colormap = existingDerived.colormap;
           else if (snap?.colormap) cfg.colormap = snap.colormap;
           if (cfg.lineColor == null && existingDerived?.color) cfg.lineColor = existingDerived.color;
@@ -164,6 +168,8 @@ export async function renderSurfaceDerivedContoursForStation(map, stations, acti
         cfg.layerId = targetId;
         cfg.visible = isVisible;
         cfg.derivedFrom = cLayer.derivedFrom || stationLayerId;
+        cfg.obsTime = win?.obsTime;
+        cfg.file = win?.obsTime;
         if (existingDerived?.colormap) cfg.colormap = existingDerived.colormap;
         else if (snap?.colormap) cfg.colormap = snap.colormap;
         if (cfg.lineColor == null && existingDerived?.color) cfg.lineColor = existingDerived.color;
@@ -222,6 +228,8 @@ export async function renderSurfaceDerivedContoursForStation(map, stations, acti
           // (baked into renderOptions at creation); keep this level's values.
           cfg.layerId = targetId;
           cfg.visible = isVisible;
+          cfg.obsTime = win?.obsTime;
+          cfg.file = win?.obsTime;
           if (existingDerived?.colormap) cfg.colormap = existingDerived.colormap;
           else if (snap?.colormap) cfg.colormap = snap.colormap;
           if (cfg.lineColor == null && existingDerived?.color) cfg.lineColor = existingDerived.color;

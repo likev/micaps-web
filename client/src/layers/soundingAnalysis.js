@@ -1,7 +1,14 @@
 // soundingAnalysis.js - In-browser objective analysis & contour calculation from sounding stations
 import * as griddata from "griddata";
-import { renderCustomContourGeoJSON, isFeatureBold } from "./contourLayer.js";
+import {
+  renderCustomContourGeoJSON,
+  isFeatureBold,
+  setLayerIsobandVisibility,
+  setLayerIsolineVisibility,
+} from "./contourLayer.js";
+import { flushContourSource } from "./contour/contourMapSync.js";
 import { addOrUpdateLayer } from "../ui/layerControl.js";
+import { removeLegend } from "../ui/legend.js";
 import { formatContourLabel } from "../utils/formatters.js";
 import { generateStationWindGrid } from "./analysis/stationWindGrid.js";
 import {
@@ -121,6 +128,42 @@ export function analyzeAndRenderSoundingElementContour(map, stationsGeoJSON, lev
   try {
     const numLevel = parseInt(level, 10) || 500;
     const cfg = SOUNDING_CONTOUR_CONFIGS[elementKey] || SOUNDING_CONTOUR_CONFIGS.HGT;
+    const layerId = options.layerId || `contour-sounding-${elementKey.toLowerCase()}-${level}`;
+    const lineColor = options.lineColor || cfg.defaultColor;
+    const { showFill, showLine, showRaster } = resolveShowFlags(options, cfg, elementKey);
+    const { palettePath, colormap } = resolveContourColormap(options, cfg, layerId);
+    const effectiveObsTime = options.obsTime || options.file || win?.obsTime || null;
+
+    if (options.visible === false) {
+      const layerMeta = buildContourLayerMeta({
+        layerId,
+        name: `${level} hPa ${cfg.name} (Sounding Analysis)`,
+        element: cfg.element,
+        model: "UPPER_AIR",
+        level: numLevel,
+        derivedFrom: options.derivedFrom || `upperair-obs-${level}`,
+        colormap,
+        lineColor,
+        gridData: null,
+        renderOptions: { ...options, layerId, visible: false },
+        showRaster,
+        palettePath,
+        options: {
+          ...options,
+          visible: false,
+          obsTime: effectiveObsTime,
+          file: effectiveObsTime,
+        },
+      });
+      if (map) {
+        flushContourSource(map, layerId);
+        setLayerIsobandVisibility(map, layerId, false);
+        setLayerIsolineVisibility(map, layerId, false);
+      }
+      removeLegend(cfg.element, win);
+      addOrUpdateLayer(layerMeta, win);
+      return { lines: [], fills: [], gridData: null };
+    }
 
     const isCustomLevels = Boolean(resolveRenderLevels(options));
     const result = calculateFieldContours(stationsGeoJSON, cfg.extract, {
@@ -145,12 +188,6 @@ export function analyzeAndRenderSoundingElementContour(map, stationsGeoJSON, lev
       f.properties.label = formatContourLabel(val, elementKey);
     }
 
-    const layerId = options.layerId || `contour-sounding-${elementKey.toLowerCase()}-${level}`;
-    const lineColor = options.lineColor || cfg.defaultColor;
-
-    const { showFill, showLine, showRaster } = resolveShowFlags(options, cfg, elementKey);
-    const { palettePath, colormap } = resolveContourColormap(options, cfg, layerId);
-
     const isolineFC = { type: "FeatureCollection", features: result.lines };
     const isobandFC = result.fills ? { type: "FeatureCollection", features: result.fills } : null;
 
@@ -170,7 +207,13 @@ export function analyzeAndRenderSoundingElementContour(map, stationsGeoJSON, lev
       lineColor,
       gridData: result.gridData,
       renderOptions, showRaster, palettePath,
-      options: { ...options, clipBounds: result.bounds, bounds: result.bounds },
+      options: {
+        ...options,
+        clipBounds: result.bounds,
+        bounds: result.bounds,
+        obsTime: effectiveObsTime,
+        file: effectiveObsTime,
+      },
     });
 
     registerContourLayer(map, isobandFC, isolineFC, renderOptions, layerMeta, win);

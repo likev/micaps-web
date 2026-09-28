@@ -17,6 +17,7 @@ function notifyError(msg) {
 }
 
 export async function triggerWindStreamlines(map, layer = null, win = null) {
+  if (layer && (layer.visible === false || layer.config?.showWind === false)) return;
   if (!layer) {
     const layers = getLayersForWindow(win);
     const windLayers = layers.filter(
@@ -67,6 +68,7 @@ export async function triggerWindStreamlines(map, layer = null, win = null) {
 }
 
 export async function triggerWindBarbs(map, layer = null, win = null) {
+  if (layer && (layer.visible === false || layer.config?.showBarbs === false)) return;
   let grid = layer?.gridData || win?.windGridData || win?.gridData || appState.get("gridData");
   if (grid && grid.u && grid.v) {
     renderGridWindBarbs(map, grid);
@@ -106,6 +108,7 @@ export async function triggerWindBarbs(map, layer = null, win = null) {
 }
 
 export async function triggerStationStreamlines(map, layer = null, win = null) {
+  if (layer && (layer.visible === false || layer.config?.showStreamlines === false)) return;
   const curLevel = layer?.level || win?.level || (layer?.model === "UPPER_AIR" ? 500 : null);
   const geojson =
     layer?.stationsGeoJSON || getStationGeoJSON(map) || win?.stationsGeoJSON || appState.get("stationData");

@@ -164,7 +164,7 @@ export function handleLayerAction(map, action, layerId, value, layer, win = getA
   const winObj = typeof win === "string" ? getWindowById(win) || getActiveWindow() : win || getActiveWindow();
 
   if (action === "visibility") {
-    handleVisibilityAction(map, layerId, value, layer, winObj);
+    return handleVisibilityAction(map, layerId, value, layer, winObj);
   } else if (action === "config") {
     handleConfigAction(map, layerId, value, layer, winObj);
   } else if (action === "addContour") {
