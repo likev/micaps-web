@@ -88,6 +88,7 @@ export async function triggerIsobandOverlay(map, layer = null, win = null) {
       showFill: isVisible,
       showRaster: false,
       showLine: isVisible && layer.config?.showLine !== false,
+      showLabels: isVisible && layer.config?.showLabels !== false,
       opacity: layer.config?.opacity ?? 0.75,
       lineColor: layer.config?.lineColor,
       lineWidth: layer.config?.lineWidth,

@@ -2,9 +2,12 @@
 import {
   setLayerIsobandVisibility,
   setLayerIsolineVisibility,
+  setLayerIsolineLabelVisibility,
   setLayerIsobandOpacity,
   setLayerIsolineStyle,
   renderContourLayers,
+  getLayerDOMIds,
+  updateMapLibreContour,
 } from "../../layers/contourLayer.js";
 import { getLayerById } from "./layerStore.js";
 import { setStationConfig, getStationGeoJSON } from "../../layers/stationLayer.js";
@@ -102,7 +105,63 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
     }
     if (value.showLine !== undefined) {
       layer.config.showLine = value.showLine;
-      setLayerIsolineVisibility(map, layerId, layer.visible && value.showLine);
+      const isVisible = layer.visible !== false;
+      const { isolineSrcId } = getLayerDOMIds(layerId);
+      const lineSrc = map.getSource(isolineSrcId);
+      const hasLineFeatures = lineSrc ? (lineSrc._data?.geojson?.features || lineSrc._data?.features || lineSrc.data?.features || []).length > 0 : false;
+      if (value.showLine && isVisible && !hasLineFeatures) {
+        if (layer.gridData) {
+          renderContourLayers(map, layer.gridData, layer.element || "TMP", {
+            ...layer.config,
+            layerId,
+            showFill: isVisible && Boolean(layer.config?.showFill),
+            showLine: true,
+            showLabels: isVisible && layer.config?.showLabels !== false,
+            viewportBounds: map && typeof map.getBounds === "function" ? map.getBounds().toArray() : null,
+          });
+        } else {
+          triggerIsobandOverlay(map, layer, winObj);
+        }
+      } else {
+        setLayerIsolineVisibility(map, layerId, isVisible && value.showLine, layer.config?.showLabels !== false);
+      }
+    }
+    if (value.showLabels !== undefined) {
+      layer.config.showLabels = value.showLabels;
+      const isVisible = layer.visible !== false;
+      const showLine = layer.config?.showLine !== false;
+      const shouldShow = Boolean(isVisible && showLine && value.showLabels);
+      const { isolineLabelSrcId, isolineSrcId } = getLayerDOMIds(layerId);
+      const labelSrc = map.getSource(isolineLabelSrcId);
+      const hasLabelFeatures = labelSrc ? (labelSrc._data?.geojson?.features || labelSrc._data?.features || labelSrc.data?.features || []).length > 0 : false;
+
+      if (shouldShow && !hasLabelFeatures) {
+        const lineSrc = map.getSource(isolineSrcId);
+        const lineGeo = lineSrc?._data?.geojson || lineSrc?._data || lineSrc?.data;
+        if (lineGeo && Array.isArray(lineGeo.features) && lineGeo.features.length > 0) {
+          updateMapLibreContour(map, null, lineGeo, {
+            ...layer.config,
+            layerId,
+            showLine,
+            showLabels: true,
+            visibleIsoline: isVisible && showLine,
+            visibleLabel: true,
+            preserveIsolines: true,
+          });
+        } else if (layer.gridData) {
+          renderContourLayers(map, layer.gridData, layer.element || "TMP", {
+            ...layer.config,
+            layerId,
+            showFill: isVisible && Boolean(layer.config?.showFill),
+            showLine: isVisible && showLine,
+            showLabels: true,
+            viewportBounds: map && typeof map.getBounds === "function" ? map.getBounds().toArray() : null,
+          });
+        }
+      } else if (!shouldShow && labelSrc && hasLabelFeatures) {
+        labelSrc.setData({ type: "FeatureCollection", features: [] });
+      }
+      setLayerIsolineLabelVisibility(map, layerId, shouldShow);
     }
     if (value.showRaster !== undefined) {
       layer.config.showRaster = value.showRaster;
@@ -231,6 +290,7 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
           smooth,
           showFill: layer.visible && layer.config?.showFill,
           showLine: layer.visible && layer.config?.showLine,
+          showLabels: layer.visible && layer.config?.showLabels !== false,
           opacity: layer.config?.opacity,
           lineColor: layer.config?.lineColor,
           lineWidth: layer.config?.lineWidth,
@@ -281,6 +341,7 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
             colormap: elem,
             showFill: layer.visible && layer.config?.showFill !== false,
             showLine: layer.visible && layer.config?.showLine !== false,
+            showLabels: layer.visible && layer.config?.showLabels !== false,
             opacity: layer.config?.opacity ?? 0.75,
             lineColor: layer.config?.lineColor,
             lineWidth: layer.config?.lineWidth,
@@ -355,6 +416,7 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
                     colormap: key,
                     showFill: layer.visible && layer.config?.showFill !== false,
                     showLine: layer.visible && layer.config?.showLine !== false,
+                    showLabels: layer.visible && layer.config?.showLabels !== false,
                     opacity: layer.config?.opacity ?? 0.75,
                     lineColor: layer.config?.lineColor,
                     lineWidth: layer.config?.lineWidth,

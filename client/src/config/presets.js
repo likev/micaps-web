@@ -218,6 +218,7 @@ export function autoSaveLayerConfig(layer) {
             // Contour & Wind properties
             if (layer.config.showFill !== undefined) pLayer.render.showFill = layer.config.showFill;
             if (layer.config.showLine !== undefined) pLayer.render.showLine = layer.config.showLine;
+            if (layer.config.showLabels !== undefined) pLayer.render.showLabels = layer.config.showLabels;
             if (layer.config.lineColor !== undefined) pLayer.render.lineColor = layer.config.lineColor;
             if (layer.config.lineWidth !== undefined) pLayer.render.lineWidth = layer.config.lineWidth;
             if (layer.config.boldValues !== undefined) pLayer.render.boldValues = layer.config.boldValues;

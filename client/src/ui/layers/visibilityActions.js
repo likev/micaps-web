@@ -2,6 +2,7 @@
 import {
   setLayerIsobandVisibility,
   setLayerIsolineVisibility,
+  setLayerIsolineLabelVisibility,
   getLayerDOMIds,
 } from "../../layers/contourLayer.js";
 import { setStationVisibility } from "../../layers/stationLayer.js";
@@ -58,7 +59,9 @@ export function handleVisibilityAction(map, layerId, value, layer, winObj) {
       setLayerIsobandVisibility(map, layerId, false);
     }
 
-    setLayerIsolineVisibility(map, layerId, isVisible && layer.config?.showLine);
+    const showLine = layer.config?.showLine !== false;
+    const showLabels = layer.config?.showLabels !== false;
+    setLayerIsolineVisibility(map, layerId, isVisible && showLine, showLabels);
 
     if (layer.config?.showRaster) {
       if (isVisible) {

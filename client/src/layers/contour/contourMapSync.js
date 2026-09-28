@@ -28,6 +28,8 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
   const opacity = options.opacity !== undefined ? options.opacity : 0.75;
   const visibleIsoband = options.visibleIsoband !== undefined ? options.visibleIsoband : (options.showFill !== false && options.visible !== false);
   const visibleIsoline = options.visibleIsoline !== undefined ? options.visibleIsoline : (options.showLine !== false && options.visible !== false);
+  const showLabels = options.showLabels !== false;
+  const visibleLabel = options.visibleLabel !== undefined ? options.visibleLabel : (visibleIsoline && showLabels);
   const lineColor = options.lineColor || "#ffffff";
   const lineWidth = typeof options.lineWidth === "number" ? options.lineWidth : 2.0;
   const boldLineWidth = typeof options.boldLineWidth === "number" ? options.boldLineWidth : 4.0;
@@ -36,20 +38,30 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
   const lineWidthExp = buildLineWidthExp(boldLineWidth, lineWidth);
   const lineColorExp = buildLineColorExp(boldLineColor, lineColor);
 
-  const { isobandSrcId, isobandLayerId, isolineSrcId, isolineLayerId, isolineLabelLayerId } = getLayerDOMIds(layerId);
+  const { isobandSrcId, isobandLayerId, isolineSrcId, isolineLayerId, isolineLabelSrcId, isolineLabelLayerId } = getLayerDOMIds(layerId);
+  const emptyFC = { type: "FeatureCollection", features: [] };
 
   // --- ISOBANDS (Contour Fills) ---
   if (isobands) {
-    if (map.getSource(isobandSrcId)) {
-      map.getSource(isobandSrcId).setData(isobands);
+    const hasIsobandFeatures = Array.isArray(isobands.features) && isobands.features.length > 0;
+    const isobandData = (visibleIsoband && hasIsobandFeatures) ? isobands : emptyFC;
+    const isobandSrc = map.getSource(isobandSrcId);
+
+    if (isobandSrc) {
+      const curFeatures = isobandSrc._data?.geojson?.features || isobandSrc._data?.features || isobandSrc.data?.features || [];
+      if (hasIsobandFeatures || curFeatures.length > 0) {
+        isobandSrc.setData(isobandData);
+      }
       if (map.getLayer(isobandLayerId)) {
         map.setLayoutProperty(isobandLayerId, "visibility", visibleIsoband ? "visible" : "none");
-        map.setPaintProperty(isobandLayerId, "fill-opacity", opacity);
+        if (visibleIsoband) {
+          map.setPaintProperty(isobandLayerId, "fill-opacity", opacity);
+        }
       }
     } else {
       map.addSource(isobandSrcId, {
         type: "geojson",
-        data: isobands,
+        data: isobandData,
       });
 
       map.addLayer(
@@ -79,33 +91,31 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
 
   // --- ISOLINES (Contour Lines) & LABELS (Every 200px) ---
   if (isolines) {
+    const hasIsolineFeatures = Array.isArray(isolines.features) && isolines.features.length > 0;
     const labelSize = typeof options.labelSize === "number" && options.labelSize > 0 ? options.labelSize : 13;
     const labelTextSize = buildLabelSizeExp(labelSize);
-    if (map.getSource(isolineSrcId)) {
-      map.getSource(isolineSrcId).setData(isolines);
+
+    // 1. Line layer on dedicated isolineSrcId (no font glyph dependency, instant render)
+    const lineData = visibleIsoline ? isolines : emptyFC;
+    const isolineSrc = map.getSource(isolineSrcId);
+    if (isolineSrc) {
+      if (!options.preserveIsolines) {
+        const curFeatures = isolineSrc._data?.geojson?.features || isolineSrc._data?.features || isolineSrc.data?.features || [];
+        if (hasIsolineFeatures || curFeatures.length > 0) {
+          isolineSrc.setData(lineData);
+        }
+      }
       if (map.getLayer(isolineLayerId)) {
         map.setLayoutProperty(isolineLayerId, "visibility", visibleIsoline ? "visible" : "none");
-        map.setPaintProperty(isolineLayerId, "line-color", lineColorExp);
-        map.setPaintProperty(isolineLayerId, "line-width", lineWidthExp);
-      }
-      if (map.getLayer(isolineLabelLayerId)) {
-        const scheme = map.__basemapScheme || "dark";
-        const plotTokens = getPlotTokens(scheme);
-        const textColor = scheme === "light" ? plotTokens.ppp.color : "#ffffff";
-        map.setLayoutProperty(isolineLabelLayerId, "visibility", visibleIsoline ? "visible" : "none");
-        map.setPaintProperty(isolineLabelLayerId, "text-color", textColor);
-        map.setPaintProperty(isolineLabelLayerId, "text-halo-color", plotTokens.halo);
-        try {
-          map.setLayoutProperty(isolineLabelLayerId, "text-size", labelTextSize);
-          map.setLayoutProperty(isolineLabelLayerId, "symbol-spacing", 160);
-          map.setLayoutProperty(isolineLabelLayerId, "symbol-sort-key", ["case", ["to-boolean", ["get", "isBold"]], 0, 10]);
-          map.setPaintProperty(isolineLabelLayerId, "text-halo-width", plotTokens.haloWidth || 2.5);
-        } catch {}
+        if (visibleIsoline) {
+          map.setPaintProperty(isolineLayerId, "line-color", lineColorExp);
+          map.setPaintProperty(isolineLayerId, "line-width", lineWidthExp);
+        }
       }
     } else {
       map.addSource(isolineSrcId, {
         type: "geojson",
-        data: isolines,
+        data: lineData,
       });
 
       map.addLayer({
@@ -123,6 +133,37 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
           "line-opacity": 0.85,
         },
       });
+    }
+
+    // 2. Label layer on decoupled isolineLabelSrcId (symbol layer)
+    const labelData = visibleLabel ? isolines : emptyFC;
+    const isolineLabelSrc = map.getSource(isolineLabelSrcId);
+    if (isolineLabelSrc) {
+      const curLabelFeatures = isolineLabelSrc._data?.geojson?.features || isolineLabelSrc._data?.features || isolineLabelSrc.data?.features || [];
+      if (visibleLabel || curLabelFeatures.length > 0) {
+        isolineLabelSrc.setData(labelData);
+      }
+      if (map.getLayer(isolineLabelLayerId)) {
+        map.setLayoutProperty(isolineLabelLayerId, "visibility", visibleLabel ? "visible" : "none");
+        if (visibleLabel) {
+          const scheme = map.__basemapScheme || "dark";
+          const plotTokens = getPlotTokens(scheme);
+          const textColor = scheme === "light" ? plotTokens.ppp.color : "#ffffff";
+          map.setPaintProperty(isolineLabelLayerId, "text-color", textColor);
+          map.setPaintProperty(isolineLabelLayerId, "text-halo-color", plotTokens.halo);
+          try {
+            map.setLayoutProperty(isolineLabelLayerId, "text-size", labelTextSize);
+            map.setLayoutProperty(isolineLabelLayerId, "symbol-spacing", 160);
+            map.setLayoutProperty(isolineLabelLayerId, "symbol-sort-key", ["case", ["to-boolean", ["get", "isBold"]], 0, 10]);
+            map.setPaintProperty(isolineLabelLayerId, "text-halo-width", plotTokens.haloWidth || 2.5);
+          } catch {}
+        }
+      }
+    } else {
+      map.addSource(isolineLabelSrcId, {
+        type: "geojson",
+        data: labelData,
+      });
 
       const scheme = map.__basemapScheme || "dark";
       const plotTokens = getPlotTokens(scheme);
@@ -130,7 +171,7 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
       map.addLayer({
         id: isolineLabelLayerId,
         type: "symbol",
-        source: isolineSrcId,
+        source: isolineLabelSrcId,
         layout: {
           "symbol-placement": "line",
           "symbol-spacing": 160,
@@ -139,7 +180,7 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
           "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
           "text-allow-overlap": false,
           "symbol-sort-key": ["case", ["to-boolean", ["get", "isBold"]], 0, 10],
-          "visibility": visibleIsoline ? "visible" : "none",
+          "visibility": visibleLabel ? "visible" : "none",
         },
         paint: {
           "text-color": textColor,
@@ -153,29 +194,26 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
 
 export function flushContourSource(map, layerId = "default") {
   if (!map) return;
-  const { isobandSrcId, isolineSrcId } = getLayerDOMIds(layerId);
+  const { isobandSrcId, isolineSrcId, isolineLabelSrcId } = getLayerDOMIds(layerId);
   const emptyFC = { type: "FeatureCollection", features: [] };
-  try {
-    const isobandSrc = map.getSource(isobandSrcId);
-    if (isobandSrc && typeof isobandSrc.setData === "function") {
-      isobandSrc.setData(emptyFC);
-    }
-  } catch {}
-  try {
-    const isolineSrc = map.getSource(isolineSrcId);
-    if (isolineSrc && typeof isolineSrc.setData === "function") {
-      isolineSrc.setData(emptyFC);
-    }
-  } catch {}
+  for (const srcId of [isobandSrcId, isolineSrcId, isolineLabelSrcId]) {
+    try {
+      const src = map.getSource(srcId);
+      if (src && typeof src.setData === "function") {
+        src.setData(emptyFC);
+      }
+    } catch {}
+  }
 }
 
 export function removeContourLayer(map, layerId) {
   flushContourSource(map, layerId);
   disarmContourReRender(map, layerId);
 
-  const { isobandSrcId, isobandLayerId, isolineSrcId, isolineLayerId, isolineLabelLayerId } = getLayerDOMIds(layerId);
+  const { isobandSrcId, isobandLayerId, isolineSrcId, isolineLayerId, isolineLabelSrcId, isolineLabelLayerId } = getLayerDOMIds(layerId);
 
   if (map.getLayer(isolineLabelLayerId)) map.removeLayer(isolineLabelLayerId);
+  if (map.getSource(isolineLabelSrcId)) map.removeSource(isolineLabelSrcId);
   if (map.getLayer(isolineLayerId)) map.removeLayer(isolineLayerId);
   if (map.getSource(isolineSrcId)) map.removeSource(isolineSrcId);
   if (map.getLayer(isobandLayerId)) map.removeLayer(isobandLayerId);
@@ -236,16 +274,6 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
 
   let { x, y, Z } = croppedData;
 
-  const shouldSmooth = options.smooth !== false;
-  const smoothIterations = typeof options.smoothIterations === "number" ? options.smoothIterations : 2;
-
-  if (shouldSmooth && Z.length >= 3 && Z[0]?.length >= 3) {
-    Z = smoothGrid2D(Z, 1, 0.4);
-  }
-
-  const { zMin, zMax } = computeGridStats(gridData);
-  const levels = resolveRenderLevels(options) || getElementLevels(element, zMin, zMax, options.colormap);
-
   const isVisible = options.visible !== false;
   const showRaster = options.showRaster === true;
   const showFill = options.preserveIsobands
@@ -253,6 +281,18 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
     : (options.showFill !== undefined
         ? Boolean(options.showFill)
         : (!showRaster && element !== "HGT" && element !== "WIND" && element !== "DTD"));
+  const showLine = options.showLine !== false;
+
+  const shouldSmooth = options.smooth !== false;
+  const smoothIterations = typeof options.smoothIterations === "number" ? options.smoothIterations : 2;
+
+  const needContours = isVisible && (showFill || showLine);
+  if (needContours && shouldSmooth && Z.length >= 3 && Z[0]?.length >= 3) {
+    Z = smoothGrid2D(Z, 1, 0.4);
+  }
+
+  const { zMin, zMax } = computeGridStats(gridData);
+  const levels = resolveRenderLevels(options) || getElementLevels(element, zMin, zMax, options.colormap);
 
   let isobandFC = options.preserveIsobands ? null : { type: "FeatureCollection", features: [] };
   if (!options.preserveIsobands && isVisible && showFill && !showRaster) {
@@ -274,7 +314,6 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
 
   const boldValues = parseBoldValues(options.boldValues, element);
   let isolineFC = { type: "FeatureCollection", features: [] };
-  const showLine = options.showLine !== false;
   if (isVisible && showLine) {
     try {
       const lines = griddata.contour(Z, { x, y, levels });

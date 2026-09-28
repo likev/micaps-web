@@ -235,6 +235,12 @@ export function buildBaseConfig(layerDef) {
         : layerDef.element === "DTD"
         ? false
         : true,
+    showLabels:
+      layerDef.config?.showLabels !== undefined
+        ? layerDef.config.showLabels
+        : (layerDef.render?.showLabels !== undefined
+          ? layerDef.render.showLabels
+          : true),
     opacity: layerDef.config?.opacity || 0.75,
     lineColor:
       layerDef.config?.lineColor ||

@@ -217,6 +217,7 @@ export function buildContourRenderOptions({ layerId, element, colormap, lineColo
     layerId,
     showFill,
     showLine,
+    showLabels: options.showLabels !== false,
     visible: options.visible !== false,
     lineColor,
     lineWidth: options.lineWidth || 2.0,

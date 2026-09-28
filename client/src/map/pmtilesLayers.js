@@ -21,7 +21,6 @@ export function getPMTilesStyle(pmtilesUrl, schemeName = "dark", projectionType 
     projection: {
       type: proj,
     },
-    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
     sources: {
       "china-vector": {
         type: "vector",

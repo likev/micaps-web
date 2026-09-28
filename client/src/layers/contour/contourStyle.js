@@ -9,6 +9,7 @@ export function getLayerDOMIds(layerId = "default") {
     isobandLayerId: isDefault ? "isoband-layer" : `${layerId}-isoband-layer`,
     isolineSrcId: isDefault ? "isoline-source" : `${layerId}-isoline-source`,
     isolineLayerId: isDefault ? "isoline-layer" : `${layerId}-isoline-layer`,
+    isolineLabelSrcId: isDefault ? "isoline-label-source" : `${layerId}-isoline-label-source`,
     isolineLabelLayerId: isDefault ? "isoline-label-layer" : `${layerId}-isoline-label-layer`,
   };
 }
@@ -41,31 +42,44 @@ export function setLayerIsobandVisibility(map, layerId, visible) {
   if (map.getLayer(isobandLayerId)) map.setLayoutProperty(isobandLayerId, "visibility", vis);
 }
 
-export function setLayerIsolineVisibility(map, layerId, visible) {
+export function setLayerIsolineVisibility(map, layerId, visible, showLabels = undefined) {
   const { isolineLayerId, isolineLabelLayerId } = getLayerDOMIds(layerId);
   const vis = visible ? "visible" : "none";
   if (map.getLayer(isolineLayerId)) map.setLayoutProperty(isolineLayerId, "visibility", vis);
+  if (showLabels !== undefined) {
+    const labelVis = (visible && showLabels !== false) ? "visible" : "none";
+    if (map.getLayer(isolineLabelLayerId)) map.setLayoutProperty(isolineLabelLayerId, "visibility", labelVis);
+  } else {
+    if (map.getLayer(isolineLabelLayerId)) map.setLayoutProperty(isolineLabelLayerId, "visibility", vis);
+  }
+}
+
+export function setLayerIsolineLabelVisibility(map, layerId, visible) {
+  const { isolineLabelLayerId } = getLayerDOMIds(layerId);
+  const vis = visible ? "visible" : "none";
   if (map.getLayer(isolineLabelLayerId)) map.setLayoutProperty(isolineLabelLayerId, "visibility", vis);
 }
 
 export function setLayerIsolineStyle(map, layerId, config = {}, parseBoldValuesFn = parseBoldValues, isFeatureBoldFn = isFeatureBold) {
-  const { isolineLayerId, isolineLabelLayerId, isolineSrcId } = getLayerDOMIds(layerId);
+  const { isolineLayerId, isolineLabelLayerId, isolineSrcId, isolineLabelSrcId } = getLayerDOMIds(layerId);
   const lineWidth = typeof config.lineWidth === "number" ? config.lineWidth : 2.0;
   const boldLineWidth = typeof config.boldLineWidth === "number" ? config.boldLineWidth : 4.0;
   const lineColor = config.lineColor || "#ffffff";
   const boldLineColor = config.boldLineColor || lineColor;
 
-  if (config.boldValues !== undefined && map.getSource(isolineSrcId) && parseBoldValuesFn && isFeatureBoldFn) {
-    const src = map.getSource(isolineSrcId);
-    const geojson = src?._data?.geojson || src?._data;
-    if (geojson && Array.isArray(geojson.features)) {
-      const parsed = parseBoldValuesFn(config.boldValues);
-      for (const f of geojson.features) {
-        if (f.properties) {
-          f.properties.isBold = isFeatureBoldFn(f.properties.value, parsed);
+  if (config.boldValues !== undefined && parseBoldValuesFn && isFeatureBoldFn) {
+    const parsed = parseBoldValuesFn(config.boldValues);
+    for (const sid of [isolineSrcId, isolineLabelSrcId]) {
+      const src = map.getSource(sid);
+      const geojson = src?._data?.geojson || src?._data || src?.data;
+      if (geojson && Array.isArray(geojson.features)) {
+        for (const f of geojson.features) {
+          if (f.properties) {
+            f.properties.isBold = isFeatureBoldFn(f.properties.value, parsed);
+          }
         }
+        src.setData(geojson);
       }
-      src.setData(geojson);
     }
   }
 
@@ -73,8 +87,12 @@ export function setLayerIsolineStyle(map, layerId, config = {}, parseBoldValuesF
   const lineColorExp = buildLineColorExp(boldLineColor, lineColor);
 
   if (map.getLayer(isolineLayerId)) {
-    map.setPaintProperty(isolineLayerId, "line-color", lineColorExp);
-    map.setPaintProperty(isolineLayerId, "line-width", lineWidthExp);
+    if (config.lineColor !== undefined || config.boldLineColor !== undefined || Object.keys(config).length === 0) {
+      map.setPaintProperty(isolineLayerId, "line-color", lineColorExp);
+    }
+    if (config.lineWidth !== undefined || config.boldLineWidth !== undefined || Object.keys(config).length === 0) {
+      map.setPaintProperty(isolineLayerId, "line-width", lineWidthExp);
+    }
   }
   if (map.getLayer(isolineLabelLayerId)) {
     const scheme = map.__basemapScheme || "dark";
@@ -108,6 +126,10 @@ export function setIsobandVisibility(map, visible) {
 
 export function setIsolineVisibility(map, visible) {
   setLayerIsolineVisibility(map, "default", visible);
+}
+
+export function setIsolineLabelVisibility(map, visible) {
+  setLayerIsolineLabelVisibility(map, "default", visible);
 }
 
 export function setContourVisibility(map, visible) {

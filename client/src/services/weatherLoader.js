@@ -80,6 +80,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
   const opacity = exCfg.opacity ?? customOptions?.opacity ?? 0.75;
   let showFill = exCfg.showFill ?? customOptions?.showFill ?? (!isHeight && !isWind && !isVortDiv);
   const showLine = exCfg.showLine ?? customOptions?.showLine ?? !isWind;
+  const showLabels = exCfg.showLabels ?? customOptions?.showLabels ?? true;
   const lineWidth = exCfg.lineWidth ?? customOptions?.lineWidth ?? (isVortDiv ? 2.0 : 1.4);
   const showWind = exCfg.showWind ?? customOptions?.showWind ?? isWind;
   const showBarbs = exCfg.showBarbs ?? customOptions?.showBarbs ?? false;
@@ -183,6 +184,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
         showFill: isVisible && showFill,
         showRaster: isVisible && showRaster,
         showLine: isVisible && showLine,
+        showLabels: isVisible && showLabels,
         lineColor,
         lineWidth,
         boldValues,
@@ -218,6 +220,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
       } : {
         showFill,
         showLine,
+        showLabels,
         lineColor,
         opacity,
         lineWidth,
@@ -250,6 +253,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
         config: {
           showFill,
           showLine,
+          showLabels,
           lineColor,
           opacity,
           lineWidth,

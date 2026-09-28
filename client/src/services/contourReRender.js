@@ -288,6 +288,7 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
               visibleIsoband: liveLayer.visible !== false && Boolean(liveLayer.config?.showFill),
               showFill: recomputeFill ? liveLayer.config?.showFill : false, // NEVER contourf on move unless out of fill bounds
               showLine: liveLayer.visible !== false && liveLayer.config?.showLine !== false,
+              showLabels: liveLayer.visible !== false && liveLayer.config?.showLabels !== false,
               viewportBounds: map.getBounds().toArray(),
               maxEffectiveCells: budget,
               onStats: (s) => {
