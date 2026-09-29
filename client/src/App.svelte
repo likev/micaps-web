@@ -45,6 +45,7 @@
     isWindowEmpty,
     hasWeatherLayers,
     getNextWindowUid,
+    shouldSkipWindowReload,
   } from "./lib/stores/tabsCore.js";
   import { getLayersForWindow, clearLayersForWindow } from "./lib/stores/layersCore.js";
   import { deleteWindowTimeline } from "./lib/stores/timeline.svelte.js";
@@ -635,19 +636,18 @@
         try { map.resize(); } catch {}
       }
 
-      const loadSeq = (w.loadSeq || 0) + 1;
-      w.loadSeq = loadSeq;
       const isInitial = isWindowEmpty(w, getLayersForWindow);
 
-      const shouldSkipMapReload = Boolean(w === baseWin && !isInitial && prevBaseState && w.activeGroup?.id === prevBaseState.groupId && (
-        (mode === "level" && w.level === prevBaseState.level) ||
-        (mode === "model" && w.model === prevBaseState.model) ||
-        (mode === "step" && w.period === prevBaseState.period) ||
-        (mode === "time" && (
-          (w.isObservation && w.obsTime === prevBaseState.obsTime) ||
-          (!w.isObservation && w.forecastCycle === prevBaseState.forecastCycle && w.period === prevBaseState.period)
-        ))
-      ));
+      const shouldSkipMapReload = Boolean(!isInitial && shouldSkipWindowReload(w, baseWin, prevBaseState, mode));
+      // Bump the stale-guard sequence only for windows that will actually
+      // reload: a skipped baseWin must not invalidate the in-flight load of
+      // a previous fan-out that already cleared its map, or the map is left
+      // blank with no restore following.
+      let loadSeq = w.loadSeq || 0;
+      if (!shouldSkipMapReload) {
+        loadSeq += 1;
+        w.loadSeq = loadSeq;
+      }
 
       if (mode === "level") {
         if (w.activeGroup && w.activeGroup.hasLevel !== false) {
@@ -692,9 +692,9 @@
       } else if (mode === "step") {
         const tl = getOrCreateTimeline(w.id);
         if (w.isObservation) {
-          stopWindAnimation(map);
-          removeGridWindBarbs(map);
-          removeRasterLayer(map);
+          // NOTE: no wind/barb/raster teardown here. The fresh load below
+          // clears internally, and a skipped reload (shouldSkipMapReload)
+          // must not wipe visuals it never restores (unintended hide).
           if (baseWin?._obsTimeline) {
             w._obsTimeline = { ...baseWin._obsTimeline, file: w.obsTime, stepLength: w.stepLength };
           }
@@ -742,9 +742,8 @@
       } else if (mode === "time") {
         const tl = getOrCreateTimeline(w.id);
         if (w.isObservation) {
-          stopWindAnimation(map);
-          removeGridWindBarbs(map);
-          removeRasterLayer(map);
+          // Same no-teardown rule as the step branch above: a skipped baseWin
+          // reload must leave its map (e.g. DTD raster) untouched.
           if (baseWin?._obsTimeline) {
             w._obsTimeline = { ...baseWin._obsTimeline, file: w.obsTime, stepLength: w.stepLength };
           }

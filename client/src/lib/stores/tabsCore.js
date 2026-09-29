@@ -384,8 +384,28 @@ export function isWindowVisible(tab, win) {
   return getVisibleWindows(tab).includes(win);
 }
 
-export function applyAutoAllocation(tab, mode = "level", baseWin = null) {
-  if (!tab || !Array.isArray(tab.windows)) return;
+/**
+ * Pure predicate behind the split fan-out's reload skip: the base window
+ * keeps its map untouched when the allocation pass changed nothing about it
+ * (same preset, level, model, period, cycle, obsTime). Skipping must not
+ * wipe or invalidate anything — callers must neither tear down its map nor
+ * bump its stale-guard sequence on this path.
+ */
+export function shouldSkipWindowReload(w, baseWin, prevBaseState, mode) {
+  if (!w || !baseWin || w !== baseWin || !prevBaseState || w.activeGroup?.id !== prevBaseState.groupId) {
+    return false;
+  }
+  if (mode === "level") return w.level === prevBaseState.level;
+  if (mode === "model") return w.model === prevBaseState.model;
+  if (mode === "step") return w.period === prevBaseState.period;
+  if (mode === "time") {
+    if (w.isObservation) return w.obsTime === prevBaseState.obsTime;
+    return w.forecastCycle === prevBaseState.forecastCycle && w.period === prevBaseState.period;
+  }
+  return false;
+}
+
+export function applyAutoAllocation(tab, mode = "level", baseWin = null) {  if (!tab || !Array.isArray(tab.windows)) return;
   tab.autoAllocation = mode;
   if (mode === "none") {
     revertAutoAllocation(tab, baseWin);

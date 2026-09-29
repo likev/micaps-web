@@ -181,8 +181,7 @@ describe("discarded obs loads leave current visuals intact", () => {  it("a supe
   });
 });
 
-describe("degenerate recomputes preserve the current picture", () => {
-  it("an all-equal grid does not erase existing isolines/isobands", () => {
+describe("degenerate recomputes preserve the current picture", () => {  it("an all-equal grid does not erase existing isolines/isobands", () => {
     const map = mockMap();
     const good = {
       header: { start_lon: 70, end_lon: 130, start_lat: 10, end_lat: 55, n_lon: 10, n_lat: 10, d_lon: 6, d_lat: 4.5 },
@@ -198,5 +197,68 @@ describe("degenerate recomputes preserve the current picture", () => {
     renderContourLayers(map, flat, "TMP", { layerId: "contour-TMP", showFill: false, showLine: true });
     expect(map.getSource("contour-TMP-isoline-source")?._data?.features?.length).toBe(nLines);
     expect(map.getLayer("contour-TMP-isoline-layer")?.layout?.visibility).toBe("visible");
+  });
+});
+
+describe("core HGT/TMP are not starved by dynamic derived layers", () => {
+  // Post-11a1d6c presets declare no HGT/TMP; once DTD is runtime-added,
+  // groupDerived is non-empty-but-partial and the default fallback is
+  // bypassed. Fresh split windows and timesteps must still render HGT/TMP.
+  function dtdOnlyGroup(level) {
+    return {
+      id: "composite-upperair-500",
+      name: "500 hPa Upper-Air Sounding",
+      isObservation: true,
+      hasLevel: true,
+      defaultLevel: 500,
+      layers: [
+        { id: `upperair-obs-${level}`, type: "station", model: "UPPER_AIR", element: "PLOT", level, path: `UPPER_AIR/PLOT/${level}`, render: { showTemp: true, showWind: true } },
+        { id: `contour-sounding-dtd-${level}`, model: "UPPER_AIR", element: "DTD", level, type: "contour", derivedFrom: `upperair-obs-${level}`, render: { showFill: false, showLine: false, showRaster: true, lineColor: "#e3b341" } },
+      ],
+    };
+  }
+
+  async function stepFresh(map, win) {
+    const seq = (win.loadSeq || 0) + 1;
+    win.loadSeq = seq;
+    await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, false, seq);
+  }
+
+  it("fresh load with only DTD declared renders HGT+TMP too", async () => {
+    const map = mockMap();
+    const win = {
+      id: "test-starve-fresh", winIdx: 1, level: 500, period: 24,
+      isObservation: true, obsTime: "20260320200000.000", stepLength: 12,
+      activeGroup: dtdOnlyGroup(500),
+    };
+    await stepFresh(map, win);
+    for (const elem of ["hgt", "tmp"]) {
+      const layer = getLayerById(`contour-sounding-${elem}-500`, win);
+      expect(layer).toBeDefined();
+      expect(layer.visible).not.toBe(false);
+      const line = map.getLayer(`contour-sounding-${elem}-500-isoline-layer`);
+      expect(line).not.toBeNull();
+      expect(line.layout?.visibility).toBe("visible");
+    }
+    expect(getLayerById("contour-sounding-dtd-500", win)?.visible).not.toBe(false);
+  });
+
+  it("eye-hidden HGT stays hidden (backfill does not resurrect it)", async () => {
+    const map = mockMap();
+    const group = dtdOnlyGroup(500);
+    group.layers.push({
+      id: "contour-sounding-hgt-500", model: "UPPER_AIR", element: "HGT", level: 500,
+      type: "contour", derivedFrom: "upperair-obs-500", visible: false,
+      render: { showFill: false, showLine: true, showRaster: false, lineColor: "#58a6ff" },
+    });
+    const win = {
+      id: "test-starve-hidden", winIdx: 1, level: 500, period: 24,
+      isObservation: true, obsTime: "20260320200000.000", stepLength: 12,
+      activeGroup: group,
+    };
+    await stepFresh(map, win);
+    expect(getLayerById("contour-sounding-hgt-500", win)?.visible).toBe(false);
+    // TMP (absent) is still backfilled and visible.
+    expect(getLayerById("contour-sounding-tmp-500", win)?.visible).not.toBe(false);
   });
 });

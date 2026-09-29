@@ -17,6 +17,29 @@ import { appState } from "../store/appState.js";
 export async function renderSoundingDerivedContoursForStation(map, stations, curLevel, activeGroup, win, stationLayerId) {
   if (!curLevel || activeGroup?.id === "composite-tlogp" || activeGroup?.hasLevel === false) return;
   const groupDerived = activeGroup?.layers?.filter((l) => l.type === "contour" && l.model === "UPPER_AIR" && Boolean(l.derivedFrom)) || [];
+  // Core contours must not starve: presets no longer pre-declare HGT/TMP, so
+  // once any dynamic layer (e.g. DTD) lands in activeGroup, the default-only
+  // fallback below is bypassed and HGT/TMP would never render — neither fresh
+  // (new split windows) nor on steps (stale map data). Backfill the missing
+  // core elements locally (never persisted); the loop below then renders them
+  // with the same visibility/snapshot/legend handling as declared layers.
+  // Eye-hidden entries stay hidden (they are present, just invisible); only
+  // genuinely absent elements are backfilled.
+  if (groupDerived.length > 0) {
+    for (const defElem of ["HGT", "TMP"]) {
+      if (!groupDerived.some((l) => (l.element || "").toUpperCase() === defElem)) {
+        groupDerived.push({
+          id: `contour-sounding-${defElem.toLowerCase()}-${curLevel}`,
+          type: "contour",
+          model: "UPPER_AIR",
+          element: defElem,
+          level: curLevel,
+          derivedFrom: stationLayerId,
+          render: {},
+        });
+      }
+    }
+  }
   if (groupDerived.length > 0) {
     for (const cLayer of groupDerived) {
       try {

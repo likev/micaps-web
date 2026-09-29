@@ -17,6 +17,7 @@ import {
   setModelLevelsCache,
   queryModelSupportedLevels,
   getEligibleModelsForAllocationAsync,
+  shouldSkipWindowReload,
 } from "../../src/lib/stores/tabsCore.js";
 import { getPeriodsForStep } from "../../src/ui/timeline/timelineMath.js";
 import {
@@ -940,3 +941,43 @@ describe("Auto-Allocation 5-Mode System & Synchronization", () => {
   });
 });
 
+
+describe("shouldSkipWindowReload fan-out guard", () => {
+  const baseGroup = { id: "composite-upperair-500", layers: [] };
+  function baseWin(over = {}) {
+    return {
+      id: "tab-1-win-0", winIdx: 0, level: 500, period: 24, model: "UPPER_AIR",
+      element: "PLOT", isObservation: true, obsTime: "20260320200000.000",
+      forecastCycle: "20260320", activeGroup: baseGroup, ...over,
+    };
+  }
+  function prevOf(win) {
+    return {
+      level: win.level, model: win.model, period: win.period,
+      forecastCycle: win.forecastCycle, obsTime: win.obsTime, groupId: win.activeGroup?.id,
+    };
+  }
+
+  it("skips the unchanged base window per allocation mode", () => {
+    const win = baseWin();
+    const prev = prevOf(win);
+    expect(shouldSkipWindowReload(win, win, prev, "level")).toBe(true);
+    expect(shouldSkipWindowReload(win, win, prev, "step")).toBe(true);
+    expect(shouldSkipWindowReload(win, win, prev, "time")).toBe(true);
+    const nwpWin = baseWin({ model: "ECMWF_HR", element: "TMP", isObservation: false, forecastCycle: "20260320" });
+    expect(shouldSkipWindowReload(nwpWin, nwpWin, prevOf(nwpWin), "model")).toBe(true);
+  });
+
+  it("reloads on any material change, other windows, or missing baseline", () => {
+    const win = baseWin();
+    const prev = prevOf(win);
+    expect(shouldSkipWindowReload({ ...win, level: 850 }, win, prev, "level")).toBe(false);
+    expect(shouldSkipWindowReload({ ...win, period: 30 }, win, prev, "step")).toBe(false);
+    expect(shouldSkipWindowReload({ ...win, obsTime: "20260320080000.000" }, win, prev, "time")).toBe(false);
+    expect(shouldSkipWindowReload({ ...win, activeGroup: { id: "other" } }, win, prev, "level")).toBe(false);
+    const other = baseWin({ id: "tab-1-win-1", winIdx: 1 });
+    expect(shouldSkipWindowReload(other, win, prev, "level")).toBe(false);
+    expect(shouldSkipWindowReload(win, win, null, "level")).toBe(false);
+    expect(shouldSkipWindowReload(win, win, prev, "none")).toBe(false);
+  });
+});
