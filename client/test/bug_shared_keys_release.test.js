@@ -18,6 +18,7 @@ import { getLayersForWindow, addOrUpdateLayer, clearLayersForWindow } from "../s
 import { handleConfigAction } from "../src/ui/layers/configActions.js";
 import { armContourReRender, disarmAllContourReRenders } from "../src/services/contourReRender.js";
 import { schedulePrefetch, cancelScheduledPrefetch } from "../src/services/prefetchService.js";
+import { prefetchWinKey } from "../src/services/prefetchService.js";
 import {
   updateLegend,
   buildLegendItems,
@@ -176,8 +177,7 @@ describe("window-close release pieces", () => {
     expect(map.offCalls).toContain("zoomend");
   });
 
-  it("cancelScheduledPrefetch prevents the pending prefetch from firing", async () => {
-    const origFetch = globalThis.fetch;
+  it("cancelScheduledPrefetch prevents the pending prefetch from firing", async () => {    const origFetch = globalThis.fetch;
     let fetchCalls = 0;
     globalThis.fetch = async () => {
       fetchCalls++;
@@ -235,5 +235,33 @@ describe("dataCache is LRU-bounded", () => {
     const stats = getCacheStats();
     expect(stats.size).toBe(MAX_DATA_CACHE_ENTRIES);
     expect(stats.size).toBeLessThanOrEqual(MAX_DATA_CACHE_ENTRIES);
+  });
+});
+
+describe("prefetch schedule/cancel share one key resolution", () => {
+  it("prefetchWinKey prefers id, then winIdx, then default", () => {
+    expect(prefetchWinKey({ id: "tab-1-win-3", winIdx: 9 })).toBe("tab-1-win-3");
+    expect(prefetchWinKey({ winIdx: 2 })).toBe("w-2");
+    expect(prefetchWinKey({})).toBe("default");
+    expect(prefetchWinKey(null)).toBe("default");
+  });
+
+  it("cancel reaches timers scheduled without a window id", async () => {
+    const origFetch = globalThis.fetch;
+    let fetchCalls = 0;
+    globalThis.fetch = async () => {
+      fetchCalls++;
+      return { ok: false, status: 404, statusText: "nf", text: async () => "", json: async () => ({}), arrayBuffer: async () => new ArrayBuffer(0) };
+    };
+    try {
+      schedulePrefetch({ winIdx: 7 }, 30);
+      cancelScheduledPrefetch({ winIdx: 7 });
+      schedulePrefetch({}, 30);
+      cancelScheduledPrefetch({});
+      await new Promise((r) => setTimeout(r, 100));
+      expect(fetchCalls).toBe(0);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
   });
 });

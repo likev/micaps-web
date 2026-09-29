@@ -7,6 +7,13 @@ import { getLayersForWindow } from "../ui/layerControl.js";
 export const VERTICAL_LEVELS = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
 
 const prefetchTimers = new Map(); // winKey -> timer
+
+// Single key resolution shared by schedule + cancel. A mismatch here would
+// silently miss the cancel (stale timer keeps a dead win + gridData alive
+// past window close), so both paths must resolve through this helper.
+export function prefetchWinKey(win) {
+  return win?.id || (win?.winIdx !== undefined ? `w-${win.winIdx}` : "default");
+}
 let lastPrefetchStats = {
   timestamp: 0,
   prefetchedCount: 0,
@@ -456,7 +463,7 @@ export async function prefetchSurroundingData(win, options = {}) {
  * @param {Object} [options] - Optional prefetch options (e.g. { directions: ['next'] })
  */
 export function schedulePrefetch(win, delayMs = 150, options = {}) {
-  const winKey = win?.id || (win?.winIdx !== undefined ? `w-${win.winIdx}` : "default");
+  const winKey = prefetchWinKey(win);
   if (prefetchTimers.has(winKey)) {
     clearTimeout(prefetchTimers.get(winKey));
     prefetchTimers.delete(winKey);
@@ -482,7 +489,7 @@ export function schedulePrefetch(win, delayMs = 150, options = {}) {
 
 export function cancelScheduledPrefetch(win = null) {
   if (win) {
-    const winKey = win?.id || (win?.winIdx !== undefined ? `w-${win.winIdx}` : "default");
+    const winKey = prefetchWinKey(win);
     if (prefetchTimers.has(winKey)) {
       clearTimeout(prefetchTimers.get(winKey));
       prefetchTimers.delete(winKey);
