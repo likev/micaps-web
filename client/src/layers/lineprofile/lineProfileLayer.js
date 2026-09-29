@@ -44,14 +44,17 @@ export async function loadLineHeightLayer(map, layer = {}, win = null) {
   return await lineHeightController.init(map, win, def);
 }
 
-export function removeLineHeightLayer(map, win = null, layerId = null) {
+export function removeLineHeightLayer(map, win = null, layerId = null, opts = null) {
   lineHeightController.destroy(map, win);
   const idToRemove = layerId || "ec-lineheight-diagram";
+  const preservePreset = Boolean(opts?.preservePreset);
   removeLayer(idToRemove, win);
   if (idToRemove !== "ec-lineheight-diagram") {
     removeLayer("ec-lineheight-diagram", win);
   }
-  if (win) {
+  // See tlogpLayer.removeTLogPLayer: explicit removes detach from per-window
+  // copies; fresh-load clearing passes { preservePreset: true }.
+  if (win && !preservePreset) {
     if (Array.isArray(win.layers)) {
       win.layers = win.layers.filter((l) => l && l.id !== idToRemove && l.type !== "lineheight");
     }
@@ -103,14 +106,17 @@ export async function loadHovmollerLayer(map, layer = {}, win = null) {
   return await hovmollerController.init(map, win, def);
 }
 
-export function removeHovmollerLayer(map, win = null, layerId = null) {
+export function removeHovmollerLayer(map, win = null, layerId = null, opts = null) {
   hovmollerController.destroy(map, win);
   const idToRemove = layerId || "ec-hovmoller-diagram";
+  const preservePreset = Boolean(opts?.preservePreset);
   removeLayer(idToRemove, win);
   if (idToRemove !== "ec-hovmoller-diagram") {
     removeLayer("ec-hovmoller-diagram", win);
   }
-  if (win) {
+  // See tlogpLayer.removeTLogPLayer: explicit removes detach from per-window
+  // copies; fresh-load clearing passes { preservePreset: true }.
+  if (win && !preservePreset) {
     if (Array.isArray(win.layers)) {
       win.layers = win.layers.filter((l) => l && l.id !== idToRemove && l.type !== "hovmoller");
     }

@@ -50,14 +50,18 @@ export async function loadTimeHeightLayer(map, layer = {}, win = null) {
   return await timeHeightController.init(map, win, timeHeightLayerDef);
 }
 
-export function removeTimeHeightLayer(map, win = null, layerId = null) {
+export function removeTimeHeightLayer(map, win = null, layerId = null, opts = null) {
   timeHeightController.destroy(map, win);
   const idToRemove = layerId || "ec-timeheight-diagram";
+  const preservePreset = Boolean(opts?.preservePreset);
   removeLayer(idToRemove, win);
   if (idToRemove !== "ec-timeheight-diagram") {
     removeLayer("ec-timeheight-diagram", win);
   }
-  if (win) {
+  // See tlogpLayer.removeTLogPLayer: explicit removes detach from per-window
+  // copies; fresh-load clearing passes { preservePreset: true } to keep the
+  // pending preset intact.
+  if (win && !preservePreset) {
     if (Array.isArray(win.layers)) {
       win.layers = win.layers.filter((l) => l && l.id !== idToRemove && l.type !== "timeheight");
     }

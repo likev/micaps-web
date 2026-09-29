@@ -53,10 +53,14 @@ export function clearAllWeatherLayersFromMap(map, win = null, { resetVisibility 
     removeGridWindBarbs(map);
     removeStationLayer(map);
     removeRasterLayer(map);
-    removeTLogPLayer(map, win);
-    removeTimeHeightLayer(map, win);
-    removeLineHeightLayer(map, win);
-    removeHovmollerLayer(map, win);
+    // preservePreset: win.activeGroup IS the incoming `group` by reference in
+    // loadPresetGroup — detaching profile layers here would wipe the pending
+    // preset before iteration (tlogp/timeheight/lineheight/hovmoller would
+    // never load). Controller teardown + layer-store removal still run.
+    removeTLogPLayer(map, win, null, { preservePreset: true });
+    removeTimeHeightLayer(map, win, null, { preservePreset: true });
+    removeLineHeightLayer(map, win, null, { preservePreset: true });
+    removeHovmollerLayer(map, win, null, { preservePreset: true });
     clearLegends(win);
   } catch (err) {
     console.warn("[Main] Error cleaning up weather layers:", err);

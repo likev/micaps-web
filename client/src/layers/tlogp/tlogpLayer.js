@@ -50,14 +50,21 @@ export async function loadTLogPLayer(map, layer = {}, period = null, level = nul
   return await tlogpController.init(map, win, tlogpLayerDef);
 }
 
-export function removeTLogPLayer(map, win = null, layerId = null) {
+export function removeTLogPLayer(map, win = null, layerId = null, opts = null) {
   tlogpController.destroy(map, win);
   const idToRemove = layerId || "upperair-tlogp-diagram";
+  const preservePreset = Boolean(opts?.preservePreset);
   removeLayer(idToRemove, win);
   if (idToRemove !== "upperair-tlogp-diagram") {
     removeLayer("upperair-tlogp-diagram", win);
   }
-  if (win) {
+  // Explicit ✕-remove (default): also detach from the per-window copies so
+  // findVisibleLayer's activeGroup fallback cannot resurrect the panel on the
+  // next timestep/sync. Fresh-load clearing MUST pass { preservePreset: true }
+  // because loadPresetGroup passes win.activeGroup by reference as `group` —
+  // mutating it there wipes the pending preset before iteration and the panel
+  // never loads (regression of 30925e3).
+  if (win && !preservePreset) {
     if (Array.isArray(win.layers)) {
       win.layers = win.layers.filter((l) => l && l.id !== idToRemove && l.type !== "tlogp");
     }
