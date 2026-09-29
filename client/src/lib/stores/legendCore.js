@@ -149,3 +149,11 @@ export function clearLegends(win = null) {
   }
   notifyLegendChanged(winId);
 }
+
+export function deleteWindowLegends(win = null) {
+  const winId = typeof win === "string" ? win : (win?.id || "default");
+  if (windowLegends.has(winId)) {
+    windowLegends.delete(winId);
+  }
+  notifyLegendChanged(winId);
+}

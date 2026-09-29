@@ -374,16 +374,20 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
           triggerRasterOverlay(map, layer, winObj);
         }
       } else {
-        const seq = (paletteSeq.get(layer.id) || 0) + 1;
-        paletteSeq.set(layer.id, seq);
+        // Split-mode correctness: two windows routinely share a layer id, so
+        // a global layer.id sequence would discard a sibling window's palette
+        // load as "stale". Scope the in-flight guard per window instead.
+        const paletteGuardKey = winObj?.id ? `${winObj.id}::${layer.id}` : layer.id;
+        const seq = (paletteSeq.get(paletteGuardKey) || 0) + 1;
+        paletteSeq.set(paletteGuardKey, seq);
         const mySeq = seq;
         const capturedPath = value.palettePath;
         import("../../utils/paletteLoader.js").then(({ loadXMLPalette }) => {
           loadXMLPalette(capturedPath).then((stops) => {
-            if (mySeq !== paletteSeq.get(layer.id)) return;
+            if (mySeq !== paletteSeq.get(paletteGuardKey)) return;
             if (!stops) return;
             import("../../utils/colormaps.js").then(({ setColormaps, COLORMAPS }) => {
-              if (mySeq !== paletteSeq.get(layer.id)) return;
+              if (mySeq !== paletteSeq.get(paletteGuardKey)) return;
               try {
                 const key = `palette:${layer.id}`;
                 setColormaps({ ...COLORMAPS, [key]: stops, [capturedPath]: stops });

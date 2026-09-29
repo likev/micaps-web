@@ -244,3 +244,30 @@ export function stepWindowTimeline(tl, delta) {
     };
   }
 }
+
+/**
+ * Split-mode sweep coalescing.
+ *
+ * One ←/→ keypress in a shared split allocation (step/time/level/model)
+ * fans out to a full sweep: one fetch + contour + raster pass PER visible
+ * window, awaited sequentially. A sweep takes far longer than the 150ms key-
+ * repeat throttle, so holding the key stacks N sweeps × M windows of
+ * fetch/compute/memory. The per-window loadSeq guard only discards stale
+ * results AFTER the fetch, so the work is still spent.
+ *
+ * Every shared sweep recomputes ALL visible windows from the latest intent,
+ * so an older sweep may stop issuing loads once a newer shared sweep starts
+ * without ever leaving a window uncovered. Single-window loads never touch
+ * the generation and are unaffected.
+ */
+export function beginSharedSweep(tab) {
+  if (!tab || typeof tab !== "object") return 0;
+  const gen = (Number.isFinite(tab._sweepGen) ? tab._sweepGen : 0) + 1;
+  tab._sweepGen = gen;
+  return gen;
+}
+
+export function sharedSweepAlive(tab, gen) {
+  if (!tab || typeof tab !== "object" || !gen) return true;
+  return tab._sweepGen === gen;
+}

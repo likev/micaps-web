@@ -1,17 +1,50 @@
 // rasterLayer.js - Zero-copy Float32Array streaming to Canvas & MapLibre raster image (§8.8.3)
 import { getColor, createColorResolver } from "../utils/colormaps.js";
 
-// Active Blob URL tracking per raster source for memory leak prevention (§8.8.3)
-const activeObjectUrls = new Map(); // rasterSrcId -> objectUrl string
-const rasterRenderSeq = new Map();  // rasterSrcId -> sequence number
+// Active Blob URL tracking per raster source for memory leak prevention (§8.8.3).
+//
+// Split-mode correctness: maps are 1:1 with workspace windows, but several
+// windows routinely render the SAME layerId concurrently (split step/level/
+// model stepping). Keying sequence + URL state by rasterSrcId alone collided
+// across maps: a sibling window's render bumped the shared counter so this
+// map's in-flight toBlob() was discarded as "stale", and its apply revoked a
+// blob URL a sibling map's image source was still displaying. State is
+// therefore scoped per map instance (WeakMap: entries die with the map).
+// The legacy module-level maps remain as the fallback namespace for map-less
+// callers.
+const activeObjectUrls = new Map(); // rasterSrcId -> objectUrl string (map-less fallback)
+const rasterRenderSeq = new Map();  // rasterSrcId -> sequence number (map-less fallback)
+const rasterSeqByMap = new WeakMap();  // map -> Map(rasterSrcId -> sequence number)
+const rasterUrlsByMap = new WeakMap(); // map -> Map(rasterSrcId -> objectUrl string)
+
+function seqStoreFor(map) {
+  if (!map || typeof map !== "object") return rasterRenderSeq;
+  let store = rasterSeqByMap.get(map);
+  if (!store) {
+    store = new Map();
+    rasterSeqByMap.set(map, store);
+  }
+  return store;
+}
+
+function urlStoreFor(map) {
+  if (!map || typeof map !== "object") return activeObjectUrls;
+  let store = rasterUrlsByMap.get(map);
+  if (!store) {
+    store = new Map();
+    rasterUrlsByMap.set(map, store);
+  }
+  return store;
+}
 
 /**
  * Revokes any allocated Blob URL for the specified raster source ID (§8.8.3).
  *
  * @param {string} rasterSrcId - Raster source DOM identifier
  */
-export function revokeRasterUrl(rasterSrcId) {
-  const prevUrl = activeObjectUrls.get(rasterSrcId);
+export function revokeRasterUrl(rasterSrcId, map = null) {
+  const store = urlStoreFor(map);
+  const prevUrl = store.get(rasterSrcId);
   if (prevUrl && typeof prevUrl === "string" && prevUrl.startsWith("blob:")) {
     if (typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") {
       try {
@@ -19,7 +52,7 @@ export function revokeRasterUrl(rasterSrcId) {
       } catch {}
     }
   }
-  activeObjectUrls.delete(rasterSrcId);
+  store.delete(rasterSrcId);
 }
 
 export function getRasterDOMIds(layerId = "default") {
@@ -243,12 +276,14 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
   ];
 
   const { rasterSrcId, rasterLayerId } = getRasterDOMIds(layerId);
-  const curSeq = (rasterRenderSeq.get(rasterSrcId) || 0) + 1;
-  rasterRenderSeq.set(rasterSrcId, curSeq);
+  const seqStore = seqStoreFor(map);
+  const urlStore = urlStoreFor(map);
+  const curSeq = (seqStore.get(rasterSrcId) || 0) + 1;
+  seqStore.set(rasterSrcId, curSeq);
 
   const applyRasterImage = (imageUrl) => {
-    // Drop stale async renders
-    if (rasterRenderSeq.get(rasterSrcId) !== curSeq) {
+    // Drop stale async renders (same map, same source — a newer step won)
+    if (seqStore.get(rasterSrcId) !== curSeq) {
       if (imageUrl && typeof imageUrl === "string" && imageUrl.startsWith("blob:")) {
         if (typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") {
           try { URL.revokeObjectURL(imageUrl); } catch {}
@@ -257,14 +292,16 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
       return;
     }
 
-    // Revoke previous URL to release memory (§8.8.3 P3-2)
-    const prevUrl = activeObjectUrls.get(rasterSrcId);
+    // Revoke previous URL to release memory (§8.8.3 P3-2).
+    // Scoped to this map: sibling split windows hold their own URLs for the
+    // same source id and must never have them revoked out from under them.
+    const prevUrl = urlStore.get(rasterSrcId);
     if (prevUrl && prevUrl !== imageUrl && prevUrl.startsWith("blob:")) {
       if (typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") {
         try { URL.revokeObjectURL(prevUrl); } catch {}
       }
     }
-    activeObjectUrls.set(rasterSrcId, imageUrl);
+    urlStore.set(rasterSrcId, imageUrl);
 
     if (map.getSource(rasterSrcId)) {
       map.getSource(rasterSrcId).updateImage({
@@ -368,7 +405,7 @@ export function removeRasterLayer(map, layerId = null) {
   if (!map || !map.getStyle) return;
   if (layerId) {
     const { rasterSrcId, rasterLayerId } = getRasterDOMIds(layerId);
-    revokeRasterUrl(rasterSrcId);
+    revokeRasterUrl(rasterSrcId, map);
     if (map.getLayer(rasterLayerId)) map.removeLayer(rasterLayerId);
     if (map.getSource(rasterSrcId)) map.removeSource(rasterSrcId);
   } else {
@@ -394,7 +431,7 @@ export function removeAllRasterLayers(map) {
   if (style.sources) {
     for (const srcId of Object.keys(style.sources)) {
       if (srcId.includes("raster-source") || srcId.endsWith("-raster-source")) {
-        revokeRasterUrl(srcId);
+        revokeRasterUrl(srcId, map);
         if (map.getSource(srcId)) {
           map.removeSource(srcId);
         }

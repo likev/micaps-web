@@ -5,6 +5,7 @@ import {
   updateLegend as coreUpdateLegend,
   removeLegend as coreRemoveLegend,
   clearLegends as coreClearLegends,
+  deleteWindowLegends as coreDeleteWindowLegends,
   onLegendChange,
 } from "./legendCore.js";
 
@@ -43,6 +44,12 @@ export function clearLegends(win = null) {
   coreClearLegends(win);
   const winId = typeof win === "string" ? win : (win?.id || "default");
   syncLegendState(winId);
+}
+
+export function deleteWindowLegends(win = null) {
+  coreDeleteWindowLegends(win);
+  const winId = typeof win === "string" ? win : (win?.id || "default");
+  if (legends[winId] !== undefined) delete legends[winId];
 }
 
 export { buildLegendItems };

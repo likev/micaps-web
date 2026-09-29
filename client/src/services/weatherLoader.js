@@ -12,6 +12,7 @@ import { resolveLatestForecastCycle } from "../utils/timelineSync.js";
 import { schedulePrefetch } from "./prefetchService.js";
 import { armContourReRender } from "./contourReRender.js";
 import * as contourReRenderModule from "./contourReRender.js";
+import { getCachedWindGrid, setCachedWindGrid } from "../utils/windGridCache.js";
 import { showErrorToast } from "../ui/toast.js";
 
 /**
@@ -183,16 +184,13 @@ export async function loadWeatherField(map, model, element, level, period, custo
     let gridData;
     if (isVortDiv) {
       const cacheKey = hasLevel ? `${model}/WIND/${level}/${file}` : `${model}/WIND/${file}`;
-      let windData = null;
-      if (win?._windGridCache?.has(cacheKey)) {
-        windData = win._windGridCache.get(cacheKey);
-      } else if (win?.windGridData && (win.level === level || !level) && win.windGridData.u && win.windGridData.v) {
-        windData = win.windGridData;
-      } else {
-        windData = await fetchGridData(dataPath, file);
-        if (win) {
-          if (!win._windGridCache) win._windGridCache = new Map();
-          win._windGridCache.set(cacheKey, windData);
+      let windData = getCachedWindGrid(win, cacheKey);
+      if (!windData) {
+        if (win?.windGridData && (win.level === level || !level) && win.windGridData.u && win.windGridData.v) {
+          windData = win.windGridData;
+        } else {
+          windData = await fetchGridData(dataPath, file);
+          if (win) setCachedWindGrid(win, cacheKey, windData);
         }
       }
       if (win && !win.windGridData) {
@@ -207,10 +205,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
       gridData = await fetchGridData(path, file);
       if (isWind) {
         const cacheKey = hasLevel ? `${model}/WIND/${level}/${file}` : `${model}/WIND/${file}`;
-        if (win) {
-          if (!win._windGridCache) win._windGridCache = new Map();
-          win._windGridCache.set(cacheKey, gridData);
-        }
+        if (win) setCachedWindGrid(win, cacheKey, gridData);
       }
     }
 

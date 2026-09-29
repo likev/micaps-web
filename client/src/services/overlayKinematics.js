@@ -3,6 +3,7 @@ import { renderContourLayers } from "../layers/contourLayer.js";
 import { renderGridRaster } from "../layers/rasterLayer.js";
 import { updateLegend, removeLegend } from "../ui/legend.js";
 import { armContourReRender } from "./contourReRender.js";
+import { getCachedWindGrid, setCachedWindGrid } from "../utils/windGridCache.js";
 
 export async function triggerVortDivOverlay(map, layer = null, win = null) {
   if (!map || !layer) return;
@@ -91,28 +92,26 @@ export async function triggerVortDivOverlay(map, layer = null, win = null) {
   let windGrid = null;
   const cacheKey = file ? `${model}/WIND/${level}/${file}` : null;
 
-  if (cacheKey && win?._windGridCache?.has(cacheKey)) {
-    windGrid = win._windGridCache.get(cacheKey);
-  } else if (
-    win?.windGridData &&
-    win.windGridData._file === file &&
-    (win.level === level || !level) &&
-    win.windGridData.u &&
-    win.windGridData.v
-  ) {
-    windGrid = win.windGridData;
-  } else if (file) {
-    try {
-      const { fetchGridData } = await import("../api/catalogApi.js");
-      windGrid = await fetchGridData(`${model}/WIND/${level}`, file);
-      if (windGrid) windGrid._file = file;
-      if (win && cacheKey) {
-        if (!win._windGridCache) win._windGridCache = new Map();
-        win._windGridCache.set(cacheKey, windGrid);
+  if (cacheKey) windGrid = getCachedWindGrid(win, cacheKey);
+  if (!windGrid) {
+    if (
+      win?.windGridData &&
+      win.windGridData._file === file &&
+      (win.level === level || !level) &&
+      win.windGridData.u &&
+      win.windGridData.v
+    ) {
+      windGrid = win.windGridData;
+    } else if (file) {
+      try {
+        const { fetchGridData } = await import("../api/catalogApi.js");
+        windGrid = await fetchGridData(`${model}/WIND/${level}`, file);
+        if (windGrid) windGrid._file = file;
+        if (win && cacheKey) setCachedWindGrid(win, cacheKey, windGrid);
+      } catch (err) {
+        console.warn(`[LayerActions] Failed to fetch wind grid for ${model}/WIND/${level}/${file}:`, err);
+        return;
       }
-    } catch (err) {
-      console.warn(`[LayerActions] Failed to fetch wind grid for ${model}/WIND/${level}/${file}:`, err);
-      return;
     }
   }
 

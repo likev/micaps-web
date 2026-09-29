@@ -9,6 +9,7 @@ import {
   triggerRasterOverlay,
   triggerVortDivOverlay,
 } from "../../services/overlayTriggers.js";
+import { setCachedWindGrid } from "../../utils/windGridCache.js";
 
 function syncDerivedLayerToWindowPreset(activeGroup, layerEntry) {
   if (!activeGroup || !Array.isArray(activeGroup.layers) || !layerEntry) return;
@@ -44,12 +45,11 @@ export function handleAddContourAction(map, layer, value, winObj) {
     if (layer?.gridData && layer.gridData.u && layer.gridData.v) {
       if (winObj) {
         winObj.windGridData = layer.gridData;
-        if (!winObj._windGridCache) winObj._windGridCache = new Map();
         const period = winObj.period ?? 24;
         const cycle = winObj.forecastCycle || (layer.file ? layer.file.split(".")[0] : null);
         const file = layer.file || (cycle ? `${cycle}.${String(period).padStart(3, "0")}` : null);
         if (file) {
-          winObj._windGridCache.set(`${model}/WIND/${level}/${file}`, layer.gridData);
+          setCachedWindGrid(winObj, `${model}/WIND/${level}/${file}`, layer.gridData);
         }
       }
     }

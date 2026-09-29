@@ -15,9 +15,9 @@
   import { app } from "./lib/stores/app.svelte.js";
   import { tabsState, getVisibleWindows, getWindowById, setMapInstance, getMapInstance, mapInstances } from "./lib/stores/tabs.svelte.js";
   import { syncLayersState } from "./lib/stores/layers.svelte.js";
-  import { syncLegendState } from "./lib/stores/legend.svelte.js";
+  import { syncLegendState, deleteWindowLegends } from "./lib/stores/legend.svelte.js";
   import { getOrCreateTimeline, playback, selectObsChipsWindow, filterObsFilesByStep, getPeriodsForStep, timelinesByWindow } from "./lib/stores/timeline.svelte.js";
-  import { setLiveTimelineResolver } from "./services/prefetchService.js";
+  import { setLiveTimelineResolver, cancelScheduledPrefetch } from "./services/prefetchService.js";
 
   // Feed the prefetch engine the live per-window timeline (not the frozen
   // legacy global) so left/right keyboard steps warm the actual adjacent
@@ -49,7 +49,9 @@
   import { getLayersForWindow, clearLayersForWindow } from "./lib/stores/layersCore.js";
   import { deleteWindowTimeline } from "./lib/stores/timeline.svelte.js";
   import { stopWindAnimation, removeGridWindBarbs } from "./layers/windLayer.js";
-  import { removeRasterLayer } from "./layers/rasterLayer.js";
+  import { removeRasterLayer, removeAllRasterLayers } from "./layers/rasterLayer.js";
+  import { removeStationLayer } from "./layers/stationLayer.js";
+  import { disarmAllContourReRenders } from "./services/contourReRender.js";
   import {
     shouldHideTimelineForGroup,
     isProfilePanelGroup,
@@ -60,6 +62,8 @@
     isUpperAirWindow,
     applyPresetToWindow,
     stepWindowTimeline,
+    beginSharedSweep,
+    sharedSweepAlive,
   } from "./lib/services/appWorkflow.js";
   import { isTextInput } from "./actions/keyboardShortcuts.js";
   import { registerWindowMapSync, syncTabCameras } from "./ui/tabs/windowMaps.js";
@@ -358,6 +362,30 @@
 
     // 2. Clear layers from layer store
     try { clearLayersForWindow(winId); } catch {}
+
+    // 2b. Release map-bound resources immediately: re-render registrations
+    // hold the map plus layer closures (with gridData), wind loops hold rAF
+    // + document listeners, raster holds blob URLs, and pending prefetch
+    // timers hold the win object. map.remove() alone does not free these.
+    try { disarmAllContourReRenders(map, win); } catch {}
+    try { if (map) stopWindAnimation(map); } catch {}
+    try { if (map) removeGridWindBarbs(map); } catch {}
+    try { if (map) removeStationLayer(map); } catch {}
+    try { if (map) removeAllRasterLayers(map); } catch {}
+    try { deleteWindowLegends(winId); } catch {}
+    try { cancelScheduledPrefetch(win); } catch {}
+    try {
+      if (win._windGridCache instanceof Map) win._windGridCache.clear();
+      win.windGridData = null;
+      win.gridData = null;
+      win.layerSnapshots = null;
+      win.derivedContourSnapshots = null;
+      win._obsTimeline = null;
+      win._obsTimelinePath = null;
+      win._nwpTimeline = null;
+      win._pendingNwp = null;
+      win.prefetchDirections = null;
+    } catch {}
 
     // 3. Clear timeline from timeline store
     try {
@@ -985,6 +1013,7 @@
     if (!payload) return;
 
     if (activeTab?.layout !== "1x1" && activeTab?.autoAllocation === "step" && !payload.isObs) {
+      const sweepGen = beginSharedSweep(activeTab);
       const visible = getVisibleWindows(activeTab);
       const win0 = visible[0] || activeWin;
       const tl0 = win0 ? getOrCreateTimeline(win0.id) : null;
@@ -1010,6 +1039,10 @@
       const startIdx = Math.max(minValidIdx !== -1 ? minValidIdx : 0, (targetIdx !== -1 ? targetIdx : 0) - targetPos);
 
       for (let i = 0; i < visible.length; i++) {
+        // Superseded by a newer shared sweep (rapid ←/→): stop issuing
+        // loads. The newer sweep covers every visible window, so bailing
+        // here can never leave one behind — it just drops wasted work.
+        if (!sharedSweepAlive(activeTab, sweepGen)) return;
         const win = visible[i];
         const loadSeq = (win.loadSeq || 0) + 1;
         win.loadSeq = loadSeq;
@@ -1077,6 +1110,7 @@
     }
 
     if (activeTab?.layout !== "1x1" && activeTab?.autoAllocation === "time" && !payload.isObs) {
+      const sweepGen = beginSharedSweep(activeTab);
       const visible = getVisibleWindows(activeTab);
       const win0 = visible[0] || activeWin;
       const targetWin = (payload.winId ? getWindowById(payload.winId) : activeWin) || win0;
@@ -1103,6 +1137,7 @@
       applyAutoAllocation(activeTab, "time", win0);
 
       for (let i = 0; i < visible.length; i++) {
+        if (!sharedSweepAlive(activeTab, sweepGen)) return;
         const win = visible[i];
         const map = getMapInstance(win.id);
         if (!map) continue;
@@ -1145,6 +1180,7 @@
     }
 
     if (activeTab?.layout !== "1x1" && (activeTab?.autoAllocation === "step" || activeTab?.autoAllocation === "time") && payload.isObs) {
+      const sweepGen = beginSharedSweep(activeTab);
       const visible = getVisibleWindows(activeTab);
       const win0 = visible[0] || activeWin;
       const tl0 = win0 ? getOrCreateTimeline(win0.id) : null;
@@ -1155,6 +1191,7 @@
       const baseFile = stepCycleHours(targetFile, targetPos * stepLen);
 
       for (let i = 0; i < visible.length; i++) {
+        if (!sharedSweepAlive(activeTab, sweepGen)) return;
         const win = visible[i];
         const map = getMapInstance(win.id);
         if (!map) continue;
@@ -1198,8 +1235,10 @@
     const targets = isShared
       ? getVisibleWindows(activeTab)
       : (payload?.winId ? [getWindowById(payload.winId)].filter(Boolean) : (activeWin ? [activeWin] : []));
+    const sweepGen = isShared ? beginSharedSweep(activeTab) : 0;
 
     for (const win of targets) {
+      if (!sharedSweepAlive(activeTab, sweepGen)) return;
       const map = getMapInstance(win.id);
       const loadSeq = (win.loadSeq || 0) + 1;
       win.loadSeq = loadSeq;

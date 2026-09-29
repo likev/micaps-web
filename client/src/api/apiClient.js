@@ -1,11 +1,10 @@
 // apiClient.js - Unified REST and Binary fetch wrappers with 3-minute TTL prefetch cache
 //
-// NOTE (reviewed, intentional, do not "fix"):
-// - Eviction is expiry-only: there is no size cap on dataCache. With many
-//   windows x layers warming grids inside one TTL window, memory can spike
-//   until the 60s prune / lazy delete-on-read catches up. Acceptable because
-//   entries are short-lived (3 min) and grids are re-fetched per cycle/file;
-//   add an LRU/size cap only if heap pressure is ever observed.
+// NOTE (reviewed, intentional):
+// - Eviction is TTL + LRU size cap (MAX_DATA_CACHE_ENTRIES). Heap pressure was
+//   observed in split mode (windows x layers x files warming grids inside one
+//   TTL window), so insertion-order eviction now bounds the worst case while
+//   reads refresh recency. Short TTL (3 min) still bounds lifetime.
 // - setCacheTTL(0) disables caching (writes are guarded by `ttl > 0`), it
 //   does NOT mean "expire immediately". No live callers set a custom TTL;
 //   effective TTL is always DEFAULT_CACHE_TTL_MS.
@@ -36,8 +35,20 @@ let currentCacheTTLMs = DEFAULT_CACHE_TTL_MS;
 // In-memory data cache: url -> { data, type: "json" | "binary", cachedAt: number, expiresAt: number }
 const dataCache = new Map();
 
+// Insertion-ordered Map used as an LRU: reads refresh recency (delete + set)
+// and writes evict oldest-first beyond MAX_DATA_CACHE_ENTRIES.
+export const MAX_DATA_CACHE_ENTRIES = 64;
+
 // In-flight requests map: url -> Promise
 const inflightRequests = new Map();
+
+function enforceDataCacheCap() {
+  while (dataCache.size > MAX_DATA_CACHE_ENTRIES) {
+    const oldest = dataCache.keys().next().value;
+    if (oldest === undefined) break;
+    dataCache.delete(oldest);
+  }
+}
 
 function cloneJson(data) {
   if (data === null || typeof data !== "object") return data;
@@ -81,6 +92,9 @@ export function getCachedEntry(url, now = Date.now()) {
     dataCache.delete(url);
     return null;
   }
+  // Refresh LRU recency so hot entries survive size eviction.
+  dataCache.delete(url);
+  dataCache.set(url, entry);
   return entry;
 }
 
@@ -137,6 +151,7 @@ export async function fetchJson(endpoint, params = {}, options = {}) {
           cachedAt: now,
           expiresAt: now + ttl,
         });
+        enforceDataCacheCap();
       }
       return cloneJson(data);
     } finally {
@@ -189,6 +204,7 @@ export async function fetchBinary(endpoint, params = {}, options = {}) {
           cachedAt: now,
           expiresAt: now + ttl,
         });
+        enforceDataCacheCap();
       }
       return buf;
     } finally {
