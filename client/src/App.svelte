@@ -1216,9 +1216,6 @@
             if (idx !== -1) tl.currentObsIdx = idx;
           }
         }
-        stopWindAnimation(map);
-        removeGridWindBarbs(map);
-        removeRasterLayer(map);
         updateWindowTitle(win);
         if (win.activeGroup) {
           await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, true, loadSeq);
@@ -1272,9 +1269,11 @@
           }
         }
         if (map) {
-          stopWindAnimation(map);
-          removeGridWindBarbs(map);
-          removeRasterLayer(map);
+          // NOTE: no pre-load teardown here. Teardown of the previous
+          // time-step's wind/barbs/raster happens inside
+          // loadObservationProduct AFTER its stale-guard passes, so a
+          // discarded or failed load leaves current visuals intact instead
+          // of blanking layers the store still reports visible.
           if (win.activeGroup) {
             await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, true, loadSeq);
           }

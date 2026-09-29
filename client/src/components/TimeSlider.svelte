@@ -26,6 +26,7 @@
     getRainAccumulationHours,
     getRainAccumulationHoursForWindow,
     getDisabledPeriodsForRain,
+    disabledPeriodsEqual,
   } from "../utils/rain12.js";
 
   let { winId = "default", onTimeChange = null } = $props();
@@ -93,7 +94,14 @@
   $effect(() => {
     const tl = timelinesByWindow[winId] || getOrCreateTimeline(winId);
     if (isRainAccum && !isObs) {
-      tl.disabledPeriods = getDisabledPeriodsForRain(rainAccumHours, tl.discretePeriods);
+      // Compare-then-assign: getDisabledPeriodsForRain builds a fresh array
+      // every run, and blind assignment re-triggers this effect forever
+      // (new object identity === changed $state), spinning CPU on rain
+      // presets. Only assign when membership actually differs.
+      const nextDisabled = getDisabledPeriodsForRain(rainAccumHours, tl.discretePeriods);
+      if (!disabledPeriodsEqual(tl.disabledPeriods, nextDisabled)) {
+        tl.disabledPeriods = nextDisabled;
+      }
       const curP = tl.discretePeriods?.[tl.currentPeriodIdx];
       const isCurDisabled = curP !== undefined && (
         Number(curP) < rainAccumHours ||

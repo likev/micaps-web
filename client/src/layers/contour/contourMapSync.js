@@ -49,7 +49,11 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
 
     if (isobandSrc) {
       const curFeatures = isobandSrc._data?.geojson?.features || isobandSrc._data?.features || isobandSrc.data?.features || [];
-      if (hasIsobandFeatures || curFeatures.length > 0) {
+      // Never blank a populated source with an empty render while it should
+      // stay visible: a degenerate recompute (levels outside data range,
+      // all-equal grid) must preserve the last good picture, not erase it.
+      // Clearing on hide (!visibleIsoband) is still intentional.
+      if (hasIsobandFeatures || (!visibleIsoband && curFeatures.length > 0)) {
         isobandSrc.setData(isobandData);
       }
       if (map.getLayer(isobandLayerId)) {
@@ -101,7 +105,9 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
     if (isolineSrc) {
       if (!options.preserveIsolines) {
         const curFeatures = isolineSrc._data?.geojson?.features || isolineSrc._data?.features || isolineSrc.data?.features || [];
-        if (hasIsolineFeatures || curFeatures.length > 0) {
+        // Same no-blank rule as isobands above: a visible but empty recompute
+        // keeps the previous lines instead of erasing them.
+        if (hasIsolineFeatures || (!visibleIsoline && curFeatures.length > 0)) {
           isolineSrc.setData(lineData);
         }
       }
@@ -137,10 +143,11 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
 
     // 2. Label layer on decoupled isolineLabelSrcId (symbol layer)
     const labelData = visibleLabel ? isolines : emptyFC;
+    const hasLabelData = Array.isArray(labelData.features) && labelData.features.length > 0;
     const isolineLabelSrc = map.getSource(isolineLabelSrcId);
     if (isolineLabelSrc) {
       const curLabelFeatures = isolineLabelSrc._data?.geojson?.features || isolineLabelSrc._data?.features || isolineLabelSrc.data?.features || [];
-      if (visibleLabel || curLabelFeatures.length > 0) {
+      if (hasLabelData || (!visibleLabel && curLabelFeatures.length > 0)) {
         isolineLabelSrc.setData(labelData);
       }
       if (map.getLayer(isolineLabelLayerId)) {

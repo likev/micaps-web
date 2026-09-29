@@ -123,3 +123,23 @@ export function getDisabledPeriodsForRain(rainHours, discretePeriods = null) {
   }
   return result.length > 0 ? result : [0];
 }
+
+// Membership-equality for disabled-period lists. The TimeSlider $effect
+// recomputes this list from discretePeriods on every run; assigning a fresh
+// array unconditionally re-triggers the effect forever (Svelte $state treats
+// every new object identity as changed), spinning CPU on rain presets.
+// Compare-then-assign instead. Order-insensitive, numeric-coerced, and
+// tolerant of Set-shaped stores used elsewhere in the timeline code.
+export function disabledPeriodsEqual(a, b) {
+  if (a === b) return true;
+  const norm = (v) => {
+    const arr = v instanceof Set ? [...v] : (Array.isArray(v) ? v : null);
+    if (!arr) return null;
+    return arr.map(Number).sort((x, y) => x - y);
+  };
+  const na = norm(a);
+  const nb = norm(b);
+  if (!na || !nb) return false;
+  if (na.length !== nb.length) return false;
+  return na.every((v, i) => v === nb[i]);
+}

@@ -4,6 +4,8 @@ import { getLayerById, addOrUpdateLayer, removeLayer, getLayersForWindow, syncLa
 import { triggerStationStreamlines, triggerRasterOverlay } from "../ui/layerActions.js";
 import { renderStationWeatherPlots } from "../layers/stationLayer.js";
 import { removeContourLayer } from "../layers/contourLayer.js";
+import { stopWindAnimation, removeGridWindBarbs } from "../layers/windLayer.js";
+import { removeRasterLayer } from "../layers/rasterLayer.js";
 import { analyzeAndRenderSoundingContours, analyzeAndRenderSoundingElementContour } from "../layers/soundingAnalysis.js";
 import { analyzeAndRenderSurfaceContours } from "../layers/surfaceAnalysis.js";
 import { fetchStationObservations } from "../api/catalogApi.js";
@@ -21,11 +23,18 @@ export async function renderSoundingDerivedContoursForStation(map, stations, cur
         const elem = (cLayer.element || "HGT").toUpperCase();
         const targetId = cLayer.id || `contour-sounding-${elem.toLowerCase()}-${curLevel}`;
         const existingDerived = getLayerById(targetId, win);
-        const snap = win?.derivedContourSnapshots?.find((s) => s.id === targetId || (s.model === "UPPER_AIR" && s.element === elem));
+        // Visibility comes from the live store, else an EXACT-id snapshot,
+        // else the preset entry. A model+element fallback snapshot must never
+        // decide visibility: snapshots are remapped per level, so a stale
+        // cross-level entry (e.g. after a discarded level step) would
+        // otherwise resurrect eye-hidden state on an unrelated window/level.
+        // The fallback below is still used for config/palette inheritance.
+        const snapExact = win?.derivedContourSnapshots?.find((s) => s.id === targetId);
+        const snap = snapExact || win?.derivedContourSnapshots?.find((s) => s.model === "UPPER_AIR" && s.element === elem);
         const cfg = { ...(cLayer.render || cLayer.config || {}) };
         cfg.layerId = targetId;
         cfg.derivedFrom = cLayer.derivedFrom || stationLayerId;
-        const isVisible = existingDerived ? (existingDerived.visible !== false) : (snap ? snap.visible !== false : cLayer.visible !== false);
+        const isVisible = existingDerived ? (existingDerived.visible !== false) : (snapExact ? snapExact.visible !== false : cLayer.visible !== false);
         cfg.visible = isVisible;
         if (snap?.config) Object.assign(cfg, snap.config);
         if (existingDerived?.config) Object.assign(cfg, existingDerived.config);
@@ -90,8 +99,10 @@ export async function renderSoundingDerivedContoursForStation(map, stations, cur
           const elem = (cLayer.element || "HGT").toUpperCase();
           const targetId = cLayer.id || `contour-sounding-${elem.toLowerCase()}-${curLevel}`;
           const existingDerived = getLayerById(targetId, win);
-          const snap = win?.derivedContourSnapshots?.find((s) => s.id === targetId || (s.model === "UPPER_AIR" && s.element === elem));
-          const isVisible = existingDerived ? (existingDerived.visible !== false) : (snap ? snap.visible !== false : cLayer.visible !== false);
+          // Same exact-id visibility rule as above; fallback only for config.
+          const snapExact = win?.derivedContourSnapshots?.find((s) => s.id === targetId);
+          const snap = snapExact || win?.derivedContourSnapshots?.find((s) => s.model === "UPPER_AIR" && s.element === elem);
+          const isVisible = existingDerived ? (existingDerived.visible !== false) : (snapExact ? snapExact.visible !== false : cLayer.visible !== false);
           const cfg = { ...(cLayer.config || {}), visible: isVisible, layerId: targetId };
           if (snap?.config) Object.assign(cfg, snap.config);
           if (existingDerived?.config) Object.assign(cfg, existingDerived.config);
@@ -153,11 +164,13 @@ export async function renderSurfaceDerivedContoursForStation(map, stations, acti
         const elem = (cLayer.element || "SLP").toUpperCase();
         const targetId = cLayer.id || `contour-surface-${elem.toLowerCase()}`;
         const existingDerived = getLayerById(targetId, win);
-        const snap = win?.derivedContourSnapshots?.find((s) => s.id === targetId || (s.model === "SURFACE" && s.element === elem));
+        // Same exact-id visibility rule as sounding; fallback only for config.
+        const snapExact = win?.derivedContourSnapshots?.find((s) => s.id === targetId);
+        const snap = snapExact || win?.derivedContourSnapshots?.find((s) => s.model === "SURFACE" && s.element === elem);
         const cfg = { ...(cLayer.render || cLayer.config || {}) };
         cfg.layerId = targetId;
         cfg.derivedFrom = cLayer.derivedFrom || stationLayerId;
-        const isVisible = existingDerived ? (existingDerived.visible !== false) : (snap ? snap.visible !== false : cLayer.visible !== false);
+        const isVisible = existingDerived ? (existingDerived.visible !== false) : (snapExact ? snapExact.visible !== false : cLayer.visible !== false);
         cfg.visible = isVisible;
         if (snap?.config) Object.assign(cfg, snap.config);
         if (existingDerived?.config) Object.assign(cfg, existingDerived.config);
@@ -219,8 +232,10 @@ export async function renderSurfaceDerivedContoursForStation(map, stations, acti
           const elem = (cLayer.element || "SLP").toUpperCase();
           const targetId = cLayer.id || `contour-surface-${elem.toLowerCase()}`;
           const existingDerived = getLayerById(targetId, win);
-          const snap = win?.derivedContourSnapshots?.find((s) => s.id === targetId || (s.model === "SURFACE" && s.element === elem));
-          const isVisible = existingDerived ? (existingDerived.visible !== false) : (snap ? snap.visible !== false : cLayer.visible !== false);
+          // Same exact-id visibility rule as above; fallback only for config.
+          const snapExact = win?.derivedContourSnapshots?.find((s) => s.id === targetId);
+          const snap = snapExact || win?.derivedContourSnapshots?.find((s) => s.model === "SURFACE" && s.element === elem);
+          const isVisible = existingDerived ? (existingDerived.visible !== false) : (snapExact ? snapExact.visible !== false : cLayer.visible !== false);
           const cfg = { ...(cLayer.config || {}), visible: isVisible, layerId: targetId };
           if (snap?.config) Object.assign(cfg, snap.config);
           if (existingDerived?.config) Object.assign(cfg, existingDerived.config);
@@ -338,6 +353,13 @@ export async function loadObservationProduct(map, model, element, level, file, w
     if (win && expectedSeq !== null && expectedSeq !== undefined && win.loadSeq !== expectedSeq) {
       return; // Discard stale in-flight response from fast navigation
     }
+    // Replacement data is in hand: only now retire the previous time-step's
+    // wind/raster/barb visuals. Tearing them down before the guarded fetch
+    // (as the step callers used to do) blanks the map while the store still
+    // reports visible whenever the load discards or fails.
+    try { stopWindAnimation(map); } catch {}
+    try { removeGridWindBarbs(map); } catch {}
+    try { removeRasterLayer(map); } catch {}
     appState.set("stationData", stations);
     const activeGroup = win?.activeGroup;
     const groupStationLayer = activeGroup?.layers?.find((l) => l.id === customStationLayerId || l.type === "station");

@@ -19,6 +19,7 @@ import {
   isRainAccumulationElement,
   isWindowRainAccumulation,
   getDisabledPeriodsForRain,
+  disabledPeriodsEqual,
 } from "../src/utils/rain12.js";
 import {
   createDefaultTab,
@@ -510,3 +511,31 @@ describe("Timeline View Mode Snapping & Playback Safeguards", () => {
   });
 });
 
+
+describe("disabledPeriodsEqual compare-then-assign guard", () => {
+  it("treats recomputed filter output as equal (effect must not re-assign)", () => {
+    const periods = [0, 6, 12, 18, 24, 30];
+    const first = getDisabledPeriodsForRain(12, periods);
+    const second = getDisabledPeriodsForRain(12, periods);
+    expect(first).not.toBe(second); // fresh array identity each call
+    expect(disabledPeriodsEqual(first, second)).toBe(true);
+  });
+
+  it("is order-insensitive and numeric-coerced, Set-tolerant", () => {
+    expect(disabledPeriodsEqual([0, 6], [6, 0])).toBe(true);
+    expect(disabledPeriodsEqual(["0", "6"], [0, 6])).toBe(true);
+    expect(disabledPeriodsEqual(new Set([0, 6]), [0, 6])).toBe(true);
+    expect(disabledPeriodsEqual([], [])).toBe(true);
+    expect(disabledPeriodsEqual([0, 6], [0, 12])).toBe(false);
+    expect(disabledPeriodsEqual([0, 6], [0, 6, 12])).toBe(false);
+    expect(disabledPeriodsEqual(null, [])).toBe(false);
+    expect(disabledPeriodsEqual(undefined, undefined)).toBe(true);
+  });
+
+  it("detects genuine membership changes from step-length switches", () => {
+    // 6h cadence vs 12h cadence produce different disabled sets for RAIN12.
+    const six = getDisabledPeriodsForRain(12, [0, 6, 12, 18, 24]);
+    const twelve = getDisabledPeriodsForRain(12, [0, 12, 24]);
+    expect(disabledPeriodsEqual(six, twelve)).toBe(false);
+  });
+});
