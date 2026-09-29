@@ -121,3 +121,4 @@
 .chip-btn { padding: 4px 10px; border-radius: 12px; background: #21262d; border: 1px solid var(--border-color); color: #8b949e; font-family: var(--font-mono); font-size: 11px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease; }
 .chip-btn:hover { background: #30363d; color: #c9d1d9; }
 .chip-btn.active { background: var(--accent-blue); border-color: #58a6ff; color: #ffffff; font-weight: bold; box-shadow: 0 0 8px rgba(56, 139, 253, 0.4); }
+.chip-btn:disabled, .chip-btn.disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; border-style: dashed; }

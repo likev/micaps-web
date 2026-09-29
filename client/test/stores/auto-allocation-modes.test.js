@@ -4,6 +4,8 @@ import {
   createDefaultWindow,
   applyAutoAllocation,
   revertAutoAllocation,
+  prepareSplitWindows,
+  isWindowEmpty,
   DEFAULT_LEVELS,
   DEFAULT_MODELS,
   stepCycleHours,
@@ -16,6 +18,7 @@ import {
   queryModelSupportedLevels,
   getEligibleModelsForAllocationAsync,
 } from "../../src/lib/stores/tabsCore.js";
+import { getPeriodsForStep } from "../../src/ui/timeline/timelineMath.js";
 import {
   isSurfaceGroup,
   isUpperAirGroup,
@@ -189,6 +192,224 @@ describe("Auto-Allocation 5-Mode System & Synchronization", () => {
     // Should use getPeriodsForStep(3): 12, 15, 18, 21, 24, 27
     expect(tab.windows.map((w) => w.period)).toEqual([12, 15, 18, 21, 24, 27]);
     expect(tab.windows.every((w) => w.stepLength === 3)).toBe(true);
+  });
+
+  it("Mode 'step': changing step-length from 6h to 12h discards stale 6h discretePeriods and applies 12h progression", () => {
+    const tab = createDefaultTab(1);
+    tab.layout = "2x2";
+    const stale6hPeriods = [0, 6, 12, 18, 24, 30, 36, 42, 48, 54, 60];
+    tab.windows = Array.from({ length: 4 }, (_, i) => ({
+      ...createDefaultWindow(i, 1),
+      level: 500,
+      model: "ECMWF_HR",
+      forecastCycle: "26092508",
+      period: 24,
+      stepLength: 6,
+      discretePeriods: [...stale6hPeriods],
+    }));
+
+    // User changes step-length to 12h and toggles tab to split
+    applyAutoAllocation(tab, "step", {
+      period: 24,
+      stepLength: 12,
+      discretePeriods: stale6hPeriods, // stale periods provided from prior 6h state
+      forecastCycle: "26092508",
+    });
+
+    // 12h step progression: 24, 36, 48, 60 (NOT 24, 30, 36, 42)
+    expect(tab.windows.map((w) => w.period)).toEqual([24, 36, 48, 60]);
+    expect(tab.windows.every((w) => w.stepLength === 12)).toBe(true);
+    expect(tab.windows.every((w) => w.discretePeriods[1] - w.discretePeriods[0] === 12)).toBe(true);
+  });
+
+  it("Mode 'step': changing step-length from 12h to 3h discards stale 12h discretePeriods and applies 3h progression", () => {
+    const tab = createDefaultTab(1);
+    tab.layout = "2x2";
+    const stale12hPeriods = [0, 12, 24, 36, 48, 60, 72];
+    tab.windows = Array.from({ length: 4 }, (_, i) => ({
+      ...createDefaultWindow(i, 1),
+      level: 500,
+      model: "ECMWF_HR",
+      forecastCycle: "26092508",
+      period: 12,
+      stepLength: 12,
+      discretePeriods: [...stale12hPeriods],
+    }));
+
+    applyAutoAllocation(tab, "step", {
+      period: 12,
+      stepLength: 3,
+      discretePeriods: stale12hPeriods,
+      forecastCycle: "26092508",
+    });
+
+    expect(tab.windows.map((w) => w.period)).toEqual([12, 15, 18, 21]);
+    expect(tab.windows.every((w) => w.stepLength === 3)).toBe(true);
+    expect(tab.windows.every((w) => w.discretePeriods[1] - w.discretePeriods[0] === 3)).toBe(true);
+  });
+
+  it("Mode 'step': non-visible windows receive matching stepLength and discretePeriods", () => {
+    const tab = createDefaultTab(1);
+    tab.layout = "1x2"; // only first 2 visible
+    tab.windows = Array.from({ length: 4 }, (_, i) => ({
+      ...createDefaultWindow(i, 1),
+      level: 500,
+      model: "ECMWF_HR",
+      forecastCycle: "26092508",
+      period: 24,
+      stepLength: 6,
+    }));
+
+    applyAutoAllocation(tab, "step", {
+      period: 24,
+      stepLength: 12,
+      forecastCycle: "26092508",
+    });
+
+    expect(tab.windows.every((w) => w.stepLength === 12)).toBe(true);
+    expect(tab.windows[2].discretePeriods[1] - tab.windows[2].discretePeriods[0]).toBe(12);
+    expect(tab.windows[3].discretePeriods[1] - tab.windows[3].discretePeriods[0]).toBe(12);
+  });
+
+  it("Mode 'step': reuses auto-allocated windows across repeated 1x1 <-> split toggles without window leakage", () => {
+    const tab = createDefaultTab(1);
+    const win0 = {
+      ...createDefaultWindow(0, 1),
+      id: "tab-1-win-0",
+      level: 500,
+      model: "ECMWF_HR",
+      forecastCycle: "26092608",
+      forecastCycles: ["26092608", "26092520"],
+      period: 24,
+      stepLength: 6,
+      activeGroup: { id: "ecmwf-500", layers: [{ type: "contour", element: "TMP" }] },
+    };
+    tab.windows = [win0];
+    tab.activeWinIdx = 0;
+
+    // 1. Initial 2x2 split
+    tab.layout = "2x2";
+    prepareSplitWindows(tab, 4, win0, isWindowEmpty, true);
+    expect(tab.windows.length).toBe(4);
+    applyAutoAllocation(tab, "step", win0);
+    expect(tab.windows.map((w) => w.period)).toEqual([24, 30, 36, 42]);
+    expect(tab.windows.every((w) => w.stepLength === 6)).toBe(true);
+
+    // 2. User toggles to 1x1 tab mode and changes step length to 12h
+    tab.layout = "1x1";
+    win0.stepLength = 12;
+    win0.discretePeriods = getPeriodsForStep(12);
+
+    // 3. User toggles back to 2x2 split mode
+    tab.layout = "2x2";
+    prepareSplitWindows(tab, 4, win0, isWindowEmpty, true);
+    // CRITICAL: Window count must stay 4, no new duplicate windows created
+    expect(tab.windows.length).toBe(4);
+    applyAutoAllocation(tab, "step", win0);
+    expect(tab.windows.map((w) => w.period)).toEqual([24, 36, 48, 60]);
+    expect(tab.windows.every((w) => w.stepLength === 12)).toBe(true);
+
+    // 4. User toggles to 1x1 tab mode again and changes step length to 3h
+    tab.layout = "1x1";
+    win0.stepLength = 3;
+    win0.discretePeriods = getPeriodsForStep(3);
+
+    // 5. User toggles back to 2x2 split mode
+    tab.layout = "2x2";
+    prepareSplitWindows(tab, 4, win0, isWindowEmpty, true);
+    expect(tab.windows.length).toBe(4);
+    applyAutoAllocation(tab, "step", win0);
+    expect(tab.windows.map((w) => w.period)).toEqual([24, 27, 30, 33]);
+    expect(tab.windows.every((w) => w.stepLength === 3)).toBe(true);
+
+    // 6. User expands to 6-split (2x3) with 24h step
+    tab.layout = "2x3";
+    win0.stepLength = 24;
+    win0.discretePeriods = getPeriodsForStep(24);
+    prepareSplitWindows(tab, 6, win0, isWindowEmpty, false, 4);
+    expect(tab.windows.length).toBe(6);
+    applyAutoAllocation(tab, "step", win0);
+    expect(tab.windows.map((w) => w.period)).toEqual([24, 48, 72, 96, 120, 144]);
+    expect(tab.windows.every((w) => w.stepLength === 24)).toBe(true);
+  });
+
+  it("Mode 'step': preserves foreign user windows with layers while reusing split windows", () => {
+    const tab = createDefaultTab(1);
+    const win0 = {
+      ...createDefaultWindow(0, 1),
+      id: "tab-1-win-0",
+      level: 500,
+      model: "ECMWF_HR",
+      forecastCycle: "26092608",
+      period: 24,
+      stepLength: 6,
+      activeGroup: { id: "ecmwf-500", layers: [{ type: "contour" }] },
+    };
+    const foreignWin = {
+      ...createDefaultWindow(1, 1),
+      id: "foreign-grapes",
+      level: 850,
+      model: "GRAPES_GFS",
+      period: 12,
+      activeGroup: { id: "grapes-850", layers: [{ type: "contour" }] },
+      isAutoAllocated: false,
+    };
+    tab.windows = [win0, foreignWin];
+    tab.activeWinIdx = 0;
+
+    // Split 2x2 from tab mode: win0 + foreignWin
+    tab.layout = "2x2";
+    prepareSplitWindows(tab, 4, win0, isWindowEmpty, true);
+    // 4 split slots + foreignWin preserved outside the split = 5 windows
+    expect(tab.windows.length).toBe(5);
+    expect(tab.windows[4].id).toBe("foreign-grapes");
+    expect(tab.windows[4].activeGroup?.id).toBe("grapes-850");
+
+    applyAutoAllocation(tab, "step", win0);
+    expect(tab.windows.slice(0, 4).map((w) => w.period)).toEqual([24, 30, 36, 42]);
+    // foreignWin untouched
+    expect(tab.windows[4].period).toBe(12);
+
+    // Toggle to 1x1, change step length to 12h, toggle back to 2x2
+    tab.layout = "1x1";
+    win0.stepLength = 12;
+    win0.discretePeriods = getPeriodsForStep(12);
+
+    tab.layout = "2x2";
+    prepareSplitWindows(tab, 4, win0, isWindowEmpty, true);
+    // Still 5 windows: split slots reused, foreignWin preserved
+    expect(tab.windows.length).toBe(5);
+    expect(tab.windows[4].id).toBe("foreign-grapes");
+
+    applyAutoAllocation(tab, "step", win0);
+    expect(tab.windows.slice(0, 4).map((w) => w.period)).toEqual([24, 36, 48, 60]);
+    expect(tab.windows[4].period).toBe(12);
+  });
+
+  it("Mode 'step': propagates forecastCycles and _nwpTimeline to allocated windows", () => {
+    const tab = createDefaultTab(1);
+    tab.layout = "1x2";
+    const win0 = {
+      ...createDefaultWindow(0, 1),
+      id: "tab-1-win-0",
+      level: 500,
+      model: "ECMWF_HR",
+      forecastCycle: "26092608",
+      forecastCycles: ["26092608", "26092520", "26092508"],
+      period: 24,
+      stepLength: 12,
+      activeGroup: { id: "ecmwf-500", layers: [{ type: "contour" }] },
+      _nwpTimeline: { stepLength: 12, cycle: "26092608" },
+    };
+    const win1 = createDefaultWindow(1, 1);
+    tab.windows = [win0, win1];
+
+    applyAutoAllocation(tab, "step", win0);
+    expect(win1.forecastCycles).toEqual(["26092608", "26092520", "26092508"]);
+    expect(win1._nwpTimeline?.stepLength).toBe(12);
+    expect(win1._nwpTimeline?.cycle).toBe("26092608");
+    expect(win1.isAutoAllocated).toBe(true);
+    expect(win1.allocParentId).toBe("tab-1-win-0");
   });
 
   it("Mode 'time': assigns dProg/dt run-to-run consistency for NWP (same valid target time)", () => {

@@ -50,9 +50,24 @@ export async function loadTimeHeightLayer(map, layer = {}, win = null) {
   return await timeHeightController.init(map, win, timeHeightLayerDef);
 }
 
-export function removeTimeHeightLayer(map, win = null) {
+export function removeTimeHeightLayer(map, win = null, layerId = null) {
   timeHeightController.destroy(map, win);
-  removeLayer("ec-timeheight-diagram", win);
+  const idToRemove = layerId || "ec-timeheight-diagram";
+  removeLayer(idToRemove, win);
+  if (idToRemove !== "ec-timeheight-diagram") {
+    removeLayer("ec-timeheight-diagram", win);
+  }
+  if (win) {
+    if (Array.isArray(win.layers)) {
+      win.layers = win.layers.filter((l) => l && l.id !== idToRemove && l.type !== "timeheight");
+    }
+    if (Array.isArray(win.activeGroup?.layers)) {
+      win.activeGroup.layers = win.activeGroup.layers.filter((l) => l && l.id !== idToRemove && l.type !== "timeheight");
+    }
+    if (Array.isArray(win.layerSnapshots)) {
+      win.layerSnapshots = win.layerSnapshots.filter((s) => s && s.id !== idToRemove && s.type !== "timeheight");
+    }
+  }
 }
 
 export function setTimeHeightVisibility(map, visible, win = null) {

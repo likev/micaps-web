@@ -167,6 +167,10 @@ export function initWindowMap(win, opts = {}) {
   const map = createMapInstance(container);
   try { coreSetMapInstance(win.id, map); } catch {}
   try { win.map = map; } catch {}
+  try {
+    map._micapsWindow = win;
+    map._winId = win.id;
+  } catch {}
 
   if (win.tabId === 1 && win.winIdx === 0) {
     setActiveMap(map);

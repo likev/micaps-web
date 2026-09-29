@@ -44,9 +44,24 @@ export async function loadLineHeightLayer(map, layer = {}, win = null) {
   return await lineHeightController.init(map, win, def);
 }
 
-export function removeLineHeightLayer(map, win = null) {
+export function removeLineHeightLayer(map, win = null, layerId = null) {
   lineHeightController.destroy(map, win);
-  removeLayer("ec-lineheight-diagram", win);
+  const idToRemove = layerId || "ec-lineheight-diagram";
+  removeLayer(idToRemove, win);
+  if (idToRemove !== "ec-lineheight-diagram") {
+    removeLayer("ec-lineheight-diagram", win);
+  }
+  if (win) {
+    if (Array.isArray(win.layers)) {
+      win.layers = win.layers.filter((l) => l && l.id !== idToRemove && l.type !== "lineheight");
+    }
+    if (Array.isArray(win.activeGroup?.layers)) {
+      win.activeGroup.layers = win.activeGroup.layers.filter((l) => l && l.id !== idToRemove && l.type !== "lineheight");
+    }
+    if (Array.isArray(win.layerSnapshots)) {
+      win.layerSnapshots = win.layerSnapshots.filter((s) => s && s.id !== idToRemove && s.type !== "lineheight");
+    }
+  }
 }
 
 export function setLineHeightVisibility(map, visible, win = null) {
@@ -88,9 +103,24 @@ export async function loadHovmollerLayer(map, layer = {}, win = null) {
   return await hovmollerController.init(map, win, def);
 }
 
-export function removeHovmollerLayer(map, win = null) {
+export function removeHovmollerLayer(map, win = null, layerId = null) {
   hovmollerController.destroy(map, win);
-  removeLayer("ec-hovmoller-diagram", win);
+  const idToRemove = layerId || "ec-hovmoller-diagram";
+  removeLayer(idToRemove, win);
+  if (idToRemove !== "ec-hovmoller-diagram") {
+    removeLayer("ec-hovmoller-diagram", win);
+  }
+  if (win) {
+    if (Array.isArray(win.layers)) {
+      win.layers = win.layers.filter((l) => l && l.id !== idToRemove && l.type !== "hovmoller");
+    }
+    if (Array.isArray(win.activeGroup?.layers)) {
+      win.activeGroup.layers = win.activeGroup.layers.filter((l) => l && l.id !== idToRemove && l.type !== "hovmoller");
+    }
+    if (Array.isArray(win.layerSnapshots)) {
+      win.layerSnapshots = win.layerSnapshots.filter((s) => s && s.id !== idToRemove && s.type !== "hovmoller");
+    }
+  }
 }
 
 export function setHovmollerVisibility(map, visible, win = null) {

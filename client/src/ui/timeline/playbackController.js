@@ -28,9 +28,25 @@ export function updatePlayButtonDisabledState() {
   if (typeof document === "undefined") return;
   const btnPlay = document.getElementById("btn-play");
   if (!btnPlay) return;
+
+  let nwpValidCount = timelineState.discretePeriods.length;
+  if (
+    timelineState.currentMode === "nwp" &&
+    timelineState.disabledPeriods &&
+    (Array.isArray(timelineState.disabledPeriods) ? timelineState.disabledPeriods.length > 0 : true)
+  ) {
+    const isPDisabled = (p) =>
+      Array.isArray(timelineState.disabledPeriods)
+        ? timelineState.disabledPeriods.includes(p) || timelineState.disabledPeriods.includes(Number(p))
+        : (timelineState.disabledPeriods instanceof Set
+            ? timelineState.disabledPeriods.has(p) || timelineState.disabledPeriods.has(Number(p))
+            : false);
+    nwpValidCount = timelineState.discretePeriods.filter((p) => !isPDisabled(p)).length;
+  }
+
   const isSingle =
     (timelineState.currentMode === "obs" && timelineState.obsFiles.length <= 1) ||
-    (timelineState.currentMode === "nwp" && timelineState.discretePeriods.length <= 1);
+    (timelineState.currentMode === "nwp" && nwpValidCount <= 1);
   if (isSingle) {
     btnPlay.setAttribute("disabled", "true");
     btnPlay.classList.add("disabled");
@@ -77,11 +93,49 @@ export function step(delta, options = {}) {
       file: timelineState.obsFiles[timelineState.currentObsIdx],
     }));
   } else {
-    if (timelineState.discretePeriods.length === 0 || (options.source === "btn-play" && timelineState.discretePeriods.length <= 1)) {
+    const hasDisabled = Boolean(
+      timelineState.disabledPeriods && (Array.isArray(timelineState.disabledPeriods) ? timelineState.disabledPeriods.length > 0 : true)
+    );
+    const nwpValidCount = hasDisabled
+      ? timelineState.discretePeriods.filter((p) => {
+          const numP = Number(p);
+          return !(Array.isArray(timelineState.disabledPeriods)
+            ? (timelineState.disabledPeriods.includes(p) || timelineState.disabledPeriods.includes(numP))
+            : (timelineState.disabledPeriods instanceof Set ? (timelineState.disabledPeriods.has(p) || timelineState.disabledPeriods.has(numP)) : false));
+        }).length
+      : timelineState.discretePeriods.length;
+
+    if (nwpValidCount === 0 || (options.source === "btn-play" && nwpValidCount <= 1)) {
       return Promise.resolve({ wrapped: false, noop: true, mode: "nwp" });
     }
-    const prevIdx = timelineState.currentPeriodIdx;
-    timelineState.currentPeriodIdx = (timelineState.currentPeriodIdx + delta + timelineState.discretePeriods.length) % timelineState.discretePeriods.length;
+    const prevIdx = (typeof timelineState.currentPeriodIdx === "number" && timelineState.currentPeriodIdx >= 0) ? timelineState.currentPeriodIdx : 0;
+    const len = timelineState.discretePeriods.length;
+    const stepDir = delta >= 0 ? 1 : -1;
+    const numSteps = Math.max(1, Math.abs(delta));
+    let nextIdx = prevIdx;
+    if (hasDisabled) {
+      for (let s = 0; s < numSteps; s++) {
+        let found = false;
+        for (let attempt = 0; attempt < len; attempt++) {
+          nextIdx = (nextIdx + stepDir + len) % len;
+          const p = timelineState.discretePeriods[nextIdx];
+          const numP = Number(p);
+          const isDisabled = Array.isArray(timelineState.disabledPeriods)
+            ? (timelineState.disabledPeriods.includes(p) || timelineState.disabledPeriods.includes(numP))
+            : (timelineState.disabledPeriods instanceof Set ? (timelineState.disabledPeriods.has(p) || timelineState.disabledPeriods.has(numP)) : false);
+          if (!isDisabled) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          nextIdx = (nextIdx + stepDir + len) % len;
+        }
+      }
+    } else {
+      nextIdx = (timelineState.currentPeriodIdx + delta + len * Math.ceil(Math.abs(delta) / len)) % len;
+    }
+    timelineState.currentPeriodIdx = nextIdx;
     const wrapped = delta > 0 ? timelineState.currentPeriodIdx < prevIdx : (delta < 0 ? timelineState.currentPeriodIdx > prevIdx : false);
     const period = timelineState.discretePeriods[timelineState.currentPeriodIdx];
     appState.set("period", period);

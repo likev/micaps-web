@@ -1,5 +1,11 @@
 import { getPeriodsForStep } from "./timelineMath.js";
 import { fetchLevels } from "../../api/catalogApi.js";
+import {
+  isRain12Element,
+  isWindowRain12,
+  getRainAccumulationHours,
+  getRainAccumulationHoursForWindow,
+} from "../../utils/rain12.js";
 export const DEFAULT_LEVELS = [500, 850, 1000, 200, 700, 925, 400, 300, 100];
 
 export const DEFAULT_MODELS = [
@@ -392,8 +398,18 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {
   const baseLevel = win0.level ?? 500;
   const baseModel = win0.model || tab.windows[tab.activeWinIdx]?.model || tab.windows[0]?.model || "ECMWF_HR";
   const baseElement = win0.element || "TMP";
-  const basePeriod = win0.period ?? 24;
-  const baseCycle = win0.forecastCycle || "26092608";
+  const rainHours = getRainAccumulationHoursForWindow(win0) ??
+    getRainAccumulationHours(baseElement) ??
+    getRainAccumulationHours(win0.activeGroup?.id) ??
+    getRainAccumulationHours(win0.activeGroup?.name);
+  const basePeriodRaw = win0.period ?? 24;
+  let basePeriod = basePeriodRaw;
+  if (rainHours !== null && rainHours > 0) {
+    if (basePeriodRaw < rainHours) {
+      basePeriod = rainHours;
+    }
+  }
+  const baseCycle = win0.forecastCycle || (Array.isArray(win0.forecastCycles) && win0.forecastCycles[0]) || "26092608";
   const isObs = Boolean(win0.isObservation || win0.activeGroup?.isObservation || tab.windows.some((w) => w.isObservation));
   const isSurface = baseModel === "SURFACE" || baseModel === "SURFACE_PLOT" || (typeof win0.element === "string" && win0.element.toLowerCase().includes("surface")) || win0.activeGroup?.id?.toLowerCase().includes("surface");
   let baseObsTime = win0.obsTime || tab.windows.find((w) => w.obsTime)?.obsTime || "26092608";
@@ -405,6 +421,17 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {
     win.element = baseElement;
     win.isObservation = isObs;
     win.stepLength = stepLen;
+    if (Array.isArray(win0.discretePeriods)) {
+      win.discretePeriods = [...win0.discretePeriods];
+    }
+    if (Array.isArray(win0.forecastCycles)) {
+      win.forecastCycles = [...win0.forecastCycles];
+    }
+    if (win !== win0) {
+      win.isAutoAllocated = true;
+      win.allocParentId = win0.id;
+      win.allocMode = mode;
+    }
     if (win0.activeGroup && (!win.activeGroup || win !== win0)) {
       try {
         win.activeGroup = JSON.parse(JSON.stringify(win0.activeGroup));
@@ -429,6 +456,12 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {
       win.model = baseModel;
       win.level = baseLevel;
       win.forecastCycle = baseCycle;
+      if (Array.isArray(win0.forecastCycles)) {
+        win.forecastCycles = [...win0.forecastCycles];
+      }
+      if (win0._nwpTimeline && !isObs) {
+        win._nwpTimeline = { ...win0._nwpTimeline, stepLength: win.stepLength, cycle: win.forecastCycle };
+      }
       if (isObs) {
         const stepped = stepCycleHours(baseObsTime, -i * stepLen);
         win.obsTime = (typeof baseObsTime === "string" && baseObsTime.endsWith(".000") && !stepped.endsWith(".000"))
@@ -436,15 +469,30 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {
           : stepped;
         if (win._obsTimeline) win._obsTimeline.file = win.obsTime;
       } else {
-        const periods = (Array.isArray(win0.discretePeriods) && win0.discretePeriods.length > 0)
+        const isCadenceMatch = Array.isArray(win0.discretePeriods) &&
+          win0.discretePeriods.length >= 2 &&
+          (Math.abs(Number(win0.discretePeriods[1]) - Number(win0.discretePeriods[0])) === Number(stepLen));
+        const periods = isCadenceMatch
           ? win0.discretePeriods
           : getPeriodsForStep(stepLen);
         win.discretePeriods = Array.isArray(periods) ? [...periods] : periods;
-        const baseIdx = periods.indexOf(basePeriod);
+        let baseIdx = periods.indexOf(basePeriod);
+        if (baseIdx === -1 && Array.isArray(periods) && periods.length > 0) {
+          let minDiff = Infinity;
+          periods.forEach((p, idx) => {
+            if (rainHours !== null && rainHours > 0 && Number(p) < rainHours) return;
+            const diff = Math.abs(p - basePeriod);
+            if (diff < minDiff) {
+              minDiff = diff;
+              baseIdx = idx;
+            }
+          });
+        }
         if (baseIdx !== -1 && baseIdx + i < periods.length) {
           win.period = periods[baseIdx + i];
         } else {
-          win.period = basePeriod + i * stepLen;
+          const startP = baseIdx !== -1 ? periods[baseIdx] : basePeriod;
+          win.period = startP + i * stepLen;
         }
       }
     } else if (mode === "time") {
@@ -464,14 +512,57 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {
         if (Array.isArray(win0.discretePeriods)) {
           win.discretePeriods = [...win0.discretePeriods];
         }
-        const cycleStep = (win0.model === "ECMWF_HR" && win0.stepLength === 6) ? 12 : (win0.stepLength || 12);
-        if (cycles && i < cycles.length) {
-          win.forecastCycle = cycles[i];
-          win.period = basePeriod + i * cycleStep;
+
+        const parseCycleEpoch = (str) => {
+          const clean = String(str || "").replace(/[^\d]/g, "").slice(0, 10);
+          if (clean.length < 8) return NaN;
+          const y = clean.length === 8 ? parseInt(`20${clean.slice(0, 2)}`, 10) : parseInt(clean.slice(0, 4), 10);
+          const m = (clean.length === 8 ? parseInt(clean.slice(2, 4), 10) : parseInt(clean.slice(4, 6), 10)) - 1;
+          const d = clean.length === 8 ? parseInt(clean.slice(4, 6), 10) : parseInt(clean.slice(6, 8), 10);
+          const h = clean.length === 8 ? parseInt(clean.slice(6, 8), 10) : parseInt(clean.slice(8, 10), 10);
+          return Date.UTC(y, m, d, h);
+        };
+
+        let cycleStep = (win0.model === "ECMWF_HR" && win0.stepLength === 6) ? 12 : (win0.stepLength || 12);
+        if (cycles && cycles.length >= 2) {
+          const t0 = parseCycleEpoch(cycles[0]);
+          const t1 = parseCycleEpoch(cycles[1]);
+          if (!isNaN(t0) && !isNaN(t1)) {
+            const diffH = Math.round(Math.abs(t0 - t1) / 3600000);
+            if (diffH > 0 && diffH <= 48) cycleStep = diffH;
+          }
+        }
+
+        const baseIdx = cycles ? cycles.indexOf(baseCycle) : -1;
+        if (cycles && baseIdx !== -1 && (baseIdx + i) < cycles.length) {
+          const chosenCycle = cycles[baseIdx + i];
+          const tBase = parseCycleEpoch(baseCycle);
+          const tChosen = parseCycleEpoch(chosenCycle);
+          const deltaH = (!isNaN(tBase) && !isNaN(tChosen)) ? Math.round((tBase - tChosen) / 3600000) : (i * cycleStep);
+          win.forecastCycle = chosenCycle;
+          win.period = basePeriod + deltaH;
         } else {
           win.forecastCycle = stepCycleHours(baseCycle, -i * cycleStep);
           win.period = basePeriod + i * cycleStep;
         }
+        if (win.forecastCycles && Array.isArray(win.forecastCycles) && !win.forecastCycles.includes(win.forecastCycle)) {
+          win.forecastCycles = [win.forecastCycle, ...win.forecastCycles];
+        }
+      }
+    }
+  }
+
+  if (mode === "step" && !isObs) {
+    const isCadenceMatch = Array.isArray(win0.discretePeriods) &&
+      win0.discretePeriods.length >= 2 &&
+      (Math.abs(Number(win0.discretePeriods[1]) - Number(win0.discretePeriods[0])) === Number(stepLen));
+    const periods = isCadenceMatch
+      ? win0.discretePeriods
+      : getPeriodsForStep(stepLen);
+    for (const w of tab.windows) {
+      if (!visible.includes(w)) {
+        w.stepLength = stepLen;
+        w.discretePeriods = Array.isArray(periods) ? [...periods] : periods;
       }
     }
   }
@@ -486,6 +577,11 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {
 export function revertAutoAllocation(tab, baseWin = null) {
   if (!tab || !Array.isArray(tab.windows)) return;
   tab.autoAllocation = "none";
+  for (const win of tab.windows) {
+    win.isAutoAllocated = false;
+    win.allocParentId = null;
+    win.allocMode = null;
+  }
   const visible = getVisibleWindows(tab);
   const isNumericLevelOnly = typeof baseWin === "number";
   const win0 = (baseWin && typeof baseWin === "object" && baseWin.activeGroup)
@@ -511,6 +607,9 @@ export function revertAutoAllocation(tab, baseWin = null) {
       if (baseCycle) win.forecastCycle = baseCycle;
       if (baseObsTime) win.obsTime = baseObsTime;
       win.stepLength = win0.stepLength || (isObs ? (isSurface ? 3 : 12) : 6);
+      if (Array.isArray(win0.discretePeriods)) {
+        win.discretePeriods = [...win0.discretePeriods];
+      }
       if (win0.activeGroup && (!win.activeGroup || win !== win0)) {
         try {
           win.activeGroup = JSON.parse(JSON.stringify(win0.activeGroup));
@@ -573,7 +672,11 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
       if (w === targetBase || (targetBase && w.id && w.id === targetBase.id)) {
         continue;
       }
-      if (isWindowEmptyFn(w)) {
+      const isAllocForBase = Boolean(
+        (w.isAutoAllocated && targetBase && w.allocParentId === targetBase.id) ||
+        (tab.autoAllocation && tab.autoAllocation !== "none" && w.activeGroup?.id && targetBase?.activeGroup?.id && w.activeGroup.id === targetBase.activeGroup.id)
+      );
+      if (isWindowEmptyFn(w) || isAllocForBase) {
         emptyWins.push(w);
       } else {
         busyWins.push(w);
@@ -591,6 +694,10 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
       const winObj = createDefaultWindow(posIdx, tab.id);
       winObj.uid = uid;
       winObj.id = `tab-${tab.id}-win-${uid}`;
+      if (tab.autoAllocation && tab.autoAllocation !== "none") {
+        winObj.isAutoAllocated = true;
+        if (targetBase) winObj.allocParentId = targetBase.id;
+      }
       createdWins.push(winObj);
     }
 
@@ -607,7 +714,11 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
     const emptyWins = [];
     const busyWins = [];
     for (const w of remaining) {
-      if (isWindowEmptyFn(w)) {
+      const isAllocForBase = Boolean(
+        (w.isAutoAllocated && targetBase && w.allocParentId === targetBase.id) ||
+        (tab.autoAllocation && tab.autoAllocation !== "none" && w.activeGroup?.id && targetBase?.activeGroup?.id && w.activeGroup.id === targetBase.activeGroup.id)
+      );
+      if (isWindowEmptyFn(w) || isAllocForBase) {
         emptyWins.push(w);
       } else {
         busyWins.push(w);
@@ -625,6 +736,10 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
       const winObj = createDefaultWindow(posIdx, tab.id);
       winObj.uid = uid;
       winObj.id = `tab-${tab.id}-win-${uid}`;
+      if (tab.autoAllocation && tab.autoAllocation !== "none") {
+        winObj.isAutoAllocated = true;
+        if (targetBase) winObj.allocParentId = targetBase.id;
+      }
       createdWins.push(winObj);
     }
 

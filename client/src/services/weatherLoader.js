@@ -39,6 +39,12 @@ export async function loadWeatherField(map, model, element, level, period, custo
     console.warn(`[weatherLoader] Aborting loadWeatherField: invalid map (${Boolean(map)}), model (${model}), or element (${element})`);
     return;
   }
+  if (map && win) {
+    try {
+      map._micapsWindow = win;
+      map._winId = win.id;
+    } catch {}
+  }
   const isVOR = element === "VOR";
   const isDIV = element === "DIV";
   const isDerivedWind = element === "WIND" && (customOptions?.type === "contour" || (customOptions?.id && customOptions.id.startsWith("contour-")) || customOptions?.derivedFrom);
@@ -121,7 +127,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
         removeGridWindBarbs(map);
       }
     }
-    contourReRenderModule.disarmContourReRender?.(map, layerId);
+    contourReRenderModule.disarmContourReRender?.(map, layerId, win);
     removeLegend(element, win);
 
     addOrUpdateLayer({

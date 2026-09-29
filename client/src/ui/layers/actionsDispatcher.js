@@ -12,6 +12,9 @@ import { triggerRasterOverlay, triggerWindStreamlines } from "../../services/ove
 import { handleVisibilityAction } from "./visibilityActions.js";
 import { handleConfigAction } from "./configActions.js";
 import { handleAddContourAction } from "./derivedContourActions.js";
+import { removeTLogPLayer } from "../../layers/tlogp/tlogpLayer.js";
+import { removeTimeHeightLayer } from "../../layers/timeheight/timeHeightLayer.js";
+import { removeLineHeightLayer, removeHovmollerLayer } from "../../layers/lineprofile/lineProfileLayer.js";
 
 export function handleRemoveAction(map, layerId, layer, win) {
   if ((layer.type === "contour" || layer.type === "wind") && layer.element) {
@@ -84,21 +87,26 @@ export function handleRemoveAction(map, layerId, layer, win) {
       win.layerSnapshots = win.layerSnapshots.filter((s) => s.id !== layerId);
     }
   } else if (layer.type === "tlogp") {
-    import("../../layers/tlogp/tlogpLayer.js").then(({ removeTLogPLayer }) => {
-      removeTLogPLayer(map, win);
-    });
+    removeTLogPLayer(map, win, layerId);
   } else if (layer.type === "timeheight") {
-    import("../../layers/timeheight/timeHeightLayer.js").then(({ removeTimeHeightLayer }) => {
-      removeTimeHeightLayer(map, win);
-    });
+    removeTimeHeightLayer(map, win, layerId);
   } else if (layer.type === "lineheight") {
-    import("../../layers/lineprofile/lineProfileLayer.js").then(({ removeLineHeightLayer }) => {
-      removeLineHeightLayer(map, win);
-    });
+    removeLineHeightLayer(map, win, layerId);
   } else if (layer.type === "hovmoller") {
-    import("../../layers/lineprofile/lineProfileLayer.js").then(({ removeHovmollerLayer }) => {
-      removeHovmollerLayer(map, win);
-    });
+    removeHovmollerLayer(map, win, layerId);
+  }
+
+  const isProfileType = layer?.type === "tlogp" || layer?.type === "timeheight" || layer?.type === "lineheight" || layer?.type === "hovmoller";
+  if (win && isProfileType) {
+    if (Array.isArray(win.layers)) {
+      win.layers = win.layers.filter((l) => l && l.id !== layerId && l.id !== layer?.id && l.type !== layer.type);
+    }
+    if (Array.isArray(win.activeGroup?.layers)) {
+      win.activeGroup.layers = win.activeGroup.layers.filter((l) => l && l.id !== layerId && l.id !== layer?.id && l.type !== layer.type);
+    }
+    if (Array.isArray(win.layerSnapshots)) {
+      win.layerSnapshots = win.layerSnapshots.filter((s) => s && s.id !== layerId && s.id !== layer?.id && s.type !== layer.type);
+    }
   }
 }
 

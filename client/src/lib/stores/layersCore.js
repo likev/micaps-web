@@ -79,6 +79,14 @@ export function removeLayer(layerId, winOrId = null) {
   }
 }
 
+export function clearLayersForWindow(winOrId = null) {
+  const winId = typeof winOrId === "object" ? (winOrId?.id || currentActiveWinId) : (winOrId || currentActiveWinId || "default");
+  if (windowLayersMap.has(winId)) {
+    windowLayersMap.delete(winId);
+    notifyLayersChanged(winId);
+  }
+}
+
 export function syncLayerControlForWindow(win) {
   if (!win) return;
   currentActiveWinId = win.id || "default";

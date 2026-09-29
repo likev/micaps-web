@@ -46,7 +46,8 @@
     hasWeatherLayers,
     getNextWindowUid,
   } from "./lib/stores/tabsCore.js";
-  import { getLayersForWindow } from "./lib/stores/layersCore.js";
+  import { getLayersForWindow, clearLayersForWindow } from "./lib/stores/layersCore.js";
+  import { deleteWindowTimeline } from "./lib/stores/timeline.svelte.js";
   import { stopWindAnimation, removeGridWindBarbs } from "./layers/windLayer.js";
   import { removeRasterLayer } from "./layers/rasterLayer.js";
   import {
@@ -66,7 +67,17 @@
   import { applyBasemapScheme } from "./map/pmtilesLayers.js";
   import { updateGraticuleScheme } from "./map/graticule.js";
   import { hovmollerController, lineHeightController } from "./layers/lineprofile/lineProfileLayer.js";
-  import { syncProfilePanelsForWindow, hideAllProfilePanels } from "./lib/services/profileVisibility.js";
+  import { tlogpController } from "./layers/tlogp/tlogpController.js";
+  import { timeHeightController } from "./layers/timeheight/timeHeightController.js";
+  import { clearProfileState } from "./lib/stores/profilesCore.js";
+  import { syncProfilePanelsForWindow, hideAllProfilePanels, findVisibleLayer } from "./lib/services/profileVisibility.js";
+  import {
+    isRain12Element,
+    isWindowRain12,
+    getRainAccumulationHours,
+    getRainAccumulationHoursForWindow,
+    getDisabledPeriodsForRain,
+  } from "./utils/rain12.js";
   import { updateWindowTitle } from "./ui/tabs/windowTitles.js";
 
   let activeTab = $derived(tabsState.tabs.find((t) => t.id === tabsState.activeTabId) || tabsState.tabs[0] || null);
@@ -222,7 +233,29 @@
     timeline.currentMode = "nwp";
     timeline.forecastCycles = cycles;
     timeline.currentInitCycle = nextCycle;
-    if (win.forecastCycle !== nextCycle) {
+    const rainHours = getRainAccumulationHoursForWindow(win) ??
+      getRainAccumulationHours(win.element) ??
+      getRainAccumulationHours(app.element);
+    let periodChanged = false;
+    if (rainHours !== null && rainHours > 0) {
+      timeline.disabledPeriods = getDisabledPeriodsForRain(rainHours, timeline.discretePeriods);
+      if (win.period !== undefined && Number(win.period) < rainHours) {
+        const firstValid = Array.isArray(timeline.discretePeriods)
+          ? timeline.discretePeriods.find((p) => Number(p) >= rainHours)
+          : null;
+        win.period = firstValid !== undefined && firstValid !== null ? firstValid : rainHours;
+        if (win === activeWin) app.period = win.period;
+        periodChanged = true;
+      }
+      if (Array.isArray(timeline.discretePeriods)) {
+        const pIdx = timeline.discretePeriods.indexOf(win.period);
+        if (pIdx !== -1) timeline.currentPeriodIdx = pIdx;
+      }
+    } else if (timeline.disabledPeriods && timeline.disabledPeriods.length > 0) {
+      timeline.disabledPeriods = [];
+    }
+
+    if (win.forecastCycle !== nextCycle || periodChanged) {
       win.forecastCycle = nextCycle;
       if (getMapInstance(win.id) && win === activeWin) {
         if (win.activeGroup) {
@@ -279,11 +312,18 @@
     const posIdx = activeTab.windows.length;
     const winObj = createDefaultWindow(posIdx, activeTab.id);
     winObj.uid = uid;
+    winObj.id = `tab-${activeTab.id}-win-${uid}`;
     winObj.level = (activeTab.autoAllocation === "level") ? (DEFAULT_LEVELS[posIdx] ?? 500) : (activeWin?.level ?? 500);
     if (activeTab.autoAllocation === "model") {
       const eligible = getEligibleModelsForAllocation(activeWin, winObj.level, DEFAULT_MODELS);
       winObj.model = eligible[posIdx % eligible.length];
     }
+    clearLayersForWindow(winObj.id);
+    deleteWindowTimeline(winObj.id);
+    clearProfileState("timeheight", winObj.id);
+    clearProfileState("lineheight", winObj.id);
+    clearProfileState("hovmoller", winObj.id);
+    clearProfileState("tlogp", winObj.id);
     activeTab.windows.push(winObj);
     // The pushed window is stored wrapped by $state: focus it by position
     // id so the new tab-win is always selected, then sync the rest.
@@ -291,10 +331,65 @@
     handleWindowFocus(winObj);
   }
 
+  function cleanupWindowResources(win) {
+    if (!win) return;
+    const winId = win.id;
+    const map = getMapInstance(winId) || win.map || null;
+
+    // 1. Destroy profile controllers for this window
+    try { timeHeightController.destroy(map, win); } catch {}
+    try { lineHeightController.destroy(map, win); } catch {}
+    try { hovmollerController.destroy(map, win); } catch {}
+    let otherHasTlogp = false;
+    try {
+      const remainingWindows = activeTab?.windows?.filter((w) => w && w.id !== winId && w !== win) || [];
+      otherHasTlogp = remainingWindows.some((w) =>
+        findVisibleLayer(w, ["tlogp"], ["upperair-tlogp-diagram"])
+      );
+      if (!otherHasTlogp) {
+        tlogpController.activeWin = win;
+        tlogpController.destroy(map, win);
+      } else if (tlogpController.activeWin?.id === winId) {
+        const otherWin = remainingWindows.find((w) => findVisibleLayer(w, ["tlogp"], ["upperair-tlogp-diagram"]));
+        tlogpController.activeWin = otherWin || null;
+        tlogpController.removeStationHighlight(map || win.map);
+      }
+    } catch {}
+
+    // 2. Clear layers from layer store
+    try { clearLayersForWindow(winId); } catch {}
+
+    // 3. Clear timeline from timeline store
+    try {
+      deleteWindowTimeline(winId);
+    } catch {}
+
+    // 4. Clear profile state
+    try {
+      clearProfileState("timeheight", winId);
+      clearProfileState("lineheight", winId);
+      clearProfileState("hovmoller", winId);
+      if (!otherHasTlogp) {
+        clearProfileState("tlogp");
+      }
+    } catch {}
+
+    // 5. Clean map bindings
+    try {
+      if (syncCleanups.has(winId)) {
+        syncCleanups.get(winId)();
+        syncCleanups.delete(winId);
+      }
+      setMapInstance(winId, null);
+      win.map = null;
+    } catch {}
+  }
+
   function handleCloseWindow(win) {
     if (!activeTab || activeTab.windows.length <= 1) return;
     const idx = findWindowIndex(activeTab.windows, win);
     if (idx !== -1) {
+      cleanupWindowResources(win);
       const wasActive = idx === activeTab.activeWinIdx;
       const currentActiveWin = activeTab.windows[activeTab.activeWinIdx];
       activeTab.windows.splice(idx, 1);
@@ -449,14 +544,22 @@
     if (baseWin) {
       const tl = getOrCreateTimeline(baseWin.id);
       if (tl) {
-        if (!baseWin.stepLength && tl.currentStepLength) {
+        if (tl.currentStepLength) {
           baseWin.stepLength = tl.currentStepLength;
         }
-        if (!baseWin.discretePeriods && Array.isArray(tl.discretePeriods) && tl.discretePeriods.length > 0) {
-          baseWin.discretePeriods = tl.discretePeriods;
+        if (Array.isArray(tl.discretePeriods) && tl.discretePeriods.length > 0) {
+          baseWin.discretePeriods = [...tl.discretePeriods];
         }
         if (!baseWin.forecastCycles && Array.isArray(tl.forecastCycles) && tl.forecastCycles.length > 0) {
           baseWin.forecastCycles = tl.forecastCycles;
+        }
+        if (tl.currentInitCycle && !baseWin.forecastCycle) {
+          baseWin.forecastCycle = tl.currentInitCycle;
+        }
+        if (tl.currentPeriodIdx !== undefined && tl.discretePeriods?.[tl.currentPeriodIdx] !== undefined) {
+          if (baseWin.period === undefined || baseWin.period === null || !tl.discretePeriods.includes(baseWin.period)) {
+            baseWin.period = tl.discretePeriods[tl.currentPeriodIdx];
+          }
         }
         if (!baseWin.obsTime && tl.obsFiles && tl.currentObsIdx !== undefined && tl.obsFiles[tl.currentObsIdx]) {
           baseWin.obsTime = tl.obsFiles[tl.currentObsIdx];
@@ -481,6 +584,9 @@
     }
     applyAutoAllocation(tab, mode, baseWin);
     const visible = getVisibleWindows(tab);
+    for (let i = 0; i < visible.length; i++) {
+      updateWindowTitle(visible[i]);
+    }
 
     await new Promise((r) => setTimeout(r, 60));
 
@@ -505,15 +611,15 @@
       w.loadSeq = loadSeq;
       const isInitial = isWindowEmpty(w, getLayersForWindow);
 
-      if (w === baseWin && !isInitial && prevBaseState && w.activeGroup?.id === prevBaseState.groupId) {
-        if (mode === "level" && w.level === prevBaseState.level) return;
-        if (mode === "model" && w.model === prevBaseState.model) return;
-        if (mode === "step" && w.period === prevBaseState.period) return;
-        if (mode === "time") {
-          if (w.isObservation && w.obsTime === prevBaseState.obsTime) return;
-          if (!w.isObservation && w.forecastCycle === prevBaseState.forecastCycle && w.period === prevBaseState.period) return;
-        }
-      }
+      const shouldSkipMapReload = Boolean(w === baseWin && !isInitial && prevBaseState && w.activeGroup?.id === prevBaseState.groupId && (
+        (mode === "level" && w.level === prevBaseState.level) ||
+        (mode === "model" && w.model === prevBaseState.model) ||
+        (mode === "step" && w.period === prevBaseState.period) ||
+        (mode === "time" && (
+          (w.isObservation && w.obsTime === prevBaseState.obsTime) ||
+          (!w.isObservation && w.forecastCycle === prevBaseState.forecastCycle && w.period === prevBaseState.period)
+        ))
+      ));
 
       if (mode === "level") {
         if (w.activeGroup && w.activeGroup.hasLevel !== false) {
@@ -529,9 +635,11 @@
             }
           }
           w.activeGroup = groupCopy;
-          await loadPresetGroup(map, groupCopy, w.period, w.level, w, false, loadSeq).catch((e) =>
-            console.error("[AutoAlloc] level failed:", e)
-          );
+          if (!shouldSkipMapReload) {
+            await loadPresetGroup(map, groupCopy, w.period, w.level, w, false, loadSeq).catch((e) =>
+              console.error("[AutoAlloc] level failed:", e)
+            );
+          }
         }
       } else if (mode === "model") {
         if (w.activeGroup) {
@@ -547,9 +655,11 @@
             }
           }
           w.activeGroup = groupCopy;
-          await loadPresetGroup(map, groupCopy, w.period, w.level, w, false, loadSeq).catch((e) =>
-            console.error("[AutoAlloc] model failed:", e)
-          );
+          if (!shouldSkipMapReload) {
+            await loadPresetGroup(map, groupCopy, w.period, w.level, w, false, loadSeq).catch((e) =>
+              console.error("[AutoAlloc] model failed:", e)
+            );
+          }
         }
       } else if (mode === "step") {
         const tl = getOrCreateTimeline(w.id);
@@ -573,21 +683,29 @@
               if (idx !== -1) tl.currentObsIdx = idx;
             }
           }
-          if (w.activeGroup) {
+          if (w.activeGroup && !shouldSkipMapReload) {
             await loadPresetGroup(map, w.activeGroup, w.period, w.level, w, false, loadSeq).catch((e) =>
               console.error("[AutoAlloc] obs step failed:", e)
             );
           }
         } else {
           if (tl) {
+            tl.currentMode = "nwp";
+            const cycle = w.forecastCycle || baseWin?.forecastCycle;
+            if (cycle) tl.currentInitCycle = cycle;
+            const fCycles = w.forecastCycles || baseWin?.forecastCycles;
+            if (fCycles) tl.forecastCycles = [...fCycles];
             if (w.stepLength) tl.currentStepLength = w.stepLength;
-            if (w.discretePeriods) tl.discretePeriods = w.discretePeriods;
+            if (w.discretePeriods) tl.discretePeriods = [...w.discretePeriods];
             if (Array.isArray(tl.discretePeriods)) {
               const idx = tl.discretePeriods.indexOf(w.period);
               if (idx !== -1) tl.currentPeriodIdx = idx;
             }
           }
-          if (w.activeGroup) {
+          if (baseWin?._nwpTimeline || w._nwpTimeline) {
+            w._nwpTimeline = { ...(baseWin?._nwpTimeline || {}), ...w._nwpTimeline, stepLength: w.stepLength, cycle: w.forecastCycle };
+          }
+          if (w.activeGroup && !shouldSkipMapReload) {
             await loadPresetGroup(map, w.activeGroup, w.period, w.level, w, false, loadSeq).catch((e) =>
               console.error("[AutoAlloc] step failed:", e)
             );
@@ -615,7 +733,7 @@
               if (idx !== -1) tl.currentObsIdx = idx;
             }
           }
-          if (w.activeGroup) {
+          if (w.activeGroup && !shouldSkipMapReload) {
             await loadPresetGroup(map, w.activeGroup, w.period, w.level, w, false, loadSeq).catch((e) =>
               console.error("[AutoAlloc] obs time failed:", e)
             );
@@ -632,7 +750,7 @@
               if (idx !== -1) tl.currentPeriodIdx = idx;
             }
           }
-          if (w.activeGroup) {
+          if (w.activeGroup && !shouldSkipMapReload) {
             await loadPresetGroup(map, w.activeGroup, w.period, w.level, w, false, loadSeq).catch((e) =>
               console.error("[AutoAlloc] nwp time failed:", e)
             );
@@ -707,6 +825,9 @@
       console.warn("[App] Load Data skipped: missing window or group");
       return;
     }
+    win.isAutoAllocated = false;
+    win.allocParentId = null;
+    win.allocMode = null;
     console.log(`[App] Load Data: group=${group.id} overrideLevel=${overrideLevel} win=${win.id} period=${win.period}`);
     const map = getMapInstance(win.id);
     if (!map) {
@@ -790,6 +911,24 @@
       tl.discretePeriods = getPeriodsForStep(nwpStep);
       const pIdx = tl.discretePeriods.indexOf(win.period ?? 24);
       tl.currentPeriodIdx = pIdx !== -1 ? pIdx : Math.min(4, tl.discretePeriods.length - 1);
+      const rainHours = getRainAccumulationHoursForWindow(win) ??
+        getRainAccumulationHours(groupCopy?.id) ??
+        getRainAccumulationHours(groupCopy?.name) ??
+        getRainAccumulationHours(win.element);
+      if (rainHours !== null && rainHours > 0) {
+        tl.disabledPeriods = getDisabledPeriodsForRain(rainHours, tl.discretePeriods);
+        if (win.period !== undefined && Number(win.period) < rainHours) {
+          const firstValid = Array.isArray(tl.discretePeriods)
+            ? tl.discretePeriods.find((p) => Number(p) >= rainHours)
+            : null;
+          win.period = firstValid !== undefined && firstValid !== null ? firstValid : rainHours;
+          if (win === activeWin) app.period = win.period;
+        }
+        const pIdx = tl.discretePeriods.indexOf(win.period);
+        if (pIdx !== -1) tl.currentPeriodIdx = pIdx;
+      } else if (tl.disabledPeriods && tl.disabledPeriods.length > 0) {
+        tl.disabledPeriods = [];
+      }
     }
 
     try {
@@ -864,12 +1003,14 @@
           if (diff < minDiff) { minDiff = diff; targetIdx = idx; }
         });
       }
-      const startIdx = Math.max(0, (targetIdx !== -1 ? targetIdx : 0) - targetPos);
+      const rainHours0 = getRainAccumulationHoursForWindow(win0) ?? getRainAccumulationHours(win0?.element);
+      const minValidIdx = (rainHours0 !== null && rainHours0 > 0 && Array.isArray(periods))
+        ? periods.findIndex((p) => Number(p) >= rainHours0)
+        : 0;
+      const startIdx = Math.max(minValidIdx !== -1 ? minValidIdx : 0, (targetIdx !== -1 ? targetIdx : 0) - targetPos);
 
       for (let i = 0; i < visible.length; i++) {
         const win = visible[i];
-        const map = getMapInstance(win.id);
-        if (!map) continue;
         const loadSeq = (win.loadSeq || 0) + 1;
         win.loadSeq = loadSeq;
         win.prefetchDirections = payload.prefetchDirections || payload.directions || null;
@@ -894,6 +1035,12 @@
         if (tl) {
           tl.currentStepLength = stepLen;
           tl.discretePeriods = periods;
+          const rainHours = getRainAccumulationHoursForWindow(win) ?? getRainAccumulationHours(win.element);
+          if (rainHours !== null && rainHours > 0) {
+            tl.disabledPeriods = getDisabledPeriodsForRain(rainHours, tl.discretePeriods);
+          } else if (tl.disabledPeriods && tl.disabledPeriods.length > 0) {
+            tl.disabledPeriods = [];
+          }
           const idx = periods.indexOf(periodForWin);
           if (idx !== -1) tl.currentPeriodIdx = idx;
           if (baseCycle) tl.currentInitCycle = baseCycle;
@@ -904,6 +1051,90 @@
           if (baseCycle) app.cycle = baseCycle;
         }
 
+        updateWindowTitle(win);
+        const map = getMapInstance(win.id);
+        if (map && win.activeGroup) {
+          await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, true, loadSeq);
+        }
+        syncLayersState(win.id);
+        syncLegendState(win.id);
+      }
+      if (Array.isArray(activeTab.windows)) {
+        for (const w of activeTab.windows) {
+          if (!visible.includes(w)) {
+            w.stepLength = stepLen;
+            w.discretePeriods = [...periods];
+            if (w._nwpTimeline) w._nwpTimeline.stepLength = stepLen;
+            const tl = timelinesByWindow[w.id];
+            if (tl) {
+              tl.currentStepLength = stepLen;
+              tl.discretePeriods = [...periods];
+            }
+          }
+        }
+      }
+      return;
+    }
+
+    if (activeTab?.layout !== "1x1" && activeTab?.autoAllocation === "time" && !payload.isObs) {
+      const visible = getVisibleWindows(activeTab);
+      const win0 = visible[0] || activeWin;
+      const targetWin = (payload.winId ? getWindowById(payload.winId) : activeWin) || win0;
+      const baseCycle = payload.cycle || win0?.forecastCycle;
+      let targetPeriod = payload.period !== undefined ? payload.period : (targetWin?.period ?? 24);
+
+      const parseCycleEpoch = (str) => {
+        const clean = String(str || "").replace(/[^\d]/g, "").slice(0, 10);
+        if (clean.length < 8) return NaN;
+        const y = clean.length === 8 ? parseInt(`20${clean.slice(0, 2)}`, 10) : parseInt(clean.slice(0, 4), 10);
+        const m = (clean.length === 8 ? parseInt(clean.slice(2, 4), 10) : parseInt(clean.slice(4, 6), 10)) - 1;
+        const d = clean.length === 8 ? parseInt(clean.slice(4, 6), 10) : parseInt(clean.slice(6, 8), 10);
+        const h = clean.length === 8 ? parseInt(clean.slice(6, 8), 10) : parseInt(clean.slice(8, 10), 10);
+        return Date.UTC(y, m, d, h);
+      };
+
+      const t0 = parseCycleEpoch(baseCycle);
+      const tTarget = parseCycleEpoch(targetWin?.forecastCycle || payload.cycle);
+      const deltaH = (!isNaN(t0) && !isNaN(tTarget)) ? Math.round((t0 - tTarget) / 3600000) : 0;
+      const basePeriod = targetPeriod - deltaH;
+      const stepLen = payload.stepLength || win0?.stepLength || 6;
+      if (baseCycle) win0.forecastCycle = baseCycle;
+      win0.period = basePeriod;
+      applyAutoAllocation(activeTab, "time", win0);
+
+      for (let i = 0; i < visible.length; i++) {
+        const win = visible[i];
+        const map = getMapInstance(win.id);
+        if (!map) continue;
+        const loadSeq = (win.loadSeq || 0) + 1;
+        win.loadSeq = loadSeq;
+        win.prefetchDirections = payload.prefetchDirections || payload.directions || null;
+
+        const tl = getOrCreateTimeline(win.id);
+        if (tl) {
+          tl.currentMode = "nwp";
+          if (win.forecastCycle) tl.currentInitCycle = win.forecastCycle;
+          if (win.stepLength) tl.currentStepLength = win.stepLength;
+          if (win.discretePeriods) tl.discretePeriods = [...win.discretePeriods];
+          if (win.forecastCycles) tl.forecastCycles = [...win.forecastCycles];
+          const rainHours = getRainAccumulationHoursForWindow(win) ?? getRainAccumulationHours(win.element);
+          if (rainHours !== null && rainHours > 0) {
+            tl.disabledPeriods = getDisabledPeriodsForRain(rainHours, tl.discretePeriods);
+          } else if (tl.disabledPeriods && tl.disabledPeriods.length > 0) {
+            tl.disabledPeriods = [];
+          }
+          if (Array.isArray(tl.discretePeriods)) {
+            const idx = tl.discretePeriods.indexOf(win.period);
+            if (idx !== -1) tl.currentPeriodIdx = idx;
+          }
+        }
+
+        if (win === activeWin) {
+          app.period = win.period;
+          if (win.forecastCycle) app.cycle = win.forecastCycle;
+        }
+
+        updateWindowTitle(win);
         if (win.activeGroup) {
           await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, true, loadSeq);
         }
@@ -913,12 +1144,15 @@
       return;
     }
 
-    if (activeTab?.layout !== "1x1" && activeTab?.autoAllocation === "step" && payload.isObs) {
+    if (activeTab?.layout !== "1x1" && (activeTab?.autoAllocation === "step" || activeTab?.autoAllocation === "time") && payload.isObs) {
       const visible = getVisibleWindows(activeTab);
       const win0 = visible[0] || activeWin;
       const tl0 = win0 ? getOrCreateTimeline(win0.id) : null;
       const stepLen = payload.stepLength || win0?.stepLength || tl0?.currentStepLength || 12;
-      const baseFile = payload.file || win0?.obsTime;
+      const targetWin = (payload.winId ? getWindowById(payload.winId) : activeWin) || win0;
+      const targetPos = Math.max(0, visible.indexOf(targetWin));
+      const targetFile = payload.file || targetWin?.obsTime || win0?.obsTime;
+      const baseFile = stepCycleHours(targetFile, targetPos * stepLen);
 
       for (let i = 0; i < visible.length; i++) {
         const win = visible[i];
@@ -948,6 +1182,7 @@
         stopWindAnimation(map);
         removeGridWindBarbs(map);
         removeRasterLayer(map);
+        updateWindowTitle(win);
         if (win.activeGroup) {
           await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, true, loadSeq);
         }
@@ -966,7 +1201,6 @@
 
     for (const win of targets) {
       const map = getMapInstance(win.id);
-      if (!map) continue;
       const loadSeq = (win.loadSeq || 0) + 1;
       win.loadSeq = loadSeq;
       win.prefetchDirections = payload.prefetchDirections || payload.directions || null;
@@ -977,6 +1211,18 @@
         if (payload.stepLength) {
           win.stepLength = payload.stepLength;
           if (win._obsTimeline) win._obsTimeline.stepLength = payload.stepLength;
+          if (Array.isArray(activeTab?.windows)) {
+            for (const otherWin of activeTab.windows) {
+              if (otherWin && otherWin !== win) {
+                otherWin.stepLength = payload.stepLength;
+                if (otherWin._obsTimeline) otherWin._obsTimeline.stepLength = payload.stepLength;
+                const otherTl = timelinesByWindow[otherWin.id];
+                if (otherTl) {
+                  otherTl.currentStepLength = payload.stepLength;
+                }
+              }
+            }
+          }
         }
         const tl = getOrCreateTimeline(win.id);
         if (tl) {
@@ -986,12 +1232,13 @@
             if (idx !== -1) tl.currentObsIdx = idx;
           }
         }
-        stopWindAnimation(map);
-        removeGridWindBarbs(map);
-        removeRasterLayer(map);
-
-        if (win.activeGroup) {
-          await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, true, loadSeq);
+        if (map) {
+          stopWindAnimation(map);
+          removeGridWindBarbs(map);
+          removeRasterLayer(map);
+          if (win.activeGroup) {
+            await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, true, loadSeq);
+          }
         }
       } else {
         if (payload.cycle) {
@@ -1001,25 +1248,44 @@
         }
         if (payload.stepLength) {
           win.stepLength = payload.stepLength;
+          win.discretePeriods = payload.discretePeriods || getPeriodsForStep(payload.stepLength);
+          if (win._nwpTimeline) win._nwpTimeline.stepLength = payload.stepLength;
           const tl = getOrCreateTimeline(win.id);
           if (tl) {
             tl.currentStepLength = payload.stepLength;
-            tl.discretePeriods = getPeriodsForStep(payload.stepLength);
+            tl.discretePeriods = [...win.discretePeriods];
+          }
+          if (Array.isArray(activeTab?.windows)) {
+            for (const otherWin of activeTab.windows) {
+              if (otherWin && otherWin !== win) {
+                otherWin.stepLength = payload.stepLength;
+                otherWin.discretePeriods = [...win.discretePeriods];
+                if (otherWin._nwpTimeline) otherWin._nwpTimeline.stepLength = payload.stepLength;
+                const otherTl = timelinesByWindow[otherWin.id];
+                if (otherTl) {
+                  otherTl.currentStepLength = payload.stepLength;
+                  otherTl.discretePeriods = [...win.discretePeriods];
+                }
+              }
+            }
           }
         }
-        win.period = payload.period;
+        if (payload.period !== undefined) {
+          win.period = payload.period;
+        }
         const tl = getOrCreateTimeline(win.id);
-        if (tl && Array.isArray(tl.discretePeriods)) {
+        if (tl && Array.isArray(tl.discretePeriods) && payload.period !== undefined) {
           const idx = tl.discretePeriods.indexOf(payload.period);
           if (idx !== -1) tl.currentPeriodIdx = idx;
         }
-        if (win === activeWin) {
+        if (win === activeWin && payload.period !== undefined) {
           app.period = payload.period;
         }
-        if (win.activeGroup) {
-          await loadPresetGroup(map, win.activeGroup, payload.period, win.level, win, true, loadSeq);
+        if (map && win.activeGroup) {
+          await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, true, loadSeq);
         }
       }
+      updateWindowTitle(win);
       syncLayersState(win.id);
       syncLegendState(win.id);
     }
@@ -1031,6 +1297,13 @@
     const map = getMapInstance(win.id);
     const valPayload = event.field !== undefined ? { [event.field]: event.value } : event.value;
     serviceHandleLayerAction(map, event.action, event.layer?.id, valPayload, event.layer, win);
+    if (event.action === "remove") {
+      syncLayersState(win.id);
+      syncLegendState(win.id);
+      try {
+        syncProfilePanelsForWindow(win, map);
+      } catch {}
+    }
     if (event.action === "config" && event.layer) {
       if (valPayload && typeof valPayload === "object" && win.activeGroup?.layers) {
         const presetLayer = win.activeGroup.layers.find((candidate) =>
@@ -1178,9 +1451,10 @@
     }
   }
 
-  async function handleLevelSelect(lvl, targetWin = activeWin) {
+  async function handleLevelSelect(lvl, targetWin = activeWin, syncModelSplit = true) {
     const win = targetWin;
     if (!win) return;
+    win.level = lvl;
     if (win === activeWin) app.level = lvl;
     const map = getMapInstance(win.id);
     if (map) {
@@ -1216,10 +1490,11 @@
         console.warn("[App] Obs timeline bridge (level) failed:", e);
       }
     }
+    updateWindowTitle(win);
     syncLayersState(win.id);
     syncLegendState(win.id);
 
-    if (targetWin === activeWin && activeTab?.layout !== "1x1" && activeTab?.autoAllocation === "model") {
+    if (syncModelSplit && targetWin === activeWin && activeTab?.layout !== "1x1" && activeTab?.autoAllocation === "model") {
       applyAutoAllocationModeToTab(activeTab, "model").catch((err) =>
         console.error("[AutoAlloc] Model level sync error:", err)
       );
@@ -1227,38 +1502,56 @@
   }
 
   async function stepVerticalLevel(delta) {
-    // v1.1.0: line-profile diagrams own the vertical axis — Up/Down never
-    // touch win.level while they are active.
+    const isSplit = activeTab?.layout !== "1x1";
+    const alloc = activeTab?.autoAllocation;
+    const visible = isSplit ? getVisibleWindows(activeTab) : (activeWin ? [activeWin] : []);
+    const win = activeWin || visible[0];
+    if (!win) return;
+
+    // Line-profile diagrams own the vertical axis — Up/Down never touch win.level while active.
     try {
-      const win = activeWin;
-      if (win && (lineHeightController.isActive(win) || hovmollerController.isActive(win))) return;
-      if (win && (win.model === "SURFACE" || win.level === 0) && !win.activeGroup?.hasLevel) return;
+      if (lineHeightController.isActive(win) || hovmollerController.isActive(win)) return;
     } catch {}
+
     const levels = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
-    const cur = app.level ?? activeWin?.level ?? 500;
+
+    if (isSplit && alloc === "level") {
+      for (const w of visible) {
+        if (!w || ((w.model === "SURFACE" || w.level === 0) && !w.activeGroup?.hasLevel)) continue;
+        const wIdx = levels.indexOf(w.level ?? 500);
+        if (wIdx !== -1) {
+          const shifted = Math.max(0, Math.min(levels.length - 1, wIdx + delta));
+          if (shifted !== wIdx) {
+            await handleLevelSelect(levels[shifted], w, false);
+          }
+        }
+      }
+      if (activeWin?.level != null) app.level = activeWin.level;
+      return;
+    }
+
+    if (isSplit && (alloc === "model" || alloc === "step" || alloc === "time")) {
+      const curLvl = activeWin?.level ?? visible.find((w) => w && w.level != null)?.level ?? app.level ?? 500;
+      const idx = levels.indexOf(curLvl);
+      if (idx === -1) return;
+      const nextIdx = Math.max(0, Math.min(levels.length - 1, idx + delta));
+      if (nextIdx === idx) return;
+      const targetLevel = levels[nextIdx];
+      for (const w of visible) {
+        if (!w || ((w.model === "SURFACE" || w.level === 0) && !w.activeGroup?.hasLevel)) continue;
+        await handleLevelSelect(targetLevel, w, false);
+      }
+      app.level = targetLevel;
+      return;
+    }
+
+    if ((win.model === "SURFACE" || win.level === 0) && !win.activeGroup?.hasLevel) return;
+    const cur = app.level ?? win?.level ?? 500;
     const idx = levels.indexOf(cur);
     if (idx === -1) return;
     const nextIdx = Math.max(0, Math.min(levels.length - 1, idx + delta));
     if (nextIdx !== idx) {
-      const isSharedModel = activeTab?.layout !== "1x1" && activeTab?.autoAllocation === "model";
-      const isSharedLevel = activeTab?.layout !== "1x1" && activeTab?.autoAllocation === "level";
-      if (isSharedModel) {
-        const visible = getVisibleWindows(activeTab);
-        for (const w of visible) {
-          await handleLevelSelect(levels[nextIdx], w);
-        }
-      } else if (isSharedLevel) {
-        const visible = getVisibleWindows(activeTab);
-        for (const w of visible) {
-          const wIdx = levels.indexOf(w.level || 500);
-          if (wIdx !== -1) {
-            const shifted = Math.max(0, Math.min(levels.length - 1, wIdx + delta));
-            await handleLevelSelect(levels[shifted], w);
-          }
-        }
-      } else {
-        await handleLevelSelect(levels[nextIdx]);
-      }
+      await handleLevelSelect(levels[nextIdx], win);
     }
   }
 
@@ -1268,16 +1561,44 @@
 
 
   async function stepTimelineDelta(delta) {
-    const isStepAlloc = activeTab?.layout !== "1x1" && activeTab?.autoAllocation === "step";
-    const win = isStepAlloc ? (getVisibleWindows(activeTab)[0] || activeWin) : activeWin;
+    const isSplit = activeTab?.layout !== "1x1";
+    const alloc = activeTab?.autoAllocation;
+    const isSharedSplit = isSplit &&
+      (alloc === "step" || alloc === "time" || alloc === "level" || alloc === "model");
+    const visible = isSplit ? getVisibleWindows(activeTab) : (activeWin ? [activeWin] : []);
+    const win = isSharedSplit
+      ? ((activeWin && visible.includes(activeWin)) ? activeWin : (visible[0] || activeWin))
+      : activeWin;
     if (!win) return;
     // v1.1.0: Hovmöller panel owns its time axis — global ←/→ are swallowed.
     try {
       if (hovmollerController.isActive(win)) return;
     } catch {}
     const tl = getOrCreateTimeline(win.id);
+    if (!tl.discretePeriods || tl.discretePeriods.length === 0) {
+      const baseTl = visible[0] ? timelinesByWindow[visible[0].id] : null;
+      if (baseTl && Array.isArray(baseTl.discretePeriods) && baseTl.discretePeriods.length > 0) {
+        tl.discretePeriods = [...baseTl.discretePeriods];
+        tl.currentStepLength = baseTl.currentStepLength;
+        tl.currentPeriodIdx = baseTl.currentPeriodIdx;
+        tl.currentInitCycle = baseTl.currentInitCycle;
+        tl.disabledPeriods = baseTl.disabledPeriods ? [...baseTl.disabledPeriods] : [];
+      } else if (Array.isArray(win.discretePeriods) && win.discretePeriods.length > 0) {
+        tl.discretePeriods = [...win.discretePeriods];
+        tl.currentStepLength = win.stepLength || 6;
+        const pIdx = tl.discretePeriods.indexOf(win.period ?? 24);
+        tl.currentPeriodIdx = pIdx !== -1 ? pIdx : 0;
+      }
+    }
+    const rainHours = getRainAccumulationHoursForWindow(win) ?? getRainAccumulationHours(win.element);
+    if (rainHours !== null && rainHours > 0) {
+      tl.disabledPeriods = getDisabledPeriodsForRain(rainHours, tl.discretePeriods);
+    } else if (tl.disabledPeriods && tl.disabledPeriods.length > 0) {
+      tl.disabledPeriods = [];
+    }
     const res = stepWindowTimeline(tl, delta);
     if (!res) return;
+    res.winId = win.id;
     // v1.1.0: keyboard steps hint prefetch direction (prev/next).
     res.prefetchDirections = delta < 0 ? ["prev"] : ["next"];
     if (!res.isObs) {

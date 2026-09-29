@@ -5,7 +5,7 @@ import { TLogPPanel } from "./tlogpPanel.js";
 import { autoSaveLayerConfig } from "../../config/presets.js";
 import { showErrorToast } from "../../ui/toast.js";
 import { addOrUpdateLayer, getLayerById, getLayersForWindow, syncLayerControlForWindow } from "../../ui/layers/layerStore.js";
-import { getActiveWindow } from "../../ui/tabs/tabsStore.js";
+import { getActiveWindow, tabsState } from "../../ui/tabs/tabsStore.js";
 import { setProfileState, getProfileState, clearProfileState } from "../../lib/stores/profilesCore.js";
 
 class TLogPController {
@@ -374,6 +374,12 @@ class TLogPController {
         try { this.panel.destroy(); } catch {}
       }
       this.panel = null;
+    }
+    if (typeof document !== "undefined") {
+      try {
+        const domEl = document.getElementById("tlogp-panel");
+        if (domEl && domEl.parentNode) domEl.parentNode.removeChild(domEl);
+      } catch {}
     }
     this.sounding = null;
     this.parcelResult = null;

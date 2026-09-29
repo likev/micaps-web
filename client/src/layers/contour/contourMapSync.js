@@ -1,6 +1,6 @@
 // contourMapSync.js - MapLibre GeoJSON layer synchronization, raster cleanup, and layer lifecycle management
 import * as griddata from "griddata";
-import { getElementLevels, getHexColor } from "../../utils/colormaps.js";
+import { getElementLevels, getHexColor, isRainElement } from "../../utils/colormaps.js";
 import { removeRasterLayer } from "../rasterLayer.js";
 import { smoothGrid2D } from "../../utils/smoothContour.js";
 import { formatContourLabel } from "../../utils/formatters.js";
@@ -206,9 +206,9 @@ export function flushContourSource(map, layerId = "default") {
   }
 }
 
-export function removeContourLayer(map, layerId) {
+export function removeContourLayer(map, layerId, win = null) {
   flushContourSource(map, layerId);
-  contourReRender.disarmContourReRender?.(map, layerId);
+  contourReRender.disarmContourReRender?.(map, layerId, win);
 
   const { isobandSrcId, isobandLayerId, isolineSrcId, isolineLayerId, isolineLabelSrcId, isolineLabelLayerId } = getLayerDOMIds(layerId);
 
@@ -221,8 +221,8 @@ export function removeContourLayer(map, layerId) {
   removeRasterLayer(map, layerId);
 }
 
-export function removeAllContourLayers(map) {
-  contourReRender.disarmAllContourReRenders?.(map);
+export function removeAllContourLayers(map, win = null) {
+  contourReRender.disarmAllContourReRenders?.(map, win);
   if (!map || !map.getStyle) return;
   const style = map.getStyle();
   if (!style) return;
@@ -292,7 +292,12 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
   }
 
   const { zMin, zMax } = computeGridStats(gridData);
-  const levels = resolveRenderLevels(options) || getElementLevels(element, zMin, zMax, options.colormap);
+  let levels = resolveRenderLevels(options) || getElementLevels(element, zMin, zMax, options.colormap);
+  if (isRainElement(element) || isRainElement(options.colormap)) {
+    levels = levels.map((l) => (l < 0.1 ? 0.1 : l));
+    levels = Array.from(new Set(levels)).sort((a, b) => a - b);
+    if (levels.length < 2) levels = [0.1, 1, 10, 25, 50, 100, 250];
+  }
 
   let isobandFC = options.preserveIsobands ? null : { type: "FeatureCollection", features: [] };
   if (!options.preserveIsobands && isVisible && showFill && !showRaster) {

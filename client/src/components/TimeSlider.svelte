@@ -20,6 +20,13 @@
   import { getPeriodsForStep, filterObsFilesByStep, selectObsChipsWindow, findClosestFile } from "../lib/stores/timelineMath.js";
   import { stepWindowTimeline } from "../lib/services/appWorkflow.js";
   import { getWindowById } from "../lib/stores/tabs.svelte.js";
+  import {
+    isRain12Element,
+    isWindowRain12,
+    getRainAccumulationHours,
+    getRainAccumulationHoursForWindow,
+    getDisabledPeriodsForRain,
+  } from "../utils/rain12.js";
 
   let { winId = "default", onTimeChange = null } = $props();
 
@@ -72,6 +79,42 @@
   let cycles = $derived(timeline.forecastCycles || []);
   let currentCycle = $derived(timeline.currentInitCycle || "");
 
+  let activeWin = $derived(getWindowById(winId) || null);
+  let rainAccumHours = $derived(
+    getRainAccumulationHoursForWindow(activeWin) ??
+    getRainAccumulationHours(app.element) ??
+    getRainAccumulationHours(activeWin?.element) ??
+    getRainAccumulationHours(activeWin?.activeGroup?.id) ??
+    getRainAccumulationHours(activeWin?.activeGroup?.name)
+  );
+  let isRainAccum = $derived(rainAccumHours !== null && rainAccumHours > 0);
+  let isRain12 = $derived(rainAccumHours === 12);
+
+  $effect(() => {
+    const tl = timelinesByWindow[winId] || getOrCreateTimeline(winId);
+    if (isRainAccum && !isObs) {
+      tl.disabledPeriods = getDisabledPeriodsForRain(rainAccumHours, tl.discretePeriods);
+      const curP = tl.discretePeriods?.[tl.currentPeriodIdx];
+      const isCurDisabled = curP !== undefined && (
+        Number(curP) < rainAccumHours ||
+        (Array.isArray(tl.disabledPeriods) && (tl.disabledPeriods.includes(curP) || tl.disabledPeriods.includes(Number(curP))))
+      );
+      if (isCurDisabled) {
+        const firstValidIdx = Array.isArray(tl.discretePeriods)
+          ? tl.discretePeriods.findIndex((p) => Number(p) >= rainAccumHours && !tl.disabledPeriods.includes(p) && !tl.disabledPeriods.includes(Number(p)))
+          : -1;
+        if (firstValidIdx !== -1) {
+          tl.currentPeriodIdx = firstValidIdx;
+          const targetP = tl.discretePeriods[firstValidIdx];
+          app.period = targetP;
+          emitTimeChange({ period: targetP, cycle: currentCycle, _seq: ++tl.periodStepSeq });
+        }
+      }
+    } else if (tl.disabledPeriods && tl.disabledPeriods.length > 0 && !isRainAccum) {
+      tl.disabledPeriods = [];
+    }
+  });
+
   let playTimer = null;
 
   function emitTimeChange(payload) {
@@ -103,6 +146,9 @@
       }
     } else {
       const p = periods[idx];
+      const isPeriodDisabled = (isRainAccum && Number(p) < rainAccumHours) ||
+        (Array.isArray(timeline.disabledPeriods) && (timeline.disabledPeriods.includes(p) || timeline.disabledPeriods.includes(Number(p))));
+      if (isPeriodDisabled) return;
       if (p !== undefined) {
         goToPeriod(winId, p);
         app.period = p;
@@ -136,23 +182,38 @@
     if (win) {
       win.stepLength = step;
       if (win._obsTimeline) win._obsTimeline.stepLength = step;
+      if (win._nwpTimeline) win._nwpTimeline.stepLength = step;
     }
     if (!isObs) {
       const curVal = periods[tl.currentPeriodIdx] ?? 24;
       tl.discretePeriods = getPeriodsForStep(step);
+      if (isRainAccum) {
+        tl.disabledPeriods = getDisabledPeriodsForRain(rainAccumHours, tl.discretePeriods);
+      } else if (tl.disabledPeriods && tl.disabledPeriods.length > 0) {
+        tl.disabledPeriods = [];
+      }
       let closestIdx = 0;
       let minDiff = Infinity;
       tl.discretePeriods.forEach((p, idx) => {
+        if (isRainAccum && Number(p) < rainAccumHours) return;
         const diff = Math.abs(p - curVal);
         if (diff < minDiff) {
           minDiff = diff;
           closestIdx = idx;
         }
       });
+      if (isRainAccum && Number(tl.discretePeriods[closestIdx]) < rainAccumHours) {
+        const firstValid = tl.discretePeriods.findIndex((p) => Number(p) >= rainAccumHours);
+        if (firstValid !== -1) closestIdx = firstValid;
+      }
       tl.currentPeriodIdx = closestIdx;
       const newPeriod = tl.discretePeriods[tl.currentPeriodIdx];
       app.period = newPeriod;
-      emitTimeChange({ period: newPeriod, cycle: currentCycle, stepLength: step, _seq: ++tl.periodStepSeq });
+      if (win) {
+        win.period = newPeriod;
+        win.discretePeriods = [...tl.discretePeriods];
+      }
+      emitTimeChange({ period: newPeriod, cycle: currentCycle, stepLength: step, discretePeriods: tl.discretePeriods, _seq: ++tl.periodStepSeq });
     } else {
       const curFile = obsFiles[tl.currentObsIdx] || "";
       const allFiltered = filterObsFilesByStep(tl.rawObsFiles, step, tl.isUpperAirMode);
@@ -164,6 +225,10 @@
       const newIdx = targetFile ? tl.obsFiles.indexOf(targetFile) : -1;
       tl.currentObsIdx = newIdx !== -1 ? newIdx : Math.max(0, tl.obsFiles.length - 1);
       const file = tl.obsFiles[tl.currentObsIdx];
+      if (win && file) {
+        win.obsTime = file;
+        if (win._obsTimeline) win._obsTimeline.file = file;
+      }
       if (file) emitTimeChange({ isObs: true, file, stepLength: step, _seq: ++tl.periodStepSeq });
     }
   }
@@ -371,14 +436,25 @@
           {/each}
         {:else}
           {#each periods as p, idx}
+            {@const isPeriodDisabled = (isRainAccum && Number(p) < rainAccumHours) ||
+              (Array.isArray(timeline.disabledPeriods) && (timeline.disabledPeriods.includes(p) || timeline.disabledPeriods.includes(Number(p))))}
             <button
               class="chip-btn"
               class:active={idx === timeline.currentPeriodIdx}
+              class:disabled={isPeriodDisabled}
+              disabled={isPeriodDisabled}
               role="tab"
               aria-selected={idx === timeline.currentPeriodIdx}
-              onclick={() => handleChipClick(idx)}
+              onclick={() => !isPeriodDisabled && handleChipClick(idx)}
               data-testid="timeline-chip"
               data-period={p}
+              title={isPeriodDisabled
+                ? (rainAccumHours
+                    ? (rainAccumHours === 12
+                        ? "Not available for RAIN12 (.000, .006 don't exist)"
+                        : `Not available for RAIN${rainAccumHours < 10 ? '0' + rainAccumHours : rainAccumHours} (lead < ${rainAccumHours}h does not exist)`)
+                    : "Not available (forecast lead time does not exist for accumulation period)")
+                : undefined}
             >
               {p === 0 ? "000h" : `+${p}h`}
             </button>
@@ -596,5 +672,14 @@
     color: #ffffff;
     font-weight: bold;
     box-shadow: 0 0 8px rgba(56, 139, 253, 0.4);
+  }
+
+  .chip-btn:disabled,
+  .chip-btn.disabled,
+  :global(.chip-btn:disabled) {
+    opacity: 0.35 !important;
+    cursor: not-allowed !important;
+    pointer-events: none !important;
+    border-style: dashed !important;
   }
 </style>

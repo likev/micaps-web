@@ -22,7 +22,7 @@ function findStoreLayer(win, types, ids = []) {
   return null;
 }
 
-function findVisibleLayer(win, types, ids = []) {
+export function findVisibleLayer(win, types, ids = []) {
   // The layer store is authoritative: an eye-hidden (visible === false) entry
   // stays hidden even if a stale preset copy still claims visible.
   const storeLayer = findStoreLayer(win, types, ids);

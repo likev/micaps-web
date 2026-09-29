@@ -20,14 +20,13 @@ export function formatCoords(lon, lat) {
 }
 
 export function formatElementUnit(element = "TMP") {
-  switch (element) {
+  const elem = String(element || "").toUpperCase();
+  const base = elem.includes("/") ? elem.split("/").pop() : elem;
+  switch (base) {
     case "TMP":
     case "TD":
     case "DTD":
       return "°C";
-    case "RAIN":
-    case "RAIN6":
-      return "mm";
     case "HGT":
       return "gpm";
     case "RH":
@@ -41,15 +40,24 @@ export function formatElementUnit(element = "TMP") {
     case "VOR":
     case "DIV":
       return "1e-5/s";
-    default:
-      return "";
   }
+  if (
+    base.startsWith("RAIN") ||
+    base === "APCP" ||
+    base === "TP" ||
+    base.startsWith("PRECIP") ||
+    base.startsWith("SNOW")
+  ) {
+    return "mm";
+  }
+  return "";
 }
 
 export function formatContourLabel(val, element = "", isDam = false) {
   if (typeof val !== "number" || isNaN(val)) return String(val ?? "");
   const elem = String(element || "").toUpperCase();
-  if (elem === "HGT" || elem === "HEIGHT") {
+  const base = elem.includes("/") ? elem.split("/").pop() : elem;
+  if (base === "HGT" || base === "HEIGHT") {
     // Upper-air geopotential height in gpm (e.g. >= 1000) displayed in decameters (dam):
     // 5880 gpm -> 588, 5840 gpm -> 584, 3120 gpm -> 312, 1520 gpm -> 152
     if (!isDam && Math.abs(val) >= 1000) {
@@ -57,7 +65,11 @@ export function formatContourLabel(val, element = "", isDam = false) {
     }
     return String(Math.round(val));
   }
-  if (elem === "TMP" || elem === "TD" || elem === "DTD" || elem === "VIS" || elem === "RAIN6" || elem === "VOR" || elem === "DIV") {
+  if (
+    base === "TMP" || base === "TD" || base === "DTD" || base === "VIS" ||
+    base === "VOR" || base === "DIV" ||
+    base.startsWith("RAIN") || base === "APCP" || base === "TP" || base.startsWith("PRECIP") || base.startsWith("SNOW")
+  ) {
     return String(Math.round(val * 10) / 10);
   }
   return String(Math.round(val));

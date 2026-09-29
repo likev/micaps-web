@@ -203,7 +203,39 @@ export function stepWindowTimeline(tl, delta) {
     };
   } else {
     if (!tl.discretePeriods || tl.discretePeriods.length === 0) return null;
-    tl.currentPeriodIdx = (tl.currentPeriodIdx + delta + tl.discretePeriods.length) % tl.discretePeriods.length;
+    const len = tl.discretePeriods.length;
+    const stepDir = delta >= 0 ? 1 : -1;
+    const numSteps = Math.max(1, Math.abs(delta));
+    let nextIdx = (typeof tl.currentPeriodIdx === "number" && tl.currentPeriodIdx >= 0) ? tl.currentPeriodIdx : 0;
+
+    const hasDisabled = Boolean(
+      tl.disabledPeriods && (Array.isArray(tl.disabledPeriods) ? tl.disabledPeriods.length > 0 : true)
+    );
+
+    if (hasDisabled) {
+      for (let s = 0; s < numSteps; s++) {
+        let found = false;
+        for (let attempt = 0; attempt < len; attempt++) {
+          nextIdx = (nextIdx + stepDir + len) % len;
+          const p = tl.discretePeriods[nextIdx];
+          const numP = Number(p);
+          const isDisabled = Array.isArray(tl.disabledPeriods)
+            ? (tl.disabledPeriods.includes(p) || tl.disabledPeriods.includes(numP))
+            : (tl.disabledPeriods instanceof Set ? (tl.disabledPeriods.has(p) || tl.disabledPeriods.has(numP)) : false);
+          if (!isDisabled) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          nextIdx = (nextIdx + stepDir + len) % len;
+        }
+      }
+    } else {
+      nextIdx = (tl.currentPeriodIdx + delta + len * Math.ceil(Math.abs(delta) / len)) % len;
+    }
+
+    tl.currentPeriodIdx = nextIdx;
     return {
       isObs: false,
       period: tl.discretePeriods[tl.currentPeriodIdx],

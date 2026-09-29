@@ -50,9 +50,24 @@ export async function loadTLogPLayer(map, layer = {}, period = null, level = nul
   return await tlogpController.init(map, win, tlogpLayerDef);
 }
 
-export function removeTLogPLayer(map, win = null) {
+export function removeTLogPLayer(map, win = null, layerId = null) {
   tlogpController.destroy(map, win);
-  removeLayer("upperair-tlogp-diagram", win);
+  const idToRemove = layerId || "upperair-tlogp-diagram";
+  removeLayer(idToRemove, win);
+  if (idToRemove !== "upperair-tlogp-diagram") {
+    removeLayer("upperair-tlogp-diagram", win);
+  }
+  if (win) {
+    if (Array.isArray(win.layers)) {
+      win.layers = win.layers.filter((l) => l && l.id !== idToRemove && l.type !== "tlogp");
+    }
+    if (Array.isArray(win.activeGroup?.layers)) {
+      win.activeGroup.layers = win.activeGroup.layers.filter((l) => l && l.id !== idToRemove && l.type !== "tlogp");
+    }
+    if (Array.isArray(win.layerSnapshots)) {
+      win.layerSnapshots = win.layerSnapshots.filter((s) => s && s.id !== idToRemove && s.type !== "tlogp");
+    }
+  }
 }
 
 export function setTLogPVisibility(map, visible, win = null) {

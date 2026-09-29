@@ -54,6 +54,32 @@ const DEFAULT_COLORMAPS = {
     { val: 100, color: [128, 0, 64, 255] },
     { val: 250, color: [80, 0, 0, 255] },
   ],
+  RAIN12: [
+    { val: 0.1, color: [166, 242, 143, 220] },
+    { val: 1, color: [61, 186, 61, 230] },
+    { val: 10, color: [97, 184, 255, 240] },
+    { val: 25, color: [0, 0, 255, 255] },
+    { val: 50, color: [250, 0, 250, 255] },
+    { val: 100, color: [128, 0, 64, 255] },
+    { val: 250, color: [80, 0, 0, 255] },
+  ],
+  RAIN6: [
+    { val: 0.1, color: [166, 242, 143, 220] },
+    { val: 1, color: [61, 186, 61, 230] },
+    { val: 10, color: [97, 184, 255, 240] },
+    { val: 25, color: [0, 0, 255, 255] },
+    { val: 50, color: [250, 0, 250, 255] },
+    { val: 100, color: [128, 0, 64, 255] },
+    { val: 250, color: [80, 0, 0, 255] },
+  ],
+  RAIN24: [
+    { val: 0.1, color: [166, 242, 143, 220] },
+    { val: 10, color: [61, 186, 61, 230] },
+    { val: 25, color: [97, 184, 255, 240] },
+    { val: 50, color: [0, 0, 255, 255] },
+    { val: 100, color: [250, 0, 250, 255] },
+    { val: 250, color: [128, 0, 64, 255] },
+  ],
   DTD: [
     { val: 0, color: [20, 90, 200, 255] },
     { val: 2, color: [40, 160, 140, 255] },
@@ -127,6 +153,33 @@ export function setColormaps(colormaps) {
   COLORMAPS = normalized;
 }
 
+export function isRainElement(name) {
+  if (!name || typeof name !== "string") return false;
+  const up = name.toUpperCase();
+  const base = up.includes("/") ? up.split("/").pop() : up;
+  return (
+    base.startsWith("RAIN") ||
+    base === "APCP" ||
+    base === "TP" ||
+    base.startsWith("PRECIP") ||
+    base.startsWith("SNOW") ||
+    up.includes("RAIN")
+  );
+}
+
+export {
+  isRain12Element,
+  isRain01Element,
+  isRain03Element,
+  isRain06Element,
+  isRain24Element,
+  getRainAccumulationHours,
+  getRainAccumulationHoursForWindow,
+  isRainAccumulationElement,
+  isWindowRainAccumulation,
+  getDisabledPeriodsForRain,
+} from "./rain12.js";
+
 export function getColormap(reference = null, element = "TMP") {
   if (Array.isArray(reference)) return reference;
   if (typeof reference === "string") {
@@ -136,9 +189,11 @@ export function getColormap(reference = null, element = "TMP") {
     const trimmed = reference.replace(/^\//, "");
     if (COLORMAPS[trimmed]) return COLORMAPS[trimmed];
     if (COLORMAPS["/" + trimmed]) return COLORMAPS["/" + trimmed];
+    if (isRainElement(reference)) return COLORMAPS.RAIN || DEFAULT_COLORMAPS.RAIN;
   }
   const elUp = (element || "").toUpperCase();
   if (COLORMAPS[elUp]) return COLORMAPS[elUp];
+  if (isRainElement(element)) return COLORMAPS.RAIN || DEFAULT_COLORMAPS.RAIN;
   return COLORMAPS[element] || COLORMAPS.TMP || COLORMAPS.default || FALLBACK_COLORMAP;
 }
 
@@ -164,13 +219,14 @@ export function createColorResolver(element = "TMP", colormap = null, zMin = und
 
   const elUpper = (element || "").toUpperCase();
   const cmUpper = (typeof colormap === "string" ? colormap : "").toUpperCase();
+  const isRain = isRainElement(element) || isRainElement(colormap) || cmUpper.includes("RAIN");
 
   // Fixed physical scale fields must NEVER be dynamically stretched:
-  // RH (0..100%), WIND (0..45 m/s), TMP (-40..40 C), RAIN (0..250 mm), DTD (0..30 C)
+  // RH (0..100%), WIND (0..45 m/s), TMP (-40..40 C), RAIN (0.1..250 mm), DTD (0..30 C)
   const isFixedPhysical = elUpper === "RH" || cmUpper.includes("RH") ||
                           elUpper === "WIND" || cmUpper.includes("WIND") ||
                           elUpper === "TMP" || cmUpper.includes("TMP") ||
-                          elUpper === "RAIN" || cmUpper.includes("RAIN") ||
+                          isRain ||
                           elUpper === "DTD" || cmUpper.includes("DTD");
 
   const isHGT = elUpper === "HGT" || cmUpper.includes("HGT");
@@ -194,6 +250,10 @@ export function createColorResolver(element = "TMP", colormap = null, zMin = und
     }
 
     if (isFixedPhysical) {
+      if (isRain && (checkVal < 0.1 || checkVal < palMin)) {
+        out[offset] = 0; out[offset + 1] = 0; out[offset + 2] = 0; out[offset + 3] = 0;
+        return;
+      }
       if (checkVal <= palMin) {
         const c = palette[0].color;
         out[offset] = c[0]; out[offset + 1] = c[1]; out[offset + 2] = c[2]; out[offset + 3] = c[3];
@@ -275,13 +335,25 @@ export function getColor(val, element = "TMP", colormap = null, zMin = undefined
 }
 
 export function getHexColor(val, element = "TMP", colormap = null, zMin = undefined, zMax = undefined) {
-  const [r, g, b] = getColor(val, element, colormap, zMin, zMax);
+  const [r, g, b, a] = getColor(val, element, colormap, zMin, zMax);
+  if (a === 0) {
+    return "rgba(0,0,0,0)";
+  }
   return `rgb(${r},${g},${b})`;
 }
 
 export function getElementLevels(element = "TMP", zMin, zMax, colormap = null) {
   const palette = getColormap(colormap, element);
   const elUpper = (element || "").toUpperCase();
+  const cmUpper = (typeof colormap === "string" ? colormap : "").toUpperCase();
+
+  if (isRainElement(element) || isRainElement(colormap) || cmUpper.includes("RAIN")) {
+    const rawLevels = (palette && palette.length >= 2)
+      ? palette.map((s) => (s.val < 0.1 ? 0.1 : s.val))
+      : [0.1, 1, 10, 25, 50, 100, 250];
+    const uniqueSorted = Array.from(new Set(rawLevels)).sort((a, b) => a - b);
+    return uniqueSorted.length >= 2 ? uniqueSorted : [0.1, 1, 10, 25, 50, 100, 250];
+  }
 
   if (elUpper === "RH") {
     return [50, 60, 70, 80, 90, 100];

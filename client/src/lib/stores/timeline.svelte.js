@@ -8,6 +8,7 @@ import {
   getActiveWindowProvider,
   setTimeChangeCallback,
   getTimeChangeCallback,
+  clearWindowTimeline,
 } from "./timelineCore.js";
 import {
   selectObsChipsWindow,
@@ -48,6 +49,13 @@ export function goToObsFile(winId, file) {
   }
 }
 
+export function deleteWindowTimeline(winId) {
+  if (winId && timelinesByWindow[winId]) {
+    delete timelinesByWindow[winId];
+  }
+  clearWindowTimeline(winId);
+}
+
 export {
   DEFAULT_PLAYBACK_MS,
   getAdjacentTimeSteps,
@@ -59,4 +67,5 @@ export {
   getActiveWindowProvider,
   setTimeChangeCallback,
   getTimeChangeCallback,
+  clearWindowTimeline,
 };

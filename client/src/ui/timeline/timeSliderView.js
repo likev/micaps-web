@@ -110,25 +110,49 @@ export function renderChips() {
     });
   } else {
     timelineState.discretePeriods.forEach((period, idx) => {
+      const isDisabled = Boolean(
+        timelineState.disabledPeriods && (
+          Array.isArray(timelineState.disabledPeriods)
+            ? (timelineState.disabledPeriods.includes(period) || timelineState.disabledPeriods.includes(Number(period)))
+            : (timelineState.disabledPeriods instanceof Set ? (timelineState.disabledPeriods.has(period) || timelineState.disabledPeriods.has(Number(period))) : false)
+        )
+      );
       const btn = document.createElement("button");
-      btn.className = `chip-btn ${idx === timelineState.currentPeriodIdx ? "active" : ""}`;
+      btn.className = `chip-btn ${idx === timelineState.currentPeriodIdx ? "active" : ""} ${isDisabled ? "disabled" : ""}`;
       btn.setAttribute("role", "tab");
       btn.setAttribute("aria-selected", idx === timelineState.currentPeriodIdx ? "true" : "false");
       btn.setAttribute("aria-label", period === 0 ? "Analysis 000h" : `Forecast +${period}h`);
       btn.textContent = period === 0 ? "000h" : `+${period}h`;
-      btn.addEventListener("click", () => {
-        pausePlayback();
-        timelineState.currentPeriodIdx = idx;
-        const p = timelineState.discretePeriods[idx];
-        appState.set("period", p);
-        updateLabels();
-        renderChips();
-        if (timelineState.onTimeChangeCallback) {
-          const seq = incPeriodStepSeq();
-          const boxed = { period: p, _seq: seq, valueOf() { return p; } };
-          fireTimeChange(boxed);
+      if (isDisabled) {
+        btn.disabled = true;
+        const maxDisabled = Array.isArray(timelineState.disabledPeriods) && timelineState.disabledPeriods.length > 0
+          ? Math.max(...timelineState.disabledPeriods.map(Number))
+          : 0;
+        const rainH = timelineState.rainHours || (
+          maxDisabled >= 18 ? 24 : (maxDisabled >= 6 ? 12 : (maxDisabled >= 3 ? 6 : (maxDisabled >= 1 ? 3 : (timelineState.disabledPeriods?.length > 0 ? 1 : null))))
+        );
+        if (rainH === 12) {
+          btn.title = "Not available for RAIN12 (.000, .006 don't exist)";
+        } else if (rainH) {
+          btn.title = `Not available for RAIN${rainH < 10 ? '0' + rainH : rainH} (lead < ${rainH}h does not exist)`;
+        } else {
+          btn.title = "Not available (forecast lead time does not exist for accumulation period)";
         }
-      });
+      } else {
+        btn.addEventListener("click", () => {
+          pausePlayback();
+          timelineState.currentPeriodIdx = idx;
+          const p = timelineState.discretePeriods[idx];
+          appState.set("period", p);
+          updateLabels();
+          renderChips();
+          if (timelineState.onTimeChangeCallback) {
+            const seq = incPeriodStepSeq();
+            const boxed = { period: p, _seq: seq, valueOf() { return p; } };
+            fireTimeChange(boxed);
+          }
+        });
+      }
       chipsContainer.appendChild(btn);
     });
   }
@@ -215,15 +239,27 @@ export function setStepLength(stepVal, triggerCallback = false) {
   if (timelineState.currentMode === "nwp") {
     const curVal = timelineState.discretePeriods[timelineState.currentPeriodIdx] ?? 24;
     timelineState.discretePeriods = getPeriodsForStep(timelineState.currentStepLength);
+    const hasDisabled = Boolean(
+      timelineState.disabledPeriods && (Array.isArray(timelineState.disabledPeriods) ? timelineState.disabledPeriods.length > 0 : true)
+    );
+    const isPDisabled = (p) => hasDisabled && (Array.isArray(timelineState.disabledPeriods)
+      ? (timelineState.disabledPeriods.includes(p) || timelineState.disabledPeriods.includes(Number(p)))
+      : (timelineState.disabledPeriods instanceof Set ? (timelineState.disabledPeriods.has(p) || timelineState.disabledPeriods.has(Number(p))) : false));
+
     let closestIdx = 0;
     let minDiff = Infinity;
     timelineState.discretePeriods.forEach((p, idx) => {
+      if (isPDisabled(p)) return;
       const diff = Math.abs(p - curVal);
       if (diff < minDiff) {
         minDiff = diff;
         closestIdx = idx;
       }
     });
+    if (isPDisabled(timelineState.discretePeriods[closestIdx])) {
+      const firstValid = timelineState.discretePeriods.findIndex((p) => !isPDisabled(p));
+      if (firstValid !== -1) closestIdx = firstValid;
+    }
     timelineState.currentPeriodIdx = closestIdx;
     const newPeriod = timelineState.discretePeriods[timelineState.currentPeriodIdx];
     appState.set("period", newPeriod);
@@ -327,6 +363,24 @@ export function setTimelineMode(mode, customData = {}) {
       timelineState.currentPeriodIdx = idx !== -1 ? idx : Math.min(2, timelineState.discretePeriods.length - 1);
     } else {
       timelineState.currentPeriodIdx = Math.min(4, timelineState.discretePeriods.length - 1);
+    }
+
+    timelineState.disabledPeriods = Array.isArray(customData.disabledPeriods)
+      ? [...customData.disabledPeriods]
+      : [];
+    timelineState.rainHours = customData.rainHours ?? null;
+
+    if (timelineState.disabledPeriods && timelineState.disabledPeriods.length > 0) {
+      const isPDisabled = (p) =>
+        timelineState.disabledPeriods.includes(p) ||
+        timelineState.disabledPeriods.includes(Number(p));
+      if (isPDisabled(timelineState.discretePeriods[timelineState.currentPeriodIdx])) {
+        const firstValid = timelineState.discretePeriods.findIndex((p) => !isPDisabled(p));
+        if (firstValid !== -1) {
+          timelineState.currentPeriodIdx = firstValid;
+          appState.set("period", timelineState.discretePeriods[firstValid]);
+        }
+      }
     }
   }
 

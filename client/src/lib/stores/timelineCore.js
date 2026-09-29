@@ -29,6 +29,7 @@ export function createTimelineState(winId = "default", overrides = {}) {
     obsFiles: obs,
     currentObsIdx: Math.max(0, obs.length - 1),
     isTickLoading: false,
+    disabledPeriods: overrides.disabledPeriods || [],
   };
 }
 
@@ -105,6 +106,12 @@ export function setTimeChangeCallback(cb, winId = null) {
   }
 }
 
+export function clearWindowTimeline(winId = null) {
+  if (winId) {
+    windowTimeCallbacks.delete(winId);
+  }
+}
+
 export function getTimeChangeCallback(winId = null) {
   if (winId && windowTimeCallbacks.has(winId)) {
     return windowTimeCallbacks.get(winId);
@@ -127,9 +134,49 @@ export function fireTimeChange(payload, winId = null) {
 }
 
 export function getAdjacentTimeSteps(state = timelineState) {
-  const { currentMode, discretePeriods, currentPeriodIdx, obsFiles, currentObsIdx, currentInitCycle } = state;
-  const prevPeriodIdx = discretePeriods.length > 0 ? (currentPeriodIdx - 1 + discretePeriods.length) % discretePeriods.length : -1;
-  const nextPeriodIdx = discretePeriods.length > 0 ? (currentPeriodIdx + 1) % discretePeriods.length : -1;
+  const {
+    currentMode,
+    discretePeriods,
+    currentPeriodIdx,
+    obsFiles,
+    currentObsIdx,
+    currentInitCycle,
+    disabledPeriods,
+  } = state;
+
+  let prevPeriodIdx = -1;
+  let nextPeriodIdx = -1;
+
+  if (discretePeriods && discretePeriods.length > 0) {
+    const len = discretePeriods.length;
+    const curIdx = (typeof currentPeriodIdx === "number" && currentPeriodIdx >= 0) ? currentPeriodIdx : 0;
+    const hasDisabled = Boolean(
+      disabledPeriods && (Array.isArray(disabledPeriods) ? disabledPeriods.length > 0 : true)
+    );
+    const isPDisabled = (p) => hasDisabled && (Array.isArray(disabledPeriods)
+      ? (disabledPeriods.includes(p) || disabledPeriods.includes(Number(p)))
+      : (disabledPeriods instanceof Set ? (disabledPeriods.has(p) || disabledPeriods.has(Number(p))) : false));
+
+    // Find previous non-disabled step
+    let pIdx = (curIdx - 1 + len) % len;
+    for (let i = 0; i < len; i++) {
+      if (!isPDisabled(discretePeriods[pIdx])) {
+        prevPeriodIdx = pIdx;
+        break;
+      }
+      pIdx = (pIdx - 1 + len) % len;
+    }
+
+    // Find next non-disabled step
+    let nIdx = (curIdx + 1) % len;
+    for (let i = 0; i < len; i++) {
+      if (!isPDisabled(discretePeriods[nIdx])) {
+        nextPeriodIdx = nIdx;
+        break;
+      }
+      nIdx = (nIdx + 1) % len;
+    }
+  }
 
   const prevObsIdx = obsFiles.length > 0 ? (currentObsIdx - 1 + obsFiles.length) % obsFiles.length : -1;
   const nextObsIdx = obsFiles.length > 0 ? (currentObsIdx + 1) % obsFiles.length : -1;
@@ -149,3 +196,4 @@ export function getAdjacentTimeSteps(state = timelineState) {
     },
   };
 }
+

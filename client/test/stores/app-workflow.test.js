@@ -10,7 +10,12 @@ import {
   setTimeChangeCallback,
   fireTimeChange,
 } from "../../src/lib/stores/timelineCore.js";
-import { createDefaultWindow } from "../../src/lib/stores/tabsCore.js";
+import {
+  createDefaultWindow,
+  applyAutoAllocation,
+  prepareSplitWindows,
+  isWindowEmpty,
+} from "../../src/lib/stores/tabsCore.js";
 
 describe("App Workflow & Preset Orchestration Integration (Phase 3 Gate)", () => {
   beforeEach(() => {
@@ -182,6 +187,108 @@ describe("App Workflow & Preset Orchestration Integration (Phase 3 Gate)", () =>
       expect(tl2).toBeDefined();
       expect(tl1.currentMode).not.toBe("obs");
       expect(tl2.currentMode).toBe("nwp");
+    });
+  });
+
+  describe("Step-Length Select & Tab to Split Step Mode Workflow", () => {
+    it("updates timeline discretePeriods when stepLength changes and allocates split windows with matching cadence", () => {
+      // 1. Initial base window in tab mode with 6h step
+      const win0 = createDefaultWindow(0, 1);
+      win0.stepLength = 6;
+      win0.period = 24;
+      win0.discretePeriods = [0, 6, 12, 18, 24, 30, 36, 42, 48];
+
+      const tl = createTimelineState(win0.id, {
+        currentStepLength: 6,
+        discretePeriods: [...win0.discretePeriods],
+        currentPeriodIdx: 4, // 24h
+      });
+
+      // 2. User changes step-length to 12h in TimeSlider
+      const newStep = 12;
+      tl.currentStepLength = newStep;
+      tl.discretePeriods = [0, 12, 24, 36, 48, 60, 72];
+      tl.currentPeriodIdx = 2; // 24h
+      win0.stepLength = newStep;
+      win0.discretePeriods = [...tl.discretePeriods];
+
+      // 3. User toggles to 2x2 split in step mode
+      const tab = {
+        id: 1,
+        layout: "2x2",
+        autoAllocation: "step",
+        windows: [win0, createDefaultWindow(1, 1), createDefaultWindow(2, 1), createDefaultWindow(3, 1)],
+      };
+
+      // Base window sync logic from applyAutoAllocationModeToTab
+      if (tl.currentStepLength) win0.stepLength = tl.currentStepLength;
+      if (tl.discretePeriods) win0.discretePeriods = [...tl.discretePeriods];
+
+      applyAutoAllocation(tab, "step", win0);
+
+      // Verify each split window advances by 12h
+      expect(tab.windows.map((w) => w.period)).toEqual([24, 36, 48, 60]);
+      expect(tab.windows.every((w) => w.stepLength === 12)).toBe(true);
+      expect(tab.windows.every((w) => w.discretePeriods[1] - w.discretePeriods[0] === 12)).toBe(true);
+    });
+
+    it("handles roundtrip tab <-> split step mode toggle with multiple step changes and no window leak", () => {
+      const win0 = {
+        ...createDefaultWindow(0, 1),
+        id: "tab-1-win-0",
+        level: 500,
+        model: "ECMWF_HR",
+        forecastCycle: "26092608",
+        forecastCycles: ["26092608", "26092520"],
+        period: 24,
+        stepLength: 6,
+        discretePeriods: [0, 6, 12, 18, 24, 30, 36, 42, 48],
+        activeGroup: { id: "ecmwf-500", layers: [{ type: "contour", element: "TMP" }] },
+      };
+
+      const tab = {
+        id: 1,
+        layout: "1x1",
+        autoAllocation: "step",
+        windows: [win0],
+        activeWinIdx: 0,
+      };
+
+      // 1. In 1x1, change step to 12h
+      win0.stepLength = 12;
+      win0.discretePeriods = [0, 12, 24, 36, 48, 60, 72];
+
+      // 2. Toggle to 2x2 split
+      tab.layout = "2x2";
+      prepareSplitWindows(tab, 4, win0, isWindowEmpty, true);
+      expect(tab.windows.length).toBe(4);
+      applyAutoAllocation(tab, "step", win0);
+      expect(tab.windows.map((w) => w.period)).toEqual([24, 36, 48, 60]);
+      expect(tab.windows.every((w) => w.stepLength === 12)).toBe(true);
+
+      // 3. Toggle back to 1x1
+      tab.layout = "1x1";
+      // Change step to 3h
+      win0.stepLength = 3;
+      win0.discretePeriods = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36];
+
+      // 4. Toggle back to 2x2
+      tab.layout = "2x2";
+      prepareSplitWindows(tab, 4, win0, isWindowEmpty, true);
+      expect(tab.windows.length).toBe(4); // No duplicate windows
+      applyAutoAllocation(tab, "step", win0);
+      expect(tab.windows.map((w) => w.period)).toEqual([24, 27, 30, 33]);
+      expect(tab.windows.every((w) => w.stepLength === 3)).toBe(true);
+
+      // 5. Expand to 6-split (2x3) with 24h step
+      win0.stepLength = 24;
+      win0.discretePeriods = [0, 24, 48, 72, 96, 120, 144, 168];
+      tab.layout = "2x3";
+      prepareSplitWindows(tab, 6, win0, isWindowEmpty, false, 4);
+      expect(tab.windows.length).toBe(6);
+      applyAutoAllocation(tab, "step", win0);
+      expect(tab.windows.map((w) => w.period)).toEqual([24, 48, 72, 96, 120, 144]);
+      expect(tab.windows.every((w) => w.stepLength === 24)).toBe(true);
     });
   });
 });

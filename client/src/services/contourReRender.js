@@ -7,6 +7,7 @@ import { getLayerById } from "../ui/layerControl.js";
 import { COLORMAPS, setColormaps } from "../utils/colormaps.js";
 import { loadXMLPalette } from "../utils/paletteLoader.js";
 import { updateLegend } from "../ui/legend.js";
+import { mapInstances } from "../lib/stores/tabsCore.js";
 
 const reRenderTimers = new Map();   // key: `${winKey}::${layerId}` -> timeout ID
 const reRenderHandlers = new Map(); // key -> handler function
@@ -49,10 +50,22 @@ export function isViewportWithinFill(viewportBounds, fillBounds, toleranceDeg = 
   return (w - fw) > tol && (s - fs) > tol && (fe - e) > tol && (fn - n) > tol;
 }
 
-function getWinKey(win) {
-  if (!win) return "default";
-  if (win.id) return win.id;
-  if (win.winIdx !== undefined) return `w-${win.winIdx}`;
+export function getWinKey(win, map = null) {
+  if (typeof win === "string" && win) return win;
+  if (win && win.id) return win.id;
+  if (win && win.winIdx !== undefined) return `w-${win.winIdx}`;
+  if (map) {
+    if (map._micapsWindow) {
+      const mw = map._micapsWindow;
+      if (typeof mw === "string" && mw) return mw;
+      if (mw && mw.id) return mw.id;
+      if (mw && mw.winIdx !== undefined) return `w-${mw.winIdx}`;
+    }
+    if (map._winId) return map._winId;
+    for (const [winId, m] of mapInstances.entries()) {
+      if (m === map) return winId;
+    }
+  }
   return "default";
 }
 
@@ -101,7 +114,7 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
   const gridData = layer.gridData || (layer.type === "wind" ? win?.windGridData : null);
   if (!gridData) return;
 
-  const winKey = getWinKey(win);
+  const winKey = getWinKey(win, map);
   const layerId = layer.id;
   const key = `${winKey}::${layerId}`;
 
@@ -141,7 +154,8 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
   }
 
   const triggerReRender = () => {
-    if (layer.visible === false) return;
+    const live = (win && typeof getLayerById === "function" ? getLayerById(layer.id, win) : null) || layer;
+    if (live && live.visible === false) return;
     if (reRenderTimers.has(key)) {
       clearTimeout(reRenderTimers.get(key));
     }
@@ -367,10 +381,16 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
  */
 export function disarmContourReRender(map, layerId, win = null) {
   if (!layerId) return;
-  if (win) {
-    const winKey = getWinKey(win);
+  const winKey = getWinKey(win, map);
+  if (winKey && winKey !== "default") {
     const key = `${winKey}::${layerId}`;
     cleanupKey(key, map);
+  } else if (map) {
+    for (const [key, storedMap] of Array.from(handlerMaps.entries())) {
+      if (key.endsWith(`::${layerId}`) && storedMap === map) {
+        cleanupKey(key, map);
+      }
+    }
   } else {
     for (const key of Array.from(reRenderHandlers.keys())) {
       if (key.endsWith(`::${layerId}`)) {
@@ -384,11 +404,17 @@ export function disarmContourReRender(map, layerId, win = null) {
  * Disarms all contour re-renders for a window or across all windows.
  */
 export function disarmAllContourReRenders(map = null, win = null) {
-  if (win) {
-    const winKey = getWinKey(win);
+  const winKey = getWinKey(win, map);
+  if (winKey && winKey !== "default") {
     const prefix = `${winKey}::`;
     for (const key of Array.from(reRenderHandlers.keys())) {
       if (key.startsWith(prefix)) {
+        cleanupKey(key, map);
+      }
+    }
+  } else if (map) {
+    for (const [key, storedMap] of Array.from(handlerMaps.entries())) {
+      if (storedMap === map) {
         cleanupKey(key, map);
       }
     }

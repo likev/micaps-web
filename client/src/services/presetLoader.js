@@ -48,7 +48,7 @@ export function clearAllWeatherLayersFromMap(map, win = null, { resetVisibility 
     } catch { /* snapshot is best-effort */ }
   }
   try {
-    removeAllContourLayers(map);
+    removeAllContourLayers(map, win);
     stopWindAnimation(map);
     removeGridWindBarbs(map);
     removeStationLayer(map);
@@ -198,14 +198,17 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
     // immediately; without this the loader could overwrite handleLoadData's
     // fresh latest with a stale cached cycles[0].
     const cycles = await resolveForecastCycles(pLayer?.model || win.model || "ECMWF_HR", pLayer?.element || win.element || "TMP", curLevel, true);
-    if (!win.forecastCycle || !cycles.includes(win.forecastCycle)) {
+    if (!win.forecastCycle) {
       win.forecastCycle = cycles[0];
     }
+    const effectiveCycles = (cycles && win.forecastCycle && !cycles.includes(win.forecastCycle))
+      ? [win.forecastCycle, ...cycles]
+      : cycles;
     updateWindowTitle(win);
     const isTimeHeight = group.id === "composite-ec-timeheight" || group.layers.some((l) => l.type === "timeheight");
     const isHovmoller = group.id === "composite-ec-hovmoller" || group.layers.some((l) => l.type === "hovmoller");
     const defaultStep = (isTimeHeight || isHovmoller) ? 12 : 6;
-    const nwpPayload = { period: curPeriod, winTitle, initCycle: win.forecastCycle, cycles, stepLength: win.stepLength || defaultStep };
+    const nwpPayload = { period: curPeriod, winTitle, initCycle: win.forecastCycle, cycles: effectiveCycles, stepLength: win.stepLength || defaultStep };
     win._nwpTimeline = nwpPayload;
     if (getActiveWindow() === win) {
       if (isTimeHeight || isHovmoller) {

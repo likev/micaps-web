@@ -590,6 +590,14 @@ export class TLogPPanel {
     if (this.container && this.container.parentNode) {
       this.container.parentNode.removeChild(this.container);
     }
+    if (typeof document !== "undefined") {
+      try {
+        const el = document.getElementById("tlogp-panel");
+        if (el && el.parentNode) {
+          el.parentNode.removeChild(el);
+        }
+      } catch {}
+    }
     this.container = null;
     this.canvasRenderer = null;
   }
