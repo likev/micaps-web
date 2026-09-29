@@ -112,7 +112,7 @@ describe("Derived Layer Config Specification & Declared Presets", () => {
     const raw = fs.readFileSync("./config.json", "utf8");
     const parsed = JSON.parse(raw);
 
-    // Surface preset check
+    // Surface preset check: station plots plus SLP / RAIN6 derived contours
     const surfacePreset = parsed.presets.find((p) => p.id === "composite-surface");
     expect(surfacePreset).toBeDefined();
     const surfaceObs = surfacePreset.layers.find((l) => l.id === "surface-obs");
@@ -128,26 +128,27 @@ describe("Derived Layer Config Specification & Declared Presets", () => {
     expect(surfaceDerivedSLP.render.showLine).toBe(true);
     expect(surfaceDerivedSLP.render.showFill).toBe(false);
 
-    // Upper-air preset check
+    const surfaceDerivedRain6 = surfacePreset.layers.find((l) => l.id === "contour-surface-rain6");
+    expect(surfaceDerivedRain6).toBeDefined();
+    expect(surfaceDerivedRain6.type).toBe("contour");
+    expect(surfaceDerivedRain6.model).toBe("SURFACE");
+    expect(surfaceDerivedRain6.element).toBe("RAIN6");
+    expect(surfaceDerivedRain6.derivedFrom).toBe("surface-obs");
+    expect(surfaceDerivedRain6.render.showFill).toBe(true);
+    expect(surfaceDerivedRain6.render.showLine).toBe(false);
+
+    // Upper-air preset check: bare station plots only. HGT / TMP derived
+    // contours are runtime-added via addContour, never pre-declared.
     const upperPreset = parsed.presets.find((p) => p.id === "composite-upperair-500");
     expect(upperPreset).toBeDefined();
     const upperObs = upperPreset.layers.find((l) => l.id === "upperair-obs-500");
     expect(upperObs).toBeDefined();
     expect(upperObs.type).toBe("station");
+    expect(upperObs.model).toBe("UPPER_AIR");
+    expect(upperObs.level).toBe(500);
 
-    const upperDerivedHGT = upperPreset.layers.find((l) => l.id === "contour-sounding-hgt-500");
-    expect(upperDerivedHGT).toBeDefined();
-    expect(upperDerivedHGT.type).toBe("contour");
-    expect(upperDerivedHGT.element).toBe("HGT");
-    expect(upperDerivedHGT.level).toBe(500);
-    expect(upperDerivedHGT.derivedFrom).toBe("upperair-obs-500");
-
-    const upperDerivedTMP = upperPreset.layers.find((l) => l.id === "contour-sounding-tmp-500");
-    expect(upperDerivedTMP).toBeDefined();
-    expect(upperDerivedTMP.type).toBe("contour");
-    expect(upperDerivedTMP.element).toBe("TMP");
-    expect(upperDerivedTMP.level).toBe(500);
-    expect(upperDerivedTMP.derivedFrom).toBe("upperair-obs-500");
+    expect(upperPreset.layers.find((l) => l.id === "contour-sounding-hgt-500")).toBeUndefined();
+    expect(upperPreset.layers.find((l) => l.id === "contour-sounding-tmp-500")).toBeUndefined();
   });
 
   test("upsertDerivedLayerToPreset adds and updates derived layers in in-memory config", () => {

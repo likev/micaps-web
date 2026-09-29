@@ -142,39 +142,46 @@ function createMockMap() {
 }
 
 describe("11. Preset Configuration Validation in config.json (§5-E)", () => {
-  test("config.json observation presets ship DTD derived layers", () => {
+  test("config.json observation presets declare station + derived layers (DTD is runtime-added)", () => {
     const raw = fs.readFileSync("./config.json", "utf8");
     const config = JSON.parse(raw);
 
-    // Surface preset
+    // Surface preset ships station plots plus SLP / RAIN6 derived contours.
+    // DTD is NOT pre-declared: operators add it at runtime via addContour
+    // (see SURFACE_CONFIGS.DTD defaults: showFill false, showLine false,
+    // showRaster true, defaultColor #e3b341).
     const surfacePreset = config.presets.find((p) => p.id === "composite-surface");
     expect(surfacePreset).toBeDefined();
-    const surfaceDtd = surfacePreset.layers.find((l) => l.id === "contour-surface-dtd");
-    expect(surfaceDtd).toBeDefined();
-    expect(surfaceDtd.element).toBe("DTD");
-    expect(surfaceDtd.model).toBe("SURFACE");
-    expect(surfaceDtd.derivedFrom).toBe("surface-obs");
-    expect(surfaceDtd.render.showFill).toBe(false);
-    expect(surfaceDtd.render.showLine).toBe(false);
-    expect(surfaceDtd.render.showRaster).toBe(true);
-    expect(surfaceDtd.render.lineColor).toBe("#e3b341");
+    const surfaceObs = surfacePreset.layers.find((l) => l.id === "surface-obs");
+    expect(surfaceObs).toBeDefined();
+    expect(surfaceObs.type).toBe("station");
+    const surfaceSlp = surfacePreset.layers.find((l) => l.id === "contour-surface-slp");
+    expect(surfaceSlp).toBeDefined();
+    expect(surfaceSlp.element).toBe("SLP");
+    expect(surfaceSlp.model).toBe("SURFACE");
+    expect(surfaceSlp.derivedFrom).toBe("surface-obs");
+    expect(surfaceSlp.render.showLine).toBe(true);
+    expect(surfaceSlp.render.showFill).toBe(false);
+    const surfaceRain6 = surfacePreset.layers.find((l) => l.id === "contour-surface-rain6");
+    expect(surfaceRain6).toBeDefined();
+    expect(surfaceRain6.element).toBe("RAIN6");
+    expect(surfaceRain6.derivedFrom).toBe("surface-obs");
+    expect(surfacePreset.layers.find((l) => l.id === "contour-surface-dtd")).toBeUndefined();
 
-    // Upper-air 500 hPa preset
+    // Upper-air 500 hPa preset ships bare station plots only; HGT / TMP /
+    // DTD derived contours are runtime-added, never pre-declared.
     const upperPreset = config.presets.find((p) => p.id === "composite-upperair-500");
     expect(upperPreset).toBeDefined();
-    const upperDtd = upperPreset.layers.find((l) => l.id === "contour-sounding-dtd-500");
-    expect(upperDtd).toBeDefined();
-    expect(upperDtd.element).toBe("DTD");
-    expect(upperDtd.model).toBe("UPPER_AIR");
-    expect(upperDtd.level).toBe(500);
-    expect(upperDtd.derivedFrom).toBe("upperair-obs-500");
-    expect(upperDtd.render.showFill).toBe(false);
-    expect(upperDtd.render.showLine).toBe(false);
-    expect(upperDtd.render.showRaster).toBe(true);
-    expect(upperDtd.render.lineColor).toBe("#e3b341");
+    const upperObs = upperPreset.layers.find((l) => l.id === "upperair-obs-500");
+    expect(upperObs).toBeDefined();
+    expect(upperObs.type).toBe("station");
+    expect(upperPreset.layers.find((l) => l.id === "contour-sounding-dtd-500")).toBeUndefined();
+    expect(upperPreset.layers.filter((l) => l.type === "contour").length).toBe(0);
 
-    // Opt-in check: station layers in config.json must NOT specify showDTD: true
+    // Opt-in check: station layers in config.json must NOT specify showDTD: true.
+    // Divider entries carry no layers array, so guard before iterating.
     for (const preset of config.presets) {
+      if (!Array.isArray(preset.layers)) continue;
       for (const layer of preset.layers) {
         if (layer.type === "station") {
           expect(layer.render?.showDTD).toBeUndefined();

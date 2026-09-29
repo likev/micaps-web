@@ -134,7 +134,7 @@ describe("T6: UI Integration, Chrome, Formatters, & Palettes (§7-T6)", () => {
     expect(divLevels).toEqual(DIV_LEVELS);
   });
 
-  test("config.json contains valid VOR and DIV colormaps and hidden NWP VOR layer", () => {
+  test("config.json contains valid VOR and DIV colormaps; NWP VOR is runtime-added", () => {
     const configRaw = fs.readFileSync(new URL("../../config.json", import.meta.url), "utf8");
     const config = JSON.parse(configRaw);
 
@@ -143,11 +143,14 @@ describe("T6: UI Integration, Chrome, Formatters, & Palettes (§7-T6)", () => {
     expect(Array.isArray(config.colormaps.VOR)).toBe(true);
     expect(Array.isArray(config.colormaps.DIV)).toBe(true);
 
+    // composite-850hpa ships TMP contours + wind only. The VOR derived layer
+    // is NOT pre-declared (and not eye-hidden): operators add it at runtime
+    // via addContour, so a stale hidden-layer assertion must not pin it here.
     const preset850 = config.presets.find((p) => p.id === "composite-850hpa");
     expect(preset850).toBeDefined();
-    const nwpVor = preset850.layers.find((l) => l.element === "VOR");
-    expect(nwpVor).toBeDefined();
-    expect(nwpVor.id).toBe("contour-ECMWF_HR-vor-850");
-    expect(nwpVor.visible).toBe(false);
+    const tmpLayer = preset850.layers.find((l) => l.id === "tmp");
+    expect(tmpLayer).toBeDefined();
+    expect(tmpLayer.element).toBe("TMP");
+    expect(preset850.layers.find((l) => l.element === "VOR")).toBeUndefined();
   });
 });

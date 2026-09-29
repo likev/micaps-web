@@ -1,10 +1,10 @@
 {
   "basemap": {
     "projection": "mercator",
-    "scheme": "dark",
-    "showCities": false,
-    "showGraticule": false,
-    "showProvinces": false,
+    "scheme": "light",
+    "showCities": true,
+    "showGraticule": true,
+    "showProvinces": true,
     "showWorld": true
   },
   "colormaps": {
@@ -295,218 +295,60 @@
         "color": [160, 20, 120, 255],
         "val": 45
       }
+    ],
+    "new_colormap": [
+      {
+        "color": [0, 0, 255, 255],
+        "val": 0
+      },
+      {
+        "color": [255, 255, 255, 255],
+        "val": 50
+      },
+      {
+        "color": [255, 0, 0, 255],
+        "val": 100
+      }
+    ],
+    "new_colormap_copy": [
+      {
+        "color": [0, 0, 255, 255],
+        "val": 0
+      },
+      {
+        "color": [255, 255, 255, 255],
+        "val": 50
+      },
+      {
+        "color": [255, 0, 0, 255],
+        "val": 100
+      },
+      {
+        "color": [255, 255, 255, 255],
+        "val": 150
+      },
+      {
+        "color": [255, 255, 255, 255],
+        "val": 200
+      },
+      {
+        "color": [255, 255, 255, 255],
+        "val": 250
+      },
+      {
+        "color": [255, 255, 255, 255],
+        "val": 300
+      },
+      {
+        "color": [255, 255, 255, 255],
+        "val": 350
+      }
     ]
   },
   "performance": {
     "maxEffectiveCells": 50000
   },
   "presets": [
-    {
-      "category": "NWP Synoptic",
-      "defaultLevel": 500,
-      "hasLevel": true,
-      "id": "composite-500hpa",
-      "layers": [
-        {
-          "element": "RH",
-          "id": "rh",
-          "model": "ECMWF_HR",
-          "name": "Relative Humidity (Fills)",
-          "render": {
-            "colormap": "RH",
-            "lineColor": "#ffffff",
-            "lineWidth": 2,
-            "opacity": 0.55,
-            "showBarbs": false,
-            "showFill": true,
-            "showLine": false,
-            "showRaster": false,
-            "showWind": false,
-            "smooth": true,
-            "smoothIterations": 2
-          },
-          "type": "contour"
-        },
-        {
-          "element": "HGT",
-          "id": "hgt",
-          "model": "ECMWF_HR",
-          "name": "Geopotential Height (Lines)",
-          "render": {
-            "boldLineWidth": 4,
-            "boldValues": [
-              5880,
-              588
-            ],
-            "colormap": "HGT",
-            "interval": null,
-            "lineColor": "#ff0000",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "palettePath": null,
-            "showBarbs": false,
-            "showFill": false,
-            "showLine": true,
-            "showRaster": false,
-            "showWind": false,
-            "smooth": true,
-            "smoothIterations": 2
-          },
-          "type": "contour"
-        },
-        {
-          "element": "WIND",
-          "id": "wind",
-          "model": "ECMWF_HR",
-          "name": "Wind Field (Streamlines)",
-          "render": {
-            "colormap": "WIND",
-            "keepWind": true
-          },
-          "type": "wind"
-        }
-      ],
-      "name": "500hPa Composite (HGT + RH + WIND)"
-    },
-    {
-      "category": "NWP Synoptic",
-      "defaultLevel": 850,
-      "hasLevel": true,
-      "id": "composite-850hpa",
-      "layers": [
-        {
-          "element": "HGT",
-          "id": "hgt",
-          "model": "ECMWF_HR",
-          "name": "850hPa Height (Lines)",
-          "render": {
-            "boldLineWidth": 4,
-            "boldValues": [
-              5880,
-              588
-            ],
-            "colormap": "HGT",
-            "interval": null,
-            "lineColor": "#ff0000",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "palettePath": null,
-            "showBarbs": false,
-            "showFill": false,
-            "showLine": true,
-            "showRaster": false,
-            "showWind": false,
-            "smooth": true,
-            "smoothIterations": 2
-          },
-          "type": "contour"
-        },
-        {
-          "element": "TMP",
-          "id": "tmp",
-          "model": "ECMWF_HR",
-          "name": "850hPa Temperature (Isotherms)",
-          "render": {
-            "boldLineWidth": 4,
-            "boldValues": [
-              0,
-              -20
-            ],
-            "colormap": "TMP",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "showFill": false,
-            "showLine": true,
-            "smooth": true
-          },
-          "type": "contour"
-        },
-        {
-          "element": "WIND",
-          "id": "wind",
-          "model": "ECMWF_HR",
-          "name": "850hPa Wind Streamlines",
-          "render": {
-            "colormap": "WIND",
-            "keepWind": true
-          },
-          "type": "wind"
-        },
-        {
-          "derivedFrom": "wind",
-          "element": "VOR",
-          "id": "contour-ECMWF_HR-vor-850",
-          "model": "ECMWF_HR",
-          "name": "850 hPa Derived Relative Vorticity",
-          "render": {
-            "boldLineWidth": 4,
-            "boldValues": [
-              0,
-              10
-            ],
-            "colormap": "VOR",
-            "lineColor": "#c678dd",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLine": true,
-            "showRaster": false,
-            "smooth": true,
-            "smoothIterations": 2
-          },
-          "type": "contour",
-          "visible": false
-        }
-      ],
-      "name": "850hPa Low-Level Jet (HGT + TMP + WIND)"
-    },
-    {
-      "category": "NWP Synoptic",
-      "defaultLevel": 200,
-      "hasLevel": true,
-      "id": "composite-200hpa",
-      "layers": [
-        {
-          "element": "HGT",
-          "id": "hgt",
-          "model": "ECMWF_HR",
-          "name": "200hPa Height (Lines)",
-          "render": {
-            "boldLineWidth": 4,
-            "boldValues": [
-              5880,
-              588
-            ],
-            "colormap": "HGT",
-            "interval": null,
-            "lineColor": "#ff0000",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "palettePath": null,
-            "showBarbs": false,
-            "showFill": false,
-            "showLine": true,
-            "showRaster": false,
-            "showWind": false,
-            "smooth": true,
-            "smoothIterations": 2
-          },
-          "type": "contour"
-        },
-        {
-          "element": "WIND",
-          "id": "wind",
-          "model": "ECMWF_HR",
-          "name": "200hPa Jet Streamlines",
-          "render": {
-            "colormap": "WIND",
-            "keepWind": true
-          },
-          "type": "wind"
-        }
-      ],
-      "name": "200hPa Jet Stream (HGT + WIND)"
-    },
     {
       "category": "Surface Observations",
       "defaultLevel": null,
@@ -520,7 +362,31 @@
           "model": "SURFACE",
           "name": "Surface Station Observations",
           "render": {
-            "showRain6": true
+            "filterField1": "none",
+            "filterField2": "none",
+            "filterLogic": "VIEW",
+            "filterOp1": "\u003e",
+            "filterOp2": "\u003c",
+            "filterRules": [
+              {
+                "field": "none",
+                "op": "\u003e",
+                "val": "",
+                "val2": ""
+              }
+            ],
+            "filterVal1": "",
+            "filterVal2": "",
+            "showCloud": false,
+            "showDewpoint": false,
+            "showPressure": false,
+            "showRain6": false,
+            "showStreamlines": false,
+            "showTemp": false,
+            "showTendency": false,
+            "showVisibility": true,
+            "showWeather": false,
+            "showWind": false
           },
           "type": "station"
         },
@@ -539,15 +405,30 @@
         },
         {
           "derivedFrom": "surface-obs",
-          "element": "DTD",
-          "id": "contour-surface-dtd",
+          "element": "RAIN6",
+          "id": "contour-surface-rain6",
           "model": "SURFACE",
-          "name": "Surface Derived Dew-Point Depression",
+          "name": "Surface Derived 6h Precipitation",
           "render": {
-            "lineColor": "#e3b341",
-            "showFill": false,
+            "boldLineWidth": 4,
+            "boldValues": [
+              10,
+              25,
+              50
+            ],
+            "interval": null,
+            "lineColor": "#a371f7",
+            "lineWidth": 2,
+            "opacity": 0.75,
+            "palettePath": null,
+            "showBarbs": false,
+            "showFill": true,
+            "showLabels": true,
             "showLine": false,
-            "showRaster": true
+            "showRaster": false,
+            "showWind": false,
+            "smooth": true,
+            "smoothIterations": 2
           },
           "type": "contour"
         }
@@ -569,7 +450,11 @@
           "name": "500 hPa Sounding Station Plots",
           "path": "UPPER_AIR/PLOT/500",
           "render": {
+            "filterField1": "none",
+            "filterField2": "none",
             "filterLogic": "AND",
+            "filterOp1": "\u003e=",
+            "filterOp2": "\u003c=",
             "filterRules": [
               {
                 "field": "none",
@@ -578,85 +463,15 @@
                 "val2": ""
               }
             ],
-            "showDewpoint": true,
-            "showPressure": true,
+            "filterVal1": "",
+            "filterVal2": "",
+            "showDewpoint": false,
+            "showPressure": false,
             "showStreamlines": false,
             "showTemp": true,
             "showWind": true
           },
           "type": "station"
-        },
-        {
-          "derivedFrom": "upperair-obs-500",
-          "element": "HGT",
-          "id": "contour-sounding-hgt-500",
-          "level": 500,
-          "model": "UPPER_AIR",
-          "name": "500 hPa Derived Height",
-          "render": {
-            "boldLineWidth": 4,
-            "boldValues": [
-              5880,
-              588
-            ],
-            "lineColor": "#58a6ff",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLine": true,
-            "showRaster": false,
-            "smooth": true,
-            "smoothIterations": 2
-          },
-          "type": "contour"
-        },
-        {
-          "derivedFrom": "upperair-obs-500",
-          "element": "TMP",
-          "id": "contour-sounding-tmp-500",
-          "level": 500,
-          "model": "UPPER_AIR",
-          "name": "500 hPa Derived Temperature",
-          "render": {
-            "boldLineWidth": 4,
-            "boldValues": [
-              0,
-              -20
-            ],
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLine": true,
-            "showRaster": false,
-            "smooth": true,
-            "smoothIterations": 2
-          },
-          "type": "contour"
-        },
-        {
-          "derivedFrom": "upperair-obs-500",
-          "element": "DTD",
-          "id": "contour-sounding-dtd-500",
-          "level": 500,
-          "model": "UPPER_AIR",
-          "name": "500 hPa Derived Dew-Point Depression",
-          "render": {
-            "boldLineWidth": 4,
-            "boldValues": [
-              2,
-              10
-            ],
-            "lineColor": "#e3b341",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLine": false,
-            "showRaster": true,
-            "smooth": true,
-            "smoothIterations": 2
-          },
-          "type": "contour"
         }
       ],
       "name": "500 hPa Upper-Air Sounding"
@@ -703,12 +518,330 @@
           "name": "T-lnP Sounding Diagram (58362 Shanghai)",
           "parcelLevel": "surface",
           "removable": true,
+          "render": {
+            "showDewpoint": true,
+            "showTemp": true,
+            "showWind": true
+          },
           "stationId": "58362",
           "type": "tlogp",
           "visible": true
         }
       ],
       "name": "T-lnP Sounding Analysis (TlogP)"
+    },
+    {
+      "divider": true,
+      "id": "div-1"
+    },
+    {
+      "category": "NWP Synoptic",
+      "defaultLevel": 500,
+      "hasLevel": true,
+      "id": "composite-500hpa",
+      "layers": [
+        {
+          "element": "RH",
+          "id": "rh",
+          "model": "ECMWF_HR",
+          "name": "Relative Humidity (Fills)",
+          "render": {
+            "colormap": "RH",
+            "interval": null,
+            "lineColor": "#ffffff",
+            "lineWidth": 2,
+            "opacity": 0.55,
+            "palettePath": null,
+            "showBarbs": false,
+            "showFill": true,
+            "showLine": false,
+            "showRaster": false,
+            "showWind": false,
+            "smooth": true,
+            "smoothIterations": 2
+          },
+          "type": "contour"
+        },
+        {
+          "element": "HGT",
+          "id": "hgt",
+          "model": "ECMWF_HR",
+          "name": "Geopotential Height (Lines)",
+          "render": {
+            "boldLineWidth": 4,
+            "boldValues": [
+              5880,
+              588
+            ],
+            "colormap": "HGT",
+            "interval": {
+              "end": 600,
+              "start": 500,
+              "step": 4
+            },
+            "levels": [
+              500,
+              504,
+              508,
+              512,
+              516,
+              520,
+              524,
+              528,
+              532,
+              536,
+              540,
+              544,
+              548,
+              552,
+              556,
+              560,
+              564,
+              568,
+              572,
+              576,
+              580,
+              584,
+              588,
+              592,
+              596,
+              600
+            ],
+            "lineColor": "#917373",
+            "lineWidth": 2,
+            "opacity": 0.75,
+            "palettePath": null,
+            "showBarbs": false,
+            "showFill": false,
+            "showLabels": true,
+            "showLine": true,
+            "showRaster": false,
+            "showWind": false,
+            "smooth": true,
+            "smoothIterations": 2
+          },
+          "type": "contour"
+        },
+        {
+          "element": "WIND",
+          "id": "wind",
+          "model": "ECMWF_HR",
+          "name": "Wind Field (Streamlines)",
+          "render": {
+            "colormap": "WIND",
+            "keepWind": true,
+            "palettePath": null,
+            "showBarbs": true,
+            "showRaster": false,
+            "showWind": false
+          },
+          "type": "wind"
+        }
+      ],
+      "name": "500hPa Composite (HGT + RH + WIND)"
+    },
+    {
+      "category": "NWP Synoptic Rain",
+      "hasLevel": false,
+      "id": "multi-model-rain12",
+      "layers": [
+        {
+          "element": "RAIN12",
+          "id": "rain12-ec",
+          "model": "ECMWF_HR",
+          "name": "Rain12 ECMWF_HR",
+          "render": {
+            "colormap": "RAIN",
+            "interval": {
+              "end": 100,
+              "start": 10,
+              "step": 10
+            },
+            "levels": [
+              10,
+              20,
+              30,
+              40,
+              50,
+              60,
+              70,
+              80,
+              90,
+              100
+            ],
+            "lineColor": "#ffffff",
+            "lineWidth": 2,
+            "opacity": 0.55,
+            "palettePath": "/palettes/RAIN/dark-rain-24h.xml",
+            "showBarbs": false,
+            "showFill": false,
+            "showLabels": true,
+            "showLine": true,
+            "showRaster": true,
+            "showWind": false,
+            "smooth": true,
+            "smoothIterations": 2
+          },
+          "type": "contour"
+        }
+      ],
+      "name": "ECMWF Rain12"
+    },
+    {
+      "category": "NWP Synoptic",
+      "defaultLevel": 850,
+      "hasLevel": true,
+      "id": "composite-850hpa",
+      "layers": [
+        {
+          "element": "TMP",
+          "id": "tmp",
+          "model": "ECMWF_HR",
+          "name": "850hPa Temperature (Isotherms)",
+          "render": {
+            "boldLineWidth": 4,
+            "boldValues": [
+              0,
+              12
+            ],
+            "colormap": "TMP",
+            "interval": {
+              "end": 30,
+              "start": -12,
+              "step": 4
+            },
+            "levels": [
+              -12,
+              -8,
+              -4,
+              0,
+              4,
+              8,
+              12,
+              16,
+              20,
+              24,
+              28
+            ],
+            "lineColor": "#ae2d97",
+            "lineWidth": 2,
+            "opacity": 0.75,
+            "palettePath": null,
+            "showBarbs": false,
+            "showFill": false,
+            "showLine": true,
+            "showRaster": false,
+            "showWind": false,
+            "smooth": true,
+            "smoothIterations": 2
+          },
+          "type": "contour"
+        },
+        {
+          "element": "WIND",
+          "id": "wind",
+          "model": "ECMWF_HR",
+          "name": "850hPa Wind Streamlines",
+          "render": {
+            "colormap": "WIND",
+            "keepWind": true,
+            "palettePath": null,
+            "showBarbs": true,
+            "showRaster": false,
+            "showWind": false
+          },
+          "type": "wind"
+        }
+      ],
+      "name": "850hPa Low-Level Jet (HGT + TMP + WIND)"
+    },
+    {
+      "category": "NWP Synoptic",
+      "defaultLevel": 200,
+      "hasLevel": true,
+      "id": "composite-200hpa",
+      "layers": [
+        {
+          "element": "HGT",
+          "id": "hgt",
+          "model": "ECMWF_HR",
+          "name": "200hPa Height (Lines)",
+          "render": {
+            "boldLineWidth": 4,
+            "boldValues": [
+              5880,
+              588
+            ],
+            "colormap": "HGT",
+            "interval": {
+              "end": 600,
+              "start": 500,
+              "step": 4
+            },
+            "levels": [
+              500,
+              504,
+              508,
+              512,
+              516,
+              520,
+              524,
+              528,
+              532,
+              536,
+              540,
+              544,
+              548,
+              552,
+              556,
+              560,
+              564,
+              568,
+              572,
+              576,
+              580,
+              584,
+              588,
+              592,
+              596,
+              600
+            ],
+            "lineColor": "#917373",
+            "lineWidth": 2,
+            "opacity": 0.75,
+            "palettePath": null,
+            "showBarbs": false,
+            "showFill": false,
+            "showLabels": true,
+            "showLine": true,
+            "showRaster": false,
+            "showWind": false,
+            "smooth": true,
+            "smoothIterations": 2
+          },
+          "type": "contour"
+        },
+        {
+          "element": "WIND",
+          "id": "wind",
+          "model": "ECMWF_HR",
+          "name": "200hPa Jet Streamlines",
+          "render": {
+            "colormap": "WIND",
+            "keepWind": true,
+            "palettePath": null,
+            "showBarbs": true,
+            "showRaster": false,
+            "showWind": false
+          },
+          "type": "wind"
+        }
+      ],
+      "name": "200hPa Jet Stream (HGT + WIND)"
+    },
+    {
+      "divider": true,
+      "id": "div-2"
     },
     {
       "category": "NWP Time-Height Profile",
@@ -750,6 +883,20 @@
           "model": "ECMWF_HR",
           "name": "EC Time-Height Profile (click map for point)",
           "removable": true,
+          "render": {
+            "interval": null,
+            "lineColor": "#ffffff",
+            "lineWidth": 2,
+            "opacity": 0.55,
+            "palettePath": null,
+            "showBarbs": false,
+            "showFill": true,
+            "showLine": false,
+            "showRaster": false,
+            "showWind": false,
+            "smooth": true,
+            "smoothIterations": 2
+          },
           "type": "timeheight",
           "visible": true
         }
@@ -797,6 +944,20 @@
           "model": "ECMWF_HR",
           "name": "EC Line-Height Cross-Section (draw line on map)",
           "removable": true,
+          "render": {
+            "interval": null,
+            "lineColor": "#ffffff",
+            "lineWidth": 2,
+            "opacity": 0.55,
+            "palettePath": null,
+            "showBarbs": false,
+            "showFill": true,
+            "showLine": false,
+            "showRaster": false,
+            "showWind": false,
+            "smooth": true,
+            "smoothIterations": 2
+          },
           "type": "lineheight",
           "visible": true
         }
@@ -836,11 +997,29 @@
           "model": "ECMWF_HR",
           "name": "EC Time-Line Hovmoller (draw line on map)",
           "removable": true,
+          "render": {
+            "interval": null,
+            "lineColor": "#ffffff",
+            "lineWidth": 2,
+            "opacity": 0.55,
+            "palettePath": null,
+            "showBarbs": false,
+            "showFill": true,
+            "showLine": false,
+            "showRaster": false,
+            "showWind": false,
+            "smooth": true,
+            "smoothIterations": 2
+          },
           "type": "hovmoller",
           "visible": true
         }
       ],
       "name": "EC Time-Line Hovmoller (RH+T+VVEL+Wind @ level)"
+    },
+    {
+      "divider": true,
+      "id": "div-3"
     }
   ]
 }
