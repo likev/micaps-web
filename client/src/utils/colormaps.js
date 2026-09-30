@@ -1,6 +1,6 @@
 // colormaps.js - Runtime-loaded meteorological color palettes
 
-const DEFAULT_COLORMAPS = {
+export const DEFAULT_COLORMAPS = {
   TMP: [
     { val: -40, color: [130, 20, 160, 255] },
     { val: -30, color: [40, 50, 180, 255] },
@@ -434,7 +434,187 @@ export function getElementLevels(element = "TMP", zMin, zMax, colormap = null) {
   return palette.map((stop) => stop.val);
 }
 
-export function getCSSGradient(element = "TMP", colormap = null) {
+export function getPaletteBandsAndTicks(palette, element = "TMP", options = {}) {
+  let effectivePalette = palette;
+  if (!effectivePalette || !Array.isArray(effectivePalette) || effectivePalette.length === 0) {
+    effectivePalette = getColormap(null, element);
+  }
+  if (!effectivePalette || effectivePalette.length === 0) {
+    return { isDiscrete: true, bands: [], ticks: [], steppedGradient: "" };
+  }
+
+  // Deduplicate and sort stops by val
+  const sorted = [...effectivePalette]
+    .filter((s) => s && Number.isFinite(s?.val) && Array.isArray(s?.color))
+    .sort((a, b) => a.val - b.val);
+
+  if (sorted.length === 0) {
+    return { isDiscrete: true, bands: [], ticks: [], steppedGradient: "" };
+  }
+
+  const seen = new Set();
+  const uniqueStops = [];
+  for (const s of sorted) {
+    if (!seen.has(s.val)) {
+      seen.add(s.val);
+      uniqueStops.push(s);
+    }
+  }
+
+  const N = uniqueStops.length;
+  const unit = options.unit || "";
+
+  function formatTickVal(val) {
+    if (!Number.isFinite(val)) return "";
+    if (Math.abs(val) >= 1000) return `${Math.round(val)}`;
+    if (Number.isInteger(val)) return `${val}`;
+    const r1 = Math.round(val * 10) / 10;
+    if (r1 === val) return `${val}`;
+    const r2 = Math.round(val * 100) / 100;
+    return `${r2}`;
+  }
+
+  if (N === 1) {
+    const s0 = uniqueStops[0];
+    const cStr = `rgb(${s0.color.slice(0, 3).join(",")})`;
+    return {
+      isDiscrete: true,
+      bands: [{ startVal: s0.val, endVal: s0.val, startPct: 0, endPct: 100, colorStr: cStr }],
+      ticks: [{ value: s0.val, label: `${formatTickVal(s0.val)}${unit ? ` ${unit}` : ""}`.trim(), percent: 50, isFirst: true, isLast: true, showLabel: true }],
+      steppedGradient: `linear-gradient(to right, ${cStr} 0%, ${cStr} 100%)`,
+    };
+  }
+
+  const isRain = isRainElement(element) || (typeof options.colormap === "string" && isRainElement(options.colormap));
+
+  const bands = [];
+  const ticks = [];
+
+  if (isRain) {
+    // For precipitation categorized palettes (ranks: light, moderate, heavy, downpour...)
+    // Each stop defines a distinct category band of equal width
+    // E.g. 7 stops: 7 bands of 100/7% = 14.29% each.
+    // Tick i is placed at the start boundary of band i: i * (100 / N)%
+    const stepPct = 100 / N;
+    for (let i = 0; i < N; i++) {
+      const s = uniqueStops[i];
+      const startPct = Math.round(i * stepPct * 100) / 100;
+      const endPct = Math.round((i + 1) * stepPct * 100) / 100;
+      const cStr = `rgb(${s.color.slice(0, 3).join(",")})`;
+      bands.push({
+        startVal: s.val,
+        endVal: i < N - 1 ? uniqueStops[i + 1].val : Infinity,
+        startPct,
+        endPct,
+        color: s.color,
+        colorStr: cStr,
+      });
+
+      const label = `${formatTickVal(s.val)}${i === N - 1 && unit ? ` ${unit}` : ""}`.trim();
+      ticks.push({
+        value: s.val,
+        label,
+        percent: startPct,
+        isFirst: i === 0,
+        isLast: false,
+        color: cStr,
+      });
+    }
+  } else {
+    // Linear / continuous physical scale (e.g. TMP, RH, WIND, DTD, VOR, DIV, HGT)
+    // Ticks positioned at proportional percentages according to threshold values
+    let minVal = uniqueStops[0].val;
+    let maxVal = uniqueStops[N - 1].val;
+
+    // Handle relative/stretched layers (e.g. HGT) if zMin and zMax specified
+    const fixedScale = new Set(["RH", "TMP", "TD", "DTD", "WIND", "RAIN", "RAIN6", "RAIN12", "RAIN24"]);
+    if (!fixedScale.has(element) && options.zMin !== undefined && options.zMax !== undefined && options.zMax > options.zMin) {
+      minVal = options.zMin;
+      maxVal = options.zMax;
+    }
+
+    const span = maxVal - minVal;
+
+    for (let i = 0; i < N; i++) {
+      const s = uniqueStops[i];
+      let pct = span > 0 ? ((s.val - minVal) / span) * 100 : (i / (N - 1)) * 100;
+      pct = Math.max(0, Math.min(100, Math.round(pct * 100) / 100));
+      const cStr = `rgb(${s.color.slice(0, 3).join(",")})`;
+      const isFirst = i === 0;
+      const isLast = i === N - 1;
+      const label = `${formatTickVal(s.val)}${isLast && unit ? ` ${unit}` : ""}`.trim();
+
+      ticks.push({
+        value: s.val,
+        label,
+        percent: isFirst ? 0 : (isLast ? 100 : pct),
+        isFirst,
+        isLast,
+        color: cStr,
+      });
+    }
+
+    // Build N - 1 bands between adjacent ticks
+    for (let i = 0; i < N - 1; i++) {
+      const startPct = ticks[i].percent;
+      const endPct = ticks[i + 1].percent;
+      if (endPct > startPct) {
+        const s = uniqueStops[i];
+        const cStr = `rgb(${s.color.slice(0, 3).join(",")})`;
+        bands.push({
+          startVal: uniqueStops[i].val,
+          endVal: uniqueStops[i + 1].val,
+          startPct,
+          endPct,
+          color: s.color,
+          colorStr: cStr,
+        });
+      }
+    }
+  }
+
+  // Label density management:
+  const totalTicks = ticks.length;
+  if (totalTicks <= 9) {
+    for (const t of ticks) t.showLabel = true;
+  } else {
+    const stride = Math.ceil(totalTicks / 7);
+    for (let i = 0; i < totalTicks; i++) {
+      const isFirst = i === 0;
+      const isLast = i === totalTicks - 1;
+      const isZero = Math.abs(ticks[i].value) < 1e-4;
+      const isStep = i % stride === 0;
+      ticks[i].showLabel = isFirst || isLast || isZero || isStep;
+    }
+  }
+
+  // Generate CSS stepped linear-gradient
+  let steppedGradient = "";
+  if (bands.length > 0) {
+    const stops = bands.map((b) => `${b.colorStr} ${b.startPct.toFixed(2)}% ${b.endPct.toFixed(2)}%`);
+    steppedGradient = `linear-gradient(to right, ${stops.join(", ")})`;
+  } else {
+    steppedGradient = getCSSGradient(element, options.colormap);
+  }
+
+  return {
+    isDiscrete: true,
+    bands,
+    ticks,
+    steppedGradient,
+  };
+}
+
+export function getSteppedCSSGradient(element = "TMP", colormap = null, options = {}) {
+  const palette = getColormap(colormap, element);
+  const { steppedGradient } = getPaletteBandsAndTicks(palette, element, options);
+  return steppedGradient;
+}
+
+export function getCSSGradient(element = "TMP", colormap = null, options = {}) {
+  if (options && (options.discrete || options.stepped)) {
+    return getSteppedCSSGradient(element, colormap, options);
+  }
   let palette = getColormap(colormap, element);
   if (!palette || palette.length === 0) {
     palette = getColormap(null, "TMP");

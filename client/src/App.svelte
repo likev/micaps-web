@@ -1373,10 +1373,11 @@
       if (valPayload && typeof valPayload === "object" && win.activeGroup?.layers) {
         const presetLayer = win.activeGroup.layers.find((candidate) =>
           candidate?.id === event.layer.id ||
-          (candidate?.type === "station" && event.layer.type === "station" && (candidate?.model === event.layer.model || (isUpperAirStationLayer(candidate) === isUpperAirStationLayer(event.layer)))) ||
+          (!candidate?.id && candidate?.type === "station" && event.layer.type === "station" && (candidate?.model === event.layer.model || (isUpperAirStationLayer(candidate) === isUpperAirStationLayer(event.layer)))) ||
           (candidate?.model === event.layer.model && candidate?.element === event.layer.element &&
             Boolean(candidate?.derivedFrom) === Boolean(event.layer.derivedFrom) &&
-            (candidate?.level === undefined || event.layer?.level === undefined || candidate.level === event.layer.level))
+            (candidate?.level === undefined || event.layer?.level === undefined || candidate.level === event.layer.level) &&
+            (!candidate?.id || candidate.id === event.layer.id))
         );
         if (presetLayer) {
           // Keep both representations in the per-window preset copy. The
@@ -1395,7 +1396,7 @@
       if (Array.isArray(win.layerSnapshots)) {
         const snap = win.layerSnapshots.find((s) =>
           s.id === event.layer.id ||
-          (s.type === "station" && event.layer.type === "station" && (s.model === event.layer.model || (isUpperAirStationLayer(s) === isUpperAirStationLayer(event.layer))))
+          (!s.id && s.type === "station" && event.layer.type === "station" && (s.model === event.layer.model || (isUpperAirStationLayer(s) === isUpperAirStationLayer(event.layer))))
         );
         if (snap) {
           snap.config = { ...(snap.config || {}), ...(valPayload && typeof valPayload === "object" ? valPayload : {}) };

@@ -5,7 +5,7 @@ import {
   setLastStationGeoJSON,
 } from "./stationState.js";
 import { hashStation } from "./stationExtract.js";
-import { compileStationFilter } from "./stationFilter.js";
+import { compileStationFilter, hasActiveStationFilters } from "./stationFilter.js";
 import { renderStationPlotToCanvas } from "./stationPlot.js";
 import {
   onStationMouseMove,
@@ -25,14 +25,18 @@ export function isStationLayerMatch(targetId, entryId, entry = null) {
 
   if (t === e) return true;
 
-  // Surface layer matching: both indicate surface
+  // Generic aliases
+  const tIsGeneric = t === "surface" || t === "surface-obs" || t === "station-surface" || t === "station" || t === "default";
+  const eIsGeneric = e === "surface" || e === "surface-obs" || e === "station-surface" || e === "station" || e === "default";
+
+  // Surface layer matching
   const tIsSurface = t.includes("surface");
   const eIsSurface = e.includes("surface");
   if (tIsSurface && eIsSurface) {
     const tHasLag = t.includes("lag") || t.includes("t-") || t.includes("t0") || t.includes("nowcast");
     const eHasLag = e.includes("lag") || e.includes("t-") || e.includes("t0") || e.includes("nowcast");
-    if (!tHasLag && !eHasLag) return true;
-    if (tHasLag && eHasLag) return t === e;
+    if (tHasLag || eHasLag) return t === e;
+    if (tIsGeneric || eIsGeneric) return true;
     return false;
   }
 
@@ -46,7 +50,10 @@ export function isStationLayerMatch(targetId, entryId, entry = null) {
     const tIsTLogP = t.includes("tlogp");
     const eIsTLogP = e.includes("tlogp");
     if (tIsTLogP || eIsTLogP) return tIsTLogP === eIsTLogP;
-    return true;
+    const tIsUpperGeneric = t === "upper" || t === "station-upper" || t === "upperair-obs" || tIsGeneric;
+    const eIsUpperGeneric = e === "upper" || e === "station-upper" || e === "upperair-obs" || eIsGeneric;
+    if (tIsUpperGeneric || eIsUpperGeneric) return true;
+    return false;
   }
 
   return false;
@@ -86,7 +93,10 @@ export function setStationConfig(map, config, layerId = null) {
     }
   }
 
-  state.config = { ...(state.config || {}), ...config };
+  // Only update global fallback config if untargeted or single layer
+  if (!targetId || !state.stationLayers || state.stationLayers.size <= 1) {
+    state.config = { ...(state.config || {}), ...config };
+  }
   updateVisibleMarkersForMap(map);
 }
 
@@ -137,15 +147,22 @@ export function renderStationWeatherPlots(map, geojson, visible = true, config =
     state.config.__themeId = map.__basemapScheme;
   }
   const mergedConfig = { ...state.config, ...(config || {}), layerId: id };
-  if (config) {
-    state.config = mergedConfig;
+  if (!state.stationLayers || state.stationLayers.size <= 1) {
+    if (config) {
+      state.config = mergedConfig;
+    }
   }
   if (!state.stationLayers) state.stationLayers = new Map();
+  if (id !== "default" && state.stationLayers.has("default")) {
+    state.stationLayers.delete("default");
+  }
   const idLower = String(id).toLowerCase();
+  const activeLayers = map?._micapsWindow?.activeGroup?.layers;
   const isUpper = idLower.startsWith("upperair-") || idLower.includes("sounding") || idLower === "station-upper";
   if (isUpper) {
     for (const existingId of Array.from(state.stationLayers.keys())) {
       const eLower = String(existingId).toLowerCase();
+      if (activeLayers && activeLayers.some((l) => l.id === existingId)) continue;
       if (existingId !== id && (eLower.startsWith("upperair-") || eLower.includes("sounding") || eLower === "station-upper")) {
         state.stationLayers.delete(existingId);
       }
@@ -153,11 +170,12 @@ export function renderStationWeatherPlots(map, geojson, visible = true, config =
   }
   const isSurface = idLower.startsWith("surface-") || idLower.includes("surface") || idLower === "station-surface";
   if (isSurface) {
-    const idHasLag = idLower.includes("lag") || idLower.includes("t-") || idLower.includes("nowcast");
+    const idHasLag = idLower.includes("lag") || idLower.includes("t-") || idLower.includes("t0") || idLower.includes("nowcast");
     if (!idHasLag) {
       for (const existingId of Array.from(state.stationLayers.keys())) {
         const eLower = String(existingId).toLowerCase();
-        const eHasLag = eLower.includes("lag") || eLower.includes("t-") || eLower.includes("nowcast");
+        if (activeLayers && activeLayers.some((l) => l.id === existingId)) continue;
+        const eHasLag = eLower.includes("lag") || eLower.includes("t-") || eLower.includes("t0") || eLower.includes("nowcast");
         if (existingId !== id && !eHasLag && (eLower.startsWith("surface-") || eLower.includes("surface") || eLower === "station-surface")) {
           state.stationLayers.delete(existingId);
         }
@@ -281,14 +299,46 @@ export function drawStationCanvas(map) {
   const activeBins = new Map();
 
   for (const layerEntry of layersToDraw) {
-    const lCfg = layerEntry.config || state.config;
+    const lCfg = { ...(state.config || {}), ...(layerEntry.config || {}) };
     const isSoftStale = lCfg.status === "soft-stale" || lCfg.isSoftStale;
     const isHardStale = lCfg.status === "hard-stale" || lCfg.isHardStale;
+    const isFilterActive = hasActiveStationFilters(lCfg);
     const filterFn = compileStationFilter(lCfg);
+
+    // 1. Data filtering filters the candidate list FIRST
+    const rawFeatures = layerEntry.geojson?.features || [];
+    const candidateFeatures = [];
+    let validCount = 0;
+    for (let i = 0; i < rawFeatures.length; i++) {
+      const f = rawFeatures[i];
+      if (!f.geometry || !Array.isArray(f.geometry.coordinates) || f.geometry.coordinates.length < 2) continue;
+      validCount++;
+      if (!filterFn(f.properties || {})) continue;
+      candidateFeatures.push(f);
+    }
+
+    const filteredCount = candidateFeatures.length;
+    // Filtering is active if data filter rules exist on the layer, or if candidate count was reduced by filtering
+    const isFiltered = isFilterActive || (validCount > 0 && filteredCount < validCount);
+    // Sparse means the filtered result has <= 500 stations, or is notably reduced (< 75% of valid stations)
+    const isSparse = isFiltered && (filteredCount <= 500 || (validCount > 0 && filteredCount < validCount * 0.75));
+    // Bypass decluttering completely when filtered station set is sparse, showing all matching stations
+    const bypassDeclutter = isFiltered && isSparse;
+
+    // Min-zoom gating: if layer specifies minZoom, respect it in full-density mode,
+    // but relax/bypass when data filter rules are active or filtered station set is sparse.
+    const rawMinZoom = lCfg.minZoom ?? lCfg.minzoom;
+    if (rawMinZoom !== undefined && rawMinZoom !== null) {
+      const minZ = Number(rawMinZoom);
+      if (!isNaN(minZ) && curZoom < minZ && !isFiltered) {
+        continue;
+      }
+    }
+
     const screenBins = new Map();
 
-    for (const f of layerEntry.geojson.features) {
-      if (!f.geometry || !Array.isArray(f.geometry.coordinates) || f.geometry.coordinates.length < 2) continue;
+    for (let i = 0; i < candidateFeatures.length; i++) {
+      const f = candidateFeatures[i];
       const [lon, lat] = f.geometry.coordinates;
 
       if (bounds) {
@@ -301,13 +351,13 @@ export function drawStationCanvas(map) {
         }
       }
 
-      if (!filterFn(f.properties || {})) continue;
       if (!hasProject) continue;
 
       const pt = map.project([lon, lat]);
       if (pt.x < -60 || pt.x > w + 60 || pt.y < -60 || pt.y > h + 60) continue;
 
-      const binKey = `${Math.floor(pt.x / 100)},${Math.floor(pt.y / 100)}`;
+      const binSize = (isFiltered && !bypassDeclutter) ? 50 : 100;
+      const binKey = `${Math.floor(pt.x / binSize)},${Math.floor(pt.y / binSize)}`;
       let list = screenBins.get(binKey);
       if (!list) {
         list = [];
@@ -320,20 +370,34 @@ export function drawStationCanvas(map) {
     const selectedStations = [];
     for (const [binKey, list] of screenBins.entries()) {
       let chosen;
-      if (list.length <= 5) {
+      if (bypassDeclutter) {
         chosen = list;
+      } else if (isFiltered) {
+        if (list.length <= 20) {
+          chosen = list;
+        } else {
+          list.sort((a, b) => a.hash - b.hash);
+          chosen = list.slice(0, 20);
+        }
       } else {
-        list.sort((a, b) => a.hash - b.hash);
-        chosen = list.slice(0, 5);
+        if (list.length <= 5) {
+          chosen = list;
+        } else {
+          list.sort((a, b) => a.hash - b.hash);
+          chosen = list.slice(0, 5);
+        }
       }
-      let existingBin = activeBins.get(binKey);
-      if (!existingBin) {
-        existingBin = [];
-        activeBins.set(binKey, existingBin);
-      }
+
       for (let i = 0; i < chosen.length; i++) {
-        existingBin.push(chosen[i]);
-        selectedStations.push(chosen[i]);
+        const item = chosen[i];
+        const hoverBinKey = `${Math.floor(item.pt.x / 100)},${Math.floor(item.pt.y / 100)}`;
+        let existingBin = activeBins.get(hoverBinKey);
+        if (!existingBin) {
+          existingBin = [];
+          activeBins.set(hoverBinKey, existingBin);
+        }
+        existingBin.push(item);
+        selectedStations.push(item);
       }
     }
 

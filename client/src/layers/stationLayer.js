@@ -20,6 +20,8 @@ export {
   evaluateSingleRule,
   matchesStationFilters,
   compileStationFilter,
+  hasActiveStationFilters,
+  hasActiveFilters,
   isViewOnly,
   normalizeFilterField,
   collectActiveRules,

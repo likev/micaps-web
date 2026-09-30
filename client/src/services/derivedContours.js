@@ -220,16 +220,20 @@ export async function renderSoundingDerivedContoursForStation(map, stations, cur
 }
 
 export async function renderSurfaceDerivedContoursForStation(map, stations, activeGroup, win, stationLayerId) {
-  const groupDerived = activeGroup?.layers?.filter((l) => l.type === "contour" && l.model === "SURFACE" && Boolean(l.derivedFrom)) || [];
+  const groupDerived = activeGroup?.layers?.filter((l) =>
+    l.type === "contour" && l.model === "SURFACE" && Boolean(l.derivedFrom) &&
+    (l.derivedFrom === stationLayerId || (!l.derivedFrom && !activeGroup.layers.some((other) => other.type === "station" && other.id !== stationLayerId)))
+  ) || [];
   if (groupDerived.length > 0) {
     for (const cLayer of groupDerived) {
       try {
         const elem = (cLayer.element || "SLP").toUpperCase();
-        const targetId = cLayer.id || `contour-surface-${elem.toLowerCase()}`;
+        const isDefaultParent = !cLayer.derivedFrom || cLayer.derivedFrom === "surface-obs" || cLayer.derivedFrom === "station-surface" || cLayer.derivedFrom === "surface" || cLayer.derivedFrom === "default";
+        const targetId = cLayer.id || (!isDefaultParent ? `contour-surface-${elem.toLowerCase()}-${cLayer.derivedFrom}` : `contour-surface-${elem.toLowerCase()}`);
         const existingDerived = getLayerById(targetId, win);
         // Same exact-id visibility rule as sounding; fallback only for config.
         const snapExact = win?.derivedContourSnapshots?.find((s) => s.id === targetId);
-        const snap = snapExact || win?.derivedContourSnapshots?.find((s) => s.model === "SURFACE" && s.element === elem);
+        const snap = snapExact || (!cLayer.derivedFrom ? win?.derivedContourSnapshots?.find((s) => s.model === "SURFACE" && s.element === elem) : null);
         const cfg = { ...(cLayer.render || cLayer.config || {}) };
         cfg.layerId = targetId;
         cfg.derivedFrom = cLayer.derivedFrom || stationLayerId;
@@ -314,21 +318,28 @@ export async function renderSurfaceDerivedContoursForStation(map, stations, acti
     }
   } else {
     const winLayers = getLayersForWindow(win);
-    let activeSurfaceContours = winLayers.filter((l) => l.type === "contour" && l.model === "SURFACE");
+    let activeSurfaceContours = winLayers.filter((l) =>
+      l.type === "contour" && l.model === "SURFACE" &&
+      (l.derivedFrom === stationLayerId || (!l.derivedFrom && !winLayers.some((other) => other.type === "station" && other.id !== stationLayerId)))
+    );
     if (activeSurfaceContours.length === 0 && Array.isArray(win?.derivedContourSnapshots)) {
-      activeSurfaceContours = win.derivedContourSnapshots.filter((l) => l.model === "SURFACE");
+      activeSurfaceContours = win.derivedContourSnapshots.filter((l) =>
+        l.model === "SURFACE" &&
+        (l.derivedFrom === stationLayerId || (!l.derivedFrom && !winLayers.some((other) => other.type === "station" && other.id !== stationLayerId)))
+      );
     }
     if (activeSurfaceContours.length > 0) {
       for (const cLayer of activeSurfaceContours) {
         try {
           const elem = (cLayer.element || "SLP").toUpperCase();
-          const targetId = cLayer.id || `contour-surface-${elem.toLowerCase()}`;
+          const isDefaultParent = !cLayer.derivedFrom || cLayer.derivedFrom === "surface-obs" || cLayer.derivedFrom === "station-surface" || cLayer.derivedFrom === "surface" || cLayer.derivedFrom === "default";
+          const targetId = cLayer.id || (!isDefaultParent ? `contour-surface-${elem.toLowerCase()}-${cLayer.derivedFrom}` : `contour-surface-${elem.toLowerCase()}`);
           const existingDerived = getLayerById(targetId, win);
           // Same exact-id visibility rule as above; fallback only for config.
           const snapExact = win?.derivedContourSnapshots?.find((s) => s.id === targetId);
-          const snap = snapExact || win?.derivedContourSnapshots?.find((s) => s.model === "SURFACE" && s.element === elem);
+          const snap = snapExact || (!cLayer.derivedFrom ? win?.derivedContourSnapshots?.find((s) => s.model === "SURFACE" && s.element === elem) : null);
           const isVisible = existingDerived ? (existingDerived.visible !== false) : (snapExact ? snapExact.visible !== false : cLayer.visible !== false);
-          const cfg = { ...(cLayer.config || {}), visible: isVisible, layerId: targetId };
+          const cfg = { ...(cLayer.config || {}), visible: isVisible, layerId: targetId, derivedFrom: cLayer.derivedFrom || stationLayerId };
           if (snap?.config) Object.assign(cfg, snap.config);
           if (existingDerived?.config) Object.assign(cfg, existingDerived.config);
           // Re-assert: win-layer/snapshot configs embed a stale layerId/visible
@@ -417,7 +428,7 @@ export async function loadUpperAirComposite(map, level = 500, obsTime = "2026082
   const groupStationLayer = activeGroup?.layers?.find((l) => l.type === "station");
   const layerId = groupStationLayer?.id || "station-upper";
   const existingStn = getLayerById(layerId, win);
-  const snapStn = win?.layerSnapshots?.find((s) => s.id === layerId || (s.type === "station" && s.model === "UPPER_AIR"));
+  const snapStn = win?.layerSnapshots?.find((s) => s.id === layerId || (!s.id && s.type === "station" && s.model === "UPPER_AIR"));
   const isVisible = existingStn ? (existingStn.visible !== false) : (snapStn ? snapStn.visible !== false : (appState.state.layers.station !== false));
   const cursorTime = win?.wallClockCursor ||
     (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
@@ -517,13 +528,13 @@ export async function loadObservationProduct(map, model, element, level, file, w
     }
     const layerId = customStationLayerId || groupStationLayer?.id || (isTLogP ? "upperair-tlogp-stations" : (model === "UPPER_AIR" ? "station-upper" : `station-${model.toLowerCase()}`));
     const existingStn = getLayerById(layerId, win);
-    const snapStn = win?.layerSnapshots?.find((s) => s.id === layerId || (s.type === "station" && s.model === model));
+    const snapStn = win?.layerSnapshots?.find((s) => s.id === layerId || (!s.id && s.type === "station" && s.model === model));
     const isVisible = existingStn
       ? (existingStn.visible !== false)
       : (snapStn ? snapStn.visible !== false : (groupStationLayer?.visible !== undefined ? groupStationLayer.visible !== false : (appState.state.layers.station !== false)));
-    const name = isTLogP
+    const name = groupStationLayer?.name || (isTLogP
       ? "Sounding Station Network"
-      : (model === "UPPER_AIR" ? `${level || 500} hPa Sounding Station Plots` : `${model === "SURFACE" ? "Surface" : "Upper Air"} Station Observations`);
+      : (model === "UPPER_AIR" ? `${level || 500} hPa Sounding Station Plots` : `${model === "SURFACE" ? "Surface" : "Upper Air"} Station Observations`));
     const isRainProduct = /rain/i.test(element || "") || /rain/i.test(path || "");
     const cursorTime = win?.wallClockCursor ||
       (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||

@@ -45,17 +45,38 @@
           </div>
           <span class="legend-unit">{item.unit ? `(${item.unit})` : ""}</span>
         </div>
-        <div
-          class="legend-bar"
-          role="img"
-          aria-label="{item.element} color scale {item.zMin ?? ''} to {item.zMax ?? ''} {item.unit}"
-          style:background={item.gradient || "rgba(255,255,255,0.08)"}
-        ></div>
-        <div class="legend-ticks">
-          {#each item.tickLabels as tick}
-            <span>{tick}</span>
-          {/each}
+        <div class="legend-bar-container">
+          <div
+            class="legend-bar"
+            role="img"
+            aria-label="{item.element} color scale {item.zMin ?? ''} to {item.zMax ?? ''} {item.unit}"
+            style:background={item.steppedGradient || item.gradient || "rgba(255,255,255,0.08)"}
+          ></div>
         </div>
+        {#if item.ticks && item.ticks.length > 0}
+          <div class="legend-ticks-container" aria-hidden="true">
+            {#each item.ticks as tick}
+              <div
+                class="legend-tick"
+                class:tick-first={tick.isFirst}
+                class:tick-last={tick.isLast}
+                style:left="{tick.percent}%"
+                title="{tick.value}{item.unit ? ` ${item.unit}` : ''}"
+              >
+                <div class="legend-tick-mark"></div>
+                {#if tick.showLabel !== false}
+                  <span class="tick-label">{tick.label}</span>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <div class="legend-ticks">
+            {#each item.tickLabels as tick}
+              <span>{tick}</span>
+            {/each}
+          </div>
+        {/if}
       </div>
     {/each}
   </div>
@@ -95,8 +116,8 @@
   .legend-item {
     display: flex;
     flex-direction: column;
-    gap: 3px;
-    min-width: 170px;
+    gap: 2px;
+    min-width: 190px;
   }
 
   .legend-header {
@@ -154,11 +175,58 @@
     line-height: 1;
   }
 
+  .legend-bar-container {
+    position: relative;
+    width: 100%;
+  }
+
   .legend-bar {
     height: 10px;
     width: 100%;
     border-radius: 3px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .legend-ticks-container {
+    position: relative;
+    width: 100%;
+    height: 16px;
+    margin-top: 1px;
+  }
+
+  .legend-tick {
+    position: absolute;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: auto;
+    white-space: nowrap;
+    font-size: 9.5px;
+    color: var(--text-secondary, #8b949e);
+    line-height: 1;
+  }
+
+  .legend-tick.tick-first {
+    transform: translateX(0);
+    align-items: flex-start;
+  }
+
+  .legend-tick.tick-last {
+    transform: translateX(-100%);
+    align-items: flex-end;
+  }
+
+  .legend-tick-mark {
+    width: 1px;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.45);
+    margin-bottom: 2px;
+  }
+
+  .tick-label {
+    font-size: 9.5px;
+    user-select: none;
   }
 
   .legend-ticks {

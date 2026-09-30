@@ -1,5 +1,5 @@
 // legendCore.js - Plain-core legend data structures and item builders
-import { getColormap, getCSSGradient } from "../../utils/colormaps.js";
+import { getColormap, getCSSGradient, getPaletteBandsAndTicks, getSteppedCSSGradient } from "../../utils/colormaps.js";
 import { formatElementUnit } from "../../utils/formatters.js";
 import { getWindowById } from "./tabsCore.js";
 import { getLayersForWindow, getCurrentActiveWinId } from "./layersCore.js";
@@ -191,6 +191,12 @@ export function buildLegendItems(winOrId, legendsMap = windowLegends, winResolve
     };
     const statusColor = statusColors[status] || "#3fb950";
 
+    const discreteData = getPaletteBandsAndTicks(palette, element, { zMin, zMax, unit, colormap });
+    const steppedGrad = discreteData?.steppedGradient || grad;
+    const ticks = discreteData?.ticks || [];
+    const bands = discreteData?.bands || [];
+    const isDiscrete = discreteData?.isDiscrete ?? true;
+
     return {
       key: item.key || layer?.id || item.layerId || element,
       element,
@@ -199,6 +205,10 @@ export function buildLegendItems(winOrId, legendsMap = windowLegends, winResolve
       zMax,
       unit,
       gradient: grad,
+      steppedGradient: steppedGrad,
+      ticks,
+      bands,
+      isDiscrete,
       tickLabels,
       displayTitle,
       timeBadge,

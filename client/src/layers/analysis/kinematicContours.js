@@ -40,9 +40,13 @@ export function analyzeKinematicContours({
 
     if (options.visible === false) {
       const numLvl = isSounding ? (Number(level) || 500) : null;
+      const parentId = options.derivedFrom;
+      const isDefaultParent = !parentId || parentId === "surface-obs" || parentId === "station-surface" || parentId === "surface" || parentId === "default";
       const layerId = options.layerId || (isSounding
         ? `contour-sounding-${elementKey.toLowerCase()}-${numLvl}`
-        : `contour-surface-${elementKey.toLowerCase()}`);
+        : (!isDefaultParent
+          ? `contour-surface-${elementKey.toLowerCase()}-${parentId}`
+          : `contour-surface-${elementKey.toLowerCase()}`));
       const lineColor = options.lineColor || cfg.defaultColor;
       const { showFill, showLine, showRaster } = resolveShowFlags(options, cfg, elementKey);
       const palettePath = options.palettePath || cfg.palettePath || null;
@@ -156,9 +160,13 @@ export function analyzeKinematicContours({
     const isobandFC = { type: "FeatureCollection", features: fills || [] };
 
     const numLvl = isSounding ? (Number(level) || 500) : null;
+    const parentId = options.derivedFrom;
+    const isDefaultParent = !parentId || parentId === "surface-obs" || parentId === "station-surface" || parentId === "surface" || parentId === "default";
     const layerId = options.layerId || (isSounding
       ? `contour-sounding-${elementKey.toLowerCase()}-${numLvl}`
-      : `contour-surface-${elementKey.toLowerCase()}`);
+      : (!isDefaultParent
+        ? `contour-surface-${elementKey.toLowerCase()}-${parentId}`
+        : `contour-surface-${elementKey.toLowerCase()}`));
 
     const lineColor = options.lineColor || cfg.defaultColor;
     const { showFill, showLine, showRaster } = resolveShowFlags(options, cfg, elementKey);

@@ -181,19 +181,88 @@
     })
   );
 
-  // Ruler markers: every 30 minutes
+  // Derive active step length / cadence in milliseconds (§2.3 / §2.9)
+  let activeStepMs = $derived.by(() => {
+    // 1. Check if upper air mode or sounding layer is active
+    const isUpper = Boolean(
+      timeline?.isUpperAirMode ||
+      pacemakerLayer?.model?.includes("UPPER_AIR") ||
+      pacemakerLayer?.type === "sounding" ||
+      weatherLayers.some((l) => l.model?.includes("UPPER_AIR") || l.type === "sounding")
+    );
+    if (isUpper) {
+      const stepH = parseInt(timeline?.currentStepLength, 10) || 12;
+      return stepH * 3600 * 1000;
+    }
+
+    // 2. Check pacemaker layer specific cadence
+    const pData = laneData.find((d) => d.layer.id === pacemakerLayer?.id) || laneData[0];
+    const pCadenceMin = pData?.cadence;
+
+    // High-resolution cadence (e.g. radar 5-6m, satellite 10-15m)
+    if (pCadenceMin && pCadenceMin <= 30) {
+      return pCadenceMin * 60 * 1000;
+    }
+
+    // 3. User-selected timeline stepLength (e.g. 1h, 3h, 6h, 12h, 24h)
+    if (timeline?.currentStepLength) {
+      const stepH = parseInt(timeline.currentStepLength, 10);
+      if (Number.isFinite(stepH) && stepH > 0) {
+        return stepH * 3600 * 1000;
+      }
+    }
+
+    // 4. Pacemaker cadence in minutes
+    if (pCadenceMin && pCadenceMin > 0) {
+      return pCadenceMin * 60 * 1000;
+    }
+
+    // Default fallback: 30 minutes
+    return 30 * 60 * 1000;
+  });
+
+  // Automatically adapt windowDurationMs when active step changes
+  let prevStepMs = $state(null);
+  $effect(() => {
+    const curStep = activeStepMs;
+    if (curStep !== prevStepMs) {
+      prevStepMs = curStep;
+      if (curStep <= 15 * 60 * 1000) {
+        windowDurationMs = Math.max(curStep * 12, 60 * 60 * 1000);
+      } else {
+        windowDurationMs = Math.max(curStep * 8, 3 * 3600 * 1000);
+      }
+      windowCenterMs = cursorMs;
+    }
+  });
+
+  // Ruler markers: sync with activeStepMs and adapt dynamically
   let rulerTicks = $derived.by(() => {
     const ticks = [];
-    const stepMs = 30 * 60 * 1000; // 30 min
-    const firstTick = Math.ceil(windowStartMs / stepMs) * stepMs;
-    for (let t = firstTick; t <= windowEndMs; t += stepMs) {
-      const pct = (t - windowStartMs) / (windowEndMs - windowStartMs);
+    const span = windowEndMs - windowStartMs;
+    if (span <= 0) return ticks;
+
+    let tickStepMs = activeStepMs;
+    if (span / tickStepMs > 24) {
+      tickStepMs *= 2;
+      if (span / tickStepMs > 24) tickStepMs *= 2;
+    } else if (span / tickStepMs < 4 && tickStepMs % 2 === 0) {
+      tickStepMs = Math.max(60 * 1000, Math.floor(tickStepMs / 2));
+    }
+
+    const firstTick = Math.ceil(windowStartMs / tickStepMs) * tickStepMs;
+    const includeDate = tickStepMs >= 12 * 3600 * 1000 || span >= 24 * 3600 * 1000;
+
+    for (let t = firstTick; t <= windowEndMs; t += tickStepMs) {
+      const pct = (t - windowStartMs) / span;
       if (pct >= 0 && pct <= 1) {
+        const d = new Date(t);
+        const isHour = tickStepMs < 3600 * 1000 ? d.getUTCMinutes() === 0 : (d.getUTCHours() % 6 === 0 || (d.getUTCHours() === 0 && d.getUTCMinutes() === 0));
         ticks.push({
           timeMs: t,
           pct: pct * 100,
-          label: formatZuluTime(t),
-          isHour: new Date(t).getUTCMinutes() === 0,
+          label: formatZuluTime(t, includeDate),
+          isHour,
         });
       }
     }
@@ -403,9 +472,26 @@
   }
 
   function handlePacemakerStep(delta) {
-    if (!pacemakerLayer) return;
-    const pData = laneData.find((d) => d.layer.id === pacemakerLayer.id);
-    if (!pData || pData.samples.length === 0) return;
+    if (onStep) {
+      onStep(delta);
+    }
+    const pData = laneData.find((d) => d.layer.id === pacemakerLayer?.id) || laneData[0];
+    if (!pData || !pData.samples || pData.samples.length === 0) {
+      const step = activeStepMs || (30 * 60 * 1000);
+      const targetMs = cursorMs + delta * step;
+      cursorMs = targetMs;
+      windowCenterMs = targetMs;
+      if (timeline) timeline.wallClockCursor = targetMs;
+      if (onTimeChange) {
+        onTimeChange({
+          cursorTime: targetMs,
+          cursorTimeZ: formatZuluTime(targetMs),
+          isLive: mode === "live",
+          winId,
+        });
+      }
+      return;
+    }
 
     const samples = pData.samples;
     // Find closest index
@@ -432,6 +518,55 @@
         isLive: mode === "live",
         winId,
       });
+    }
+  }
+
+  function handleTickClick(tickMs) {
+    if (mode === "live") return;
+    cursorMs = tickMs;
+    windowCenterMs = tickMs;
+    if (timeline) timeline.wallClockCursor = tickMs;
+    if (onTimeChange) {
+      onTimeChange({
+        cursorTime: tickMs,
+        cursorTimeZ: formatZuluTime(tickMs),
+        isLive: false,
+        winId,
+      });
+    }
+  }
+
+  function handleWheel(e) {
+    if (mode === "live") return;
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const zoomFactor = e.deltaY > 0 ? 1.2 : 0.833;
+      const minDuration = Math.max(activeStepMs * 2, 30 * 60 * 1000);
+      const maxDuration = Math.max(activeStepMs * 30, 14 * 24 * 3600 * 1000);
+      windowDurationMs = Math.max(minDuration, Math.min(maxDuration, windowDurationMs * zoomFactor));
+    } else {
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (Math.abs(delta) > 2) {
+        const panMs = (delta / 500) * windowDurationMs * 0.15;
+        windowCenterMs += panMs;
+      }
+    }
+  }
+
+  function handleTracksKeyDown(e) {
+    if (mode === "live") return;
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      handlePacemakerStep(-1);
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      handlePacemakerStep(1);
+    } else if (e.key === "PageUp") {
+      e.preventDefault();
+      windowCenterMs -= windowDurationMs * 0.3;
+    } else if (e.key === "PageDown") {
+      e.preventDefault();
+      windowCenterMs += windowDurationMs * 0.3;
     }
   }
 
@@ -549,6 +684,8 @@
       class="tracks-scroll-area"
       bind:this={tracksContainerEl}
       onpointerdown={handlePointerDown}
+      onwheel={handleWheel}
+      onkeydown={handleTracksKeyDown}
       role="slider"
       tabindex="0"
       aria-label="Timeline Scrubber"
@@ -561,6 +698,19 @@
             class="ruler-tick"
             class:hour-tick={tick.isHour}
             style:left="{tick.pct}%"
+            role="button"
+            tabindex="0"
+            title="{tick.label} (Click to jump playhead)"
+            onclick={(e) => {
+              e.stopPropagation();
+              handleTickClick(tick.timeMs);
+            }}
+            onkeydown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.stopPropagation();
+                handleTickClick(tick.timeMs);
+              }
+            }}
           >
             <span class="tick-line"></span>
             <span class="tick-label">{tick.label}</span>
@@ -972,6 +1122,8 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    cursor: pointer;
+    user-select: none;
   }
 
   .tick-line {
@@ -991,6 +1143,7 @@
     color: var(--text-secondary, #8b949e);
     margin-top: 1px;
     transform: translateX(-50%);
+    white-space: nowrap;
   }
 
   .forecast-future-shade {

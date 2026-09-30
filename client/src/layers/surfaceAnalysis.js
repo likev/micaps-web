@@ -41,7 +41,12 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
 
   try {
     const cfg = SURFACE_CONTOUR_CONFIGS[elementKey] || SURFACE_CONTOUR_CONFIGS.SLP;
-    const layerId = options.layerId || `contour-surface-${elementKey.toLowerCase()}`;
+    const parentId = options.derivedFrom;
+    const isDefaultParent = !parentId || parentId === "surface-obs" || parentId === "station-surface" || parentId === "surface" || parentId === "default";
+    const layerId = options.layerId ||
+      (!isDefaultParent
+        ? `contour-surface-${elementKey.toLowerCase()}-${parentId}`
+        : `contour-surface-${elementKey.toLowerCase()}`);
     const lineColor = options.lineColor || cfg.defaultColor;
     const { showFill, showLine, showRaster } = resolveShowFlags(options, cfg, elementKey);
     const { palettePath, colormap } = resolveContourColormap(options, cfg, layerId);

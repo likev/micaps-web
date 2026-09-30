@@ -7,7 +7,8 @@ import { getFieldValue } from "./stationExtract.js";
 export const VIEW_LOGIC = "VIEW";
 
 export function isViewOnly(cfg) {
-  return String(cfg?.filterLogic ?? "").toUpperCase() === VIEW_LOGIC;
+  const logic = cfg?.filterData?.filterLogic ?? cfg?.filterLogic;
+  return String(logic ?? "").toUpperCase() === VIEW_LOGIC;
 }
 
 const VIEW_FIELD_ALIASES = {
@@ -35,7 +36,7 @@ export function normalizeFilterField(field) {
 
 function ruleIsActive(r) {
   return Boolean(
-    r && r.field && r.field !== "none" &&
+    r && r.field && String(r.field).trim().toLowerCase() !== "none" &&
     r.val !== undefined && r.val !== null && r.val !== "" &&
     !isNaN(Number(r.val))
   );
@@ -46,30 +47,48 @@ function ruleIsActive(r) {
 export function collectActiveRules(cfg) {
   const out = [];
   if (!cfg) return out;
-  if (Array.isArray(cfg.filterRules)) {
-    for (const r of cfg.filterRules) {
+  const rules = (Array.isArray(cfg.filterRules) && cfg.filterRules.length > 0)
+    ? cfg.filterRules
+    : (Array.isArray(cfg.filterData?.filterRules) && cfg.filterData.filterRules.length > 0
+        ? cfg.filterData.filterRules
+        : (Array.isArray(cfg.filterRules) ? cfg.filterRules : (Array.isArray(cfg.filterData?.filterRules) ? cfg.filterData.filterRules : null)));
+  if (rules) {
+    for (const r of rules) {
       if (ruleIsActive(r)) {
         out.push({ field: r.field, op: r.op || ">", val: r.val, val2: r.val2 });
       }
     }
-    return out;
+    if (out.length > 0) return out;
   }
+  const f1 = cfg.filterField1 ?? cfg.filterData?.filterField1;
+  const val1 = cfg.filterVal1 ?? cfg.filterData?.filterVal1;
+  const op1 = cfg.filterOp1 ?? cfg.filterData?.filterOp1 ?? ">";
   if (
-    cfg.filterField1 && cfg.filterField1 !== "none" &&
-    cfg.filterVal1 !== undefined && cfg.filterVal1 !== null && cfg.filterVal1 !== "" &&
-    !isNaN(Number(cfg.filterVal1))
+    f1 && String(f1).trim().toLowerCase() !== "none" &&
+    val1 !== undefined && val1 !== null && val1 !== "" &&
+    !isNaN(Number(val1))
   ) {
-    out.push({ field: cfg.filterField1, op: cfg.filterOp1 || ">", val: cfg.filterVal1 });
+    out.push({ field: f1, op: op1, val: val1 });
   }
+  const f2 = cfg.filterField2 ?? cfg.filterData?.filterField2;
+  const val2 = cfg.filterVal2 ?? cfg.filterData?.filterVal2;
+  const op2 = cfg.filterOp2 ?? cfg.filterData?.filterOp2 ?? "<";
   if (
-    cfg.filterField2 && cfg.filterField2 !== "none" &&
-    cfg.filterVal2 !== undefined && cfg.filterVal2 !== null && cfg.filterVal2 !== "" &&
-    !isNaN(Number(cfg.filterVal2))
+    f2 && String(f2).trim().toLowerCase() !== "none" &&
+    val2 !== undefined && val2 !== null && val2 !== "" &&
+    !isNaN(Number(val2))
   ) {
-    out.push({ field: cfg.filterField2, op: cfg.filterOp2 || "<", val: cfg.filterVal2 });
+    out.push({ field: f2, op: op2, val: val2 });
   }
   return out;
 }
+
+export function hasActiveStationFilters(cfg) {
+  if (!cfg || isViewOnly(cfg)) return false;
+  return collectActiveRules(cfg).length > 0;
+}
+
+export const hasActiveFilters = hasActiveStationFilters;
 
 // ViewOnly element gate: an element is drawn iff every active rule on its
 // own field passes. Fields without rules (or unknown fields) default to
@@ -122,7 +141,7 @@ export function getViewAutoCheckPatch(cfg) {
 }
 
 export function evaluateSingleRule(p, rule) {
-  if (!rule || !rule.field || rule.field === "none") return true;
+  if (!rule || !rule.field || String(rule.field).trim().toLowerCase() === "none") return true;
   const actual = getFieldValue(p, rule.field);
   if (actual === null || isNaN(actual)) return false;
 
@@ -163,13 +182,17 @@ export function matchesStationFilters(p, cfg) {
   // ViewOnly never hides stations; per-element gating happens at render.
   if (isViewOnly(cfg)) return true;
 
-  if (Array.isArray(cfg.filterRules)) {
-    const activeRules = cfg.filterRules.filter(
-      (r) => r.field && r.field !== "none" && r.val !== undefined && r.val !== null && r.val !== "" && !isNaN(Number(r.val))
-    );
+  const rules = (Array.isArray(cfg.filterRules) && cfg.filterRules.length > 0)
+    ? cfg.filterRules
+    : (Array.isArray(cfg.filterData?.filterRules) && cfg.filterData.filterRules.length > 0
+        ? cfg.filterData.filterRules
+        : (Array.isArray(cfg.filterRules) ? cfg.filterRules : (Array.isArray(cfg.filterData?.filterRules) ? cfg.filterData.filterRules : null)));
+
+  if (rules) {
+    const activeRules = rules.filter(ruleIsActive);
     if (activeRules.length === 0) return true;
 
-    const logic = (cfg.filterLogic || "AND").toUpperCase();
+    const logic = ((cfg.filterLogic ?? cfg.filterData?.filterLogic) || "AND").toUpperCase();
     if (logic === "NONE") {
       return evaluateSingleRule(p, activeRules[0]);
     }
@@ -179,27 +202,27 @@ export function matchesStationFilters(p, cfg) {
     return activeRules.every((r) => evaluateSingleRule(p, r));
   }
 
-  const f1 = cfg.filterField1 || "none";
-  const op1 = cfg.filterOp1 || ">";
-  const val1 = cfg.filterVal1;
+  const f1 = cfg.filterField1 ?? cfg.filterData?.filterField1 ?? "none";
+  const op1 = cfg.filterOp1 ?? cfg.filterData?.filterOp1 ?? ">";
+  const val1 = cfg.filterVal1 ?? cfg.filterData?.filterVal1;
 
-  const logic = cfg.filterLogic || "none";
+  const logic = String(cfg.filterLogic ?? cfg.filterData?.filterLogic ?? "none").toLowerCase();
 
-  const f2 = cfg.filterField2 || "none";
-  const op2 = cfg.filterOp2 || "<";
-  const val2 = cfg.filterVal2;
+  const f2 = cfg.filterField2 ?? cfg.filterData?.filterField2 ?? "none";
+  const op2 = cfg.filterOp2 ?? cfg.filterData?.filterOp2 ?? "<";
+  const val2 = cfg.filterVal2 ?? cfg.filterData?.filterVal2;
 
-  const has1 = f1 !== "none" && val1 !== undefined && val1 !== null && val1 !== "" && !isNaN(Number(val1));
-  const has2 = f2 !== "none" && val2 !== undefined && val2 !== null && val2 !== "" && !isNaN(Number(val2));
+  const has1 = String(f1).trim().toLowerCase() !== "none" && val1 !== undefined && val1 !== null && val1 !== "" && !isNaN(Number(val1));
+  const has2 = String(f2).trim().toLowerCase() !== "none" && val2 !== undefined && val2 !== null && val2 !== "" && !isNaN(Number(val2));
 
   if (!has1 && !has2) return true;
-  if (logic === "none" || !has2) return has1 ? evaluateSingleRule(p, { field: f1, op: op1, val: val1, val2: cfg.filterVal1_2 ?? cfg.filterVal2 }) : true;
-  if (!has1 && has2) return evaluateSingleRule(p, { field: f2, op: op2, val: val2, val2: cfg.filterVal2_2 });
+  if (logic === "none" || !has2) return has1 ? evaluateSingleRule(p, { field: f1, op: op1, val: val1, val2: cfg.filterVal1_2 ?? cfg.filterVal2 ?? cfg.filterData?.filterVal1_2 ?? cfg.filterData?.filterVal2 }) : true;
+  if (!has1 && has2) return evaluateSingleRule(p, { field: f2, op: op2, val: val2, val2: cfg.filterVal2_2 ?? cfg.filterData?.filterVal2_2 });
 
-  const res1 = evaluateSingleRule(p, { field: f1, op: op1, val: val1, val2: cfg.filterVal1_2 ?? cfg.filterVal2 });
-  const res2 = evaluateSingleRule(p, { field: f2, op: op2, val: val2, val2: cfg.filterVal2_2 });
+  const res1 = evaluateSingleRule(p, { field: f1, op: op1, val: val1, val2: cfg.filterVal1_2 ?? cfg.filterVal2 ?? cfg.filterData?.filterVal1_2 ?? cfg.filterData?.filterVal2 });
+  const res2 = evaluateSingleRule(p, { field: f2, op: op2, val: val2, val2: cfg.filterVal2_2 ?? cfg.filterData?.filterVal2_2 });
 
-  if (logic === "OR" || logic === "or") {
+  if (logic === "or") {
     return res1 || res2;
   }
   return res1 && res2;
@@ -210,26 +233,29 @@ export function compileStationFilter(cfg) {
   // ViewOnly never hides stations; per-element gating happens at render.
   if (isViewOnly(cfg)) return () => true;
 
-  if (Array.isArray(cfg.filterRules)) {
+  const rules = (Array.isArray(cfg.filterRules) && cfg.filterRules.length > 0)
+    ? cfg.filterRules
+    : (Array.isArray(cfg.filterData?.filterRules) && cfg.filterData.filterRules.length > 0
+        ? cfg.filterData.filterRules
+        : (Array.isArray(cfg.filterRules) ? cfg.filterRules : (Array.isArray(cfg.filterData?.filterRules) ? cfg.filterData.filterRules : null)));
+
+  if (rules) {
     const active = [];
-    for (let i = 0; i < cfg.filterRules.length; i++) {
-      const r = cfg.filterRules[i];
-      if (r && r.field && r.field !== "none" && r.val !== undefined && r.val !== null && r.val !== "") {
-        const numVal = Number(r.val);
-        if (!isNaN(numVal)) {
-          active.push({
-            field: r.field,
-            op: r.op || ">",
-            val: numVal,
-            val2: r.val2 !== undefined && r.val2 !== null && r.val2 !== "" ? Number(r.val2) : undefined,
-          });
-        }
+    for (let i = 0; i < rules.length; i++) {
+      const r = rules[i];
+      if (ruleIsActive(r)) {
+        active.push({
+          field: r.field,
+          op: r.op || ">",
+          val: Number(r.val),
+          val2: r.val2 !== undefined && r.val2 !== null && r.val2 !== "" && !isNaN(Number(r.val2)) ? Number(r.val2) : undefined,
+        });
       }
     }
 
     if (active.length === 0) return () => true;
 
-    const logic = (cfg.filterLogic || "AND").toUpperCase();
+    const logic = ((cfg.filterLogic ?? cfg.filterData?.filterLogic) || "AND").toUpperCase();
     if (logic === "NONE") {
       const r0 = active[0];
       return (p) => evaluateSingleRule(p, r0);

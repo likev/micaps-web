@@ -15,7 +15,7 @@ function syncDerivedLayerToWindowPreset(activeGroup, layerEntry) {
   if (!activeGroup || !Array.isArray(activeGroup.layers) || !layerEntry) return;
   const index = activeGroup.layers.findIndex((candidate) =>
     candidate?.id === layerEntry.id ||
-    (candidate?.derivedFrom && candidate.model === layerEntry.model && candidate.element === layerEntry.element)
+    (candidate?.derivedFrom && candidate.derivedFrom === layerEntry.derivedFrom && candidate.model === layerEntry.model && candidate.element === layerEntry.element)
   );
   if (index >= 0) {
     activeGroup.layers[index] = {
@@ -219,12 +219,13 @@ export function handleAddContourAction(map, layer, value, winObj) {
   } else {
     import("../../layers/surfaceAnalysis.js").then(
       ({ analyzeAndRenderSurfaceContours, SURFACE_CONTOUR_CONFIGS }) => {
-        const liveLayerId = `contour-surface-${elem.toLowerCase()}`;
+        const activeGroup = winObj?.activeGroup || appState.get("activeGroup");
+        const parentLayerId = layer?.id || activeGroup?.layers?.find((l) => l.type === "station")?.id || "surface-obs";
+        const derivedFrom = parentLayerId;
+        const isDefaultParent = !parentLayerId || parentLayerId === "surface-obs" || parentLayerId === "station-surface" || parentLayerId === "surface" || parentLayerId === "default";
+        const liveLayerId = !isDefaultParent ? `contour-surface-${elem.toLowerCase()}-${parentLayerId}` : `contour-surface-${elem.toLowerCase()}`;
         const cfg = SURFACE_CONTOUR_CONFIGS?.[elem];
         const defaultColor = cfg?.defaultColor || (elem === "VOR" ? "#c678dd" : elem === "DIV" ? "#56d4dd" : "#58a6ff");
-        const activeGroup = winObj?.activeGroup || appState.get("activeGroup");
-        const stnLayerInGroup = activeGroup?.layers?.find((l) => l.type === "station");
-        const derivedFrom = stnLayerInGroup?.id || layer?.id || "surface-obs";
         const isDTD = elem === "DTD";
         const isKinematic = elem === "VOR" || elem === "DIV";
         const contourDefaults = isDTD
@@ -256,7 +257,7 @@ export function handleAddContourAction(map, layer, value, winObj) {
             id: liveLayerId,
             model: "SURFACE",
             element: elem,
-            name: `Surface Derived ${cfg?.name || elem}`,
+            name: `${layer?.name ? `${layer.name} ` : "Surface "}Derived ${cfg?.name || elem}`,
             type: "contour",
             derivedFrom,
             render: {

@@ -122,10 +122,10 @@ describe("Auto-Allocation 5-Mode System & Synchronization", () => {
     expect(tab.windows.map((w) => w.model)).toEqual([
       "ECMWF_HR",
       "GRAPES_GFS",
-      "BEIJING_MR",
       "GRAPES_3KM",
-      "JAPAN_MR",
       "SHANGHAI_MR",
+      "BEIJING_MR",
+      "JAPAN_MR",
     ]);
     // Keeps level and period uniform across models
     expect(tab.windows.every((w) => w.level === 850)).toBe(true);
@@ -763,8 +763,6 @@ describe("Auto-Allocation 5-Mode System & Synchronization", () => {
         "GRAPES_GFS",
         "BEIJING_MR",
         "JAPAN_MR",
-        "NCEP_GFS",
-        "GERMAN_HR",
       ]);
 
       const eligible700 = getEligibleModelsForAllocation(composite500, 700);
@@ -818,8 +816,8 @@ describe("Auto-Allocation 5-Mode System & Synchronization", () => {
         "GRAPES_GFS",
         "BEIJING_MR",
         "JAPAN_MR",
-        "NCEP_GFS",
-        "GERMAN_HR",
+        "ECMWF_HR",
+        "GRAPES_GFS",
       ]);
     });
 
@@ -852,10 +850,10 @@ describe("Auto-Allocation 5-Mode System & Synchronization", () => {
       expect(allocatedModels).toEqual([
         "ECMWF_HR",
         "GRAPES_GFS",
-        "BEIJING_MR",
         "GRAPES_3KM",
-        "JAPAN_MR",
         "SHANGHAI_MR",
+        "BEIJING_MR",
+        "JAPAN_MR",
       ]);
     });
 

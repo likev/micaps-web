@@ -70,7 +70,8 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
         (candidate?.type === "station" && layer.type === "station" && (candidate?.model === layer.model || (isUpperAirStationLayer(candidate) === isUpperAirStationLayer(layer)))) ||
         (candidate?.model === layer.model && candidate?.element === layer.element &&
           Boolean(candidate?.derivedFrom) === Boolean(layer.derivedFrom) &&
-          (candidate?.level === undefined || layer?.level === undefined || candidate.level === layer.level))
+          (candidate?.level === undefined || layer?.level === undefined || candidate.level === layer.level) &&
+          (!candidate?.id || candidate.id === layer.id))
       );
       if (presetLayer) {
         presetLayer.config = { ...(presetLayer.config || {}), ...value };
@@ -287,7 +288,9 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
       const smooth = value.smooth !== undefined ? value.smooth : (layer.config?.smooth !== false);
 
       if (isUpper || isSurface) {
-        const geojson = layer?.stationsGeoJSON || getStationGeoJSON(map) || winObj?.stationsGeoJSON || appState.get("stationData");
+        const parentId = layer.derivedFrom;
+        const parentStn = parentId ? getLayerById(parentId, winObj) : null;
+        const geojson = layer?.stationsGeoJSON || parentStn?.stationsGeoJSON || getStationGeoJSON(map) || winObj?.stationsGeoJSON || appState.get("stationData");
         if (geojson && geojson.features && geojson.features.length >= 3) {
           if (isUpper) {
             const level = layer.level || winObj?.level || 500;
@@ -297,7 +300,7 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
                 geojson,
                 level,
                 layer.element,
-                { ...layer.config, layerId, smooth, levels },
+                { ...layer.config, layerId, derivedFrom: parentId, smooth, levels },
                 winObj
               );
             });
@@ -307,7 +310,7 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
                 map,
                 geojson,
                 layer.element,
-                { ...layer.config, layerId, smooth, levels },
+                { ...layer.config, layerId, derivedFrom: parentId, smooth, levels },
                 winObj
               );
             });

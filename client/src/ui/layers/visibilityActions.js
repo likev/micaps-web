@@ -182,13 +182,18 @@ export async function recalcAndRerenderLayer(map, layer, winObj) {
       syncLegendForLayer(rendered || layer, winObj, true);
     }
   } else if (isSurface && layer.type === "contour") {
-    const targetId = layer.id || `contour-surface-${(layer.element || "SLP").toLowerCase()}`;
+    const parentId = layer.derivedFrom;
+    const isDefaultParent = !parentId || parentId === "surface-obs";
+    const targetId = layer.id ||
+      (!isDefaultParent
+        ? `contour-surface-${(layer.element || "SLP").toLowerCase()}-${parentId}`
+        : `contour-surface-${(layer.element || "SLP").toLowerCase()}`);
     layer.id = targetId;
     layer.obsTime = winObj?.obsTime || layer.obsTime;
     layer.file = winObj?.obsTime || layer.file;
 
     const winLayers = getLayersForWindow(winObj);
-    const stnLayer = winLayers.find((l) => l.type === "station" && l.model === "SURFACE");
+    const stnLayer = (parentId ? winLayers.find((l) => l.id === parentId) : null) || winLayers.find((l) => l.type === "station" && l.model === "SURFACE");
     let stations = stnLayer?.stationsGeoJSON || (typeof getStationGeoJSON === "function" ? getStationGeoJSON(map) : null);
 
     if (!stations || !stations.features || stations.features.length < 3) {
@@ -336,7 +341,7 @@ export function handleVisibilityAction(map, layerId, value, layer, winObj) {
       if (!Array.isArray(snapshots)) continue;
       const snapshot = snapshots.find((entry) =>
         entry?.id === layerId ||
-        (entry?.type === "station" && layer.type === "station" && (entry?.model === layer.model || (!entry?.model && !layer.model)))
+        (!entry?.id && entry?.type === "station" && layer.type === "station" && (entry?.model === layer.model || (!entry?.model && !layer.model)))
       );
       if (snapshot) snapshot.visible = isVisible;
     }
@@ -344,9 +349,10 @@ export function handleVisibilityAction(map, layerId, value, layer, winObj) {
     if (Array.isArray(winObj.activeGroup?.layers)) {
       const pLayer = winObj.activeGroup.layers.find((candidate) =>
         candidate?.id === layerId ||
-        (candidate?.type === "station" && layer.type === "station" && (candidate?.model === layer.model || (!candidate?.model && !layer.model))) ||
+        (!candidate?.id && candidate?.type === "station" && layer.type === "station" && (candidate?.model === layer.model || (!candidate?.model && !layer.model))) ||
         (candidate?.model === layer.model && candidate?.element === layer.element &&
-          Boolean(candidate?.derivedFrom) === Boolean(layer.derivedFrom))
+          Boolean(candidate?.derivedFrom) === Boolean(layer.derivedFrom) &&
+          (!candidate?.id || candidate.id === layerId))
       );
       if (pLayer) {
         pLayer.visible = isVisible;

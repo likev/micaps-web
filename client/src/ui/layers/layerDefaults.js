@@ -32,6 +32,28 @@ export function isUpperAirStationLayer(layer) {
   return false;
 }
 
+export function isGenericSurfaceStationId(id) {
+  if (!id) return true;
+  const s = String(id).toLowerCase();
+  return s === "surface" || s === "station-surface" || s === "surface-obs" || s === "station" || s === "default";
+}
+
+export function isMatchingStationLayer(a, b) {
+  if (!a || !b) return false;
+  if (a.id && b.id && a.id === b.id) return true;
+  if (a.type !== "station" || b.type !== "station") return false;
+  const aUpper = isUpperAirStationLayer(a);
+  const bUpper = isUpperAirStationLayer(b);
+  if (aUpper !== bUpper) return false;
+  if (!aUpper) {
+    return isGenericSurfaceStationId(a.id) && isGenericSurfaceStationId(b.id);
+  }
+  const aLvl = a.level !== undefined ? String(a.level) : null;
+  const bLvl = b.level !== undefined ? String(b.level) : null;
+  if (aLvl && bLvl && aLvl !== bLvl) return false;
+  return (!a.id || !b.id || (a.id === b.id));
+}
+
 export function resolveDefaultScheme() {
   try {
     const s = localStorage.getItem("micaps-basemap-scheme");

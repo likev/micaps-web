@@ -52,12 +52,12 @@ export function handleRemoveAction(map, layerId, layer, win) {
     }
     if (Array.isArray(win?.derivedContourSnapshots)) {
       win.derivedContourSnapshots = win.derivedContourSnapshots.filter(
-        (s) => s.id !== layerId && !(s.model === layer.model && s.element === layer.element)
+        (s) => s.id !== layerId && !(s.model === layer.model && s.element === layer.element && (!s.derivedFrom || !layer.derivedFrom || s.derivedFrom === layer.derivedFrom))
       );
     }
     if (Array.isArray(win?.layerSnapshots)) {
       win.layerSnapshots = win.layerSnapshots.filter(
-        (s) => s.id !== layerId && !(s.model === layer.model && s.element === layer.element)
+        (s) => s.id !== layerId && !(s.model === layer.model && s.element === layer.element && (!s.derivedFrom || !layer.derivedFrom || s.derivedFrom === layer.derivedFrom))
       );
     }
 

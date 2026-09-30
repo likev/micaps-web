@@ -9,12 +9,10 @@ export const DEFAULT_LEVELS = [500, 850, 1000, 200, 700, 925, 400, 300, 100];
 export const DEFAULT_MODELS = [
   "ECMWF_HR",
   "GRAPES_GFS",
-  "BEIJING_MR",
   "GRAPES_3KM",
-  "JAPAN_MR",
   "SHANGHAI_MR",
-  "NCEP_GFS",
-  "GERMAN_HR",
+  "BEIJING_MR",
+  "JAPAN_MR",
 ];
 
 // Runtime cache of model levels queried from server (/api/catalog/levels)

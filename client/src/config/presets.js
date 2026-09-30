@@ -298,8 +298,8 @@ export function upsertDerivedLayerToPreset(presetId, layerEntry) {
 
   // Match existing derived layer in this preset by (model, element, derivedFrom) or id
   const existing = preset.layers.find((l) =>
-    (l.derivedFrom && l.model === model && l.element === elem) ||
-    l.id === layerEntry.id
+    l.id === layerEntry.id ||
+    (l.derivedFrom && layerEntry.derivedFrom && l.derivedFrom === layerEntry.derivedFrom && l.model === model && l.element === elem)
   );
 
   if (existing) {
@@ -330,7 +330,10 @@ export function removeDerivedLayerFromPreset(presetId, layerMatcher) {
   const idx = preset.layers.findIndex((l) => {
     if (!l.derivedFrom) return false;
     if (layerMatcher.id && l.id === layerMatcher.id) return true;
-    if (layerMatcher.model && layerMatcher.element && l.model === layerMatcher.model && l.element === layerMatcher.element) return true;
+    if (layerMatcher.model && layerMatcher.element && l.model === layerMatcher.model && l.element === layerMatcher.element) {
+      if (layerMatcher.derivedFrom && l.derivedFrom && layerMatcher.derivedFrom !== l.derivedFrom) return false;
+      return true;
+    }
     return false;
   });
 

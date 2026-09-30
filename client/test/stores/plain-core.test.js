@@ -216,10 +216,10 @@ describe("Plain-Core Stores (Phase 1 Foundations)", () => {
       expect(tab.windows.map((w) => w.model)).toEqual([
         "ECMWF_HR",
         "GRAPES_GFS",
-        "BEIJING_MR",
         "GRAPES_3KM",
-        "JAPAN_MR",
         "SHANGHAI_MR",
+        "BEIJING_MR",
+        "JAPAN_MR",
       ]);
 
       // 3. Step allocation (same cycle, increasing forecast leads: 24h, 36h, 48h, 60h, 72h, 84h)

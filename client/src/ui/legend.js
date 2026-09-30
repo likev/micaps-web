@@ -63,7 +63,27 @@ function renderLegendPanel(winOrId, panelId = "legend-panel") {
 
   panel.classList.remove("hidden");
   const itemsHTML = items.map((item) => {
-    const { element, zMin, zMax, unit, gradient, tickLabels, displayTitle } = item;
+    const { element, zMin, zMax, unit, gradient, tickLabels, ticks, displayTitle } = item;
+
+    const ticksHTML = (ticks && ticks.length > 0)
+      ? `
+        <div class="legend-ticks-container">
+          ${ticks.map((t) => `
+            <div class="legend-tick${t.isFirst ? ' tick-first' : ''}${t.isLast ? ' tick-last' : ''}" style="left: ${t.percent}%;">
+              <div class="legend-tick-mark"></div>
+              ${t.showLabel !== false ? `<span class="tick-label">${t.label}</span>` : ''}
+            </div>
+          `).join("")}
+        </div>
+        <div class="legend-ticks" style="display: none;">
+          ${(tickLabels || []).map((t) => `<span>${t}</span>`).join("")}
+        </div>
+      `
+      : `
+        <div class="legend-ticks">
+          ${(tickLabels || []).map((t) => `<span>${t}</span>`).join("")}
+        </div>
+      `;
 
     return `
       <div class="legend-item">
@@ -72,9 +92,7 @@ function renderLegendPanel(winOrId, panelId = "legend-panel") {
           <span class="legend-unit">${unit ? `(${unit})` : ""}</span>
         </div>
         <div class="legend-bar" role="img" aria-label="${element} color scale ${zMin ?? ''} to ${zMax ?? ''} ${unit}" style="background: ${gradient};"></div>
-        <div class="legend-ticks">
-          ${tickLabels.map((t) => `<span>${t}</span>`).join("")}
-        </div>
+        ${ticksHTML}
       </div>
     `;
   }).join("");
