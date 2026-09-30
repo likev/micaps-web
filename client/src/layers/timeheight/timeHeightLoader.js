@@ -1,5 +1,5 @@
 // timeHeightLoader.js - Single streaming NWP time-height profile fetcher & matrix builder
-import { createScalarSampler, createWindSampler, snapToGridNode } from "./timeHeightSampling.js";
+import { createScalarSampler, createWindSampler } from "./timeHeightSampling.js";
 import { loadHovmollerMatrix } from "../lineprofile/hovmollerLoader.js";
 import { buildTransectNodes } from "../lineprofile/lineUtils.js";
 

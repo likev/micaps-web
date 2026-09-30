@@ -18,7 +18,7 @@ import { loadWeatherField } from "./weatherLoader.js";
 import { loadObservationProduct } from "./derivedContours.js";
 import { schedulePrefetch } from "./prefetchService.js";
 import { loadPresetGroups, PRESET_GROUPS } from "../config/presets.js";
-import { resolveLayerTime, parseTimestamp, parseOffset, formatMicapsTimestamp } from "../utils/timeResolver.js";
+import { resolveLayerTime, parseTimestamp } from "../utils/timeResolver.js";
 import { fetchTree } from "../api/catalogApi.js";
 import { filterObsFilesByStep } from "../ui/timeline/timelineMath.js";
 

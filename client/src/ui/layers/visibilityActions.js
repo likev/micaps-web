@@ -2,7 +2,6 @@
 import {
   setLayerIsobandVisibility,
   setLayerIsolineVisibility,
-  setLayerIsolineLabelVisibility,
   getLayerDOMIds,
 } from "../../layers/contourLayer.js";
 import { setStationVisibility } from "../../layers/stationLayer.js";

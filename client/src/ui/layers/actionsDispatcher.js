@@ -1,6 +1,6 @@
 // actionsDispatcher.js - Main dispatcher for layer control events and mutations
 import { removeContourLayer, setLayerIsobandVisibility } from "../../layers/contourLayer.js";
-import { setStationVisibility, removeStationLayer } from "../../layers/stationLayer.js";
+import { removeStationLayer } from "../../layers/stationLayer.js";
 import { setRasterVisibility, removeRasterLayer } from "../../layers/rasterLayer.js";
 import { stopWindAnimation, removeGridWindBarbs } from "../../layers/windLayer.js";
 import { appState } from "../../store/appState.js";

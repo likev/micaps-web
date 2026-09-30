@@ -1,7 +1,6 @@
 // soundingAnalysis.js - In-browser objective analysis & contour calculation from sounding stations
 import * as griddata from "griddata";
 import {
-  renderCustomContourGeoJSON,
   isFeatureBold,
   setLayerIsobandVisibility,
   setLayerIsolineVisibility,

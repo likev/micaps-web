@@ -1,5 +1,5 @@
 // derivedContours.js - Observation station plot loading and objective analysis derived contours
-import { getActiveWindow, updateWindowTitle } from "../ui/tabWindowManager.js";
+import { getActiveWindow } from "../ui/tabWindowManager.js";
 import { getLayerById, addOrUpdateLayer, removeLayer, getLayersForWindow, syncLayerControlForWindow } from "../ui/layerControl.js";
 import { triggerStationStreamlines, triggerRasterOverlay } from "../ui/layerActions.js";
 import { renderStationWeatherPlots } from "../layers/stationLayer.js";

@@ -1,5 +1,5 @@
 // rasterLayer.js - Zero-copy Float32Array streaming to Canvas & MapLibre raster image (§8.8.3)
-import { getColor, createColorResolver } from "../utils/colormaps.js";
+import { createColorResolver } from "../utils/colormaps.js";
 
 // Active Blob URL tracking per raster source for memory leak prevention (§8.8.3).
 //

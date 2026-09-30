@@ -6,7 +6,7 @@
 // services still call after configuration reloads.
 import { PRESET_GROUPS, isDivider } from "../../config/presets.js";
 import { appState } from "../../store/appState.js";
-import { tabsState, getActiveTab, getActiveWindow, getCallbacks } from "./tabsStore.js";
+import { tabsState, getActiveWindow, getCallbacks } from "./tabsStore.js";
 import { updateWindowTitle } from "./windowTitles.js";
 
 export function refreshPresetControls() {

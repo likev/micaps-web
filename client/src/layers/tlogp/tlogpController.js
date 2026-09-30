@@ -5,7 +5,7 @@ import { TLogPPanel } from "./tlogpPanel.js";
 import { autoSaveLayerConfig } from "../../config/presets.js";
 import { showErrorToast } from "../../ui/toast.js";
 import { addOrUpdateLayer, getLayerById, getLayersForWindow, syncLayerControlForWindow } from "../../ui/layers/layerStore.js";
-import { getActiveWindow, tabsState } from "../../ui/tabs/tabsStore.js";
+import { getActiveWindow } from "../../ui/tabs/tabsStore.js";
 import { setProfileState, getProfileState, clearProfileState } from "../../lib/stores/profilesCore.js";
 
 class TLogPController {

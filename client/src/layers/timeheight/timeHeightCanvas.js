@@ -365,7 +365,11 @@ export class TimeHeightCanvasRenderer {
     ctx.strokeStyle = "#30363d";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect ? ctx.roundRect(badgeX, badgeY, textW + 12, 20, 4) : ctx.rect(badgeX, badgeY, textW + 12, 20);
+    if (ctx.roundRect) {
+      ctx.roundRect(badgeX, badgeY, textW + 12, 20, 4);
+    } else {
+      ctx.rect(badgeX, badgeY, textW + 12, 20);
+    }
     ctx.fill();
     ctx.stroke();
 

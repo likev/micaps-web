@@ -2,7 +2,7 @@
 import { generateDynamicForecastCycles } from "../../utils/timelineSync.js";
 import { DEFAULT_MOCK_OBS_FILES } from "../../config/presets.js";
 import { selectObsChipsWindow, filterObsFilesByStep } from "./timelineMath.js";
-import { parseTimestamp, resolveLayerTime, resolveAllLayersForStatus } from "../../utils/timeResolver.js";
+import { parseTimestamp, resolveLayerTime } from "../../utils/timeResolver.js";
 
 export const DEFAULT_PLAYBACK_MS = 1500;
 

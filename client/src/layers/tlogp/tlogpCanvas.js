@@ -2,9 +2,6 @@
 import {
   P_BOTTOM,
   P_TOP,
-  T_MIN,
-  T_MAX,
-  SKEW_FACTOR,
   pressureToY,
   yToPressure,
   tempAndPressureToX,

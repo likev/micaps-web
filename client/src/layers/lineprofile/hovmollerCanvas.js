@@ -241,7 +241,11 @@ export class HovmollerCanvasRenderer {
     const badgeY = y > pRect.y + 36 ? y - 26 : y + 14;
     ctx.fillStyle = "rgba(22,27,34,0.92)"; ctx.strokeStyle = "#30363d"; ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect ? ctx.roundRect(badgeX, badgeY, textW + 12, 20, 4) : ctx.rect(badgeX, badgeY, textW + 12, 20);
+    if (ctx.roundRect) {
+      ctx.roundRect(badgeX, badgeY, textW + 12, 20, 4);
+    } else {
+      ctx.rect(badgeX, badgeY, textW + 12, 20);
+    }
     ctx.fill(); ctx.stroke();
     ctx.fillStyle = "#e6edf3"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
     ctx.fillText(tooltip, badgeX + 6, badgeY + 10);

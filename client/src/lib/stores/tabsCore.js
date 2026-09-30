@@ -1,8 +1,6 @@
 import { getPeriodsForStep } from "./timelineMath.js";
 import { fetchLevels } from "../../api/catalogApi.js";
 import {
-  isRain12Element,
-  isWindowRain12,
   getRainAccumulationHours,
   getRainAccumulationHoursForWindow,
 } from "../../utils/rain12.js";
