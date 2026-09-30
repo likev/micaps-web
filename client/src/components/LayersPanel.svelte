@@ -11,11 +11,30 @@
   } from "../lib/stores/layers.svelte.js";
   import { getWindowById } from "../lib/stores/tabs.svelte.js";
   import LayerRow from "./LayerRow.svelte";
+  import StatusPanel from "./StatusPanel.svelte";
+  import { resolveLayerTime, parseTimestamp } from "../utils/timeResolver.js";
 
   let { winId = null, onLayerAction = null } = $props();
 
   let activeWinId = $derived(winId || getCurrentActiveWinId());
   let winObj = $derived(getWindowById(activeWinId));
+  let panelTab = $state("layers"); // "layers" or "status"
+  let autoHideStale = $state(false);
+
+  let cursorTime = $derived(
+    winObj?.wallClockCursor ||
+    (winObj?.obsTime ? parseTimestamp(winObj.obsTime) : null) ||
+    (winObj?.forecastCycle ? parseTimestamp({ cycle: winObj.forecastCycle, period: winObj.period ?? 0 }) : null) ||
+    (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
+    Date.now()
+  );
+
+  $effect(() => {
+    if (typeof window !== "undefined" && cursorTime) {
+      window.__MICAPS_CURSOR__ = cursorTime;
+    }
+  });
+
   let winTitle = $derived(
     winObj
       ? (() => {
@@ -66,6 +85,43 @@
     }
   }
 
+  let hiddenStaleLayers = $derived(
+    autoHideStale
+      ? layers.filter((l) => {
+          const res = resolveLayerTime(l, cursorTime);
+          return res.isHardStale || res.status === "hard-stale";
+        })
+      : []
+  );
+
+  function handleToggleAutoHide(val) {
+    autoHideStale = val;
+    if (val) {
+      for (const layer of layers) {
+        const res = resolveLayerTime(layer, cursorTime);
+        if (res.isHardStale || res.status === "hard-stale") {
+          if (layer.visible) {
+            layer._autoHiddenByStale = true;
+            layer.visible = false;
+            if (onLayerAction) {
+              onLayerAction({ action: "visibility", layer, value: false });
+            }
+          }
+        }
+      }
+    } else {
+      for (const layer of layers) {
+        if (layer._autoHiddenByStale) {
+          layer._autoHiddenByStale = false;
+          layer.visible = true;
+          if (onLayerAction) {
+            onLayerAction({ action: "visibility", layer, value: true });
+          }
+        }
+      }
+    }
+  }
+
   function handleRowAction(event) {
     if (onLayerAction) {
       onLayerAction(event);
@@ -77,7 +133,30 @@
   <div id="layer-control" class="panel layers-panel" role="region" aria-label="Layers Manager">
     <div class="panel-title">
       <div class="panel-title-left">
-        <span>Layers</span>
+        <div class="panel-subtabs" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={panelTab === "layers"}
+            class="subtab-btn"
+            class:active={panelTab === "layers"}
+            onclick={() => (panelTab = "layers")}
+          >
+            Layers
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={panelTab === "status"}
+            class="subtab-btn"
+            class:active={panelTab === "status"}
+            onclick={() => (panelTab = "status")}
+            title="Observation Age and Staleness Status (§2.5)"
+          >
+            ⏱ Time Status
+          </button>
+        </div>
+
         {#if winTitle}
           <span class="win-target-badge" title={winTitle}>{winTitle}</span>
         {/if}
@@ -85,18 +164,43 @@
       <span class="badge" id="layer-count">{count}</span>
     </div>
 
-    <div class="layers-manage-container" id="layers-list">
-      {#each layers as layer (layer.id)}
-        <LayerRow
-          {layer}
-          expanded={ui.expandedLayerId === layer.id}
-          onToggleExpanded={() => handleToggleExpanded(layer.id)}
-          onToggleVisible={() => handleToggleVisible(layer)}
-          onRemove={() => handleRemoveLayer(layer)}
-          onLayerAction={handleRowAction}
+    {#if autoHideStale && hiddenStaleLayers.length > 0}
+      <div class="stale-hidden-chip" title="Click to show stale layers">
+        <span class="stale-hidden-icon">⚠️</span>
+        <span class="stale-hidden-text">{hiddenStaleLayers.length} layer{hiddenStaleLayers.length > 1 ? "s" : ""} hidden (stale)</span>
+        <button
+          type="button"
+          class="btn-unhide-stale"
+          onclick={() => handleToggleAutoHide(false)}
+        >Show</button>
+      </div>
+    {/if}
+
+    {#if panelTab === "layers"}
+      <div class="layers-manage-container" id="layers-list">
+        {#each layers as layer (layer.id)}
+          <LayerRow
+            {layer}
+            {cursorTime}
+            expanded={ui.expandedLayerId === layer.id}
+            onToggleExpanded={() => handleToggleExpanded(layer.id)}
+            onToggleVisible={() => handleToggleVisible(layer)}
+            onRemove={() => handleRemoveLayer(layer)}
+            onLayerAction={handleRowAction}
+          />
+        {/each}
+      </div>
+    {:else}
+      <div class="layers-manage-container" id="layers-list">
+        <StatusPanel
+          {layers}
+          {cursorTime}
+          onToggleVisible={handleToggleVisible}
+          {autoHideStale}
+          onToggleAutoHide={handleToggleAutoHide}
         />
-      {/each}
-    </div>
+      </div>
+    {/if}
 
     <!-- Hidden compatibility elements for automated test suites (§11 R4) -->
     <div class="compat-hidden-tests" aria-hidden="true">
@@ -162,6 +266,40 @@
     overflow: hidden;
   }
 
+  .panel-subtabs {
+    display: inline-flex;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 2px;
+    gap: 2px;
+  }
+
+  .subtab-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary, #8b949e);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  .subtab-btn:hover {
+    color: var(--text-primary, #e6edf3);
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .subtab-btn.active {
+    color: #ffffff;
+    background: var(--accent-blue, #1f6feb);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
+
   .win-target-badge {
     font-size: 10px;
     font-weight: 600;
@@ -190,5 +328,28 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+  }
+
+  .stale-hidden-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 10px;
+    background: rgba(248, 81, 73, 0.12);
+    border: 1px solid rgba(248, 81, 73, 0.3);
+    border-radius: 6px;
+    font-size: 11px;
+    color: #f85149;
+  }
+
+  .btn-unhide-stale {
+    background: rgba(248, 81, 73, 0.2);
+    border: 1px solid rgba(248, 81, 73, 0.4);
+    color: #ff7b72;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 10px;
+    cursor: pointer;
   }
 </style>

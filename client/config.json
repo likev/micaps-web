@@ -1019,7 +1019,108 @@
     },
     {
       "divider": true,
-      "id": "div-3"
+      "id": "div-3",
+      "label": "Multi-Time Product Recipes"
+    },
+    {
+      "category": "Multi-Time Recipes",
+      "defaultLevel": null,
+      "hasLevel": false,
+      "id": "composite-convective-nowcast",
+      "isObservation": true,
+      "mode": "live",
+      "name": "Convective Nowcast (Multi-Cadence)",
+      "pacemaker": "surface-obs-nowcast",
+      "layers": [
+        {
+          "element": "PLOT_GLOBAL_3H",
+          "id": "surface-obs-nowcast",
+          "model": "SURFACE",
+          "name": "Surface Station Obs",
+          "offset": 0,
+          "policy": "latest-at",
+          "render": {
+            "showTemp": true,
+            "showWeather": true,
+            "showWind": true
+          },
+          "tolerance": "90m",
+          "type": "station"
+        },
+        {
+          "derivedFrom": "surface-obs-nowcast",
+          "element": "SLP",
+          "id": "contour-mslp-nowcast",
+          "model": "SURFACE",
+          "name": "Surface MSLP Analysis",
+          "offset": 0,
+          "policy": "latest-at",
+          "render": {
+            "lineColor": "#58a6ff",
+            "showFill": false,
+            "showLine": true
+          },
+          "tolerance": "3h",
+          "type": "contour"
+        },
+        {
+          "element": "TMP",
+          "id": "ecmwf-t850-meso",
+          "level": 850,
+          "model": "ECMWF_HR",
+          "name": "ECMWF 850 hPa Temp (Background)",
+          "offset": 0,
+          "period": 24,
+          "policy": "hold",
+          "render": {
+            "lineColor": "#f85149",
+            "showFill": false,
+            "showLine": true
+          },
+          "tolerance": "6h",
+          "type": "contour"
+        }
+      ]
+    },
+    {
+      "category": "Multi-Time Recipes",
+      "defaultLevel": null,
+      "hasLevel": false,
+      "id": "composite-radar-motion-compare",
+      "isObservation": true,
+      "mode": "review",
+      "name": "Surface Motion Compare (T0 vs T-30m)",
+      "pacemaker": "surface-obs-t0",
+      "layers": [
+        {
+          "element": "PLOT_GLOBAL_3H",
+          "id": "surface-obs-t0",
+          "model": "SURFACE",
+          "name": "Surface Obs (T+0)",
+          "offset": 0,
+          "policy": "nearest",
+          "render": {
+            "showTemp": true,
+            "showWind": true
+          },
+          "tolerance": "30m",
+          "type": "station"
+        },
+        {
+          "element": "PLOT_GLOBAL_3H",
+          "id": "surface-obs-lag30",
+          "model": "SURFACE",
+          "name": "Surface Obs (T-30m Compare)",
+          "offset": "-30m",
+          "policy": "nearest",
+          "render": {
+            "showTemp": false,
+            "showWind": true
+          },
+          "tolerance": "30m",
+          "type": "station"
+        }
+      ]
     }
   ]
 }

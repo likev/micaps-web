@@ -263,6 +263,10 @@ export function buildContourLayerMeta({ layerId, name, element, model, level, de
         } : null),
     color: lineColor,
     removable: true,
+    policy: options.policy,
+    tolerance: options.tolerance,
+    offset: options.offset,
+    sampleTimes: options.sampleTimes,
     config: {
       ...renderOptions,
       showRaster,

@@ -266,7 +266,38 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
     }
   }
 
+  const isSoftStale = Boolean(opts.isSoftStale || opts.status === "soft-stale");
+  const isHardStale = Boolean(opts.isHardStale || opts.status === "hard-stale");
+
+  if (isSoftStale) {
+    // 30% desaturation for soft-stale (§2.4)
+    for (let p = 0; p < data.length; p += 4) {
+      if (data[p + 3] > 0) {
+        const gray = 0.299 * data[p] + 0.587 * data[p + 1] + 0.114 * data[p + 2];
+        data[p] = Math.round(data[p] * 0.7 + gray * 0.3);
+        data[p + 1] = Math.round(data[p + 1] * 0.7 + gray * 0.3);
+        data[p + 2] = Math.round(data[p + 2] * 0.7 + gray * 0.3);
+      }
+    }
+  }
+
   ctx.putImageData(imgData, 0, 0);
+
+  if (isHardStale) {
+    // Diagonal hatch overlay for hard-stale (§2.4)
+    ctx.save();
+    ctx.strokeStyle = "rgba(248, 81, 73, 0.45)";
+    ctx.lineWidth = Math.max(2, Math.round(outWidth / 300));
+    const step = Math.max(16, Math.round(outWidth / 40));
+    const diagTotal = outWidth + outHeight;
+    for (let x = -outHeight; x < diagTotal; x += step) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x + outHeight, outHeight);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
 
   const coordinates = [
     [leftLon, topLat],     // Top-left
@@ -303,6 +334,8 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
     }
     urlStore.set(rasterSrcId, imageUrl);
 
+    const effectiveOpacity = isHardStale ? opacity * 0.4 : opacity;
+
     if (map.getSource(rasterSrcId)) {
       map.getSource(rasterSrcId).updateImage({
         url: imageUrl,
@@ -310,7 +343,7 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
       });
       if (map.getLayer(rasterLayerId)) {
         map.setLayoutProperty(rasterLayerId, "visibility", visible ? "visible" : "none");
-        map.setPaintProperty(rasterLayerId, "raster-opacity", opacity);
+        map.setPaintProperty(rasterLayerId, "raster-opacity", effectiveOpacity);
       }
     } else {
       map.addSource(rasterSrcId, {
@@ -329,7 +362,7 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
             visibility: visible ? "visible" : "none",
           },
           paint: {
-            "raster-opacity": opacity,
+            "raster-opacity": effectiveOpacity,
             "raster-fade-duration": 0,
           },
         },

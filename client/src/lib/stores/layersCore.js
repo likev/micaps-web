@@ -138,6 +138,10 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
       isExpanded: prevLayer.isExpanded !== undefined ? prevLayer.isExpanded : Boolean(layerDef.isExpanded),
       colormap: mergedColormap,
       config: mergedConfig,
+      policy: layerDef.policy || prevLayer.policy || mergedConfig.policy || "nearest",
+      tolerance: layerDef.tolerance || prevLayer.tolerance || mergedConfig.tolerance || null,
+      offset: layerDef.offset !== undefined ? layerDef.offset : (prevLayer.offset !== undefined ? prevLayer.offset : (mergedConfig.offset || 0)),
+      sampleTimes: layerDef.sampleTimes || prevLayer.sampleTimes || [],
     };
   } else {
     const baseConfig = buildBaseConfig(layerDef);
@@ -149,6 +153,10 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
       visible: layerDef.visible !== undefined ? layerDef.visible : true,
       isExpanded: Boolean(layerDef.isExpanded),
       color: layerDef.color || (layerDef.element === "HGT" ? "#58a6ff" : layerDef.element === "TMP" ? "#f85149" : (layerDef.element === "VOR" ? "#c678dd" : (layerDef.element === "DIV" ? "#56d4dd" : "#388bfd"))),
+      policy: layerDef.policy || baseConfig.policy || "nearest",
+      tolerance: layerDef.tolerance || baseConfig.tolerance || null,
+      offset: layerDef.offset !== undefined ? layerDef.offset : (baseConfig.offset || 0),
+      sampleTimes: layerDef.sampleTimes || [],
       ...layerDef,
       config: baseConfig,
     });

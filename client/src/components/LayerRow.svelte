@@ -2,11 +2,13 @@
   import { isWindRelated, isUpperAirStationLayer } from "../ui/layers/layerDefaults.js";
   import { buildLevelsFromInterval } from "../layers/contour/contourLevels.js";
   import { getPaletteCategory, listPaletteFiles } from "../utils/paletteLoader.js";
+  import { parseOffset, formatOffset, resolveLayerTime } from "../utils/timeResolver.js";
   import StationFilter from "./StationFilter.svelte";
 
   let {
     layer,
     expanded = false,
+    cursorTime = null,
     onToggleExpanded = null,
     onToggleVisible = null,
     onRemove = null,
@@ -65,6 +67,15 @@
       ? (layer.config.palettePath.startsWith("/") ? layer.config.palettePath : `/${layer.config.palettePath}`)
       : ""
   );
+
+  let resolvedStatus = $derived.by(() => {
+    const cursor = cursorTime ||
+      (layer.forecastCycle ? parseTimestamp({ cycle: layer.forecastCycle, period: layer.period ?? 0 }) : null) ||
+      (layer.cycle ? parseTimestamp({ cycle: layer.cycle, period: layer.period ?? 0 }) : null) ||
+      (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
+      Date.now();
+    return resolveLayerTime(layer, cursor);
+  });
 
   $effect(() => {
     if (!expanded || (!isContour && layer.type !== "wind")) return;
@@ -126,6 +137,22 @@
     {/if}
 
     <span class="layer-name" title={layer.name}>{layer.name}</span>
+
+    {#if resolvedStatus && resolvedStatus.actualTimeZ && resolvedStatus.actualTimeZ !== "--:--Z"}
+      <span
+        class="layer-row-time-chip"
+        class:status-desync={resolvedStatus.isDesync}
+        class:status-soft-stale={resolvedStatus.status === "soft-stale"}
+        class:status-hard-stale={resolvedStatus.isHardStale}
+        title="{resolvedStatus.statusText}: {resolvedStatus.actualTimeZ} ({resolvedStatus.ageStr})"
+      >
+        <span class="chip-status-dot" style:color={resolvedStatus.status === "desync" ? "#58a6ff" : (resolvedStatus.status === "soft-stale" ? "#d29922" : (resolvedStatus.isHardStale ? "#f85149" : "#3fb950"))}>
+          {resolvedStatus.statusIcon}
+        </span>
+        <span class="chip-time">{resolvedStatus.actualTimeZ}</span>
+        <span class="chip-age">{resolvedStatus.ageStr}</span>
+      </span>
+    {/if}
 
     <button
       type="button"
@@ -574,6 +601,95 @@
           </select>
         </div>
       {/if}
+
+      {#if layer.type !== "pmtiles"}
+        <div class="config-time-section">
+          <div class="time-section-header">
+            <span class="section-title">⏱ Observation Time & Matching</span>
+            {#if resolvedStatus && resolvedStatus.actualTimeZ && resolvedStatus.actualTimeZ !== "--:--Z"}
+              <span
+                class="resolved-pill"
+                class:pill-desync={resolvedStatus.isDesync}
+                class:pill-soft-stale={resolvedStatus.status === "soft-stale"}
+                class:pill-hard-stale={resolvedStatus.isHardStale}
+                title={resolvedStatus.statusText}
+              >
+                <span class="status-indicator">{resolvedStatus.statusIcon}</span>
+                {resolvedStatus.actualTimeZ} ({resolvedStatus.ageStr})
+              </span>
+            {/if}
+          </div>
+
+          <div class="config-row config-row-wrap">
+            <label class="inline-control">
+              <span>Policy</span>
+              <select
+                class="sel-time-policy"
+                value={layer.policy || layer.config?.policy || "nearest"}
+                onchange={(e) => {
+                  handleConfigChange("policy", e.target.value);
+                  layer.policy = e.target.value;
+                }}
+                title="Time matching policy per §2.2"
+              >
+                <option value="nearest">Nearest (closest sample either side)</option>
+                <option value="latest-at">Latest-at (causal: sample ≤ T)</option>
+                <option value="hold">Hold (keep showing until superseded)</option>
+                <option value="interpolate">Interpolate (smooth fields)</option>
+              </select>
+            </label>
+
+            <label class="inline-control">
+              <span>Tolerance</span>
+              <select
+                class="sel-time-tolerance"
+                value={String(layer.tolerance ?? layer.config?.tolerance ?? "default")}
+                onchange={(e) => {
+                  const val = e.target.value === "default" ? null : e.target.value;
+                  handleConfigChange("tolerance", val);
+                  layer.tolerance = val;
+                }}
+                title="Tolerance window before layer goes stale (§2.2)"
+              >
+                <option value="default">Element Default</option>
+                <option value="5m">5 min</option>
+                <option value="10m">10 min (Radar)</option>
+                <option value="20m">20 min (Satellite)</option>
+                <option value="30m">30 min</option>
+                <option value="1h">1 hour (METAR)</option>
+                <option value="3h">3 hours (Synoptic/MSLP)</option>
+                <option value="6h">6 hours (Sounding/Meso)</option>
+                <option value="12h">12 hours</option>
+                <option value="24h">24 hours</option>
+                <option value="unlimited">Unlimited</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="config-row config-row-wrap offset-row">
+            <label class="inline-control wide-control">
+              <span>Time Offset (Desync)</span>
+              <input
+                type="text"
+                class="input-time-offset"
+                value={formatOffset(layer.offset ?? layer.config?.offset ?? 0)}
+                placeholder="e.g. T - 30m, T + 1h"
+                onchange={(e) => {
+                  const parsed = parseOffset(e.target.value);
+                  handleConfigChange("offset", parsed);
+                  layer.offset = parsed;
+                }}
+                title="Intentional time offset (§2.7). Badge turns blue so intentional desync is never confused with staleness."
+              />
+            </label>
+            <div class="offset-quick-buttons">
+              <button type="button" class="btn-offset-preset" onclick={() => { handleConfigChange("offset", -30); layer.offset = -30; }}>−30m</button>
+              <button type="button" class="btn-offset-preset" onclick={() => { handleConfigChange("offset", -60); layer.offset = -60; }}>−1h</button>
+              <button type="button" class="btn-offset-preset" onclick={() => { handleConfigChange("offset", 0); layer.offset = 0; }}>Sync (0)</button>
+            </div>
+          </div>
+        </div>
+      {/if}
     </div>
   {/if}
 </div>
@@ -885,4 +1001,153 @@
     gap: 4px;
     white-space: nowrap;
   }
+
+  .layer-row-time-chip {
+    font-size: 9.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-secondary, #8b949e);
+    font-weight: 500;
+    margin-left: auto;
+    margin-right: 4px;
+    white-space: nowrap;
+    border: 1px solid transparent;
+  }
+
+  .layer-row-time-chip.status-desync {
+    background: rgba(56, 139, 253, 0.15);
+    border-color: rgba(56, 139, 253, 0.4);
+    color: #79c0ff;
+  }
+
+  .layer-row-time-chip.status-soft-stale {
+    background: rgba(210, 153, 34, 0.15);
+    border-color: rgba(210, 153, 34, 0.35);
+    color: #e3b341;
+  }
+
+  .layer-row-time-chip.status-hard-stale {
+    background: rgba(248, 81, 73, 0.18);
+    border-color: rgba(248, 81, 73, 0.45);
+    color: #ff7b72;
+  }
+
+  .chip-status-dot {
+    font-size: 8px;
+    line-height: 1;
+  }
+
+  .chip-age {
+    opacity: 0.85;
+  }
+
+  .config-time-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    margin-top: 6px;
+  }
+
+  .time-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary, #e6edf3);
+  }
+
+  .resolved-pill {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 1px 7px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary, #8b949e);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid transparent;
+  }
+
+  .resolved-pill.pill-desync {
+    background: rgba(56, 139, 253, 0.2);
+    border-color: rgba(56, 139, 253, 0.5);
+    color: #79c0ff;
+  }
+
+  .resolved-pill.pill-soft-stale {
+    background: rgba(210, 153, 34, 0.2);
+    border-color: rgba(210, 153, 34, 0.45);
+    color: #e3b341;
+  }
+
+  .resolved-pill.pill-hard-stale {
+    background: rgba(248, 81, 73, 0.22);
+    border-color: rgba(248, 81, 73, 0.5);
+    color: #ff7b72;
+  }
+
+  .status-indicator {
+    font-size: 9px;
+  }
+
+  .offset-row {
+    align-items: flex-end;
+  }
+
+  .input-time-offset {
+    background: var(--bg-secondary, #161b22);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    color: var(--text-primary, #e6edf3);
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 11px;
+    outline: none;
+    font-family: var(--font-mono, monospace);
+  }
+
+  .offset-quick-buttons {
+    display: flex;
+    gap: 4px;
+    padding-bottom: 1px;
+  }
+
+  .btn-offset-preset {
+    background: #21262d;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #c9d1d9;
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 10px;
+    cursor: pointer;
+    font-family: var(--font-mono, monospace);
+    transition: background 0.15s ease;
+  }
+
+  .btn-offset-preset:hover {
+    background: #30363d;
+    color: #ffffff;
+    border-color: #58a6ff;
+  }
+
+  .sel-time-policy,
+  .sel-time-tolerance {
+    background: var(--bg-secondary, #161b22);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    color: var(--text-primary, #e6edf3);
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 11px;
+    outline: none;
+  }
 </style>
+

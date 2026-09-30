@@ -25,6 +25,7 @@ export function getState(map) {
       visible: true,
       activeVisibleStations: [],
       renderedCount: 0,
+      stationLayers: new Map(), // layerId -> { geojson, visible, config, id }
       config: {
         showTemp: true,
         showDewpoint: true,

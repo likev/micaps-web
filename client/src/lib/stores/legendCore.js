@@ -2,6 +2,8 @@
 import { getColormap, getCSSGradient } from "../../utils/colormaps.js";
 import { formatElementUnit } from "../../utils/formatters.js";
 import { getWindowById } from "./tabsCore.js";
+import { getLayersForWindow } from "./layersCore.js";
+import { resolveLayerTime } from "../../utils/timeResolver.js";
 
 const windowLegends = new Map();
 
@@ -51,10 +53,11 @@ export function buildLegendItems(winOrId, legendsMap = windowLegends, winResolve
   if (!elMap || elMap.size === 0) return [];
 
   let livePrefix = null;
+  let liveWin = null;
   const resolver = winResolver || defaultWinResolver || getWindowById;
   if (typeof resolver === "function") {
     try {
-      const liveWin = resolver(winId);
+      liveWin = resolver(winId);
       if (liveWin && typeof liveWin.winIdx === "number") livePrefix = `W${liveWin.winIdx + 1}`;
     } catch {}
   }
@@ -62,6 +65,8 @@ export function buildLegendItems(winOrId, legendsMap = windowLegends, winResolve
     const m = winId.match(/win-(\d+)/);
     if (m) livePrefix = `W${parseInt(m[1], 10) + 1}`;
   }
+
+  const layers = getLayersForWindow(winId) || [];
 
   return Array.from(elMap.values()).map((item) => {
     const { element, colormap, zMin, zMax } = item;
@@ -71,10 +76,6 @@ export function buildLegendItems(winOrId, legendsMap = windowLegends, winResolve
 
     let tickLabels = [];
     if (palette && palette.length > 0) {
-      // Fixed-physical-scale elements (RH 0..100%, TMP, WIND, RAIN, DTD) are
-      // rendered against an absolute palette, so the legend must show the
-      // palette scale — never transient data min/max (e.g. RH stats -1..115
-      // from supersaturation/overshoot would draw ticks past the scale).
       const fixedScale = new Set(["RH", "TMP", "TD", "DTD", "WIND", "RAIN", "RAIN6"]);
       if (!fixedScale.has(element) && zMin !== undefined && zMax !== undefined && zMax > zMin) {
         if (element === "HGT") {
@@ -97,7 +98,56 @@ export function buildLegendItems(winOrId, legendsMap = windowLegends, winResolve
       }
     }
 
-    const displayTitle = (livePrefix || item.winPrefix) ? `[${livePrefix || item.winPrefix}] ${element}` : element;
+    const layer = (item.layerId ? layers.find((l) => l.id === item.layerId) : null) ||
+      layers.find((l) => (l.element && l.element.toUpperCase() === element) || l.id === item.layerId) || null;
+
+    const titleText = item.name || (layers.filter((l) => l.element && l.element.toUpperCase() === element).length > 1 ? layer?.name : null) || element;
+    const displayTitle = (livePrefix || item.winPrefix) ? `[${livePrefix || item.winPrefix}] ${titleText}` : titleText;
+
+    // Part 2: Time resolution & staleness for legend item (§2.4)
+    let timeBadge = item.timeBadge || null;
+    let resolvedTimeZ = item.resolvedTimeZ || null;
+    let ageStr = item.ageStr || null;
+    let status = item.status || "current";
+    let statusIcon = item.statusIcon || "●";
+    let statusText = item.statusText || "Current";
+    let isStale = Boolean(item.isStale);
+    let isHardStale = Boolean(item.isHardStale);
+    let isDesync = Boolean(item.isDesync);
+
+    if (layer) {
+      if (layer.resolved) {
+        resolvedTimeZ = layer.resolved.actualTimeZ;
+        ageStr = layer.resolved.ageStr;
+        timeBadge = `${resolvedTimeZ} (${ageStr})`;
+        status = layer.resolved.status;
+        statusIcon = layer.resolved.statusIcon;
+        statusText = layer.resolved.statusText;
+        isStale = layer.resolved.isStale;
+        isHardStale = layer.resolved.isHardStale;
+        isDesync = layer.resolved.isDesync;
+      } else if (liveWin) {
+        const cursor = liveWin.obsTime || (liveWin.period !== undefined ? { cycle: liveWin.forecastCycle, period: liveWin.period } : Date.now());
+        const res = resolveLayerTime(layer, cursor);
+        resolvedTimeZ = res.actualTimeZ;
+        ageStr = res.ageStr;
+        timeBadge = `${resolvedTimeZ} (${ageStr})`;
+        status = res.status;
+        statusIcon = res.statusIcon;
+        statusText = res.statusText;
+        isStale = res.isStale;
+        isHardStale = res.isHardStale;
+        isDesync = res.isDesync;
+      }
+    }
+
+    const statusColors = {
+      current: "#3fb950",
+      "soft-stale": "#d29922",
+      "hard-stale": "#f85149",
+      desync: "#58a6ff",
+    };
+    const statusColor = statusColors[status] || "#3fb950";
 
     return {
       element,
@@ -108,11 +158,22 @@ export function buildLegendItems(winOrId, legendsMap = windowLegends, winResolve
       gradient: grad,
       tickLabels,
       displayTitle,
+      timeBadge,
+      resolvedTimeZ,
+      ageStr,
+      status,
+      statusIcon,
+      statusColor,
+      statusText,
+      isStale,
+      isHardStale,
+      isDesync,
+      layerId: layer?.id || item.layerId || null,
     };
   });
 }
 
-export function updateLegend(element = "TMP", colormap = null, zMin = undefined, zMax = undefined, win = null) {
+export function updateLegend(element = "TMP", colormap = null, zMin = undefined, zMax = undefined, win = null, extra = {}) {
   const normElement = (element || "TMP").toUpperCase();
   const resolver = defaultWinResolver || getWindowById;
   const winObj = typeof win === "string" ? (typeof resolver === "function" ? resolver(win) : null) : win;
@@ -126,17 +187,65 @@ export function updateLegend(element = "TMP", colormap = null, zMin = undefined,
     const m = winId.match(/win-(\d+)/);
     if (m) winPrefix = `W${parseInt(m[1], 10) + 1}`;
   }
-  elMap.set(normElement, { element: normElement, colormap, zMin, zMax, winPrefix });
+  const extraObj = (typeof extra === "object" && extra !== null) ? extra : {};
+  let timeBadge = extraObj.timeBadge;
+  if (!timeBadge && extraObj.resolved?.actualTimeZ) {
+    timeBadge = `${extraObj.resolved.actualTimeZ} (${extraObj.resolved.ageStr || "±0m"})`;
+  }
+
+  // Key by layerId when provided to avoid collapsing multi-time layers of the same element (§2.7)
+  const layerId = extraObj.layerId || extraObj.id || null;
+  const legendKey = layerId || normElement;
+
+  elMap.set(legendKey, {
+    key: legendKey,
+    layerId,
+    element: normElement,
+    colormap,
+    zMin,
+    zMax,
+    winPrefix,
+    ...extraObj,
+    timeBadge: timeBadge || extraObj.timeBadge || null,
+    resolvedTimeZ: extraObj.resolvedTimeZ || extraObj.resolved?.actualTimeZ || null,
+    ageStr: extraObj.ageStr || extraObj.resolved?.ageStr || null,
+    status: extraObj.status || extraObj.resolved?.status || "current",
+    statusIcon: extraObj.statusIcon || extraObj.resolved?.statusIcon || "●",
+    statusText: extraObj.statusText || extraObj.resolved?.statusText || "Current",
+    isStale: extraObj.isStale !== undefined ? extraObj.isStale : (extraObj.resolved?.isStale ?? false),
+    isHardStale: extraObj.isHardStale !== undefined ? extraObj.isHardStale : (extraObj.resolved?.isHardStale ?? false),
+    isDesync: extraObj.isDesync !== undefined ? extraObj.isDesync : (extraObj.resolved?.isDesync ?? false),
+  });
   notifyLegendChanged(winId);
 }
 
-export function removeLegend(element, win = null) {
-  const normElement = (element || "").toUpperCase();
+export function removeLegend(elementOrId, win = null) {
+  if (!elementOrId) return;
   const winId = typeof win === "string" ? win : (win?.id || "default");
   if (windowLegends.has(winId)) {
-    windowLegends.get(winId).delete(normElement);
-    if (element && element !== normElement) {
-      windowLegends.get(winId).delete(element);
+    const elMap = windowLegends.get(winId);
+    let matched = false;
+    if (elMap.has(elementOrId)) {
+      elMap.delete(elementOrId);
+      matched = true;
+    }
+    for (const [k, v] of elMap.entries()) {
+      if (v.layerId === elementOrId || k === elementOrId) {
+        elMap.delete(k);
+        matched = true;
+      }
+    }
+    // Only fall back to element-name matching if elementOrId did not match a specific layer ID
+    if (!matched) {
+      const norm = String(elementOrId).toUpperCase();
+      if (elMap.has(norm)) {
+        elMap.delete(norm);
+      }
+      for (const [k, v] of elMap.entries()) {
+        if (v.element === norm || v.element === elementOrId) {
+          elMap.delete(k);
+        }
+      }
     }
   }
   notifyLegendChanged(winId);

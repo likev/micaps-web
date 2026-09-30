@@ -1,4 +1,5 @@
 // layerDefaults.js - Default configurations and factories for weather and basemap layers
+import { getDefaultToleranceForLayer } from "../../utils/timeResolver.js";
 
 export function isWindRelated(layer) {
   if (!layer) return false;
@@ -283,6 +284,9 @@ export function buildBaseConfig(layerDef) {
     palettePath: layerDef.config?.palettePath || null,
     interval: layerDef.config?.interval || null,
     levels: layerDef.config?.levels || null,
+    policy: layerDef.policy || layerDef.config?.policy || "nearest",
+    tolerance: layerDef.tolerance || layerDef.config?.tolerance || getDefaultToleranceForLayer(layerDef),
+    offset: layerDef.offset !== undefined ? layerDef.offset : (layerDef.config?.offset !== undefined ? layerDef.config.offset : 0),
     ...(layerDef.config || {}),
   };
 }

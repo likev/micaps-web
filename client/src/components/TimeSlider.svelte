@@ -20,6 +20,9 @@
   import { getPeriodsForStep, filterObsFilesByStep, selectObsChipsWindow, findClosestFile } from "../lib/stores/timelineMath.js";
   import { stepWindowTimeline } from "../lib/services/appWorkflow.js";
   import { getWindowById } from "../lib/stores/tabs.svelte.js";
+  import { getLayersForWindow } from "../lib/stores/layersCore.js";
+  import { parseTimestamp } from "../utils/timeResolver.js";
+  import MultiTrackTimeline from "./timeline/MultiTrackTimeline.svelte";
   import {
     isRain12Element,
     isWindowRain12,
@@ -81,6 +84,7 @@
   let currentCycle = $derived(timeline.currentInitCycle || "");
 
   let activeWin = $derived(getWindowById(winId) || null);
+  let layers = $derived(getLayersForWindow(winId) || []);
   let rainAccumHours = $derived(
     getRainAccumulationHoursForWindow(activeWin) ??
     getRainAccumulationHours(app.element) ??
@@ -241,6 +245,50 @@
     }
   }
 
+  function handleMultiTrackTimeChange(payload) {
+    if (!payload || !payload.cursorTime) return;
+    const targetMs = payload.cursorTime;
+    timeline.wallClockCursor = targetMs;
+
+    if (isObs) {
+      if (obsFiles.length > 0) {
+        let closestIdx = 0;
+        let minDiff = Infinity;
+        obsFiles.forEach((file, idx) => {
+          const ts = parseTimestamp(file);
+          if (ts !== null) {
+            const diff = Math.abs(ts - targetMs);
+            if (diff < minDiff) {
+              minDiff = diff;
+              closestIdx = idx;
+            }
+          }
+        });
+        timeline.currentObsIdx = closestIdx;
+        const file = obsFiles[closestIdx];
+        emitTimeChange({ isObs: true, file, cursorTime: targetMs, _seq: ++timeline.periodStepSeq });
+      }
+    } else {
+      if (periods.length > 0 && currentCycle) {
+        const cycleTs = parseTimestamp(currentCycle) || Date.now();
+        const diffHours = (targetMs - cycleTs) / (3600 * 1000);
+        let closestIdx = 0;
+        let minDiff = Infinity;
+        periods.forEach((p, idx) => {
+          const diff = Math.abs(p - diffHours);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestIdx = idx;
+          }
+        });
+        timeline.currentPeriodIdx = closestIdx;
+        const targetP = periods[closestIdx];
+        app.period = targetP;
+        emitTimeChange({ period: targetP, cycle: currentCycle, cursorTime: targetMs, _seq: ++timeline.periodStepSeq });
+      }
+    }
+  }
+
   function togglePlay() {
     if (playback.isPlaying) {
       pause();
@@ -268,7 +316,8 @@
   }
 
   function handleSpeedChange(e) {
-    const spd = parseInt(e.target.value, 10);
+    const val = typeof e === "number" ? e : (e?.target?.value !== undefined ? e.target.value : e);
+    const spd = parseInt(val, 10);
     const next = Number.isFinite(spd) ? spd : DEFAULT_PLAYBACK_MS;
     playback.speed = next;
     app.playbackSpeed = next;
@@ -316,6 +365,23 @@
 </script>
 
 {#if ui.timelineVisible && !ui.configOpen}
+  {#if timeline.multiTrackExpanded}
+    <MultiTrackTimeline
+      {winId}
+      {layers}
+      {timeline}
+      isPlaying={playback.isPlaying}
+      speed={playback.speed}
+      onTogglePlay={togglePlay}
+      onStep={handleStep}
+      onSpeedChange={handleSpeedChange}
+      onToggleCollapse={() => {
+        timeline.multiTrackExpanded = false;
+      }}
+      onTimeChange={handleMultiTrackTimeChange}
+    />
+  {/if}
+
   <footer id="sl-timeslider" class="timeslider-container" aria-label="Timeline and Playback Controls">
     <div class="timeline-stepper">
       <button
@@ -387,6 +453,19 @@
           <option value="750">2.0x</option>
         </select>
       </div>
+
+      <button
+        type="button"
+        id="sl-btn-toggle-multitrack"
+        class="multitrack-toggle-btn"
+        class:active={timeline.multiTrackExpanded}
+        title={timeline.multiTrackExpanded ? "Collapse Multi-Track DAW View" : "Expand Multi-Track DAW Lanes (§2.3)"}
+        onclick={() => {
+          timeline.multiTrackExpanded = !timeline.multiTrackExpanded;
+        }}
+      >
+        {timeline.multiTrackExpanded ? "⤡ Single Strip" : "⤢ DAW Lanes"}
+      </button>
     </div>
 
     <div class="timeline-body">
@@ -572,6 +651,33 @@
     outline: none;
     cursor: pointer;
     transition: all 0.15s ease;
+  }
+
+  .multitrack-toggle-btn {
+    background: #21262d;
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.18));
+    color: #c9d1d9;
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-left: 8px;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+  }
+
+  .multitrack-toggle-btn:hover {
+    background: #30363d;
+    color: #ffffff;
+    border-color: #58a6ff;
+  }
+
+  .multitrack-toggle-btn.active {
+    background: rgba(56, 139, 253, 0.2);
+    border-color: rgba(56, 139, 253, 0.6);
+    color: #79c0ff;
+    box-shadow: 0 0 8px rgba(56, 139, 253, 0.3);
   }
 
   .step-length-select:hover,

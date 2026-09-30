@@ -489,4 +489,69 @@ describe("Direct HTML5 Canvas 2D Station Plotting (§8.9 & §8.8)", () => {
     expect(getStationGeoJSON(null)).toBeNull();
     expect(globalThis.__STATION_LAYER__.getTotalCount()).toBe(0);
   });
+
+  test("supports multi-layer station rendering with independent visibility, teardown, and staleness visuals", () => {
+    const map = createMockMapWithContainer(ctx);
+    const geojson1 = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [116.4, 39.9] },
+          properties: { station_id: "54511", temperature: 22.0 },
+        },
+      ],
+    };
+    const geojson2 = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [121.5, 31.2] },
+          properties: { station_id: "58362", temperature: 28.5 },
+        },
+      ],
+    };
+
+    // Render Layer 1 (T0, fresh)
+    renderStationWeatherPlots(map, geojson1, true, { isSoftStale: false, isHardStale: false }, "stn-t0");
+    // Render Layer 2 (T-30m, hard-stale)
+    renderStationWeatherPlots(map, geojson2, true, { isSoftStale: false, isHardStale: true }, "stn-t30m");
+
+    // Both layers coexist on map canvas
+    expect(globalThis.__STATION_LAYER__.getVisibleCount(map)).toBe(2);
+
+    // Hide only stn-t0
+    setStationVisibility(map, false, "stn-t0");
+    expect(globalThis.__STATION_LAYER__.getVisibleCount(map)).toBe(1);
+    expect(getStationCanvas(map).style.display).toBe("block");
+
+    // Hide stn-t30m as well -> canvas style display becomes 'none'
+    setStationVisibility(map, false, "stn-t30m");
+    expect(getStationCanvas(map).style.display).toBe("none");
+
+    // Re-show stn-t30m -> canvas style display becomes 'block'
+    setStationVisibility(map, true, "stn-t30m");
+    expect(getStationCanvas(map).style.display).toBe("block");
+    expect(globalThis.__STATION_LAYER__.getVisibleCount(map)).toBe(1);
+
+    // Visibility toggle with unknown layerId must not affect existing layers
+    setStationVisibility(map, false, "non-existent-layer");
+    expect(globalThis.__STATION_LAYER__.getVisibleCount(map)).toBe(1);
+    expect(getStationCanvas(map).style.display).toBe("block");
+
+    // Removal with unknown layerId must not destroy or remove existing layers
+    removeStationLayer(map, "non-existent-layer");
+    expect(globalThis.__STATION_LAYER__.getVisibleCount(map)).toBe(1);
+    expect(getStationCanvas(map).style.display).toBe("block");
+
+    // Remove stn-t30m
+    removeStationLayer(map, "stn-t30m");
+    expect(globalThis.__STATION_LAYER__.getVisibleCount(map)).toBe(0);
+
+    // Remove stn-t0 -> canvas fully cleaned up
+    removeStationLayer(map, "stn-t0");
+    expect(map.container.children.length).toBe(0);
+    expect(getStationCanvas(map)).toBeNull();
+  });
 });

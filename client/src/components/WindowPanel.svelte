@@ -1,5 +1,7 @@
 <script>
   import MapViewport from "../map/MapViewport.svelte";
+  import { getLayersForWindow } from "../lib/stores/layersCore.js";
+  import { resolveAllLayersForStatus, parseTimestamp } from "../utils/timeResolver.js";
 
   let {
     win,
@@ -10,6 +12,24 @@
     onMapCreated = null,
     onMapDestroyed = null,
   } = $props();
+
+  let effectiveCursor = $derived.by(() => {
+    return win?.wallClockCursor ||
+      (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
+      (win?.forecastCycle ? parseTimestamp({ cycle: win.forecastCycle, period: win.period ?? 0 }) : null) ||
+      (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
+      Date.now();
+  });
+
+  $effect(() => {
+    if (isActive && typeof window !== "undefined" && effectiveCursor) {
+      window.__MICAPS_CURSOR__ = effectiveCursor;
+    }
+  });
+
+  let layers = $derived(getLayersForWindow(win?.id) || []);
+  let resolvedLayers = $derived(resolveAllLayersForStatus(layers, effectiveCursor));
+  let hardStaleLayers = $derived(resolvedLayers.filter((r) => r.isHardStale && r.layer?.visible !== false));
 
   let winTitle = $derived.by(() => {
     if (!win) return "";
@@ -84,10 +104,39 @@
       {onMapCreated}
       onMapDestroyed={() => onMapDestroyed && onMapDestroyed(win)}
     />
+
+    {#if hardStaleLayers.length > 0}
+      <div class="stale-viewport-hatch" aria-hidden="true"></div>
+      <div class="stale-corner-badges" role="status" aria-label="Stale Layer Warnings">
+        {#each hardStaleLayers as item (item.layer.id)}
+          <div class="stale-badge" title="Hard stale: observation is {Math.abs(item.ageMinutes)}m old">
+            <span class="stale-badge-icon">⚠️</span>
+            <span class="stale-badge-text">{item.layer.name}: {Math.abs(item.ageMinutes)} min old (stale)</span>
+          </div>
+        {/each}
+      </div>
+    {/if}
   </div>
 </div>
 
 <style>
+  .stale-viewport-hatch {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 405;
+    background: repeating-linear-gradient(
+      -45deg,
+      rgba(248, 81, 73, 0.05),
+      rgba(248, 81, 73, 0.05) 10px,
+      rgba(0, 0, 0, 0) 10px,
+      rgba(0, 0, 0, 0) 20px
+    );
+  }
+
   .window-panel {
     display: flex;
     flex-direction: column;
@@ -212,4 +261,42 @@
     height: 100%;
     position: relative;
   }
+
+  .stale-corner-badges {
+    position: absolute;
+    top: 50px;
+    right: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 400;
+    pointer-events: none;
+    max-width: 280px;
+  }
+
+  .stale-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: rgba(30, 16, 20, 0.88);
+    border: 1px solid rgba(248, 81, 73, 0.6);
+    backdrop-filter: blur(8px);
+    color: #ff7b72;
+    font-size: 11px;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  }
+
+  .stale-badge-icon {
+    font-size: 12px;
+  }
+
+  .stale-badge-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 </style>
+

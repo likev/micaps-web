@@ -412,12 +412,12 @@ export function handleVisibilityAction(map, layerId, value, layer, winObj) {
     }
   } else if (layer.type === "station") {
     if (isVisible) {
-      setStationVisibility(map, true);
+      setStationVisibility(map, true, layer?.id);
       if (layer.config?.showStreamlines) {
         triggerStationStreamlines(map, layer, winObj);
       }
     } else {
-      setStationVisibility(map, false);
+      setStationVisibility(map, false, layer?.id);
       if (layer.config?.showStreamlines) {
         stopWindAnimation(map);
       }

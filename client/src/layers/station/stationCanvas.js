@@ -67,18 +67,27 @@ export function getStationCanvas(map) {
   return getState(map).canvas || null;
 }
 
-export function renderStationWeatherPlots(map, geojson, visible = true, config = null) {
+export function renderStationWeatherPlots(map, geojson, visible = true, config = null, layerId = null) {
   if (!map || !geojson || !geojson.features) return;
   setLastStationGeoJSON(geojson);
   const state = getState(map);
+  const id = layerId || config?.layerId || config?.id || "default";
   state.geojson = geojson;
   if (visible !== undefined) state.visible = Boolean(visible);
   if (map.__basemapScheme && !config?.__themeId) {
     state.config.__themeId = map.__basemapScheme;
   }
+  const mergedConfig = { ...state.config, ...(config || {}), layerId: id };
   if (config) {
-    state.config = { ...state.config, ...config };
+    state.config = mergedConfig;
   }
+  if (!state.stationLayers) state.stationLayers = new Map();
+  state.stationLayers.set(id, {
+    id,
+    geojson,
+    visible: visible !== undefined ? Boolean(visible) : true,
+    config: mergedConfig,
+  });
 
   ensureStationCanvas(map);
 
@@ -152,7 +161,19 @@ export function drawStationCanvas(map) {
     state.config.__themeId = map.__basemapScheme;
   }
 
-  if (!state.visible || !state.geojson || !state.geojson.features || state.geojson.features.length === 0) {
+  // Collect layers to render
+  const layersToDraw = [];
+  if (state.stationLayers && state.stationLayers.size > 0) {
+    for (const l of state.stationLayers.values()) {
+      if (l.visible && l.geojson?.features?.length > 0) {
+        layersToDraw.push(l);
+      }
+    }
+  } else if (state.visible && state.geojson?.features?.length > 0) {
+    layersToDraw.push({ id: "default", geojson: state.geojson, config: state.config, visible: state.visible });
+  }
+
+  if (layersToDraw.length === 0) {
     state.activeVisibleStations = [];
     state.activeBins = new Map();
     state.renderedCount = 0;
@@ -172,63 +193,105 @@ export function drawStationCanvas(map) {
   const curZoom = typeof map.getZoom === "function" ? map.getZoom() : 5;
   const scale = curZoom < 4.5 ? 0.85 : (curZoom < 6.5 ? 1.0 : 1.15);
   state.currentScale = scale;
-
-  const filterFn = compileStationFilter(state.config);
   const hasProject = typeof map.project === "function";
 
-  const screenBins = new Map();
-  for (const f of state.geojson.features) {
-    if (!f.geometry || !Array.isArray(f.geometry.coordinates) || f.geometry.coordinates.length < 2) continue;
-    const [lon, lat] = f.geometry.coordinates;
+  const allVisibleStations = [];
+  const activeBins = new Map();
 
-    if (bounds) {
-      if (lat < south - 1.5 || lat > north + 1.5) continue;
-      if (!fullWorld) {
-        let normLon = lon;
-        while (normLon < west) normLon += 360;
-        while (normLon > east) normLon -= 360;
-        if (normLon < west || normLon > east) continue;
+  for (const layerEntry of layersToDraw) {
+    const lCfg = layerEntry.config || state.config;
+    const isSoftStale = lCfg.status === "soft-stale" || lCfg.isSoftStale;
+    const isHardStale = lCfg.status === "hard-stale" || lCfg.isHardStale;
+    const filterFn = compileStationFilter(lCfg);
+    const screenBins = new Map();
+
+    for (const f of layerEntry.geojson.features) {
+      if (!f.geometry || !Array.isArray(f.geometry.coordinates) || f.geometry.coordinates.length < 2) continue;
+      const [lon, lat] = f.geometry.coordinates;
+
+      if (bounds) {
+        if (lat < south - 1.5 || lat > north + 1.5) continue;
+        if (!fullWorld) {
+          let normLon = lon;
+          while (normLon < west) normLon += 360;
+          while (normLon > east) normLon -= 360;
+          if (normLon < west || normLon > east) continue;
+        }
+      }
+
+      if (!filterFn(f.properties || {})) continue;
+      if (!hasProject) continue;
+
+      const pt = map.project([lon, lat]);
+      if (pt.x < -60 || pt.x > w + 60 || pt.y < -60 || pt.y > h + 60) continue;
+
+      const binKey = `${Math.floor(pt.x / 100)},${Math.floor(pt.y / 100)}`;
+      let list = screenBins.get(binKey);
+      if (!list) {
+        list = [];
+        screenBins.set(binKey, list);
+      }
+      const hash = hashStation(f.properties?.station_id, lon, lat);
+      list.push({ feature: f, pt, lon, lat, hash, layerId: layerEntry.id });
+    }
+
+    const selectedStations = [];
+    for (const [binKey, list] of screenBins.entries()) {
+      let chosen;
+      if (list.length <= 5) {
+        chosen = list;
+      } else {
+        list.sort((a, b) => a.hash - b.hash);
+        chosen = list.slice(0, 5);
+      }
+      let existingBin = activeBins.get(binKey);
+      if (!existingBin) {
+        existingBin = [];
+        activeBins.set(binKey, existingBin);
+      }
+      for (let i = 0; i < chosen.length; i++) {
+        existingBin.push(chosen[i]);
+        selectedStations.push(chosen[i]);
       }
     }
 
-    if (!filterFn(f.properties || {})) continue;
-    if (!hasProject) continue;
-
-    const pt = map.project([lon, lat]);
-    if (pt.x < -60 || pt.x > w + 60 || pt.y < -60 || pt.y > h + 60) continue;
-
-    const binKey = `${Math.floor(pt.x / 100)},${Math.floor(pt.y / 100)}`;
-    let list = screenBins.get(binKey);
-    if (!list) {
-      list = [];
-      screenBins.set(binKey, list);
+    ctx.save();
+    if (isSoftStale) {
+      // ~30% desaturation for soft-stale (§2.4)
+      if (typeof ctx.filter !== "undefined") {
+        ctx.filter = "saturate(70%)";
+      }
+    } else if (isHardStale) {
+      // Hard drop in opacity for hard-stale (§2.4)
+      ctx.globalAlpha = 0.35;
     }
-    const hash = hashStation(f.properties?.station_id, lon, lat);
-    list.push({ feature: f, pt, lon, lat, hash });
-  }
 
-  const selectedStations = [];
-  const activeBins = new Map();
-  for (const [binKey, list] of screenBins.entries()) {
-    if (list.length <= 5) {
-      activeBins.set(binKey, list);
-      for (let i = 0; i < list.length; i++) selectedStations.push(list[i]);
-    } else {
-      list.sort((a, b) => a.hash - b.hash);
-      const top5 = list.slice(0, 5);
-      activeBins.set(binKey, top5);
-      for (let i = 0; i < 5; i++) selectedStations.push(top5[i]);
+    for (let i = 0; i < selectedStations.length; i++) {
+      const s = selectedStations[i];
+      renderStationPlotToCanvas(ctx, s.feature.properties || {}, s.pt.x, s.pt.y, lCfg, scale);
+
+      // Diagonal hatch overlay for hard-stale (§2.4)
+      if (isHardStale) {
+        ctx.save();
+        ctx.strokeStyle = "rgba(248, 81, 73, 0.45)";
+        ctx.lineWidth = 1.5;
+        const bSize = 20 * scale;
+        ctx.beginPath();
+        for (let offset = -bSize; offset <= bSize; offset += 6) {
+          ctx.moveTo(s.pt.x + offset - 8, s.pt.y - bSize);
+          ctx.lineTo(s.pt.x + offset + 8, s.pt.y + bSize);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+      allVisibleStations.push(s);
     }
-  }
-
-  for (let i = 0; i < selectedStations.length; i++) {
-    const s = selectedStations[i];
-    renderStationPlotToCanvas(ctx, s.feature.properties || {}, s.pt.x, s.pt.y, state.config, scale);
+    ctx.restore();
   }
 
   state.activeBins = activeBins;
-  state.activeVisibleStations = selectedStations;
-  state.renderedCount = selectedStations.length;
+  state.activeVisibleStations = allVisibleStations;
+  state.renderedCount = allVisibleStations.length;
   return true;
 }
 
@@ -240,14 +303,31 @@ export function updateVisibleMarkers() {
   // Legacy export alias for backward compatibility
 }
 
-export function setStationVisibility(map, visible) {
+export function setStationVisibility(map, visible, layerId = null) {
   if (!map) return;
   const state = getState(map);
-  state.visible = Boolean(visible);
-  if (state.canvas && state.canvas.style) {
-    state.canvas.style.display = state.visible ? "block" : "none";
+  if (layerId) {
+    if (state.stationLayers && state.stationLayers.has(layerId)) {
+      const l = state.stationLayers.get(layerId);
+      l.visible = Boolean(visible);
+    } else {
+      return;
+    }
+  } else {
+    state.visible = Boolean(visible);
+    if (state.stationLayers) {
+      for (const l of state.stationLayers.values()) {
+        l.visible = Boolean(visible);
+      }
+    }
   }
-  if (!state.visible) {
+  const anyVis = (state.stationLayers && state.stationLayers.size > 0)
+    ? Array.from(state.stationLayers.values()).some((l) => l.visible)
+    : Boolean(state.visible);
+  if (state.canvas && state.canvas.style) {
+    state.canvas.style.display = anyVis ? "block" : "none";
+  }
+  if (!anyVis) {
     if (state.hoverAnimId && typeof cancelAnimationFrame === "function") {
       cancelAnimationFrame(state.hoverAnimId);
       state.hoverAnimId = null;
@@ -265,9 +345,23 @@ export function setStationVisibility(map, visible) {
   }
 }
 
-export function removeStationLayer(map) {
+export function removeStationLayer(map, layerId = null) {
   if (!map) return;
   const state = getState(map);
+  if (layerId) {
+    if (state.stationLayers && state.stationLayers.has(layerId)) {
+      state.stationLayers.delete(layerId);
+      if (state.stationLayers.size > 0) {
+        updateVisibleMarkersForMap(map);
+        return;
+      }
+    } else {
+      return;
+    }
+  }
+  if (state.stationLayers) {
+    state.stationLayers.clear();
+  }
   if (state.animId) {
     cancelAnim(state.animId);
     state.animId = null;

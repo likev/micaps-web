@@ -13,15 +13,23 @@ export function syncLegendForLayer(layer, winObj, isVisible = true) {
       : (layer.config?.palettePath ? `palette:${layer.id}` : (layer.colormap || element));
     const min = layer.gridData?.stats?.min;
     const max = layer.gridData?.stats?.max;
-    updateLegend(element, colormap, min, max, winObj);
+    updateLegend(element, colormap, min, max, winObj, {
+      layerId: layer.id,
+      name: layer.name,
+      resolved: layer.resolved,
+      status: layer.status,
+      isSoftStale: layer.isSoftStale,
+      isHardStale: layer.isHardStale,
+      isDesync: layer.isDesync,
+    });
   } else {
-    removeLegend(element, winObj);
+    removeLegend(layer.id || element, winObj);
   }
 }
 
 export function removeLegendForLayer(layer, winObj) {
   const element = layer?.element || (layer?.type === "wind" ? "WIND" : null);
-  if (element) {
-    removeLegend(element, winObj);
+  if (layer?.id || element) {
+    removeLegend(layer?.id || element, winObj);
   }
 }

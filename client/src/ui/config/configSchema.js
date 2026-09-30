@@ -156,6 +156,14 @@ export function validateConfig(draft) {
           }
         }
 
+        if (entry.mode !== undefined && entry.mode !== "live" && entry.mode !== "review") {
+          addError(`presets[${idx}].mode`, `Preset "${id}" mode must be "live" or "review"`, "preset", id);
+        }
+
+        if (entry.pacemaker !== undefined && (typeof entry.pacemaker !== "string" || !entry.pacemaker.trim())) {
+          addError(`presets[${idx}].pacemaker`, `Preset "${id}" pacemaker must be a non-empty string`, "preset", id);
+        }
+
         if (!Array.isArray(entry.layers)) {
           addError(`presets[${idx}].layers`, `Preset "${id}" layers must be an array`, "preset", id);
         } else {
@@ -218,8 +226,37 @@ export function validateConfig(draft) {
               }
             }
 
+            if (layer.policy !== undefined && !["nearest", "latest-at", "hold", "interpolate"].includes(layer.policy)) {
+              addError(`presets[${idx}].layers[${lIdx}].policy`, `Layer "${lId || lIdx}" policy must be one of: nearest, latest-at, hold, interpolate`, "preset", id);
+            }
+
+            if (layer.tolerance !== undefined) {
+              const isNum = typeof layer.tolerance === "number" && Number.isFinite(layer.tolerance) && layer.tolerance > 0;
+              const isStr = typeof layer.tolerance === "string" && (/^(\d+(?:\.\d+)?)\s*(m|min|mins|h|hr|hrs|d|day|days)?$/i.test(layer.tolerance.trim()) || /^(unlimited|infinite)$/i.test(layer.tolerance.trim()));
+              if (!isNum && !isStr) {
+                addError(`presets[${idx}].layers[${lIdx}].tolerance`, `Layer "${lId || lIdx}" tolerance must be a positive duration (e.g. "10m", "3h", 60) or "unlimited"`, "preset", id);
+              }
+            }
+
+            if (layer.offset !== undefined) {
+              const isNum = typeof layer.offset === "number" && Number.isFinite(layer.offset);
+              const isStr = typeof layer.offset === "string" && /^[+-]?\d+(?:\.\d+)?\s*(m|min|mins|h|hr|hrs|d|day|days)?$/i.test(layer.offset.trim());
+              if (!isNum && !isStr) {
+                addError(`presets[${idx}].layers[${lIdx}].offset`, `Layer "${lId || lIdx}" offset must be a valid time offset (e.g. 0, "-30m", "+1h")`, "preset", id);
+              }
+            }
+
+            if (layer.sampleTimes !== undefined && (!Array.isArray(layer.sampleTimes) || layer.sampleTimes.some((s) => typeof s !== "string" && typeof s !== "number"))) {
+              addError(`presets[${idx}].layers[${lIdx}].sampleTimes`, `Layer "${lId || lIdx}" sampleTimes must be an array of strings or numbers`, "preset", id);
+            }
+
             validateLineProfileLayerConfig(layer, entry, idx, lIdx, addError);
           });
+
+          // Check pacemaker references match a layer
+          if (entry.pacemaker && !layerIds.has(entry.pacemaker) && !entry.layers.some((l) => l.src === entry.pacemaker)) {
+            addWarning(`presets[${idx}].pacemaker`, `Preset "${id}" pacemaker "${entry.pacemaker}" does not match any layer id`);
+          }
 
           // Check derivedFrom references match sibling layer ids
           entry.layers.forEach((layer, lIdx) => {

@@ -38,6 +38,11 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
   const lineWidthExp = buildLineWidthExp(boldLineWidth, lineWidth);
   const lineColorExp = buildLineColorExp(boldLineColor, lineColor);
 
+  const isSoftStale = Boolean(options.isSoftStale || options.status === "soft-stale");
+  const isHardStale = Boolean(options.isHardStale || options.status === "hard-stale");
+  const effectiveOpacity = isHardStale ? opacity * 0.35 : (isSoftStale ? opacity * 0.7 : opacity);
+  const effectiveLineOpacity = isHardStale ? 0.35 : (isSoftStale ? 0.6 : 0.85);
+
   const { isobandSrcId, isobandLayerId, isolineSrcId, isolineLayerId, isolineLabelSrcId, isolineLabelLayerId } = getLayerDOMIds(layerId);
   const emptyFC = { type: "FeatureCollection", features: [] };
 
@@ -59,7 +64,7 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
       if (map.getLayer(isobandLayerId)) {
         map.setLayoutProperty(isobandLayerId, "visibility", visibleIsoband ? "visible" : "none");
         if (visibleIsoband) {
-          map.setPaintProperty(isobandLayerId, "fill-opacity", opacity);
+          map.setPaintProperty(isobandLayerId, "fill-opacity", effectiveOpacity);
         }
       }
     } else {
@@ -78,7 +83,7 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
           },
           paint: {
             "fill-color": ["coalesce", ["get", "fillColor"], "#388bfd"],
-            "fill-opacity": opacity,
+            "fill-opacity": effectiveOpacity,
           },
         },
         map.getLayer("citys-boundary") ? "citys-boundary" : (map.getLayer("provinces-boundary") ? "provinces-boundary" : undefined)
@@ -89,7 +94,7 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
       map.setLayoutProperty(isobandLayerId, "visibility", visibleIsoband ? "visible" : "none");
     }
     if (opacity !== undefined) {
-      map.setPaintProperty(isobandLayerId, "fill-opacity", opacity);
+      map.setPaintProperty(isobandLayerId, "fill-opacity", effectiveOpacity);
     }
   }
 
@@ -116,6 +121,7 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
         if (visibleIsoline) {
           map.setPaintProperty(isolineLayerId, "line-color", lineColorExp);
           map.setPaintProperty(isolineLayerId, "line-width", lineWidthExp);
+          map.setPaintProperty(isolineLayerId, "line-opacity", effectiveLineOpacity);
         }
       }
     } else {
@@ -136,7 +142,7 @@ export function updateMapLibreContour(map, isobands, isolines, options = {}) {
         paint: {
           "line-color": lineColorExp,
           "line-width": lineWidthExp,
-          "line-opacity": 0.85,
+          "line-opacity": effectiveLineOpacity,
         },
       });
     }

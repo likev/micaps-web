@@ -14,6 +14,7 @@ import { armContourReRender } from "./contourReRender.js";
 import * as contourReRenderModule from "./contourReRender.js";
 import { getCachedWindGrid, setCachedWindGrid } from "../utils/windGridCache.js";
 import { showErrorToast } from "../ui/toast.js";
+import { resolveLayerTime, parseTimestamp, parseOffset } from "../utils/timeResolver.js";
 
 /**
  * Resolve a contour's stroke color across a timeline reload.
@@ -59,7 +60,50 @@ export async function loadWeatherField(map, model, element, level, period, custo
       updateWindowTitle(win);
     }
   }
-  const file = `${cycle}.${String(period).padStart(3, "0")}`;
+
+  const cursorTime = win?.wallClockCursor ||
+    (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
+    (win?.forecastCycle ? { cycle: win.forecastCycle, period: period ?? win.period } : null) ||
+    (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
+    Date.now();
+
+  let effectivePeriod = period;
+  if (effectivePeriod === null || effectivePeriod === undefined || isNaN(Number(effectivePeriod)) || String(effectivePeriod) === "null") {
+    if (customOptions?.period !== undefined && customOptions?.period !== null) {
+      effectivePeriod = Number(customOptions.period);
+    } else if (customOptions?.stepLead !== undefined && customOptions?.stepLead !== null) {
+      effectivePeriod = Number(customOptions.stepLead);
+    } else if (win?.period !== undefined && win?.period !== null && !isNaN(Number(win.period))) {
+      effectivePeriod = Number(win.period);
+    } else {
+      effectivePeriod = 24;
+    }
+  } else {
+    effectivePeriod = Number(effectivePeriod);
+  }
+
+  if (customOptions?.offset) {
+    const offMin = parseOffset(customOptions.offset);
+    effectivePeriod = Math.max(0, effectivePeriod + Math.round(offMin / 60));
+  }
+
+  const file = `${cycle}.${String(effectivePeriod).padStart(3, "0")}`;
+
+  const layerMetaDummy = {
+    id: customOptions?.id,
+    model,
+    element,
+    level,
+    cycle,
+    forecastCycle: cycle,
+    period: effectivePeriod,
+    file,
+    policy: customOptions?.policy,
+    tolerance: customOptions?.tolerance,
+    offset: customOptions?.offset,
+    sampleTimes: customOptions?.sampleTimes,
+  };
+  const resolved = resolveLayerTime(layerMetaDummy, cursorTime);
   const hasLevel = level !== null && level !== undefined && level !== "null" && level !== "undefined" && String(level).trim().toLowerCase() !== "undefined" && String(level).trim().toLowerCase() !== "null" && level !== "";
   const defaultPath = hasLevel ? `${model}/${element}/${level}` : `${model}/${element}`;
   const path = customOptions?.path || defaultPath;
@@ -140,14 +184,22 @@ export async function loadWeatherField(map, model, element, level, period, custo
       model,
       path: dataPath,
       file,
-      period,
-      stepLead: period,
+      period: effectivePeriod,
+      stepLead: effectivePeriod,
       forecastCycle: cycle,
       gridData: null,
       colormap: customOptions?.colormap || element,
       color: lineColor,
       visible: false,
       derivedFrom: customOptions?.derivedFrom || (isVortDiv ? (hasLevel ? `wind-${model}-${level}` : `wind-${model}`) : undefined),
+      policy: customOptions?.policy,
+      tolerance: customOptions?.tolerance,
+      offset: customOptions?.offset,
+      sampleTimes: customOptions?.sampleTimes,
+      resolved,
+      status: resolved.status,
+      isSoftStale: resolved.status === "soft-stale",
+      isHardStale: resolved.isHardStale,
       config: isWind ? {
         showWind,
         showBarbs,
@@ -259,6 +311,9 @@ export async function loadWeatherField(map, model, element, level, period, custo
         smooth,
         smoothIterations,
         labelSize,
+        status: resolved.status,
+        isSoftStale: resolved.status === "soft-stale",
+        isHardStale: resolved.isHardStale,
         viewportBounds: (map && typeof map.getBounds === "function") ? map.getBounds().toArray() : null,
       });
     }
@@ -272,19 +327,30 @@ export async function loadWeatherField(map, model, element, level, period, custo
       model,
       path: dataPath,
       file,
-      period,
-      stepLead: period,
+      period: effectivePeriod,
+      stepLead: effectivePeriod,
       forecastCycle: cycle,
       gridData,
       colormap,
       color: lineColor,
       visible: isVisible,
       derivedFrom: customOptions?.derivedFrom || (isVortDiv ? (hasLevel ? `wind-${model}-${level}` : `wind-${model}`) : undefined),
+      policy: customOptions?.policy,
+      tolerance: customOptions?.tolerance,
+      offset: customOptions?.offset,
+      sampleTimes: customOptions?.sampleTimes,
+      resolved,
+      status: resolved.status,
+      isSoftStale: resolved.status === "soft-stale",
+      isHardStale: resolved.isHardStale,
       config: isWind ? {
         showWind,
         showBarbs,
         showRaster,
         palettePath: savedPalettePath,
+        status: resolved.status,
+        isSoftStale: resolved.status === "soft-stale",
+        isHardStale: resolved.isHardStale,
       } : {
         showFill,
         showLine,
@@ -303,6 +369,9 @@ export async function loadWeatherField(map, model, element, level, period, custo
         smoothIterations,
         interval,
         levels,
+        status: resolved.status,
+        isSoftStale: resolved.status === "soft-stale",
+        isHardStale: resolved.isHardStale,
       },
     }, win);
 
@@ -315,12 +384,16 @@ export async function loadWeatherField(map, model, element, level, period, custo
         model,
         path: dataPath,
         file,
-        period,
-        stepLead: period,
+        period: effectivePeriod,
+        stepLead: effectivePeriod,
         forecastCycle: cycle,
         gridData,
         colormap,
         visible: isVisible,
+        resolved,
+        status: resolved.status,
+        isSoftStale: resolved.status === "soft-stale",
+        isHardStale: resolved.isHardStale,
         config: {
           showFill,
           showLine,
@@ -337,6 +410,9 @@ export async function loadWeatherField(map, model, element, level, period, custo
           smoothIterations,
           interval,
           levels,
+          status: resolved.status,
+          isSoftStale: resolved.status === "soft-stale",
+          isHardStale: resolved.isHardStale,
         },
       };
       armContourReRender(map, layerObj, win);
@@ -350,11 +426,18 @@ export async function loadWeatherField(map, model, element, level, period, custo
     }
 
     if (showRaster && isVisible) {
+      const rasterOpts = {
+        layerId,
+        opacity,
+        status: resolved.status,
+        isSoftStale: resolved.status === "soft-stale",
+        isHardStale: resolved.isHardStale,
+      };
       if (gridData && (gridData.values || (gridData.u && gridData.v))) {
-        renderGridRaster(map, gridData, element, colormap, { layerId, opacity });
+        renderGridRaster(map, gridData, element, colormap, rasterOpts);
       } else {
         const binBuffer = await fetchGridBinaryStream(path, file);
-        renderBinaryRaster(map, binBuffer, element, colormap, { layerId, opacity });
+        renderBinaryRaster(map, binBuffer, element, colormap, rasterOpts);
       }
     }
 
@@ -373,9 +456,17 @@ export async function loadWeatherField(map, model, element, level, period, custo
 
     const hasShading = isVisible && (Boolean(showFill) || Boolean(showRaster));
     if (hasShading) {
-      updateLegend(element, colormap, gridData.stats?.min, gridData.stats?.max, win);
+      updateLegend(element, colormap, gridData.stats?.min, gridData.stats?.max, win, {
+        layerId,
+        id: layerId,
+        name,
+        resolved,
+        status: resolved.status,
+        isSoftStale: resolved.status === "soft-stale",
+        isHardStale: resolved.isHardStale,
+      });
     } else {
-      removeLegend(element, win);
+      removeLegend(layerId || element, win);
     }
 
     if (win) {

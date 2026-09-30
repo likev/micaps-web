@@ -9,6 +9,12 @@ import {
   setTimeChangeCallback,
   getTimeChangeCallback,
   clearWindowTimeline,
+  setTimelineModeSetting,
+  setPacemaker,
+  setWallClockCursor,
+  setLoopRange,
+  toggleMultiTrack,
+  updateLayerResolutions,
 } from "./timelineCore.js";
 import {
   selectObsChipsWindow,
@@ -68,4 +74,11 @@ export {
   setTimeChangeCallback,
   getTimeChangeCallback,
   clearWindowTimeline,
+  setTimelineModeSetting,
+  setPacemaker,
+  setWallClockCursor,
+  setLoopRange,
+  toggleMultiTrack,
+  updateLayerResolutions,
 };
+

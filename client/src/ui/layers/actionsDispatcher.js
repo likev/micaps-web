@@ -1,6 +1,6 @@
 // actionsDispatcher.js - Main dispatcher for layer control events and mutations
 import { removeContourLayer, setLayerIsobandVisibility } from "../../layers/contourLayer.js";
-import { setStationVisibility } from "../../layers/stationLayer.js";
+import { setStationVisibility, removeStationLayer } from "../../layers/stationLayer.js";
 import { setRasterVisibility, removeRasterLayer } from "../../layers/rasterLayer.js";
 import { stopWindAnimation, removeGridWindBarbs } from "../../layers/windLayer.js";
 import { appState } from "../../store/appState.js";
@@ -18,7 +18,7 @@ import { removeLineHeightLayer, removeHovmollerLayer } from "../../layers/linepr
 
 export function handleRemoveAction(map, layerId, layer, win) {
   if ((layer.type === "contour" || layer.type === "wind") && layer.element) {
-    removeLegend(layer.element, win);
+    removeLegend(layerId || layer.id || layer.element, win);
   }
   if (layer.type === "contour" || layer.type === "wind") {
     removeContourLayer(map, layerId);
@@ -81,10 +81,10 @@ export function handleRemoveAction(map, layerId, layer, win) {
       }
     }
   } else if (layer.type === "station") {
-    setStationVisibility(map, false);
+    removeStationLayer(map, layerId || layer?.id);
     if (layer.config?.showStreamlines) stopWindAnimation(map);
     if (Array.isArray(win?.layerSnapshots)) {
-      win.layerSnapshots = win.layerSnapshots.filter((s) => s.id !== layerId);
+      win.layerSnapshots = win.layerSnapshots.filter((s) => s.id !== layerId && s.id !== layer?.id);
     }
   } else if (layer.type === "tlogp") {
     removeTLogPLayer(map, win, layerId);

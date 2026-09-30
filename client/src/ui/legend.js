@@ -15,10 +15,13 @@ const windowLegends = getWindowLegendsMap();
 
 export { buildLegendItems };
 
-export function updateLegend(element = "TMP", colormap = null, zMin = undefined, zMax = undefined, win = null, panelId = "legend-panel") {
+export function updateLegend(element = "TMP", colormap = null, zMin = undefined, zMax = undefined, win = null, panelIdOrExtra = "legend-panel", maybeExtra = {}) {
+  const isExtraObject = typeof panelIdOrExtra === "object" && panelIdOrExtra !== null;
+  const panelId = isExtraObject ? "legend-panel" : (panelIdOrExtra || "legend-panel");
+  const extra = isExtraObject ? panelIdOrExtra : maybeExtra;
   const winObj = typeof win === "string" ? getWindowById(win) : win;
   const winId = typeof win === "string" ? win : (win?.id || "default");
-  coreUpdateLegend(element, colormap, zMin, zMax, winObj || winId);
+  coreUpdateLegend(element, colormap, zMin, zMax, winObj || winId, extra);
   renderLegendPanel(winId, panelId);
 }
 

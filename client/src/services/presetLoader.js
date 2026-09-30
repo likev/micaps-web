@@ -18,6 +18,7 @@ import { loadWeatherField } from "./weatherLoader.js";
 import { loadObservationProduct } from "./derivedContours.js";
 import { schedulePrefetch } from "./prefetchService.js";
 import { loadPresetGroups, PRESET_GROUPS } from "../config/presets.js";
+import { resolveLayerTime, parseTimestamp, parseOffset, formatMicapsTimestamp } from "../utils/timeResolver.js";
 
 export function clearAllWeatherLayersFromMap(map, win = null, { resetVisibility = false } = {}) {
   if (!map) return;
@@ -227,6 +228,11 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
 
   console.log(`[PresetGroup] Loading "${group.name}" with levelOverride=${level}, period=+${curPeriod}h, cycle=${win?.forecastCycle}...`);
 
+  const cursorTime = win?.wallClockCursor ||
+    (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
+    (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
+    Date.now();
+
   const results = await Promise.allSettled(
     group.layers.map(async (layer) => {
       let targetLevel = null;
@@ -245,15 +251,24 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
           // station pass derives them once station data is fetched.
           return;
         }
+        const layerResolved = resolveLayerTime(layer, cursorTime);
+        layer.resolved = layerResolved;
         const render = layer.render || {};
-        await loadWeatherField(map, layer.model, layer.element, targetLevel, curPeriod, {
+        const layerPeriod = (layer.period !== undefined && layer.period !== null) ? layer.period : curPeriod;
+        await loadWeatherField(map, layer.model, layer.element, targetLevel, layerPeriod, {
           ...render,
           id: layer.id,
           name: layer.name,
           path: layer.path,
+          period: layerPeriod,
           keepWind: true,
           visible: layer.visible !== false,
           colormap: resolveColormap(group, render, targetLevel),
+          policy: layer.policy,
+          tolerance: layer.tolerance,
+          offset: layer.offset,
+          sampleTimes: layer.sampleTimes,
+          resolved: layerResolved,
         }, win, isTimeStep, expectedSeq);
       } else if (layer.type === "station") {
         const isTLogP = layer.element === "TLOGP" || (layer.path && layer.path.includes("TLOGP"));
@@ -281,9 +296,32 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
             updateWindowTitle(win);
           }
         }
+        let targetFile = file;
+        if (layer.offset) {
+          const offMin = parseOffset(layer.offset);
+          const targetMs = cursorTime + offMin * 60 * 1000;
+          if (win?._obsTimeline?.obsFiles && win._obsTimeline.obsFiles.length > 0) {
+            const matchResolved = resolveLayerTime({
+              ...layer,
+              sampleTimes: win._obsTimeline.obsFiles,
+            }, cursorTime);
+            if (matchResolved.sampleFile) {
+              targetFile = matchResolved.sampleFile;
+            } else {
+              targetFile = formatMicapsTimestamp(targetMs);
+            }
+          } else {
+            targetFile = formatMicapsTimestamp(targetMs);
+          }
+        }
         const stationLayerId = (!isTLogP && layer.model === "UPPER_AIR" && targetLevel) ? `upperair-obs-${targetLevel}` : layer.id;
-        console.log(`[PresetGroup] Station load ${obsPath}/${file} (layer ${stationLayerId})`);
-        await loadObservationProduct(map, layer.model, layer.element, targetLevel, file, win, obsPath, expectedSeq, stationLayerId);
+        const layerResolved = resolveLayerTime({
+          ...layer,
+          file: targetFile,
+        }, cursorTime);
+        layer.resolved = layerResolved;
+        console.log(`[PresetGroup] Station load ${obsPath}/${targetFile} (layer ${stationLayerId})`);
+        await loadObservationProduct(map, layer.model, layer.element, targetLevel, targetFile, win, obsPath, expectedSeq, stationLayerId);
       } else if (layer.type === "tlogp") {
         let file = win?.obsTime;
         if (typeof file === "string" && file.length === 14 && !file.includes(".")) {

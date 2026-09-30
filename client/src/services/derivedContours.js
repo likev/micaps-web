@@ -13,6 +13,7 @@ import { updateLegend, removeLegend } from "../ui/legend.js";
 import { schedulePrefetch } from "./prefetchService.js";
 import { showErrorToast } from "../ui/toast.js";
 import { appState } from "../store/appState.js";
+import { resolveLayerTime, parseTimestamp } from "../utils/timeResolver.js";
 
 export async function renderSoundingDerivedContoursForStation(map, stations, curLevel, activeGroup, win, stationLayerId) {
   if (!curLevel || activeGroup?.id === "composite-tlogp" || activeGroup?.hasLevel === false) return;
@@ -65,11 +66,22 @@ export async function renderSoundingDerivedContoursForStation(map, stations, cur
         // previous level's layerId/visible inside config (buildContourLayerMeta
         // bakes them into renderOptions), which would otherwise resurrect stale
         // ids and un-hide eye-hidden layers on level steps and fresh reloads.
+        const cursorTime = win?.wallClockCursor ||
+          (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
+          (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
+          Date.now();
+        const cResolved = resolveLayerTime(cLayer, cursorTime);
+        cLayer.resolved = cResolved;
+
         cfg.layerId = targetId;
         cfg.visible = isVisible;
         cfg.derivedFrom = cLayer.derivedFrom || stationLayerId;
-        cfg.obsTime = win?.obsTime;
-        cfg.file = win?.obsTime;
+        cfg.resolved = cResolved;
+        cfg.status = cResolved.status;
+        cfg.isSoftStale = cResolved.status === "soft-stale";
+        cfg.isHardStale = cResolved.isHardStale;
+        cfg.obsTime = cResolved.sampleFile || win?.obsTime;
+        cfg.file = cResolved.sampleFile || win?.obsTime;
         if (existingDerived?.colormap) cfg.colormap = existingDerived.colormap;
         else if (snap?.colormap) cfg.colormap = snap.colormap;
         if (cfg.lineColor == null && existingDerived?.color) cfg.lineColor = existingDerived.color;
@@ -102,9 +114,17 @@ export async function renderSoundingDerivedContoursForStation(map, stations, cur
         const hasShading = isVisible && (Boolean(renderedLayer?.config?.showFill ?? cfg.showFill) || Boolean(renderedLayer?.config?.showRaster ?? cLayer.render?.showRaster));
         if (hasShading) {
           const colormap = renderedLayer?.colormap || cfg.colormap || elem;
-          updateLegend(elem, colormap, renderedLayer?.gridData?.stats?.min, renderedLayer?.gridData?.stats?.max, win);
+          updateLegend(elem, colormap, renderedLayer?.gridData?.stats?.min, renderedLayer?.gridData?.stats?.max, win, {
+            layerId: targetId,
+            id: targetId,
+            name: cLayer.name,
+            resolved: cResolved,
+            status: cResolved.status,
+            isSoftStale: cResolved.status === "soft-stale",
+            isHardStale: cResolved.isHardStale,
+          });
         } else {
-          removeLegend(elem, win);
+          removeLegend(targetId || elem, win);
         }
       } catch (err) {
         console.warn(`[Main] Sounding derived contour failed for ${cLayer.element}:`, err);
@@ -133,6 +153,10 @@ export async function renderSoundingDerivedContoursForStation(map, stations, cur
           // (baked into renderOptions at creation); keep this level's values.
           cfg.layerId = targetId;
           cfg.visible = isVisible;
+          cfg.policy = cLayer.policy;
+          cfg.tolerance = cLayer.tolerance;
+          cfg.offset = cLayer.offset;
+          cfg.sampleTimes = cLayer.sampleTimes;
           cfg.obsTime = win?.obsTime;
           cfg.file = win?.obsTime;
           if (existingDerived?.colormap) cfg.colormap = existingDerived.colormap;
@@ -201,11 +225,26 @@ export async function renderSurfaceDerivedContoursForStation(map, stations, acti
         // previous level's layerId/visible inside config (buildContourLayerMeta
         // bakes them into renderOptions), which would otherwise resurrect stale
         // ids and un-hide eye-hidden layers on level steps and fresh reloads.
+        const cursorTime = win?.wallClockCursor ||
+          (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
+          (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
+          Date.now();
+        const cResolved = resolveLayerTime(cLayer, cursorTime);
+        cLayer.resolved = cResolved;
+
         cfg.layerId = targetId;
         cfg.visible = isVisible;
         cfg.derivedFrom = cLayer.derivedFrom || stationLayerId;
-        cfg.obsTime = win?.obsTime;
-        cfg.file = win?.obsTime;
+        cfg.policy = cLayer.policy;
+        cfg.tolerance = cLayer.tolerance;
+        cfg.offset = cLayer.offset;
+        cfg.sampleTimes = cLayer.sampleTimes;
+        cfg.resolved = cResolved;
+        cfg.status = cResolved.status;
+        cfg.isSoftStale = cResolved.status === "soft-stale";
+        cfg.isHardStale = cResolved.isHardStale;
+        cfg.obsTime = cResolved.sampleFile || win?.obsTime;
+        cfg.file = cResolved.sampleFile || win?.obsTime;
         if (existingDerived?.colormap) cfg.colormap = existingDerived.colormap;
         else if (snap?.colormap) cfg.colormap = snap.colormap;
         if (cfg.lineColor == null && existingDerived?.color) cfg.lineColor = existingDerived.color;
@@ -235,9 +274,17 @@ export async function renderSurfaceDerivedContoursForStation(map, stations, acti
         const hasShading = isVisible && (Boolean(renderedLayer?.config?.showFill ?? cfg.showFill) || Boolean(renderedLayer?.config?.showRaster ?? cLayer.render?.showRaster));
         if (hasShading) {
           const colormap = renderedLayer?.colormap || cfg.colormap || elem;
-          updateLegend(elem, colormap, renderedLayer?.gridData?.stats?.min, renderedLayer?.gridData?.stats?.max, win);
+          updateLegend(elem, colormap, renderedLayer?.gridData?.stats?.min, renderedLayer?.gridData?.stats?.max, win, {
+            layerId: targetId,
+            id: targetId,
+            name: cLayer.name,
+            resolved: cResolved,
+            status: cResolved.status,
+            isSoftStale: cResolved.status === "soft-stale",
+            isHardStale: cResolved.isHardStale,
+          });
         } else {
-          removeLegend(elem, win);
+          removeLegend(targetId || elem, win);
         }
       } catch (err) {
         console.warn(`[Main] Surface derived contour failed for ${cLayer.element}:`, err);
@@ -341,14 +388,51 @@ export async function loadUpperAirComposite(map, level = 500, obsTime = "2026082
   const existingStn = getLayerById(layerId, win);
   const snapStn = win?.layerSnapshots?.find((s) => s.id === layerId || (s.type === "station" && s.model === "UPPER_AIR"));
   const isVisible = existingStn ? (existingStn.visible !== false) : (snapStn ? snapStn.visible !== false : (appState.state.layers.station !== false));
+  const cursorTime = win?.wallClockCursor ||
+    (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
+    (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
+    Date.now();
+  const stnResolved = resolveLayerTime(groupStationLayer || {
+    id: layerId,
+    type: "station",
+    model: "UPPER_AIR",
+    file: effectiveObsTime,
+    policy: groupStationLayer?.policy,
+    tolerance: groupStationLayer?.tolerance,
+    offset: groupStationLayer?.offset,
+    sampleTimes: groupStationLayer?.sampleTimes,
+  }, cursorTime);
   const stnConfig = {
     ...(groupStationLayer?.render || {}),
     ...(groupStationLayer?.config || {}),
     ...(snapStn?.config || {}),
     ...(existingStn?.config || {}),
+    resolved: stnResolved,
+    status: stnResolved.status,
+    isSoftStale: stnResolved.status === "soft-stale",
+    isHardStale: stnResolved.isHardStale,
   };
-  renderStationWeatherPlots(map, stations, isVisible, stnConfig);
-  const stnLayer = addOrUpdateLayer({ id: layerId, name: `${curLevel} hPa Sounding Station Plots`, type: "station", color: "#e3b341", visible: isVisible, removable: true, stationsGeoJSON: stations, model: "UPPER_AIR", level: curLevel, config: stnConfig }, win);
+  renderStationWeatherPlots(map, stations, isVisible, stnConfig, layerId);
+  const stnLayer = addOrUpdateLayer({
+    id: layerId,
+    name: `${curLevel} hPa Sounding Station Plots`,
+    type: "station",
+    color: "#e3b341",
+    visible: isVisible,
+    removable: true,
+    stationsGeoJSON: stations,
+    model: "UPPER_AIR",
+    level: curLevel,
+    policy: groupStationLayer?.policy,
+    tolerance: groupStationLayer?.tolerance,
+    offset: groupStationLayer?.offset,
+    sampleTimes: groupStationLayer?.sampleTimes,
+    resolved: stnResolved,
+    status: stnResolved.status,
+    isSoftStale: stnResolved.status === "soft-stale",
+    isHardStale: stnResolved.isHardStale,
+    config: stnConfig,
+  }, win);
   if (win && getActiveWindow() === win) syncLayerControlForWindow(win);
   if (stnLayer?.config?.showStreamlines && isVisible) triggerStationStreamlines(map, stnLayer, win);
   if (stations?.features?.length >= 3) {
@@ -385,7 +469,9 @@ export async function loadObservationProduct(map, model, element, level, file, w
     try { removeRasterLayer(map); } catch {}
     appState.set("stationData", stations);
     const activeGroup = win?.activeGroup;
-    const groupStationLayer = activeGroup?.layers?.find((l) => l.id === customStationLayerId || l.type === "station");
+    const groupStationLayer = customStationLayerId
+      ? activeGroup?.layers?.find((l) => l.id === customStationLayerId)
+      : activeGroup?.layers?.find((l) => l.type === "station");
     const isTLogP = element === "TLOGP" || (path && path.includes("TLOGP"));
     if (isTLogP) {
       const winLayers = getLayersForWindow(win);
@@ -407,15 +493,54 @@ export async function loadObservationProduct(map, model, element, level, file, w
       ? "Sounding Station Network"
       : (model === "UPPER_AIR" ? `${level || 500} hPa Sounding Station Plots` : `${model === "SURFACE" ? "Surface" : "Upper Air"} Station Observations`);
     const isRainProduct = /rain/i.test(element || "") || /rain/i.test(path || "");
+    const cursorTime = win?.wallClockCursor ||
+      (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
+      (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
+      Date.now();
+    const stnResolved = resolveLayerTime(groupStationLayer || {
+      id: layerId,
+      type: "station",
+      model,
+      element,
+      file: targetFile,
+      policy: groupStationLayer?.policy,
+      tolerance: groupStationLayer?.tolerance,
+      offset: groupStationLayer?.offset,
+      sampleTimes: groupStationLayer?.sampleTimes,
+    }, cursorTime);
     const stnConfig = {
       ...(isRainProduct ? { showRain6: true } : {}),
       ...(groupStationLayer?.render || {}),
       ...(groupStationLayer?.config || {}),
       ...(snapStn?.config || {}),
       ...(existingStn?.config || {}),
+      resolved: stnResolved,
+      status: stnResolved.status,
+      isSoftStale: stnResolved.status === "soft-stale",
+      isHardStale: stnResolved.isHardStale,
     };
-    renderStationWeatherPlots(map, stations, isVisible, stnConfig);
-    const stnLayer = addOrUpdateLayer({ id: layerId, name, type: "station", color: "#e3b341", visible: isVisible, removable: true, stationsGeoJSON: stations, model, element, level, config: stnConfig }, win);
+    renderStationWeatherPlots(map, stations, isVisible, stnConfig, layerId);
+    const stnLayer = addOrUpdateLayer({
+      id: layerId,
+      name,
+      type: "station",
+      color: "#e3b341",
+      visible: isVisible,
+      removable: true,
+      stationsGeoJSON: stations,
+      model,
+      element,
+      level,
+      policy: groupStationLayer?.policy,
+      tolerance: groupStationLayer?.tolerance,
+      offset: groupStationLayer?.offset,
+      sampleTimes: groupStationLayer?.sampleTimes,
+      resolved: stnResolved,
+      status: stnResolved.status,
+      isSoftStale: stnResolved.status === "soft-stale",
+      isHardStale: stnResolved.isHardStale,
+      config: stnConfig,
+    }, win);
     if (win && getActiveWindow() === win) syncLayerControlForWindow(win);
     if (stnLayer?.config?.showStreamlines && isVisible) triggerStationStreamlines(map, stnLayer, win);
     if (model === "SURFACE" && stations?.features?.length >= 3) {

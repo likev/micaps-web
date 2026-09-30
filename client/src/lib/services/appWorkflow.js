@@ -1,6 +1,7 @@
 // appWorkflow.js - Pure application workflow orchestrator helpers for window presets, timeline visibility, and multi-window isolation
 import { uiState } from "../stores/uiCore.js";
 import { createTimelineState } from "../stores/timelineCore.js";
+import { parseTimestamp } from "../../utils/timeResolver.js";
 
 /**
  * Determines whether a preset group requires hiding the forecast timeline
@@ -183,6 +184,16 @@ export function applyPresetToWindow(win, group, overrideLevel = null, timelinesM
     } else if (!isSpecialProfile) {
       tl.currentMode = "nwp";
     }
+    if (groupCopy.pacemaker) {
+      tl.pacemakerId = groupCopy.pacemaker;
+    } else {
+      tl.pacemakerId = groupCopy.layers?.[0]?.id || null;
+    }
+    if (groupCopy.mode) {
+      tl.timelineMode = groupCopy.mode;
+    } else {
+      tl.timelineMode = "review";
+    }
   }
 
   return win;
@@ -193,12 +204,53 @@ export function applyPresetToWindow(win, group, overrideLevel = null, timelinesM
  */
 export function stepWindowTimeline(tl, delta) {
   if (!tl) return null;
+  const loopActive = Boolean(tl.loopRange?.active && tl.loopRange?.start != null && tl.loopRange?.end != null);
+  const loopStart = loopActive ? Math.min(tl.loopRange.start, tl.loopRange.end) : null;
+  const loopEnd = loopActive ? Math.max(tl.loopRange.start, tl.loopRange.end) : null;
+
   if (tl.currentMode === "obs") {
     if (!tl.obsFiles || tl.obsFiles.length === 0) return null;
-    tl.currentObsIdx = (tl.currentObsIdx + delta + tl.obsFiles.length) % tl.obsFiles.length;
+    const len = tl.obsFiles.length;
+    let nextIdx = (tl.currentObsIdx + delta + len) % len;
+
+    if (loopActive) {
+      // Find range of indices in obsFiles within [loopStart, loopEnd]
+      let minIdx = -1;
+      let maxIdx = -1;
+      for (let i = 0; i < len; i++) {
+        const ts = parseTimestamp(tl.obsFiles[i]);
+        if (ts !== null && ts >= loopStart && ts <= loopEnd) {
+          if (minIdx === -1) minIdx = i;
+          maxIdx = i;
+        }
+      }
+      if (minIdx !== -1 && maxIdx !== -1 && minIdx <= maxIdx) {
+        if (delta > 0) {
+          if (tl.currentObsIdx < minIdx || tl.currentObsIdx >= maxIdx) {
+            nextIdx = minIdx;
+          } else {
+            nextIdx = tl.currentObsIdx + 1;
+          }
+        } else if (delta < 0) {
+          if (tl.currentObsIdx <= minIdx || tl.currentObsIdx > maxIdx) {
+            nextIdx = maxIdx;
+          } else {
+            nextIdx = tl.currentObsIdx - 1;
+          }
+        }
+      }
+    }
+
+    tl.currentObsIdx = nextIdx;
+    const file = tl.obsFiles[tl.currentObsIdx];
+    const fileTs = parseTimestamp(file);
+    if (fileTs !== null) {
+      tl.wallClockCursor = fileTs;
+    }
     return {
       isObs: true,
-      file: tl.obsFiles[tl.currentObsIdx],
+      file,
+      cursorTime: fileTs,
       _seq: ++tl.periodStepSeq,
     };
   } else {
@@ -207,6 +259,47 @@ export function stepWindowTimeline(tl, delta) {
     const stepDir = delta >= 0 ? 1 : -1;
     const numSteps = Math.max(1, Math.abs(delta));
     let nextIdx = (typeof tl.currentPeriodIdx === "number" && tl.currentPeriodIdx >= 0) ? tl.currentPeriodIdx : 0;
+
+    if (loopActive && tl.currentInitCycle) {
+      const cycleTs = parseTimestamp(tl.currentInitCycle);
+      if (cycleTs) {
+        let minIdx = -1;
+        let maxIdx = -1;
+        for (let i = 0; i < len; i++) {
+          const validTs = cycleTs + Number(tl.discretePeriods[i]) * 3600 * 1000;
+          if (validTs >= loopStart && validTs <= loopEnd) {
+            if (minIdx === -1) minIdx = i;
+            maxIdx = i;
+          }
+        }
+        if (minIdx !== -1 && maxIdx !== -1 && minIdx <= maxIdx) {
+          if (delta > 0) {
+            if (tl.currentPeriodIdx < minIdx || tl.currentPeriodIdx >= maxIdx) {
+              nextIdx = minIdx;
+            } else {
+              nextIdx = tl.currentPeriodIdx + 1;
+            }
+          } else if (delta < 0) {
+            if (tl.currentPeriodIdx <= minIdx || tl.currentPeriodIdx > maxIdx) {
+              nextIdx = maxIdx;
+            } else {
+              nextIdx = tl.currentPeriodIdx - 1;
+            }
+          }
+          tl.currentPeriodIdx = nextIdx;
+          const p = tl.discretePeriods[tl.currentPeriodIdx];
+          const validTs = cycleTs + Number(p) * 3600 * 1000;
+          tl.wallClockCursor = validTs;
+          return {
+            isObs: false,
+            period: p,
+            cycle: tl.currentInitCycle,
+            cursorTime: validTs,
+            _seq: ++tl.periodStepSeq,
+          };
+        }
+      }
+    }
 
     const hasDisabled = Boolean(
       tl.disabledPeriods && (Array.isArray(tl.disabledPeriods) ? tl.disabledPeriods.length > 0 : true)
@@ -236,10 +329,18 @@ export function stepWindowTimeline(tl, delta) {
     }
 
     tl.currentPeriodIdx = nextIdx;
+    const p = tl.discretePeriods[tl.currentPeriodIdx];
+    if (tl.currentInitCycle) {
+      const cycleTs = parseTimestamp(tl.currentInitCycle);
+      if (cycleTs) {
+        tl.wallClockCursor = cycleTs + Number(p) * 3600 * 1000;
+      }
+    }
     return {
       isObs: false,
-      period: tl.discretePeriods[tl.currentPeriodIdx],
+      period: p,
       cycle: tl.currentInitCycle,
+      cursorTime: tl.wallClockCursor,
       _seq: ++tl.periodStepSeq,
     };
   }
