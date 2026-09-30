@@ -236,6 +236,7 @@ export async function renderSurfaceDerivedContoursForStation(map, stations, acti
           (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
           (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
           Date.now();
+        const stationLayer = getLayerById(stationLayerId, win);
         const rawSamples = cLayer.sampleTimes || stationLayer?.sampleTimes || win?._obsTimeline?.files;
         const sampleTimes = Array.isArray(rawSamples) ? [...rawSamples].sort((a, b) => a.localeCompare(b)) : rawSamples;
         const cResolved = resolveLayerTime({
