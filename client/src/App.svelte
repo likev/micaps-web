@@ -29,7 +29,7 @@
   import { changeVerticalLevel } from "./services/levelController.js";
   import { handleLayerAction as serviceHandleLayerAction } from "./ui/layerActions.js";
   import { resolveForecastCycles } from "./utils/timelineSync.js";
-  import { resolveLayerTime } from "./utils/timeResolver.js";
+  import { resolveLayerTime, parseTimestamp } from "./utils/timeResolver.js";
   import {
     DEFAULT_LEVELS,
     DEFAULT_MODELS,
