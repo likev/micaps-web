@@ -29,6 +29,7 @@
   import { changeVerticalLevel } from "./services/levelController.js";
   import { handleLayerAction as serviceHandleLayerAction } from "./ui/layerActions.js";
   import { resolveForecastCycles } from "./utils/timelineSync.js";
+  import { resolveLayerTime } from "./utils/timeResolver.js";
   import {
     DEFAULT_LEVELS,
     DEFAULT_MODELS,
@@ -1240,8 +1241,34 @@
       win.loadSeq = loadSeq;
       win.prefetchDirections = payload.prefetchDirections || payload.directions || null;
 
+      if (payload.cursorTime !== undefined && payload.cursorTime !== null) {
+        win.wallClockCursor = payload.cursorTime;
+        const tl = getOrCreateTimeline(win.id);
+        if (tl) tl.wallClockCursor = payload.cursorTime;
+
+        if (win.activeGroup?.isObservation || win._obsTimeline) {
+          const obsFiles = win._obsTimeline?.files || tl?.rawObsFiles || [];
+          if (obsFiles.length > 0) {
+            const matched = resolveLayerTime({ sampleTimes: obsFiles, policy: "latest-at" }, payload.cursorTime);
+            if (matched?.sampleFile) {
+              win.obsTime = matched.sampleFile;
+              if (win._obsTimeline) win._obsTimeline.file = matched.sampleFile;
+              updateWindowTitle(win);
+            }
+          }
+        }
+      }
+
       if (payload.isObs) {
         win.obsTime = payload.file;
+        if (!payload.cursorTime && payload.file) {
+          const ts = parseTimestamp(payload.file);
+          if (ts) {
+            win.wallClockCursor = ts;
+            const tl = getOrCreateTimeline(win.id);
+            if (tl) tl.wallClockCursor = ts;
+          }
+        }
         if (win._obsTimeline) win._obsTimeline.file = payload.file;
         if (payload.stepLength) {
           win.stepLength = payload.stepLength;
@@ -1354,6 +1381,9 @@
           // loader consumes render, while the layer panel edits config.
           presetLayer.config = { ...(presetLayer.config || {}), ...valPayload };
           presetLayer.render = { ...(presetLayer.render || {}), ...valPayload };
+          if (valPayload.policy !== undefined) presetLayer.policy = valPayload.policy;
+          if (valPayload.offset !== undefined) presetLayer.offset = valPayload.offset;
+          if (valPayload.tolerance !== undefined) presetLayer.tolerance = valPayload.tolerance;
           if (valPayload.lineColor !== undefined) presetLayer.color = valPayload.lineColor;
           if (valPayload.palettePath !== undefined) {
             presetLayer.colormap = valPayload.palettePath ? `palette:${event.layer.id}` : (presetLayer.element || event.layer.element);
@@ -1361,6 +1391,14 @@
         }
       }
       autoSaveLayerConfig(event.layer);
+      if (valPayload && typeof valPayload === "object") {
+        if (valPayload.policy !== undefined) event.layer.policy = valPayload.policy;
+        if (valPayload.offset !== undefined) event.layer.offset = valPayload.offset;
+        if (valPayload.tolerance !== undefined) event.layer.tolerance = valPayload.tolerance;
+        if ((valPayload.policy !== undefined || valPayload.offset !== undefined || valPayload.tolerance !== undefined) && win.activeGroup && map) {
+          loadPresetGroup(map, win.activeGroup, win.period, win.level, win, true);
+        }
+      }
       if (event.layer.type === "pmtiles" || event.layer.id?.startsWith("layer-pmtiles")) {
         if (valPayload && typeof valPayload === "object") {
           if (valPayload.projection !== undefined) {

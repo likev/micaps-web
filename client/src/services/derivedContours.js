@@ -70,12 +70,19 @@ export async function renderSoundingDerivedContoursForStation(map, stations, cur
           (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
           (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
           Date.now();
-        const cResolved = resolveLayerTime(cLayer, cursorTime);
+        const stationLayer = getLayerById(stationLayerId, win);
+        const rawSamples = cLayer.sampleTimes || stationLayer?.sampleTimes || win?._obsTimeline?.files;
+        const sampleTimes = Array.isArray(rawSamples) ? [...rawSamples].sort((a, b) => a.localeCompare(b)) : rawSamples;
+        const cResolved = resolveLayerTime({
+          ...cLayer,
+          sampleTimes,
+        }, cursorTime);
         cLayer.resolved = cResolved;
 
         cfg.layerId = targetId;
         cfg.visible = isVisible;
         cfg.derivedFrom = cLayer.derivedFrom || stationLayerId;
+        cfg.sampleTimes = sampleTimes;
         cfg.resolved = cResolved;
         cfg.status = cResolved.status;
         cfg.isSoftStale = cResolved.status === "soft-stale";
@@ -229,7 +236,12 @@ export async function renderSurfaceDerivedContoursForStation(map, stations, acti
           (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
           (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
           Date.now();
-        const cResolved = resolveLayerTime(cLayer, cursorTime);
+        const rawSamples = cLayer.sampleTimes || stationLayer?.sampleTimes || win?._obsTimeline?.files;
+        const sampleTimes = Array.isArray(rawSamples) ? [...rawSamples].sort((a, b) => a.localeCompare(b)) : rawSamples;
+        const cResolved = resolveLayerTime({
+          ...cLayer,
+          sampleTimes,
+        }, cursorTime);
         cLayer.resolved = cResolved;
 
         cfg.layerId = targetId;
@@ -238,7 +250,7 @@ export async function renderSurfaceDerivedContoursForStation(map, stations, acti
         cfg.policy = cLayer.policy;
         cfg.tolerance = cLayer.tolerance;
         cfg.offset = cLayer.offset;
-        cfg.sampleTimes = cLayer.sampleTimes;
+        cfg.sampleTimes = sampleTimes;
         cfg.resolved = cResolved;
         cfg.status = cResolved.status;
         cfg.isSoftStale = cResolved.status === "soft-stale";

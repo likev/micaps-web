@@ -1,6 +1,5 @@
 <script>
-  import { resolveAllLayersForStatus } from "../utils/timeResolver.js";
-  import { formatOffset } from "../utils/timeResolver.js";
+  import { resolveAllLayersForStatus, formatOffset, isBasemapLayer } from "../utils/timeResolver.js";
 
   let {
     layers = [],
@@ -10,9 +9,11 @@
     autoHideStale = false,
   } = $props();
 
+  let weatherLayers = $derived(layers.filter((l) => !isBasemapLayer(l)));
+
   let resolvedLayers = $derived.by(() => {
     const cur = cursorTime || (typeof window !== "undefined" && window.__MICAPS_CURSOR__) || Date.now();
-    return resolveAllLayersForStatus(layers, cur);
+    return resolveAllLayersForStatus(weatherLayers, cur);
   });
 
   let currentCount = $derived(resolvedLayers.filter((r) => r.status === "current").length);

@@ -19,6 +19,8 @@ import { loadObservationProduct } from "./derivedContours.js";
 import { schedulePrefetch } from "./prefetchService.js";
 import { loadPresetGroups, PRESET_GROUPS } from "../config/presets.js";
 import { resolveLayerTime, parseTimestamp, parseOffset, formatMicapsTimestamp } from "../utils/timeResolver.js";
+import { fetchTree } from "../api/catalogApi.js";
+import { filterObsFilesByStep } from "../ui/timeline/timelineMath.js";
 
 export function clearAllWeatherLayersFromMap(map, win = null, { resetVisibility = false } = {}) {
   if (!map) return;
@@ -158,6 +160,7 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
   }
 
   if (win) {
+    win.activeGroup = group;
     if (group.hasLevel === false) {
       win.level = null;
     } else if (level !== null) {
@@ -237,8 +240,10 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
     group.layers.map(async (layer) => {
       let targetLevel = null;
       const isTLogPLayer = layer.element === "TLOGP" || (layer.path && layer.path.includes("TLOGP")) || layer.type === "tlogp";
-      if (group.hasLevel === false || isTLogPLayer) {
+      if (isTLogPLayer) {
         targetLevel = null;
+      } else if (group.hasLevel === false) {
+        targetLevel = (layer.model === "SURFACE" || layer.level === 0) ? null : (layer.level || null);
       } else if (level !== null) {
         targetLevel = (layer.model === "SURFACE" || layer.level === 0) ? null : level;
       } else {
@@ -264,9 +269,9 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
           keepWind: true,
           visible: layer.visible !== false,
           colormap: resolveColormap(group, render, targetLevel),
-          policy: layer.policy,
-          tolerance: layer.tolerance,
-          offset: layer.offset,
+          policy: layer.policy || layer.config?.policy || render.policy,
+          tolerance: layer.tolerance || layer.config?.tolerance || render.tolerance,
+          offset: layer.offset || layer.config?.offset || render.offset,
           sampleTimes: layer.sampleTimes,
           resolved: layerResolved,
         }, win, isTimeStep, expectedSeq);
@@ -279,16 +284,41 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
             : (layer.path || (layer.model === "UPPER_AIR"
               ? `UPPER_AIR/${layer.element || "PLOT"}/${targetLevel || 500}`
               : `${layer.model}/${layer.element}`));
+
+        // 1. Collect real available files for this specific obsPath
+        let availableFiles = [];
+        if (Array.isArray(layer.sampleTimes) && layer.sampleTimes.length > 0) {
+          availableFiles = [...layer.sampleTimes].sort((a, b) => a.localeCompare(b));
+        } else if (win?._obsTimelinePath === obsPath && Array.isArray(win?._obsTimeline?.files) && win._obsTimeline.files.length > 0) {
+          availableFiles = [...win._obsTimeline.files].sort((a, b) => a.localeCompare(b));
+        } else {
+          try {
+            const entries = await fetchTree(obsPath, 100);
+            if (Array.isArray(entries) && entries.length > 0) {
+              availableFiles = entries.map((e) => e.name).filter(Boolean).sort((a, b) => a.localeCompare(b));
+            }
+          } catch (e) {
+            console.warn(`[PresetGroup] fetchTree failed for ${obsPath}:`, e);
+          }
+        }
+        if (isTLogP && availableFiles.length > 0) {
+          const filtered = filterObsFilesByStep(availableFiles, 12, true);
+          if (filtered.length > 0) availableFiles = filtered;
+        }
+        if (availableFiles.length > 0) {
+          layer.sampleTimes = availableFiles;
+          layer.obsFiles = availableFiles;
+        }
+
+        // 2. Sync observation timeline if this is primary or path changed
+        const levelChanged = !isTimeStep && Boolean(group.isObservation) && level !== null && (!win?._obsTimeline || win?._obsTimelinePath !== obsPath);
+        const isPrimaryObs = !win?._obsTimeline || freshObsLoad || levelChanged || win?._obsTimelinePath === obsPath;
         let file = win?.obsTime;
         if (typeof file === "string" && file.length === 14 && !file.includes(".")) {
           file = `${file}.000`;
           if (win) win.obsTime = file;
         }
-        // Fresh Load Data always lands on latest (bypassCache). Level steps
-        // preserve the selected chip: sync for new level path if path changed or no timeline,
-        // and keep the current file when still valid.
-        const levelChanged = !isTimeStep && Boolean(group.isObservation) && level !== null && (!win?._obsTimeline || win?._obsTimelinePath !== obsPath);
-        if (!file || freshObsLoad || !win?._obsTimeline || levelChanged) {
+        if (isPrimaryObs && (!file || freshObsLoad || !win?._obsTimeline || levelChanged)) {
           file = await syncObservationTimeline(obsPath, freshObsLoad ? null : (win?.obsTime || file), winTitle, win, { forceLatest: freshObsLoad });
           if (win) {
             win.obsTime = file;
@@ -296,47 +326,102 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
             updateWindowTitle(win);
           }
         }
-        let targetFile = file;
-        if (layer.offset) {
-          const offMin = parseOffset(layer.offset);
-          const targetMs = cursorTime + offMin * 60 * 1000;
-          if (win?._obsTimeline?.obsFiles && win._obsTimeline.obsFiles.length > 0) {
-            const matchResolved = resolveLayerTime({
-              ...layer,
-              sampleTimes: win._obsTimeline.obsFiles,
-            }, cursorTime);
-            if (matchResolved.sampleFile) {
-              targetFile = matchResolved.sampleFile;
-            } else {
-              targetFile = formatMicapsTimestamp(targetMs);
-            }
+
+        // 3. Resolve targetFile using policy against available real files
+        const isLive = group.mode === "live" || win?.timelineMode === "live";
+        let targetFile = file || win?.obsTime;
+        let layerResolved = null;
+        const effectiveCursorTime = win?.wallClockCursor ||
+          (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
+          cursorTime;
+
+        if (availableFiles.length > 0) {
+          layerResolved = resolveLayerTime({
+            ...layer,
+            sampleTimes: availableFiles,
+          }, effectiveCursorTime, { forceLatestAt: isLive });
+          if (layerResolved?.sampleFile) {
+            targetFile = layerResolved.sampleFile;
           } else {
-            targetFile = formatMicapsTimestamp(targetMs);
+            targetFile = availableFiles[availableFiles.length - 1];
+          }
+        } else {
+          layerResolved = resolveLayerTime({
+            ...layer,
+            file: targetFile,
+          }, effectiveCursorTime, { forceLatestAt: isLive });
+        }
+
+        if (typeof targetFile === "string") {
+          targetFile = targetFile.trim();
+          if (targetFile.length === 14 && !targetFile.includes(".")) {
+            targetFile = `${targetFile}.000`;
           }
         }
-        const stationLayerId = (!isTLogP && layer.model === "UPPER_AIR" && targetLevel) ? `upperair-obs-${targetLevel}` : layer.id;
-        const layerResolved = resolveLayerTime({
-          ...layer,
-          file: targetFile,
-        }, cursorTime);
+
         layer.resolved = layerResolved;
+        layer.file = targetFile;
+        if (!win?.obsTime && targetFile) {
+          if (win) win.obsTime = targetFile;
+        }
+
+        const stationLayerId = (!isTLogP && layer.model === "UPPER_AIR" && targetLevel) ? `upperair-obs-${targetLevel}` : layer.id;
         console.log(`[PresetGroup] Station load ${obsPath}/${targetFile} (layer ${stationLayerId})`);
         await loadObservationProduct(map, layer.model, layer.element, targetLevel, targetFile, win, obsPath, expectedSeq, stationLayerId);
       } else if (layer.type === "tlogp") {
+        const tlogpPath = layer.path || "UPPER_AIR/TLOGP";
+        let availableFiles = [];
+        if (Array.isArray(layer.sampleTimes) && layer.sampleTimes.length > 0) {
+          availableFiles = [...layer.sampleTimes].sort((a, b) => a.localeCompare(b));
+        } else if (win?._obsTimelinePath === tlogpPath && Array.isArray(win?._obsTimeline?.files) && win._obsTimeline.files.length > 0) {
+          availableFiles = [...win._obsTimeline.files].sort((a, b) => a.localeCompare(b));
+        } else {
+          try {
+            const entries = await fetchTree(tlogpPath, 100);
+            if (Array.isArray(entries) && entries.length > 0) {
+              availableFiles = entries.map((e) => e.name).filter(Boolean).sort((a, b) => a.localeCompare(b));
+            }
+          } catch (e) {}
+        }
+        if (availableFiles.length > 0) {
+          const filtered = filterObsFilesByStep(availableFiles, 12, true);
+          if (filtered.length > 0) availableFiles = filtered;
+          layer.sampleTimes = availableFiles;
+          layer.obsFiles = availableFiles;
+        }
+
         let file = win?.obsTime;
         if (typeof file === "string" && file.length === 14 && !file.includes(".")) {
           file = `${file}.000`;
           if (win) win.obsTime = file;
         }
         if (!file || freshObsLoad || !win?._obsTimeline || (!isTimeStep && group.isObservation && !win?.obsTime)) {
-          file = await syncObservationTimeline(layer.path || "UPPER_AIR/TLOGP", freshObsLoad ? null : (win?.obsTime || file), winTitle, win, { forceLatest: freshObsLoad });
+          file = await syncObservationTimeline(tlogpPath, freshObsLoad ? null : (win?.obsTime || file), winTitle, win, { forceLatest: freshObsLoad });
           if (win) {
             win.obsTime = file;
             updateWindowTitle(win);
           }
         }
+
+        let targetFile = file || win?.obsTime;
+        const isLive = group.mode === "live" || win?.timelineMode === "live";
+        const effectiveCursorTime = win?.wallClockCursor ||
+          (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
+          cursorTime;
+
+        if (availableFiles.length > 0) {
+          const match = resolveLayerTime({ ...layer, sampleTimes: availableFiles }, effectiveCursorTime, { forceLatestAt: isLive });
+          if (match?.sampleFile) targetFile = match.sampleFile;
+          else targetFile = availableFiles[availableFiles.length - 1];
+          layer.resolved = match;
+        }
+        if (typeof targetFile === "string" && targetFile.length === 14 && !targetFile.includes(".")) {
+          targetFile = `${targetFile}.000`;
+        }
+        layer.file = targetFile;
+
         if (isTimeStep && tlogpController.isActive()) {
-          await tlogpController.updateCycle(file, win, map);
+          await tlogpController.updateCycle(targetFile, win, map);
         } else {
           await loadTLogPLayer(map, layer, curPeriod, targetLevel, win);
         }

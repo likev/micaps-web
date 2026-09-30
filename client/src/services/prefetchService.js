@@ -234,7 +234,9 @@ function collectNwpItems(win, targetPeriod, cycle, hasRasterActive, direction, o
           const lvl =
             overrideLevel !== null
               ? overrideLevel
-              : (isNoLevel ? null : (win.level ?? layer.level ?? (activeGroup.hasLevel ? activeGroup.defaultLevel : 500)));
+              : (layer.level !== undefined && layer.level !== null
+                  ? ((layer.model === "SURFACE" || layer.level === 0) ? null : layer.level)
+                  : (isNoLevel ? null : (win.level ?? (activeGroup.hasLevel ? activeGroup.defaultLevel : 500))));
 
           const path = lvl ? `${model}/WIND/${lvl}` : `${model}/WIND`;
           items.push({ type: "grid", path, file, direction, level: lvl, period: targetPeriod });
@@ -250,8 +252,10 @@ function collectNwpItems(win, targetPeriod, cycle, hasRasterActive, direction, o
         let lvl =
           overrideLevel !== null
             ? overrideLevel
-            : (isNoLevel ? null : (win.level ?? layer.level ?? (activeGroup.hasLevel ? activeGroup.defaultLevel : 500)));
-        if (layer.model === "SURFACE" || layer.level === 0 || isNoLevel) lvl = null;
+            : (layer.level !== undefined && layer.level !== null
+                ? ((layer.model === "SURFACE" || layer.level === 0) ? null : layer.level)
+                : (isNoLevel ? null : (win.level ?? (activeGroup.hasLevel ? activeGroup.defaultLevel : 500))));
+        if (layer.model === "SURFACE" || layer.level === 0) lvl = null;
 
         const path = layer.path || (lvl ? `${model}/${element}/${lvl}` : `${model}/${element}`);
         items.push({ type: "grid", path, file, direction, level: lvl, period: targetPeriod });

@@ -36,6 +36,35 @@ export const DEFAULT_TOLERANCES = {
 };
 
 /**
+ * Identify basemap / non-weather vector layers
+ * @param {Object} layer
+ * @returns {boolean}
+ */
+export function isBasemapLayer(layer) {
+  if (!layer) return false;
+  const type = String(layer.type || "").toLowerCase();
+  const id = String(layer.id || "").toLowerCase();
+  const name = String(layer.name || "").toLowerCase();
+  const rawId = String(layer.rawId || "").toLowerCase();
+  return (
+    type === "pmtiles" ||
+    type === "basemap" ||
+    type === "vector" ||
+    layer.isBasemap === true ||
+    id === "pmtiles" ||
+    id === "pmtiles-base" ||
+    id === "basemap" ||
+    rawId === "pmtiles" ||
+    rawId === "basemap" ||
+    id.startsWith("layer-pmtiles") ||
+    id.startsWith("pmtiles") ||
+    id.startsWith("basemap") ||
+    name.includes("basemap") ||
+    name.includes("pmtiles")
+  );
+}
+
+/**
  * Parse tolerance string (e.g. "10m", "90m", "1h", "3h", "6h") or number (minutes)
  * @param {string|number} tol
  * @param {number} fallback
@@ -153,6 +182,15 @@ export function parseTimestamp(input) {
     }
     if (input.file) {
       return parseTimestamp(input.file);
+    }
+    if (input.name) {
+      return parseTimestamp(input.name);
+    }
+    if (input.filename) {
+      return parseTimestamp(input.filename);
+    }
+    if (input.time || input.ts) {
+      return parseTimestamp(input.time || input.ts);
     }
   }
 
@@ -406,21 +444,26 @@ export function resolveLayerTime(layer, cursorTime, options = {}) {
 
   // 3. Collect available sample times
   let sampleEntries = [];
-  if (Array.isArray(layer.sampleTimes) && layer.sampleTimes.length > 0) {
-    sampleEntries = layer.sampleTimes.map((item) => {
+  const rawList = (Array.isArray(layer.sampleTimes) && layer.sampleTimes.length > 0) ? layer.sampleTimes
+    : ((Array.isArray(layer.samples) && layer.samples.length > 0) ? layer.samples
+    : ((Array.isArray(layer.obsFiles) && layer.obsFiles.length > 0) ? layer.obsFiles
+    : ((Array.isArray(layer.files) && layer.files.length > 0) ? layer.files
+    : ((Array.isArray(layer.availableFiles) && layer.availableFiles.length > 0) ? layer.availableFiles
+    : ((Array.isArray(options.sampleTimes) && options.sampleTimes.length > 0) ? options.sampleTimes
+    : ((Array.isArray(options.sampleFiles) && options.sampleFiles.length > 0) ? options.sampleFiles
+    : ((Array.isArray(options.files) && options.files.length > 0) ? options.files : null)))))));
+
+  if (rawList) {
+    sampleEntries = rawList.map((item) => {
       const ts = parseTimestamp(item);
-      return { ts, file: typeof item === "string" ? item : null };
+      let file = null;
+      if (typeof item === "string") {
+        file = item;
+      } else if (typeof item === "object" && item !== null) {
+        file = item.file || item.name || item.filename || null;
+      }
+      return { ts, file };
     }).filter((s) => s.ts !== null);
-  } else if (Array.isArray(layer.samples) && layer.samples.length > 0) {
-    sampleEntries = layer.samples.map((item) => {
-      const ts = parseTimestamp(item.time || item.ts || item);
-      return { ts, file: item.file || item.name || null };
-    }).filter((s) => s.ts !== null);
-  } else if (Array.isArray(layer.obsFiles) && layer.obsFiles.length > 0) {
-    sampleEntries = layer.obsFiles.map((file) => ({
-      ts: parseTimestamp(file),
-      file,
-    })).filter((s) => s.ts !== null);
   } else if (layer.sampleCadenceMinutes && layer.sampleCadenceMinutes > 0) {
     // Generate virtual samples for layer with known cadence
     const base = layer.sampleBaseTime ? parseTimestamp(layer.sampleBaseTime) : cursorMs;
@@ -615,7 +658,7 @@ export function generateCadenceSampleEntries(baseMs, cadenceMinutes, count = 24,
 export function resolveAllLayersForStatus(layers, cursorTime, options = {}) {
   if (!Array.isArray(layers)) return [];
   const results = layers
-    .filter((l) => l && l.visible !== false)
+    .filter((l) => l && l.visible !== false && !isBasemapLayer(l))
     .map((layer) => {
       const res = resolveLayerTime(layer, cursorTime, options);
       return {

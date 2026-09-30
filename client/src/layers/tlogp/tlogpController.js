@@ -62,16 +62,45 @@ class TLogPController {
       this.show();
     }
 
-    this.obsFile = win?.obsTime || null;
+    this.obsFile = layerDef.file || win?.obsTime || null;
     return this.loadSounding(map, win);
   }
 
   async loadSounding(map = this.activeMap, win = this.activeWin) {
-    const file = this.obsFile || win?.obsTime || "latest";
+    let file = this.obsFile || win?.obsTime || "latest";
     const stn = this.activeStationId || "58362";
 
     try {
-      const data = await fetchJson("/api/data/tlogp", { file, station: stn });
+      let data = null;
+      try {
+        data = await fetchJson("/api/data/tlogp", { file, station: stn });
+      } catch (fetchErr) {
+        if (file && file !== "latest") {
+          console.warn(`[TLogPController] Sounding file ${file} unavailable for ${stn}, trying synoptic/latest fallback...`);
+          const files = win?._obsTimeline?.files || [];
+          const synopticFiles = files.filter((f) => f.length >= 10 && (f.slice(8, 10) === "08" || f.slice(8, 10) === "20"));
+          const prefixCandidates = [];
+          if (file.length >= 10) {
+            const ymd = file.slice(0, 8);
+            prefixCandidates.push(`${ymd}080000.000`, `${ymd}200000.000`);
+          }
+          const candidates = [...prefixCandidates, ...synopticFiles.slice(-4).reverse(), "latest"];
+          for (const cand of candidates) {
+            if (cand && cand !== file) {
+              try {
+                const fbData = await fetchJson("/api/data/tlogp", { file: cand, station: stn });
+                if (fbData && fbData.levels && fbData.levels.length > 0) {
+                  data = fbData;
+                  this.obsFile = cand;
+                  file = cand;
+                  break;
+                }
+              } catch (_) {}
+            }
+          }
+        }
+        if (!data) throw fetchErr;
+      }
       if (!data || !data.levels || data.levels.length === 0) {
         throw new Error(`Empty sounding profile for station ${stn}`);
       }

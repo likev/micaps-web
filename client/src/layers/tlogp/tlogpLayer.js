@@ -23,6 +23,7 @@ export async function loadTLogPLayer(map, layer = {}, period = null, level = nul
     model: "UPPER_AIR",
     element: "TLOGP",
     stationId,
+    file: layer.file || win?.obsTime || null,
     visible: isVisible,
     removable: layer.removable !== false,
     color: layer.color || "#f85149",

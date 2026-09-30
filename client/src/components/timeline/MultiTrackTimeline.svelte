@@ -7,6 +7,7 @@
     formatAgeOffset,
     resolveLayerTime,
     generateCadenceSampleEntries,
+    isBasemapLayer,
   } from "../../utils/timeResolver.js";
 
   let {
@@ -22,9 +23,11 @@
     onToggleCollapse = null,
   } = $props();
 
+  let weatherLayers = $derived(layers.filter((l) => l && !isBasemapLayer(l)));
+
   // Mode: "review" or "live" (§2.6)
   let mode = $state(timeline?.timelineMode || "review");
-  let pacemakerId = $state(timeline?.pacemakerId || (layers[0]?.id || null));
+  let pacemakerId = $state(timeline?.pacemakerId || (layers.find((l) => l && !isBasemapLayer(l))?.id || null));
   let snapToPacemaker = $state(timeline?.snapToPacemaker !== undefined ? timeline.snapToPacemaker : true);
   let loopActive = $state(timeline?.loopRange?.active || false);
   let loopStartPct = $state(0.2); // 20% along ruler
@@ -133,18 +136,18 @@
 
   // Default pacemaker if none set or if pacemakerId not found in layers
   $effect(() => {
-    const hasPacemaker = layers.some((l) => l.id === pacemakerId);
-    if (!hasPacemaker && layers.length > 0) {
-      pacemakerId = layers[0].id;
+    const hasPacemaker = weatherLayers.some((l) => l.id === pacemakerId);
+    if (!hasPacemaker && weatherLayers.length > 0) {
+      pacemakerId = weatherLayers[0].id;
       if (timeline) timeline.pacemakerId = pacemakerId;
     }
   });
 
-  let pacemakerLayer = $derived(layers.find((l) => l.id === pacemakerId) || layers[0] || null);
+  let pacemakerLayer = $derived(weatherLayers.find((l) => l.id === pacemakerId) || weatherLayers[0] || null);
 
   // Generate or extract samples per layer for lanes
   let laneData = $derived(
-    layers.filter((l) => l.visible !== false).map((layer) => {
+    weatherLayers.filter((l) => l.visible !== false).map((layer) => {
       let samples = [];
       const cadence = layer.sampleCadenceMinutes ||
         (layer.element?.includes("RADAR") ? 5 :
@@ -204,7 +207,7 @@
 
   // Past vs Future / Forecast shading boundary (§2.9)
   let mixesObsAndForecast = $derived.by(() => {
-    const hasObs = layers.some((l) =>
+    const hasObs = weatherLayers.some((l) =>
       l.type === "station" ||
       l.model === "SURFACE" ||
       l.model === "UPPER_AIR" ||
@@ -212,7 +215,7 @@
       l.element?.includes("SAT") ||
       l.isObservation === true
     );
-    const hasForecast = layers.some((l) =>
+    const hasForecast = weatherLayers.some((l) =>
       l.model === "ECMWF_HR" ||
       l.model === "GFS" ||
       l.model === "CMA_GFS" ||
@@ -230,7 +233,7 @@
       const cycleTs = parseTimestamp(timeline.forecastCycle || timeline.currentInitCycle || timeline.initCycle);
       if (cycleTs) return cycleTs;
     }
-    for (const l of layers) {
+    for (const l of weatherLayers) {
       if (l.cycle || l.forecastCycle) {
         const cycleTs = parseTimestamp(l.cycle || l.forecastCycle);
         if (cycleTs) return cycleTs;
