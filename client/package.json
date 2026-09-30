@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "check": "svelte-check --threshold error",
+    "lint": "oxlint src",
     "build": "npm run check && vite build",
     "package": "rm -f ../client.zip && cd .. && zip -r client.zip client/dist/ client/palettes/ client/config.json --exclude \"*.pmtiles*\" && cd client",
     "build:all": "npm run build && npm run package",
@@ -23,6 +24,7 @@
     "svelte": "^5.57.1"
   },
   "devDependencies": {
+    "oxlint": "^1.86.0",
     "svelte-check": "^4.7.6",
     "typescript": "^6.0.3",
     "vite": "^6.1.1"
