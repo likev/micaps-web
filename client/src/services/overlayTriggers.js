@@ -73,7 +73,15 @@ export async function triggerIsobandOverlay(map, layer = null, win = null) {
   if (features.length > 0) {
     setLayerIsobandVisibility(map, layerId, layer.visible !== false);
     if (layer.visible !== false && layer.element) {
-      updateLegend(layer.element, colormap, layer.gridData?.stats?.min, layer.gridData?.stats?.max, win);
+      updateLegend(layer.element, colormap, layer.gridData?.stats?.min, layer.gridData?.stats?.max, win, {
+        layerId: layer.id || layerId,
+        name: layer.name,
+        resolved: layer.resolved,
+        status: layer.status,
+        isSoftStale: layer.isSoftStale,
+        isHardStale: layer.isHardStale,
+        isDesync: layer.isDesync,
+      });
     }
     return;
   }
@@ -102,7 +110,15 @@ export async function triggerIsobandOverlay(map, layer = null, win = null) {
     });
     armContourReRender(map, layer, win);
     if (isVisible && layer.element) {
-      updateLegend(layer.element, colormap, layer.gridData?.stats?.min, layer.gridData?.stats?.max, win);
+      updateLegend(layer.element, colormap, layer.gridData?.stats?.min, layer.gridData?.stats?.max, win, {
+        layerId: layer.id || layerId,
+        name: layer.name,
+        resolved: layer.resolved,
+        status: layer.status,
+        isSoftStale: layer.isSoftStale,
+        isHardStale: layer.isHardStale,
+        isDesync: layer.isDesync,
+      });
     }
     return;
   }
@@ -165,7 +181,15 @@ export async function triggerIsobandOverlay(map, layer = null, win = null) {
         });
         armContourReRender(map, layer, win);
         if (isVisible && layer.element) {
-          updateLegend(layer.element, colormap, gridData.stats?.min, gridData.stats?.max, win);
+          updateLegend(layer.element, colormap, gridData.stats?.min, gridData.stats?.max, win, {
+            layerId: layer.id,
+            name: layer.name,
+            resolved: layer.resolved,
+            status: layer.status,
+            isSoftStale: layer.isSoftStale,
+            isHardStale: layer.isHardStale,
+            isDesync: layer.isDesync,
+          });
         }
         return;
       }
@@ -224,7 +248,15 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
   if (layer?.gridData) {
     renderGridRaster(map, layer.gridData, element, colormap, { layerId, opacity });
     if (layer.visible !== false) {
-      updateLegend(element, colormap, layer.gridData.stats?.min, layer.gridData.stats?.max, win);
+      updateLegend(element, colormap, layer.gridData.stats?.min, layer.gridData.stats?.max, win, {
+        layerId: layer?.id || layerId,
+        name: layer?.name,
+        resolved: layer?.resolved,
+        status: layer?.status,
+        isSoftStale: layer?.isSoftStale,
+        isHardStale: layer?.isHardStale,
+        isDesync: layer?.isDesync,
+      });
     }
     armContourReRender(map, layer, win);
     return;
@@ -234,7 +266,15 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
   if ((layer?.type === "wind" || layer?.element === "WIND") && win?.windGridData) {
     renderGridRaster(map, win.windGridData, "WIND", colormap, { layerId, opacity });
     if (layer?.visible !== false) {
-      updateLegend("WIND", colormap, 0, undefined, win);
+      updateLegend("WIND", colormap, 0, undefined, win, {
+        layerId: layer?.id || layerId,
+        name: layer?.name,
+        resolved: layer?.resolved,
+        status: layer?.status,
+        isSoftStale: layer?.isSoftStale,
+        isHardStale: layer?.isHardStale,
+        isDesync: layer?.isDesync,
+      });
     }
     armContourReRender(map, layer, win);
     return;
@@ -290,7 +330,15 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
     .then((bin) => {
       renderBinaryRaster(map, bin, element, colormap, { layerId, opacity });
       if (layer?.visible !== false) {
-        updateLegend(element, colormap, layer?.gridData?.stats?.min, layer?.gridData?.stats?.max, win);
+        updateLegend(element, colormap, layer?.gridData?.stats?.min, layer?.gridData?.stats?.max, win, {
+          layerId: layer?.id || layerId,
+          name: layer?.name,
+          resolved: layer?.resolved,
+          status: layer?.status,
+          isSoftStale: layer?.isSoftStale,
+          isHardStale: layer?.isHardStale,
+          isDesync: layer?.isDesync,
+        });
       }
     })
     .catch((err) => {
@@ -301,7 +349,15 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
             if (layer) layer.gridData = grid;
             renderGridRaster(map, grid, element, colormap, { layerId, opacity });
             if (layer?.visible !== false) {
-              updateLegend(element, colormap, grid.stats?.min, grid.stats?.max, win);
+              updateLegend(element, colormap, grid.stats?.min, grid.stats?.max, win, {
+                layerId: layer?.id || layerId,
+                name: layer?.name,
+                resolved: layer?.resolved,
+                status: layer?.status,
+                isSoftStale: layer?.isSoftStale,
+                isHardStale: layer?.isHardStale,
+                isDesync: layer?.isDesync,
+              });
             }
             if (layer) armContourReRender(map, layer, win);
           } else {

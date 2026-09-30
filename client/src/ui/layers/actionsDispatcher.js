@@ -145,9 +145,17 @@ export function handleAuxAction(map, layerId, value, winObj, layer = null) {
         const colormap = (l.colormap && String(l.colormap).startsWith("palette:"))
           ? l.colormap
           : (l.config?.palettePath ? `palette:${l.id}` : (l.colormap || l.element));
-        updateLegend(l.element, colormap, l.gridData?.stats?.min, l.gridData?.stats?.max, winObj);
+        updateLegend(l.element, colormap, l.gridData?.stats?.min, l.gridData?.stats?.max, winObj, {
+          layerId: l.id,
+          name: l.name,
+          resolved: l.resolved,
+          status: l.status,
+          isSoftStale: l.isSoftStale,
+          isHardStale: l.isHardStale,
+          isDesync: l.isDesync,
+        });
       } else {
-        removeLegend(l.element, winObj);
+        removeLegend(l.id || l.element, winObj);
       }
     });
   } else if (layerId === "wind") {

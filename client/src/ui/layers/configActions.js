@@ -10,6 +10,7 @@ import {
   updateMapLibreContour,
 } from "../../layers/contourLayer.js";
 import { getLayerById } from "./layerStore.js";
+import { isUpperAirStationLayer } from "./layerDefaults.js";
 import { setStationConfig, getStationGeoJSON } from "../../layers/stationLayer.js";
 import { setRasterVisibility, getRasterDOMIds } from "../../layers/rasterLayer.js";
 import { stopWindAnimation, removeGridWindBarbs } from "../../layers/windLayer.js";
@@ -52,6 +53,30 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
         }
       }
     } catch { /* best-effort */ }
+    for (const snapshots of [winObj.layerSnapshots, winObj.derivedContourSnapshots]) {
+      if (!Array.isArray(snapshots)) continue;
+      const snapshot = snapshots.find((entry) =>
+        entry?.id === layer.id ||
+        (entry?.type === "station" && layer.type === "station" && (entry?.model === layer.model || (isUpperAirStationLayer(entry) === isUpperAirStationLayer(layer))))
+      );
+      if (snapshot) {
+        snapshot.config = { ...(snapshot.config || {}), ...(layer.config || {}) };
+      }
+    }
+
+    if (winObj?.activeGroup?.layers && value && typeof value === "object") {
+      const presetLayer = winObj.activeGroup.layers.find((candidate) =>
+        candidate?.id === layer.id ||
+        (candidate?.type === "station" && layer.type === "station" && (candidate?.model === layer.model || (isUpperAirStationLayer(candidate) === isUpperAirStationLayer(layer)))) ||
+        (candidate?.model === layer.model && candidate?.element === layer.element &&
+          Boolean(candidate?.derivedFrom) === Boolean(layer.derivedFrom) &&
+          (candidate?.level === undefined || layer?.level === undefined || candidate.level === layer.level))
+      );
+      if (presetLayer) {
+        presetLayer.config = { ...(presetLayer.config || {}), ...value };
+        presetLayer.render = { ...(presetLayer.render || {}), ...value };
+      }
+    }
   }
 
   if (layer.type === "pmtiles") {
@@ -185,12 +210,20 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
 
     if (layer.element && (value.showFill !== undefined || value.showRaster !== undefined || value.showLine !== undefined)) {
       if (!hasShading) {
-        removeLegend(layer.element, winObj);
+        removeLegend(layer.id || layer.element, winObj);
       } else {
         const colormap = (layer.colormap && String(layer.colormap).startsWith("palette:"))
           ? layer.colormap
           : (layer.config?.palettePath ? `palette:${layer.id}` : (layer.colormap || layer.element));
-        updateLegend(layer.element, colormap, layer.gridData?.stats?.min, layer.gridData?.stats?.max, winObj);
+        updateLegend(layer.element, colormap, layer.gridData?.stats?.min, layer.gridData?.stats?.max, winObj, {
+          layerId: layer.id,
+          name: layer.name,
+          resolved: layer.resolved,
+          status: layer.status,
+          isSoftStale: layer.isSoftStale,
+          isHardStale: layer.isHardStale,
+          isDesync: layer.isDesync,
+        });
       }
     }
     if (value.opacity !== undefined) {
@@ -324,11 +357,12 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
     // Palette change: load the XML palette file and update the live colormap for this layer
     if (value.palettePath !== undefined) {
       const elem = (layer.element || (layer.type === "wind" ? "WIND" : "TMP")).toUpperCase();
+      const effId = layer.id || layerId;
       if (!value.palettePath) {
         layer.colormap = null;
         if (!layer.config) layer.config = {};
         layer.config.palettePath = null;
-        const canonical = getLayerById(layer.id, winObj);
+        const canonical = getLayerById(effId, winObj);
         if (canonical) {
           canonical.colormap = null;
           if (!canonical.config) canonical.config = {};
@@ -337,7 +371,7 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
         if (layer.type === "contour" && layer.gridData) {
           renderContourLayers(map, layer.gridData, elem, {
             ...layer.config,
-            layerId,
+            layerId: effId,
             colormap: elem,
             showFill: layer.visible && layer.config?.showFill !== false,
             showLine: layer.visible && layer.config?.showLine !== false,
@@ -355,9 +389,17 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
           armContourReRender(map, layer, winObj);
           const hasShad = layer.visible !== false && (Boolean(layer.config?.showFill) || Boolean(layer.config?.showRaster));
           if (hasShad) {
-            updateLegend(elem, elem, layer.gridData?.stats?.min, layer.gridData?.stats?.max, winObj);
+            updateLegend(elem, elem, layer.gridData?.stats?.min, layer.gridData?.stats?.max, winObj, {
+              layerId: effId,
+              name: layer.name,
+              resolved: layer.resolved,
+              status: layer.status,
+              isSoftStale: layer.isSoftStale,
+              isHardStale: layer.isHardStale,
+              isDesync: layer.isDesync,
+            });
           } else {
-            removeLegend(elem, winObj);
+            removeLegend(effId || elem, winObj);
           }
         } else if (layer.type === "wind") {
           if (layer.config?.showRaster && layer.visible) {
@@ -365,9 +407,17 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
           }
           const hasShad = layer.visible !== false && Boolean(layer.config?.showRaster);
           if (hasShad) {
-            updateLegend("WIND", "WIND", 0, undefined, winObj);
+            updateLegend("WIND", "WIND", 0, undefined, winObj, {
+              layerId: effId,
+              name: layer.name,
+              resolved: layer.resolved,
+              status: layer.status,
+              isSoftStale: layer.isSoftStale,
+              isHardStale: layer.isHardStale,
+              isDesync: layer.isDesync,
+            });
           } else {
-            removeLegend("WIND", winObj);
+            removeLegend(effId || "WIND", winObj);
           }
         }
         if (layer.config?.showRaster && layer.visible && layer.type !== "wind") {
@@ -377,7 +427,7 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
         // Split-mode correctness: two windows routinely share a layer id, so
         // a global layer.id sequence would discard a sibling window's palette
         // load as "stale". Scope the in-flight guard per window instead.
-        const paletteGuardKey = winObj?.id ? `${winObj.id}::${layer.id}` : layer.id;
+        const paletteGuardKey = winObj?.id ? `${winObj.id}::${effId}` : effId;
         const seq = (paletteSeq.get(paletteGuardKey) || 0) + 1;
         paletteSeq.set(paletteGuardKey, seq);
         const mySeq = seq;
@@ -389,24 +439,24 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
             import("../../utils/colormaps.js").then(({ setColormaps, COLORMAPS }) => {
               if (mySeq !== paletteSeq.get(paletteGuardKey)) return;
               try {
-                const key = `palette:${layer.id}`;
+                const key = `palette:${effId}`;
                 setColormaps({ ...COLORMAPS, [key]: stops, [capturedPath]: stops });
                 layer.colormap = key;
                 if (!layer.config) layer.config = {};
                 layer.config.palettePath = capturedPath;
 
-                const canonical = getLayerById(layer.id, winObj);
+                const canonical = getLayerById(effId, winObj);
                 if (canonical) {
                   canonical.colormap = key;
                   if (!canonical.config) canonical.config = {};
                   canonical.config.palettePath = capturedPath;
                 }
 
-                const isUpper = layer.model === "UPPER_AIR" || (layer.id && layer.id.startsWith("contour-sounding-"));
+                const isUpper = layer.model === "UPPER_AIR" || (effId && String(effId).startsWith("contour-sounding-"));
                 const isSurface =
                   layer.model === "SURFACE" ||
                   layer.model === "SURFACE_ANALYSIS" ||
-                  (layer.id && layer.id.startsWith("contour-surface-"));
+                  (effId && String(effId).startsWith("contour-surface-"));
                 const isNwpKinematic =
                   (elem === "VOR" || elem === "DIV" || (elem === "WIND" && layer.type === "contour")) &&
                   !isUpper &&
@@ -416,7 +466,7 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
                 } else if (layer.type === "contour" && layer.gridData) {
                   renderContourLayers(map, layer.gridData, elem, {
                     ...layer.config,
-                    layerId,
+                    layerId: effId,
                     colormap: key,
                     showFill: layer.visible && layer.config?.showFill !== false,
                     showLine: layer.visible && layer.config?.showLine !== false,
@@ -434,9 +484,17 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
                   armContourReRender(map, layer, winObj);
                   const hasShad = layer.visible !== false && (Boolean(layer.config?.showFill) || Boolean(layer.config?.showRaster));
                   if (hasShad) {
-                    updateLegend(elem, key, layer.gridData?.stats?.min, layer.gridData?.stats?.max, winObj);
+                    updateLegend(elem, key, layer.gridData?.stats?.min, layer.gridData?.stats?.max, winObj, {
+                      layerId: effId,
+                      name: layer.name,
+                      resolved: layer.resolved,
+                      status: layer.status,
+                      isSoftStale: layer.isSoftStale,
+                      isHardStale: layer.isHardStale,
+                      isDesync: layer.isDesync,
+                    });
                   } else {
-                    removeLegend(elem, winObj);
+                    removeLegend(effId || elem, winObj);
                   }
                 } else if (layer.type === "wind") {
                   if (layer.config?.showRaster && layer.visible) {
@@ -444,7 +502,17 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
                   }
                   const hasShad = layer.visible !== false && Boolean(layer.config?.showRaster);
                   if (hasShad) {
-                    updateLegend("WIND", key, 0, undefined, winObj);
+                    updateLegend("WIND", key, 0, undefined, winObj, {
+                      layerId: effId,
+                      name: layer.name,
+                      resolved: layer.resolved,
+                      status: layer.status,
+                      isSoftStale: layer.isSoftStale,
+                      isHardStale: layer.isHardStale,
+                      isDesync: layer.isDesync,
+                    });
+                  } else {
+                    removeLegend(effId || "WIND", winObj);
                   }
                 }
                 if (layer.config?.showRaster && layer.visible && !isNwpKinematic && layer.type !== "wind") {
@@ -457,8 +525,79 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
         });
       }
     }
+
+    // Colormap change: update colormap and legend directly
+    if (value.colormap !== undefined) {
+      const elem = (layer.element || (layer.type === "wind" ? "WIND" : "TMP")).toUpperCase();
+      const effId = layer.id || layerId;
+      const targetColormap = value.colormap || elem;
+      layer.colormap = targetColormap;
+      if (!layer.config) layer.config = {};
+      layer.config.colormap = targetColormap;
+      const canonical = getLayerById(effId, winObj);
+      if (canonical) {
+        canonical.colormap = targetColormap;
+        if (!canonical.config) canonical.config = {};
+        canonical.config.colormap = targetColormap;
+      }
+      if (layer.type === "contour" && layer.gridData) {
+        renderContourLayers(map, layer.gridData, elem, {
+          ...layer.config,
+          layerId: effId,
+          colormap: targetColormap,
+          showFill: layer.visible && layer.config?.showFill !== false,
+          showLine: layer.visible && layer.config?.showLine !== false,
+          showLabels: layer.visible && layer.config?.showLabels !== false,
+          opacity: layer.config?.opacity ?? 0.75,
+          lineColor: layer.config?.lineColor,
+          lineWidth: layer.config?.lineWidth,
+          boldValues: layer.config?.boldValues,
+          boldLineWidth: layer.config?.boldLineWidth,
+          smooth: layer.config?.smooth,
+          smoothIterations: layer.config?.smoothIterations,
+          labelSize: layer.config?.labelSize,
+          viewportBounds: map && typeof map.getBounds === "function" ? map.getBounds().toArray() : null,
+        });
+        armContourReRender(map, layer, winObj);
+        const hasShad = layer.visible !== false && (Boolean(layer.config?.showFill) || Boolean(layer.config?.showRaster));
+        if (hasShad) {
+          updateLegend(elem, targetColormap, layer.gridData?.stats?.min, layer.gridData?.stats?.max, winObj, {
+            layerId: effId,
+            name: layer.name,
+            resolved: layer.resolved,
+            status: layer.status,
+            isSoftStale: layer.isSoftStale,
+            isHardStale: layer.isHardStale,
+            isDesync: layer.isDesync,
+          });
+        } else {
+          removeLegend(effId || elem, winObj);
+        }
+      } else if (layer.type === "wind") {
+        if (layer.config?.showRaster && layer.visible) {
+          triggerRasterOverlay(map, layer, winObj);
+        }
+        const hasShad = layer.visible !== false && Boolean(layer.config?.showRaster);
+        if (hasShad) {
+          updateLegend("WIND", targetColormap, 0, undefined, winObj, {
+            layerId: effId,
+            name: layer.name,
+            resolved: layer.resolved,
+            status: layer.status,
+            isSoftStale: layer.isSoftStale,
+            isHardStale: layer.isHardStale,
+            isDesync: layer.isDesync,
+          });
+        } else {
+          removeLegend(effId || "WIND", winObj);
+        }
+      }
+      if (layer.config?.showRaster && layer.visible && layer.type !== "wind") {
+        triggerRasterOverlay(map, layer, winObj);
+      }
+    }
   } else if (layer.type === "station") {
-    setStationConfig(map, value);
+    setStationConfig(map, value, layerId || layer?.id);
     if (value.showStreamlines !== undefined) {
       if (value.showStreamlines && layer.visible) {
         triggerStationStreamlines(map, layer, winObj);

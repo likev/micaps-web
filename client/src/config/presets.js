@@ -1,5 +1,6 @@
 // presets.js - Runtime-loaded composite preset & layer configuration (config.json)
 import { setColormaps } from "../utils/colormaps.js";
+import { isUpperAirStationLayer } from "../ui/layers/layerDefaults.js";
 
 const CONFIG_URL = new URL("./config.json", (typeof document !== "undefined" && document.baseURI) ? document.baseURI : "http://localhost:8088/");
 
@@ -211,7 +212,12 @@ export function autoSaveLayerConfig(layer) {
           pLayer.element === layer.element &&
           (!layer.derivedFrom || pLayer.derivedFrom === layer.derivedFrom)
         );
-        const isStandardMatch = pLayer.id === layer.id || (pLayer.model === layer.model && pLayer.element === layer.element && (pLayer.level === layer.level || pLayer.level === null || pLayer.level === undefined));
+        const isStationMatch = Boolean(
+          pLayer.type === "station" &&
+          layer.type === "station" &&
+          (pLayer.model === layer.model || (isUpperAirStationLayer(pLayer) === isUpperAirStationLayer(layer)))
+        );
+        const isStandardMatch = isStationMatch || pLayer.id === layer.id || (pLayer.model === layer.model && pLayer.element === layer.element && (pLayer.level === layer.level || pLayer.level === null || pLayer.level === undefined));
         if (isDerivedMatch || isStandardMatch) {
           if (!pLayer.render) pLayer.render = {};
           if (layer.config) {
@@ -249,7 +255,9 @@ export function autoSaveLayerConfig(layer) {
             if (layer.config.showTendency !== undefined) pLayer.render.showTendency = layer.config.showTendency;
             if (layer.config.showVisibility !== undefined) pLayer.render.showVisibility = layer.config.showVisibility;
             if (layer.config.showRain6 !== undefined) pLayer.render.showRain6 = layer.config.showRain6;
+            if (layer.config.showDTD !== undefined) pLayer.render.showDTD = layer.config.showDTD;
             if (layer.config.showStreamlines !== undefined) pLayer.render.showStreamlines = layer.config.showStreamlines;
+            if (pLayer.config) Object.assign(pLayer.config, pLayer.render);
 
             // Station filter rules & logic
             if (layer.config.filterRules !== undefined) pLayer.render.filterRules = layer.config.filterRules;

@@ -334,13 +334,17 @@ export function handleVisibilityAction(map, layerId, value, layer, winObj) {
 
     for (const snapshots of [winObj.layerSnapshots, winObj.derivedContourSnapshots]) {
       if (!Array.isArray(snapshots)) continue;
-      const snapshot = snapshots.find((entry) => entry?.id === layerId);
+      const snapshot = snapshots.find((entry) =>
+        entry?.id === layerId ||
+        (entry?.type === "station" && layer.type === "station" && (entry?.model === layer.model || (!entry?.model && !layer.model)))
+      );
       if (snapshot) snapshot.visible = isVisible;
     }
 
     if (Array.isArray(winObj.activeGroup?.layers)) {
       const pLayer = winObj.activeGroup.layers.find((candidate) =>
         candidate?.id === layerId ||
+        (candidate?.type === "station" && layer.type === "station" && (candidate?.model === layer.model || (!candidate?.model && !layer.model))) ||
         (candidate?.model === layer.model && candidate?.element === layer.element &&
           Boolean(candidate?.derivedFrom) === Boolean(layer.derivedFrom))
       );

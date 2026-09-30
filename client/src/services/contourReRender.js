@@ -340,9 +340,25 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
           if (hasShad) {
             try {
               if (isWindLayer) {
-                updateLegend("WIND", targetColormap, 0, undefined, win);
+                updateLegend("WIND", targetColormap, 0, undefined, win, {
+                  layerId: liveLayer.id,
+                  name: liveLayer.name,
+                  resolved: liveLayer.resolved,
+                  status: liveLayer.status,
+                  isSoftStale: liveLayer.isSoftStale,
+                  isHardStale: liveLayer.isHardStale,
+                  isDesync: liveLayer.isDesync,
+                });
               } else {
-                updateLegend(effectiveElem, targetColormap, liveGridData?.stats?.min, liveGridData?.stats?.max, win);
+                updateLegend(effectiveElem, targetColormap, liveGridData?.stats?.min, liveGridData?.stats?.max, win, {
+                  layerId: liveLayer.id,
+                  name: liveLayer.name,
+                  resolved: liveLayer.resolved,
+                  status: liveLayer.status,
+                  isSoftStale: liveLayer.isSoftStale,
+                  isHardStale: liveLayer.isHardStale,
+                  isDesync: liveLayer.isDesync,
+                });
               }
             } catch {}
           }

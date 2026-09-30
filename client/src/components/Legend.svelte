@@ -25,7 +25,7 @@
 
 {#if !ui.configOpen && items && items.length > 0}
   <div id="legend-panel" class="legend-panel" role="region" aria-label="Map Legends">
-    {#each items as item}
+    {#each items as item (item.key || item.layerId || item.element)}
       <div class="legend-item">
         <div class="legend-header">
           <div class="legend-title-group">

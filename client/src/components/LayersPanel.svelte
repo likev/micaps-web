@@ -70,7 +70,7 @@
   function handleToggleVisible(layer) {
     layer.visible = !layer.visible;
     if (onLayerAction) {
-      onLayerAction({ action: "visibility", layer, value: layer.visible });
+      onLayerAction({ action: "visibility", layer, value: layer.visible, winId: activeWinId });
     }
   }
 
@@ -81,7 +81,7 @@
   function handleRemoveLayer(layer) {
     deleteLayer(layer.id, activeWinId);
     if (onLayerAction) {
-      onLayerAction({ action: "remove", layer });
+      onLayerAction({ action: "remove", layer, winId: activeWinId });
     }
   }
 
@@ -104,7 +104,7 @@
             layer._autoHiddenByStale = true;
             layer.visible = false;
             if (onLayerAction) {
-              onLayerAction({ action: "visibility", layer, value: false });
+              onLayerAction({ action: "visibility", layer, value: false, winId: activeWinId });
             }
           }
         }
@@ -115,7 +115,7 @@
           layer._autoHiddenByStale = false;
           layer.visible = true;
           if (onLayerAction) {
-            onLayerAction({ action: "visibility", layer, value: true });
+            onLayerAction({ action: "visibility", layer, value: true, winId: activeWinId });
           }
         }
       }
@@ -124,7 +124,7 @@
 
   function handleRowAction(event) {
     if (onLayerAction) {
-      onLayerAction(event);
+      onLayerAction({ ...event, winId: event?.winId || activeWinId });
     }
   }
 </script>

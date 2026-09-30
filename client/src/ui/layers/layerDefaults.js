@@ -24,7 +24,8 @@ export function isUpperAirStationLayer(layer) {
     name.includes("upper") ||
     name.includes("sounding") ||
     name.includes("高空") ||
-    name.includes("探空")
+    name.includes("探空") ||
+    (layer.type === "station" && typeof layer.level === "number" && layer.level > 0)
   ) {
     return true;
   }

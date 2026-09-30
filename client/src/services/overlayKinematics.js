@@ -81,9 +81,17 @@ export async function triggerVortDivOverlay(map, layer = null, win = null) {
     }
     const hasShading = isVisible && (Boolean(layer.config?.showFill) || Boolean(layer.config?.showRaster));
     if (hasShading) {
-      updateLegend(element, colormap, layer.gridData.stats?.min, layer.gridData.stats?.max, win);
+      updateLegend(element, colormap, layer.gridData.stats?.min, layer.gridData.stats?.max, win, {
+        layerId: layer.id || layerId,
+        name: layer.name,
+        resolved: layer.resolved,
+        status: layer.status,
+        isSoftStale: layer.isSoftStale,
+        isHardStale: layer.isHardStale,
+        isDesync: layer.isDesync,
+      });
     } else {
-      removeLegend(element, win);
+      removeLegend(layer.id || layerId || element, win);
     }
     return;
   }
@@ -157,8 +165,16 @@ export async function triggerVortDivOverlay(map, layer = null, win = null) {
 
   const hasShading = isVisible && (Boolean(layer.config?.showFill) || Boolean(layer.config?.showRaster));
   if (hasShading) {
-    updateLegend(element, colormap, kinGrid.stats?.min, kinGrid.stats?.max, win);
+    updateLegend(element, colormap, kinGrid.stats?.min, kinGrid.stats?.max, win, {
+      layerId: layer.id || layerId,
+      name: layer.name,
+      resolved: layer.resolved,
+      status: layer.status,
+      isSoftStale: layer.isSoftStale,
+      isHardStale: layer.isHardStale,
+      isDesync: layer.isDesync,
+    });
   } else {
-    removeLegend(element, win);
+    removeLegend(layer.id || layerId || element, win);
   }
 }

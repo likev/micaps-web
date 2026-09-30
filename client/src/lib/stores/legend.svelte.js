@@ -8,6 +8,7 @@ import {
   deleteWindowLegends as coreDeleteWindowLegends,
   onLegendChange,
 } from "./legendCore.js";
+import { getCurrentActiveWinId } from "./layersCore.js";
 
 // Svelte 5 reactive legends state: { [winId]: LegendEntry[] }
 export const legends = $state({});
@@ -28,27 +29,29 @@ onLegendChange((winId) => {
   } catch {}
 });
 
-export function updateLegend(element, colormap, zMin, zMax, win = null) {
-  coreUpdateLegend(element, colormap, zMin, zMax, win);
-  const winId = typeof win === "string" ? win : (win?.id || "default");
+export function updateLegend(element = "TMP", colormap = null, zMin = undefined, zMax = undefined, win = null, panelIdOrExtra = {}, maybeExtra = {}) {
+  const isExtraObject = typeof panelIdOrExtra === "object" && panelIdOrExtra !== null;
+  const extra = isExtraObject ? panelIdOrExtra : maybeExtra;
+  coreUpdateLegend(element, colormap, zMin, zMax, win, extra);
+  const winId = typeof win === "string" ? win : (win?.id || (typeof getCurrentActiveWinId === "function" ? getCurrentActiveWinId() : "default") || "default");
   syncLegendState(winId);
 }
 
 export function removeLegend(element, win = null) {
   coreRemoveLegend(element, win);
-  const winId = typeof win === "string" ? win : (win?.id || "default");
+  const winId = typeof win === "string" ? win : (win?.id || (typeof getCurrentActiveWinId === "function" ? getCurrentActiveWinId() : "default") || "default");
   syncLegendState(winId);
 }
 
 export function clearLegends(win = null) {
   coreClearLegends(win);
-  const winId = typeof win === "string" ? win : (win?.id || "default");
+  const winId = typeof win === "string" ? win : (win?.id || (typeof getCurrentActiveWinId === "function" ? getCurrentActiveWinId() : "default") || "default");
   syncLegendState(winId);
 }
 
 export function deleteWindowLegends(win = null) {
   coreDeleteWindowLegends(win);
-  const winId = typeof win === "string" ? win : (win?.id || "default");
+  const winId = typeof win === "string" ? win : (win?.id || (typeof getCurrentActiveWinId === "function" ? getCurrentActiveWinId() : "default") || "default");
   if (legends[winId] !== undefined) delete legends[winId];
 }
 

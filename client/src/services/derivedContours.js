@@ -195,9 +195,18 @@ export async function renderSoundingDerivedContoursForStation(map, stations, cur
           const hasShading = isVisible && (Boolean(renderedLayer?.config?.showFill ?? cfg.showFill) || Boolean(renderedLayer?.config?.showRaster ?? cLayer.config?.showRaster));
           if (hasShading) {
             const colormap = renderedLayer?.colormap || cfg.colormap || elem;
-            updateLegend(elem, colormap, renderedLayer?.gridData?.stats?.min, renderedLayer?.gridData?.stats?.max, win);
+            updateLegend(elem, colormap, renderedLayer?.gridData?.stats?.min, renderedLayer?.gridData?.stats?.max, win, {
+              layerId: targetId,
+              id: targetId,
+              name: cLayer.name,
+              resolved: renderedLayer?.resolved,
+              status: renderedLayer?.status,
+              isSoftStale: renderedLayer?.isSoftStale,
+              isHardStale: renderedLayer?.isHardStale,
+              isDesync: renderedLayer?.isDesync,
+            });
           } else {
-            removeLegend(elem, win);
+            removeLegend(targetId || elem, win);
           }
         } catch (err) {
           console.warn(`[Main] Sounding active contour failed for ${cLayer.element}:`, err);
@@ -357,9 +366,18 @@ export async function renderSurfaceDerivedContoursForStation(map, stations, acti
           const hasShading = isVisible && (Boolean(renderedLayer?.config?.showFill ?? cfg.showFill) || Boolean(renderedLayer?.config?.showRaster ?? cLayer.config?.showRaster));
           if (hasShading) {
             const colormap = renderedLayer?.colormap || cfg.colormap || elem;
-            updateLegend(elem, colormap, renderedLayer?.gridData?.stats?.min, renderedLayer?.gridData?.stats?.max, win);
+            updateLegend(elem, colormap, renderedLayer?.gridData?.stats?.min, renderedLayer?.gridData?.stats?.max, win, {
+              layerId: targetId,
+              id: targetId,
+              name: cLayer.name,
+              resolved: renderedLayer?.resolved,
+              status: renderedLayer?.status,
+              isSoftStale: renderedLayer?.isSoftStale,
+              isHardStale: renderedLayer?.isHardStale,
+              isDesync: renderedLayer?.isDesync,
+            });
           } else {
-            removeLegend(elem, win);
+            removeLegend(targetId || elem, win);
           }
         } catch (err) {
           console.warn(`[Main] Surface active contour failed for ${cLayer.element}:`, err);
@@ -435,6 +453,7 @@ export async function loadUpperAirComposite(map, level = 500, obsTime = "2026082
     removable: true,
     stationsGeoJSON: stations,
     model: "UPPER_AIR",
+    element: "PLOT",
     level: curLevel,
     policy: groupStationLayer?.policy,
     tolerance: groupStationLayer?.tolerance,

@@ -293,7 +293,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
       }
     }
     contourReRenderModule.disarmContourReRender?.(map, layerId, win);
-    removeLegend(element, win);
+    removeLegend(layerId || element, win);
 
     addOrUpdateLayer({
       id: layerId,

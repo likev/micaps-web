@@ -16,18 +16,77 @@ import {
 const reqAnim = typeof requestAnimationFrame === "function" ? requestAnimationFrame : (cb) => setTimeout(cb, 16);
 const cancelAnim = typeof cancelAnimationFrame === "function" ? cancelAnimationFrame : (id) => clearTimeout(id);
 
-export function setStationConfig(map, config) {
+export function isStationLayerMatch(targetId, entryId, entry = null) {
+  if (!targetId || !entryId) return false;
+  if (targetId === entryId) return true;
+
+  const t = String(targetId).toLowerCase();
+  const e = String(entryId).toLowerCase();
+
+  if (t === e) return true;
+
+  // Surface layer matching: both indicate surface
+  const tIsSurface = t.includes("surface");
+  const eIsSurface = e.includes("surface");
+  if (tIsSurface && eIsSurface) {
+    const tHasLag = t.includes("lag") || t.includes("t-") || t.includes("t0") || t.includes("nowcast");
+    const eHasLag = e.includes("lag") || e.includes("t-") || e.includes("t0") || e.includes("nowcast");
+    if (!tHasLag && !eHasLag) return true;
+    if (tHasLag && eHasLag) return t === e;
+    return false;
+  }
+
+  // Upper-air / Sounding layer matching: both indicate upper-air or sounding
+  const tIsUpper = t.includes("upper") || t.includes("sounding");
+  const eIsUpper = e.includes("upper") || e.includes("sounding");
+  if (tIsUpper && eIsUpper) {
+    const tLvl = t.match(/\b\d{3,4}\b/)?.[0];
+    const eLvl = e.match(/\b\d{3,4}\b/)?.[0] || (entry?.config?.level ? String(entry.config.level) : null);
+    if (tLvl && eLvl) return tLvl === eLvl;
+    const tIsTLogP = t.includes("tlogp");
+    const eIsTLogP = e.includes("tlogp");
+    if (tIsTLogP || eIsTLogP) return tIsTLogP === eIsTLogP;
+    return true;
+  }
+
+  return false;
+}
+
+export function setStationConfig(map, config, layerId = null) {
   if (!map || !config) return;
   const state = getState(map);
-  let changed = false;
-  for (const k of Object.keys(config)) {
-    if (state.config[k] !== config[k]) {
-      changed = true;
-      break;
+  if (!state) return;
+  const targetId = layerId || config?.layerId || config?.id;
+
+  let matched = false;
+  if (state.stationLayers && state.stationLayers.size > 0) {
+    if (targetId && state.stationLayers.has(targetId)) {
+      const entry = state.stationLayers.get(targetId);
+      entry.config = { ...(entry.config || {}), ...config };
+      matched = true;
+    } else if (targetId) {
+      for (const [id, entry] of state.stationLayers.entries()) {
+        if (isStationLayerMatch(targetId, id, entry)) {
+          entry.config = { ...(entry.config || {}), ...config };
+          matched = true;
+        }
+      }
+    }
+    if (!matched && state.stationLayers.size === 1) {
+      const entry = state.stationLayers.values().next().value;
+      if (entry) {
+        entry.config = { ...(entry.config || {}), ...config };
+        matched = true;
+      }
+    }
+    if (!matched && !targetId) {
+      for (const entry of state.stationLayers.values()) {
+        entry.config = { ...(entry.config || {}), ...config };
+      }
     }
   }
-  if (!changed) return;
-  state.config = { ...state.config, ...config };
+
+  state.config = { ...(state.config || {}), ...config };
   updateVisibleMarkersForMap(map);
 }
 
@@ -82,6 +141,29 @@ export function renderStationWeatherPlots(map, geojson, visible = true, config =
     state.config = mergedConfig;
   }
   if (!state.stationLayers) state.stationLayers = new Map();
+  const idLower = String(id).toLowerCase();
+  const isUpper = idLower.startsWith("upperair-") || idLower.includes("sounding") || idLower === "station-upper";
+  if (isUpper) {
+    for (const existingId of Array.from(state.stationLayers.keys())) {
+      const eLower = String(existingId).toLowerCase();
+      if (existingId !== id && (eLower.startsWith("upperair-") || eLower.includes("sounding") || eLower === "station-upper")) {
+        state.stationLayers.delete(existingId);
+      }
+    }
+  }
+  const isSurface = idLower.startsWith("surface-") || idLower.includes("surface") || idLower === "station-surface";
+  if (isSurface) {
+    const idHasLag = idLower.includes("lag") || idLower.includes("t-") || idLower.includes("nowcast");
+    if (!idHasLag) {
+      for (const existingId of Array.from(state.stationLayers.keys())) {
+        const eLower = String(existingId).toLowerCase();
+        const eHasLag = eLower.includes("lag") || eLower.includes("t-") || eLower.includes("nowcast");
+        if (existingId !== id && !eHasLag && (eLower.startsWith("surface-") || eLower.includes("surface") || eLower === "station-surface")) {
+          state.stationLayers.delete(existingId);
+        }
+      }
+    }
+  }
   state.stationLayers.set(id, {
     id,
     geojson,
@@ -306,12 +388,28 @@ export function updateVisibleMarkers() {
 export function setStationVisibility(map, visible, layerId = null) {
   if (!map) return;
   const state = getState(map);
+  if (!state) return;
   if (layerId) {
+    let matched = false;
     if (state.stationLayers && state.stationLayers.has(layerId)) {
       const l = state.stationLayers.get(layerId);
       l.visible = Boolean(visible);
-    } else {
-      return;
+      matched = true;
+    } else if (state.stationLayers && state.stationLayers.size > 0) {
+      for (const [id, l] of state.stationLayers.entries()) {
+        if (isStationLayerMatch(layerId, id, l)) {
+          l.visible = Boolean(visible);
+          matched = true;
+        }
+      }
+    }
+    if (!matched) {
+      if (state.stationLayers && state.stationLayers.size === 1) {
+        const l = state.stationLayers.values().next().value;
+        if (l) l.visible = Boolean(visible);
+      } else {
+        return;
+      }
     }
   } else {
     state.visible = Boolean(visible);
@@ -348,15 +446,31 @@ export function setStationVisibility(map, visible, layerId = null) {
 export function removeStationLayer(map, layerId = null) {
   if (!map) return;
   const state = getState(map);
+  if (!state) return;
   if (layerId) {
-    if (state.stationLayers && state.stationLayers.has(layerId)) {
-      state.stationLayers.delete(layerId);
-      if (state.stationLayers.size > 0) {
-        updateVisibleMarkersForMap(map);
-        return;
+    if (state.stationLayers && state.stationLayers.size > 0) {
+      if (state.stationLayers.has(layerId)) {
+        state.stationLayers.delete(layerId);
+        if (state.stationLayers.size > 0) {
+          updateVisibleMarkersForMap(map);
+          return;
+        }
+      } else {
+        let deleted = false;
+        for (const [id, l] of state.stationLayers.entries()) {
+          if (isStationLayerMatch(layerId, id, l)) {
+            state.stationLayers.delete(id);
+            deleted = true;
+          }
+        }
+        if (deleted && state.stationLayers.size > 0) {
+          updateVisibleMarkersForMap(map);
+          return;
+        }
+        if (!deleted && state.stationLayers.size > 1) {
+          return;
+        }
       }
-    } else {
-      return;
     }
   }
   if (state.stationLayers) {

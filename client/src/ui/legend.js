@@ -1,6 +1,4 @@
 // legend.js - Color scale bar and label renderer for weather element fields
-import { getColormap, getCSSGradient } from "../utils/colormaps.js";
-import { formatElementUnit } from "../utils/formatters.js";
 import {
   getWindowLegendsMap,
   buildLegendItems,
@@ -9,6 +7,7 @@ import {
   clearLegends as coreClearLegends,
   hasSvelteLegendOwner,
 } from "../lib/stores/legendCore.js";
+import { getCurrentActiveWinId } from "../lib/stores/layersCore.js";
 import { getWindowById } from "./tabWindowManager.js";
 
 const windowLegends = getWindowLegendsMap();
@@ -20,29 +19,31 @@ export function updateLegend(element = "TMP", colormap = null, zMin = undefined,
   const panelId = isExtraObject ? "legend-panel" : (panelIdOrExtra || "legend-panel");
   const extra = isExtraObject ? panelIdOrExtra : maybeExtra;
   const winObj = typeof win === "string" ? getWindowById(win) : win;
-  const winId = typeof win === "string" ? win : (win?.id || "default");
+  const winId = typeof win === "string" ? win : (win?.id || (typeof getCurrentActiveWinId === "function" ? getCurrentActiveWinId() : "default") || "default");
   coreUpdateLegend(element, colormap, zMin, zMax, winObj || winId, extra);
-  renderLegendPanel(winId, panelId);
+  renderLegendPanel(winObj || winId, panelId);
 }
 
 export function removeLegend(element, win = null, panelId = "legend-panel") {
-  const winId = typeof win === "string" ? win : (win?.id || "default");
-  coreRemoveLegend(element, winId);
-  renderLegendPanel(winId, panelId);
+  const winObj = typeof win === "string" ? getWindowById(win) : win;
+  const winId = typeof win === "string" ? win : (win?.id || (typeof getCurrentActiveWinId === "function" ? getCurrentActiveWinId() : "default") || "default");
+  coreRemoveLegend(element, winObj || winId);
+  renderLegendPanel(winObj || winId, panelId);
 }
 
 export function clearLegends(win = null, panelId = "legend-panel") {
-  const winId = typeof win === "string" ? win : (win?.id || "default");
-  coreClearLegends(winId);
-  renderLegendPanel(winId, panelId);
+  const winObj = typeof win === "string" ? getWindowById(win) : win;
+  const winId = typeof win === "string" ? win : (win?.id || (typeof getCurrentActiveWinId === "function" ? getCurrentActiveWinId() : "default") || "default");
+  coreClearLegends(winObj || winId);
+  renderLegendPanel(winObj || winId, panelId);
 }
 
 export function syncLegendForWindow(win = null, panelId = "legend-panel") {
-  const winId = typeof win === "string" ? win : (win?.id || "default");
-  renderLegendPanel(winId, panelId);
+  const winId = typeof win === "string" ? win : (win?.id || (typeof getCurrentActiveWinId === "function" ? getCurrentActiveWinId() : "default") || "default");
+  renderLegendPanel(win || winId, panelId);
 }
 
-function renderLegendPanel(winId, panelId = "legend-panel") {
+function renderLegendPanel(winOrId, panelId = "legend-panel") {
   // Single-renderer rule: the mounted Svelte component owns #legend-panel
   // (kept fresh via the store bridge); direct writes here would clobber
   // Svelte-managed nodes and cause partial renders. Only write when no
@@ -52,54 +53,17 @@ function renderLegendPanel(winId, panelId = "legend-panel") {
   const panel = document.getElementById(panelId);
   if (!panel) return;
 
-  const elMap = windowLegends.get(winId);
-  if (!elMap || elMap.size === 0) {
+  const winId = typeof winOrId === "string" ? winOrId : (winOrId?.id || "default");
+  const items = buildLegendItems(winOrId);
+  if (!items || items.length === 0) {
     panel.innerHTML = "";
     panel.classList.add("hidden");
     return;
   }
 
   panel.classList.remove("hidden");
-  // Recompute the Wn prefix from the live window position so drag-reorder
-  // keeps legend attribution correct (stored prefix goes stale after moves).
-  let livePrefix = null;
-  try {
-    const liveWin = getWindowById(winId);
-    if (liveWin && typeof liveWin.winIdx === "number") livePrefix = `W${liveWin.winIdx + 1}`;
-  } catch {}
-  const itemsHTML = Array.from(elMap.values()).map((item) => {
-    const { element, colormap, zMin, zMax } = item;
-    const palette = getColormap(colormap, element);
-    const unit = formatElementUnit(element);
-    const grad = getCSSGradient(element, colormap);
-
-    let tickLabels = [];
-    if (palette && palette.length > 0) {
-      // Fixed-physical-scale elements use the palette scale, never transient
-      // data min/max (mirrors legendCore.buildLegendItems).
-      const fixedScale = new Set(["RH", "TMP", "TD", "DTD", "WIND", "RAIN", "RAIN6"]);
-      if (!fixedScale.has(element) && zMin !== undefined && zMax !== undefined && zMax > zMin) {
-        if (element === "HGT") {
-          const isDam = zMax < 2500;
-          const low = Math.round(zMin);
-          const mid = Math.round((zMin + zMax) / 2);
-          const high = Math.round(zMax);
-          tickLabels = [`${low}`, `${mid}`, `${high} ${isDam ? "dam" : "gpm"}`];
-        } else {
-          const low = Math.round(zMin);
-          const mid = Math.round((zMin + zMax) / 2);
-          const high = Math.round(zMax);
-          tickLabels = [`${low}`, `${mid}`, `${high} ${unit}`.trim()];
-        }
-      } else {
-        const first = palette[0].val;
-        const mid = palette[Math.floor(palette.length / 2)].val;
-        const last = palette[palette.length - 1].val;
-        tickLabels = [`${first}`, `${mid}`, `${last} ${unit}`.trim()];
-      }
-    }
-
-    const displayTitle = (livePrefix || item.winPrefix) ? `[${livePrefix || item.winPrefix}] ${element}` : element;
+  const itemsHTML = items.map((item) => {
+    const { element, zMin, zMax, unit, gradient, tickLabels, displayTitle } = item;
 
     return `
       <div class="legend-item">
@@ -107,7 +71,7 @@ function renderLegendPanel(winId, panelId = "legend-panel") {
           <span class="legend-title">${displayTitle}</span>
           <span class="legend-unit">${unit ? `(${unit})` : ""}</span>
         </div>
-        <div class="legend-bar" role="img" aria-label="${element} color scale ${zMin ?? ''} to ${zMax ?? ''} ${unit}" style="background: ${grad};"></div>
+        <div class="legend-bar" role="img" aria-label="${element} color scale ${zMin ?? ''} to ${zMax ?? ''} ${unit}" style="background: ${gradient};"></div>
         <div class="legend-ticks">
           ${tickLabels.map((t) => `<span>${t}</span>`).join("")}
         </div>

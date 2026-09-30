@@ -25,6 +25,7 @@
   setLiveTimelineResolver((winId) => (winId ? timelinesByWindow[winId] : null) || null);
 
   import { loadPresetGroups, PRESET_GROUPS, onConfigLoaded, CURRENT_CONFIG, autoSaveLayerConfig } from "./config/presets.js";
+  import { isUpperAirStationLayer } from "./ui/layers/layerDefaults.js";
   import { loadPresetGroup, reloadConfiguration } from "./services/presetLoader.js";
   import { changeVerticalLevel } from "./services/levelController.js";
   import { handleLayerAction as serviceHandleLayerAction } from "./ui/layerActions.js";
@@ -1356,9 +1357,9 @@
   }
 
   function handleLayerAction(event) {
-    const win = activeWin;
+    const win = event?.win || (event?.winId ? getWindowById(event.winId) : activeWin);
     if (!win) return;
-    const map = getMapInstance(win.id);
+    const map = (win ? getMapInstance(win.id) || win.map : null) || getMapInstance(activeWin?.id) || activeWin?.map;
     const valPayload = event.field !== undefined ? { [event.field]: event.value } : event.value;
     serviceHandleLayerAction(map, event.action, event.layer?.id, valPayload, event.layer, win);
     if (event.action === "remove") {
@@ -1372,6 +1373,7 @@
       if (valPayload && typeof valPayload === "object" && win.activeGroup?.layers) {
         const presetLayer = win.activeGroup.layers.find((candidate) =>
           candidate?.id === event.layer.id ||
+          (candidate?.type === "station" && event.layer.type === "station" && (candidate?.model === event.layer.model || (isUpperAirStationLayer(candidate) === isUpperAirStationLayer(event.layer)))) ||
           (candidate?.model === event.layer.model && candidate?.element === event.layer.element &&
             Boolean(candidate?.derivedFrom) === Boolean(event.layer.derivedFrom) &&
             (candidate?.level === undefined || event.layer?.level === undefined || candidate.level === event.layer.level))
@@ -1388,6 +1390,15 @@
           if (valPayload.palettePath !== undefined) {
             presetLayer.colormap = valPayload.palettePath ? `palette:${event.layer.id}` : (presetLayer.element || event.layer.element);
           }
+        }
+      }
+      if (Array.isArray(win.layerSnapshots)) {
+        const snap = win.layerSnapshots.find((s) =>
+          s.id === event.layer.id ||
+          (s.type === "station" && event.layer.type === "station" && (s.model === event.layer.model || (isUpperAirStationLayer(s) === isUpperAirStationLayer(event.layer))))
+        );
+        if (snap) {
+          snap.config = { ...(snap.config || {}), ...(valPayload && typeof valPayload === "object" ? valPayload : {}) };
         }
       }
       autoSaveLayerConfig(event.layer);

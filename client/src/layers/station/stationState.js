@@ -12,8 +12,12 @@ export function getLastStationGeoJSON() {
 }
 
 export function getState(map) {
+  if (!map) return null;
+  if (map._stationState) {
+    return map._stationState;
+  }
   if (!mapState.has(map)) {
-    mapState.set(map, {
+    const s = {
       canvas: null,
       ctx: null,
       animId: null,
@@ -49,9 +53,15 @@ export function getState(map) {
       moveListener: null,
       mouseMoveListener: null,
       mouseOutListener: null,
-    });
+    };
+    mapState.set(map, s);
+    try { map._stationState = s; } catch {}
   }
-  return mapState.get(map);
+  const s = mapState.get(map);
+  if (map && typeof map === "object" && !map._stationState) {
+    try { map._stationState = s; } catch {}
+  }
+  return s;
 }
 
 export function getStationGeoJSON(map = null) {
