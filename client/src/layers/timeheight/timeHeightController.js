@@ -88,6 +88,9 @@ class TimeHeightController {
       if (this._defaultState.leads) state.leads = [...this._defaultState.leads];
       if (this._defaultState.levels) state.levels = [...this._defaultState.levels];
       if (this._defaultState.timeDirection) state.timeDirection = this._defaultState.timeDirection;
+      if (this._defaultState.startHour !== undefined) state.startHour = this._defaultState.startHour;
+      if (this._defaultState.endHour !== undefined) state.endHour = this._defaultState.endHour;
+      if (this._defaultState.stepHours !== undefined) state.stepHours = this._defaultState.stepHours;
       this.windows.set(winId, state);
     }
     return state;
@@ -177,11 +180,15 @@ class TimeHeightController {
       const nv = validateNPoints(config.npoints);
       if (nv.ok) state.npoints = nv.value;
     }
-    state.startHour = config.startHour !== undefined ? config.startHour : 0;
-    state.endHour = config.endHour !== undefined ? config.endHour : 144;
-    state.stepHours = config.stepHours !== undefined ? config.stepHours : 12;
+    state.startHour = config.startHour !== undefined ? config.startHour : (state.startHour ?? 0);
+    state.endHour = config.endHour !== undefined ? config.endHour : (state.endHour ?? 144);
+    state.stepHours = config.stepHours !== undefined ? config.stepHours : (state.stepHours ?? 12);
     state.leads = buildLeads(state.startHour, state.endHour, state.stepHours);
-    state.timeDirection = config.timeDirection || "ltr";
+    if (state.leads && state.leads.length > 0) {
+      state.startHour = state.leads[0];
+      state.endHour = state.leads[state.leads.length - 1];
+    }
+    state.timeDirection = config.timeDirection || state.timeDirection || "ltr";
     state.levels = config.levels || [...PROFILE_LEVELS];
 
     // Resolve available forecast cycles
@@ -235,7 +242,8 @@ class TimeHeightController {
     state.panel.setModel(state.model);
     state.panel.setCycle(state.cycle, state.availableCycles);
     state.panel.setPoint(state.activePoint.lon, state.activePoint.lat);
-    state.panel.setTimeDirection(state.timeDirection);
+    state.panel.setRange(state.startHour, state.endHour, state.stepHours);
+    state.panel.setTimeDirection(state.timeDirection, state.startHour, state.endHour);
     state.panel.setMode(state.mode);
     state.transect = this.getTransect(win);
     state.panel.setLine(state.line.a, state.line.b, state.npoints, state.transect.totalKm);
@@ -591,7 +599,7 @@ class TimeHeightController {
     if (dir !== "ltr" && dir !== "rtl") return;
     const state = this._getState(win);
     state.timeDirection = dir;
-    state.panel?.setTimeDirection(dir);
+    state.panel?.setTimeDirection(dir, state.startHour, state.endHour);
     this._persistConfig({ timeDirection: dir }, win);
     this._syncProfileStore(win);
   }

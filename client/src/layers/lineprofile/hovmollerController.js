@@ -89,7 +89,9 @@ class HovmollerController {
     if (cfg.lon1 !== undefined) s.line.b = { lon: cfg.lon1, lat: cfg.lat1 ?? s.line.b.lat };
     if (cfg.npoints !== undefined) s.npoints = Math.max(2, Math.min(81, cfg.npoints));
     if (cfg.level !== undefined && PROFILE_LEVELS.includes(cfg.level)) s.level = cfg.level;
-    s.startHour = cfg.startHour ?? 0; s.endHour = cfg.endHour ?? 144; s.stepHours = cfg.stepHours ?? 12;
+    s.startHour = cfg.startHour !== undefined ? cfg.startHour : (s.startHour ?? 0);
+    s.endHour = cfg.endHour !== undefined ? cfg.endHour : (s.endHour ?? 144);
+    s.stepHours = cfg.stepHours !== undefined ? cfg.stepHours : (s.stepHours ?? 12);
     s.leads = buildLeads(s.startHour, s.endHour, s.stepHours);
     s.axisSwap = cfg.axisSwap === "time-x" ? "time-x" : "dist-x";
     s.timeDir = cfg.timeDir === "rev" ? "rev" : "fwd";

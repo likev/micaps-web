@@ -45,6 +45,7 @@
   let isProfile = $derived(Boolean(activeWindow && isProfilePanelWindow(activeWindow)));
   let isSurface = $derived(Boolean(activeWindow && isSurfaceWindow(activeWindow)));
   let isUpperAir = $derived(Boolean(activeWindow && isUpperAirWindow(activeWindow)));
+  let isObs = $derived(Boolean(isSurface || isUpperAir || activeWindow?.isObservation || activeWindow?.activeGroup?.isObservation));
   let allocDisabled = $derived(layout !== "1x1" || isProfile);
   let allocTitle = $derived(
     isProfile
@@ -52,9 +53,9 @@
       : (layout !== "1x1"
         ? "Auto-Allocation can only be selected in tab-mode before splitting"
         : (isSurface
-          ? "Auto-Allocation (time only for Surface)"
+          ? "Auto-Allocation (multi-time-contrast only for Surface)"
           : (isUpperAir
-            ? "Auto-Allocation (time and level for Upper-Air)"
+            ? "Auto-Allocation (multi-time-contrast and multi-level-contrast for Upper-Air)"
             : "Auto-Allocation mode across split windows")))
   );
   let effectiveAlloc = $derived.by(() => {
@@ -290,53 +291,6 @@
   </div>
 
   <div class="layout-controls" id="layout-controls">
-    <span class="layout-label">Layout:</span>
-    <button
-      id="btn-layout-1"
-      type="button"
-      class="layout-btn"
-      class:active={layout === "1x1"}
-      title="Tabs Mode (Full window tab)"
-      onclick={() => setLayout("1x1")}
-    >⊟ Tabs</button>
-    <button
-      id="btn-layout-2"
-      type="button"
-      class="layout-btn"
-      class:active={layout === "1x2"}
-      title="2-Split Mode (Side-by-side 1x2)"
-      onclick={() => setLayout("1x2")}
-    >◫ 2-Split</button>
-    <button
-      id="btn-layout-4"
-      type="button"
-      class="layout-btn"
-      class:active={layout === "2x2"}
-      title="4-Split Mode (2x2 grid)"
-      onclick={() => setLayout("2x2")}
-    >⊞ 4-Split</button>
-    <button
-      id="btn-layout-6"
-      type="button"
-      class="layout-btn"
-      class:active={layout === "2x3" || layout === "3x2"}
-      title="6-Split Mode (2x3 grid)"
-      onclick={() => setLayout("2x3")}
-    >▦ 6-Split</button>
-    <button
-      id="btn-sync-toggle"
-      type="button"
-      class="layout-btn"
-      class:active={syncMap}
-      class:hidden={layout === "1x1"}
-      aria-pressed={syncMap ? "true" : "false"}
-      title={syncMap
-        ? "Camera sync enabled across windows (Click to toggle off)"
-        : "Camera sync disabled (Click to toggle on)"}
-      onclick={() => onToggleSync && onToggleSync()}
-    >
-      {syncMap ? "Sync 🔗" : "Sync ✕"}
-    </button>
     <div
       class="auto-alloc-container"
       title={allocTitle}
@@ -359,12 +313,43 @@
         }}
       >
         <option value="none">none</option>
-        <option value="time">time</option>
-        <option value="step" disabled={isSurface || isUpperAir}>step</option>
-        <option value="level" disabled={isSurface}>level</option>
-        <option value="model" disabled={isSurface || isUpperAir}>model</option>
+        <option value="time">{isObs ? "multi-time-contrast" : "multi-init-contrast"}</option>
+        <option value="step" disabled={isSurface || isUpperAir}>multi-step-contrast</option>
+        <option value="level" disabled={isSurface}>multi-level-contrast</option>
+        <option value="model" disabled={isSurface || isUpperAir}>multi-model-contrast</option>
       </select>
     </div>
+
+    <label for="btn-layout-select" class="layout-label">Layout:</label>
+    <select
+      id="btn-layout-select"
+      data-testid="btn-layout-select"
+      class="layout-select"
+      class:active={layout !== "1x1"}
+      value={layout === "3x2" ? "2x3" : layout}
+      title="Map window layout"
+      onchange={(e) => setLayout(e.currentTarget.value)}
+    >
+      <option id="btn-layout-1" value="1x1">⊟ Tabs</option>
+      <option id="btn-layout-2" value="1x2">◫ 2-Split</option>
+      <option id="btn-layout-4" value="2x2">⊞ 4-Split</option>
+      <option id="btn-layout-6" value="2x3">▦ 6-Split</option>
+    </select>
+
+    <button
+      id="btn-sync-toggle"
+      type="button"
+      class="layout-btn"
+      class:active={syncMap}
+      class:hidden={layout === "1x1"}
+      aria-pressed={syncMap ? "true" : "false"}
+      title={syncMap
+        ? "Camera sync enabled across windows (Click to toggle off)"
+        : "Camera sync disabled (Click to toggle on)"}
+      onclick={() => onToggleSync && onToggleSync()}
+    >
+      {syncMap ? "Sync 🔗" : "Sync ✕"}
+    </button>
   </div>
 </div>
 

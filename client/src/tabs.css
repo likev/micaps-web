@@ -152,7 +152,8 @@
   display: none !important;
 }
 
-.alloc-label {
+.alloc-label,
+.layout-label {
   font-size: 11px;
   color: var(--text-secondary, #8b949e);
   text-transform: uppercase;

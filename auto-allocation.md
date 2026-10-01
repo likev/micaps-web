@@ -39,10 +39,10 @@ The Auto-Allocation control is a `<select id="sel-auto-alloc">` dropdown located
 ```mermaid
 flowchart TD
     Select["Alloc Dropdown (TabsBar)"] --> None["none (default)"]
-    Select --> Level["level (Vertical Profile)"]
-    Select --> Model["model (Multi-Model NWP)"]
-    Select --> Step["step (Forecast Lead Sequence)"]
-    Select --> Time["time (Obs Trend / NWP dProg/dt)"]
+    Select --> Level["multi-level-contrast (level)"]
+    Select --> Model["multi-model-contrast (model)"]
+    Select --> Step["multi-step-contrast (step)"]
+    Select --> Time["multi-time-contrast / multi-init-contrast (time)"]
 
     Level --> L_Action["Distributes DEFAULT_LEVELS across visible windows<br/>(500, 850, 1000, 200, 700, 925 hPa)"]
     Model --> M_Action["Distributes DEFAULT_MODELS across visible windows<br/>(ECMWF_HR, GRAPES_GFS, BEIJING_MR, GRAPES_3KM, ...)"]
@@ -55,13 +55,13 @@ flowchart TD
 
 ### Summary Matrix
 
-| Mode | Target Product Type | Controlled Window Parameter | Shared Controls |
-|---|---|---|---|
-| **`none`** *(default)* | Any | None (windows stay unified or manual) | Independent |
-| **`level`** | 3D Upper-Air Fields (`hasLevel: true`) | `win.level` | **Shared** Timeline & Levels |
-| **`model`** | Numerical Weather Prediction (NWP) | `win.model` + layer models | **Shared** Timeline & Levels |
-| **`step`** | NWP Forecast Cycles | `win.period` (lead hours) | Independent |
-| **`time`** | Observation & NWP | `win.obsTime` (Obs) or `win.forecastCycle` + `win.period` (NWP) | Independent |
+| Mode | Label in UI | Target Product Type | Controlled Window Parameter | Shared Controls |
+|---|---|---|---|---|
+| **`none`** *(default)* | `none` | Any | None (windows stay unified or manual) | Independent |
+| **`level`** | `multi-level-contrast` | 3D Upper-Air Fields (`hasLevel: true`) | `win.level` | **Shared** Timeline & Levels |
+| **`model`** | `multi-model-contrast` | Numerical Weather Prediction (NWP) | `win.model` + layer models | **Shared** Timeline & Levels |
+| **`step`** | `multi-step-contrast` | NWP Forecast Cycles | `win.period` (lead hours) | Independent |
+| **`time`** | `multi-time-contrast` (Obs) / `multi-init-contrast` (NWP) | Observation & NWP | `win.obsTime` (Obs) or `win.forecastCycle` + `win.period` (NWP) | Independent |
 
 ---
 

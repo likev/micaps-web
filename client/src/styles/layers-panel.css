@@ -119,6 +119,83 @@
 
 .layer-config.hidden { display: none; }
 
+.config-subtabs-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 6px;
+  margin-bottom: 2px;
+  overflow-x: auto;
+}
+
+.config-subtab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-secondary, #8b949e);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  line-height: 1.2;
+  user-select: none;
+}
+
+.config-subtab-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary, #c9d1d9);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.config-subtab-btn.active {
+  background: rgba(56, 139, 253, 0.15);
+  border-color: #58a6ff;
+  color: #58a6ff;
+  font-weight: 600;
+}
+
+.subtab-icon {
+  font-size: 11px;
+}
+
+.subtab-title {
+  font-size: 11px;
+}
+
+.subtab-dot {
+  font-size: 8px;
+  line-height: 1;
+  margin-left: 2px;
+}
+
+.subtab-dot.dot-blue {
+  color: #58a6ff;
+}
+
+.subtab-dot.dot-red {
+  color: #f85149;
+}
+
+.subtab-dot.dot-amber {
+  color: #d29922;
+}
+
+.config-subtab-pane {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.config-subtab-pane.active {
+  display: flex;
+}
+
 .layer-config input,
 .layer-config select {
   min-width: 0;

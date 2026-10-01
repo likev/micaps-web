@@ -35,6 +35,13 @@ export class HovmollerPanel {
     this.activeCycle = null; this.availableCycles = [];
     this._initDOM();
   }
+  _formatTimeDirLabel(dir = this.timeDir) {
+    const s = Number.isFinite(Number(this.span?.start)) ? Number(this.span.start) : (this.options.startHour ?? 0);
+    const e = Number.isFinite(Number(this.span?.end)) ? Number(this.span.end) : (this.options.endHour ?? 144);
+    const min = Math.min(s, e);
+    const max = Math.max(s, e);
+    return dir === "rev" ? `⇄ ${max}→${min}h` : `⇄ ${min}→${max}h`;
+  }
   _initDOM() {
     if (typeof document === "undefined" || typeof document.getElementById !== "function") return;
     const panelId = `hovmoller-panel-${this.options.windowId || "default"}`;
@@ -85,7 +92,7 @@ export class HovmollerPanel {
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
           <button class="hov-btn-swap" title="Swap axes (display-only, no refetch)" style="background:#21262d;border:1px solid #30363d;color:#e3b341;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;">⇄ X:dist · Y:time</button>
-          <button class="hov-btn-rev" title="Reverse time axis (display-only)" style="background:#21262d;border:1px solid #30363d;color:#e3b341;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;">⇄ 0→144h</button>
+          <button class="hov-btn-rev" title="Reverse time axis (display-only)" style="background:#21262d;border:1px solid #30363d;color:#e3b341;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;">${this._formatTimeDirLabel(this.timeDir)}</button>
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="hov-cb-rh" checked /> <span style="color:#56d4dd;">RH</span></label>
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="hov-cb-temp" checked /> <span style="color:#f85149;">T</span></label>
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="hov-cb-vvel" checked /> <span style="color:#39c5bb;">VVEL</span></label>
@@ -168,13 +175,15 @@ export class HovmollerPanel {
     if (swap) swap.textContent = this.axisSwap === "time-x" ? "⇄ X:time · Y:dist" : "⇄ X:dist · Y:time";
     const rev = this.container?.querySelector(".hov-btn-rev");
     if (rev) {
-      const s = this.span.start ?? 0, e = this.span.end ?? 144;
-      rev.textContent = this.timeDir === "rev" ? `⇄ ${e}→${s}h` : `⇄ ${s}→${e}h`;
+      rev.textContent = this._formatTimeDirLabel();
     }
     const fv = this.container?.querySelector(".hov-footer-view");
     if (fv) {
-      const s = this.span.start ?? 0, e = this.span.end ?? 144;
-      fv.textContent = `[X:${this.axisSwap === "time-x" ? "time" : "dist"} · ${this.timeDir === "rev" ? `${e}→${s}` : `${s}→${e}`}]`;
+      const s = Number.isFinite(Number(this.span?.start)) ? Number(this.span.start) : (this.options.startHour ?? 0);
+      const e = Number.isFinite(Number(this.span?.end)) ? Number(this.span.end) : (this.options.endHour ?? 144);
+      const min = Math.min(s, e);
+      const max = Math.max(s, e);
+      fv.textContent = `[X:${this.axisSwap === "time-x" ? "time" : "dist"} · ${this.timeDir === "rev" ? `${max}→${min}` : `${min}→${max}`}]`;
     }
   }
   _bindEvents() {
@@ -184,12 +193,19 @@ export class HovmollerPanel {
     q(".hov-btn-min")?.addEventListener("click", () => this.toggleMinimize());
     q(".hov-btn-export")?.addEventListener("click", () => this.exportPNG());
     q(".hov-btn-cancel")?.addEventListener("click", () => this.options.onCancel?.());
-    q(".hov-btn-span")?.addEventListener("click", () => {
+    const fireSpan = () => {
       const s = parseInt(q(".hov-input-start")?.value, 10) || 0;
       const e = parseInt(q(".hov-input-end")?.value, 10) || 144;
       const st = parseInt(q(".hov-select-step")?.value, 10) || 12;
-      this.options.onSpanChange?.(s, e, st);
-    });
+      if (typeof this.options.onSpanChange === "function") {
+        this.options.onSpanChange(s, e, st);
+      } else {
+        this.setSpan(s, e, st);
+      }
+    };
+    q(".hov-btn-span")?.addEventListener("click", fireSpan);
+    q(".hov-input-start")?.addEventListener("keydown", (e) => { if (e.key === "Enter") fireSpan(); });
+    q(".hov-input-end")?.addEventListener("keydown", (e) => { if (e.key === "Enter") fireSpan(); });
     q(".hov-select-level")?.addEventListener("change", (e) => this.options.onLevelChange?.(parseInt(e.target.value, 10)));
     q(".hov-btn-lineapply")?.addEventListener("click", () => {
       const a = { lon: parseFloat(q(".hov-input-alon")?.value), lat: parseFloat(q(".hov-input-alat")?.value) };
@@ -200,8 +216,20 @@ export class HovmollerPanel {
     q(".hov-btn-draw")?.addEventListener("click", () => this.options.onDrawLine?.());
     q(".hov-btn-seta")?.addEventListener("click", () => this.options.onSetA?.());
     q(".hov-btn-setb")?.addEventListener("click", () => this.options.onSetB?.());
-    q(".hov-btn-swap")?.addEventListener("click", () => this.options.onAxisSwap?.());
-    q(".hov-btn-rev")?.addEventListener("click", () => this.options.onTimeDir?.());
+    q(".hov-btn-swap")?.addEventListener("click", () => {
+      if (typeof this.options.onAxisSwap === "function") {
+        this.options.onAxisSwap();
+      } else {
+        this.setView(this.axisSwap === "dist-x" ? "time-x" : "dist-x", this.timeDir);
+      }
+    });
+    q(".hov-btn-rev")?.addEventListener("click", () => {
+      if (typeof this.options.onTimeDir === "function") {
+        this.options.onTimeDir();
+      } else {
+        this.setView(this.axisSwap, this.timeDir === "rev" ? "fwd" : "rev");
+      }
+    });
     q(".hov-select-cycle")?.addEventListener("change", (e) => this.options.onCycleChange?.(e.target.value));
     q(".hov-select-model")?.addEventListener("change", (e) => {
       this.model = e.target.value;
@@ -380,12 +408,18 @@ export class HovmollerPanel {
     this._refreshHeader();
   }
   setSpan(start, end, step) {
-    this.span = { start, end, step };
+    const s = Number.isFinite(Number(start)) ? Number(start) : (this.span.start ?? 0);
+    const e = Number.isFinite(Number(end)) ? Number(end) : (this.span.end ?? 144);
+    const st = step !== undefined && Number.isFinite(Number(step)) ? Number(step) : (this.span.step ?? 12);
+    this.span = { start: s, end: e, step: st };
+    this.options.startHour = s;
+    this.options.endHour = e;
+    this.options.stepHours = st;
     if (!this.container) return;
     const q = (s) => this.container.querySelector(s);
-    if (q(".hov-input-start")) q(".hov-input-start").value = start;
-    if (q(".hov-input-end")) q(".hov-input-end").value = end;
-    if (q(".hov-select-step")) q(".hov-select-step").value = step;
+    if (q(".hov-input-start")) q(".hov-input-start").value = s;
+    if (q(".hov-input-end")) q(".hov-input-end").value = e;
+    if (q(".hov-select-step")) q(".hov-select-step").value = st;
     this._syncViewButtons();
   }
   setLevel(level) {
@@ -395,8 +429,15 @@ export class HovmollerPanel {
     this._refreshHeader();
   }
   setView(axisSwap, timeDir) {
-    this.axisSwap = axisSwap; this.timeDir = timeDir;
-    this.canvasRenderer?.setView(axisSwap, timeDir);
+    if (axisSwap !== undefined && axisSwap !== null) {
+      this.axisSwap = axisSwap;
+      this.options.axisSwap = axisSwap;
+    }
+    if (timeDir !== undefined && timeDir !== null) {
+      this.timeDir = timeDir;
+      this.options.timeDir = timeDir;
+    }
+    this.canvasRenderer?.setView(this.axisSwap, this.timeDir);
     this._syncViewButtons();
   }
   syncElementCheckbox(element, checked) {
@@ -432,6 +473,20 @@ export class HovmollerPanel {
   hideProgress() { const w = this.container?.querySelector(".hov-progress-wrap"); if (w) w.style.display = "none"; }
   setData(matrix, distKm) {
     this.matrix = matrix;
+    if (matrix?.leads && matrix.leads.length > 0) {
+      const start = Math.min(...matrix.leads);
+      const end = Math.max(...matrix.leads);
+      this.span = { ...this.span, start, end };
+      this.options.startHour = start;
+      this.options.endHour = end;
+      if (this.container) {
+        const inputStart = this.container.querySelector(".hov-input-start");
+        const inputEnd = this.container.querySelector(".hov-input-end");
+        if (inputStart) inputStart.value = start;
+        if (inputEnd) inputEnd.value = end;
+      }
+      this._syncViewButtons();
+    }
     if (this.canvasRenderer) {
       const step = matrix?.rainStep || this.rainStep;
       if (step) {

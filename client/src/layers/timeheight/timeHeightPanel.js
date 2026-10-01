@@ -54,9 +54,28 @@ export class TimeHeightPanel {
     this.activeCycle = null;
     this.availableCycles = [];
     this.timeDirection = this.options.timeDirection || "ltr";
+    this.startHour = this.options.startHour !== undefined ? this.options.startHour : 0;
+    this.endHour = this.options.endHour !== undefined ? this.options.endHour : 144;
+    this.stepHours = this.options.stepHours !== undefined ? this.options.stepHours : 12;
     this.resizeObserver = null;
 
     this._initDOM();
+  }
+
+  _formatDirectionLabel(dir = this.timeDirection) {
+    const s = this.startHour ?? this.options.startHour ?? 0;
+    const e = this.endHour ?? this.options.endHour ?? 144;
+    const min = Math.min(s, e);
+    const max = Math.max(s, e);
+    return dir === "rtl" ? `⇄ ${max}→${min}h` : `⇄ ${min}→${max}h`;
+  }
+
+  _updateDirectionButton() {
+    if (!this.container) return;
+    const btnDir = this.container.querySelector(".th-btn-direction");
+    if (btnDir) {
+      btnDir.textContent = this._formatDirectionLabel();
+    }
   }
 
   _initDOM() {
@@ -122,12 +141,12 @@ export class TimeHeightPanel {
           <span>Init:</span>
           <select class="th-select-cycle" style="background: #0d1117; border: 1px solid #30363d; color: #58a6ff; border-radius: 4px; padding: 2px 6px; font-size: 11px; cursor: pointer;"></select>
           <span style="margin-left: 6px;">Span:</span>
-          <input type="number" class="th-input-start" value="${this.options.startHour}" min="0" max="240" step="12" style="width: 44px; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 2px 4px; text-align: center; font-size: 11px;" />
+          <input type="number" class="th-input-start" value="${this.startHour}" min="0" max="240" step="12" style="width: 44px; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 2px 4px; text-align: center; font-size: 11px;" />
           <span>–</span>
-          <input type="number" class="th-input-end" value="${this.options.endHour}" min="12" max="240" step="12" style="width: 44px; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 2px 4px; text-align: center; font-size: 11px;" />
+          <input type="number" class="th-input-end" value="${this.endHour}" min="12" max="240" step="12" style="width: 44px; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 2px 4px; text-align: center; font-size: 11px;" />
           <span>h</span>
           <select class="th-select-step" style="background: #0d1117; border: 1px solid #30363d; color: #e6edf3; border-radius: 4px; padding: 2px 4px; font-size: 11px; cursor: pointer;">
-            ${SUPPORTED_STEPS.map((s) => `<option value="${s}" ${s === this.options.stepHours ? "selected" : ""}>@${s}h</option>`).join("")}
+            ${SUPPORTED_STEPS.map((s) => `<option value="${s}" ${s === this.stepHours ? "selected" : ""}>@${s}h</option>`).join("")}
           </select>
           <button class="th-btn-apply" style="background: #21262d; border: 1px solid #30363d; color: #58a6ff; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer;">Apply</button>
         </div>
@@ -135,7 +154,7 @@ export class TimeHeightPanel {
         <div style="display: flex; align-items: center; gap: 10px;">
           <!-- Time Direction Toggle -->
           <button class="th-btn-direction" title="Toggle time axis direction (left-to-right vs right-to-left)" style="background: #21262d; border: 1px solid #30363d; color: #e3b341; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer;">
-            ${this.timeDirection === "rtl" ? "⇄ 144→0h" : "⇄ 0→144h"}
+            ${this._formatDirectionLabel(this.timeDirection)}
           </button>
           <!-- Display Layer Toggles -->
           <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;"><input type="checkbox" class="th-cb-rh" checked /> <span style="color: #56d4dd;">RH</span></label>
@@ -223,6 +242,7 @@ export class TimeHeightPanel {
       this.resizeObserver.observe(this.container);
     }
 
+    this._updateDirectionButton();
     this._bindEvents();
   }
 
@@ -283,7 +303,11 @@ export class TimeHeightPanel {
       const s = parseInt(inputStart.value, 10) || 0;
       const e = parseInt(inputEnd.value, 10) || 144;
       const st = parseInt(selectStep.value, 10) || 12;
-      this.options.onRangeChange?.(s, e, st);
+      if (this.options.onRangeChange) {
+        this.options.onRangeChange(s, e, st);
+      } else {
+        this.setRange(s, e, st);
+      }
     };
     btnApply?.addEventListener("click", fireRange);
     inputStart?.addEventListener("keydown", (e) => { if (e.key === "Enter") fireRange(); });
@@ -556,20 +580,22 @@ export class TimeHeightPanel {
   }
 
   setRange(start, end, step) {
-    this.options.startHour = start;
-    this.options.endHour = end;
-    this.options.stepHours = step;
+    const s = Number.isFinite(Number(start)) ? Number(start) : (this.startHour ?? 0);
+    const e = Number.isFinite(Number(end)) ? Number(end) : (this.endHour ?? 144);
+    this.startHour = s;
+    this.endHour = e;
+    if (step !== undefined && Number.isFinite(Number(step))) this.stepHours = Number(step);
+    this.options.startHour = this.startHour;
+    this.options.endHour = this.endHour;
+    if (step !== undefined) this.options.stepHours = this.stepHours;
     if (!this.container) return;
     const inputStart = this.container.querySelector(".th-input-start");
     const inputEnd = this.container.querySelector(".th-input-end");
     const selectStep = this.container.querySelector(".th-select-step");
-    if (inputStart) inputStart.value = start;
-    if (inputEnd) inputEnd.value = end;
-    if (selectStep) selectStep.value = step;
-    const btnDir = this.container.querySelector(".th-btn-direction");
-    if (btnDir) {
-      btnDir.textContent = this.timeDirection === "rtl" ? `⇄ ${end}→${start}h` : `⇄ ${start}→${end}h`;
-    }
+    if (inputStart) inputStart.value = this.startHour;
+    if (inputEnd) inputEnd.value = this.endHour;
+    if (selectStep && step !== undefined) selectStep.value = this.stepHours;
+    this._updateDirectionButton();
   }
 
   syncElementCheckbox(element, checked) {
@@ -621,17 +647,20 @@ export class TimeHeightPanel {
     }
   }
 
-  setTimeDirection(dir) {
+  setTimeDirection(dir, start, end) {
     this.timeDirection = dir;
+    if (start !== undefined && Number.isFinite(Number(start))) {
+      this.startHour = Number(start);
+      this.options.startHour = this.startHour;
+    }
+    if (end !== undefined && Number.isFinite(Number(end))) {
+      this.endHour = Number(end);
+      this.options.endHour = this.endHour;
+    }
     if (this.canvasRenderer) {
       this.canvasRenderer.setTimeDirection(dir);
     }
-    if (this.container) {
-      const btnDir = this.container.querySelector(".th-btn-direction");
-      if (btnDir) {
-        btnDir.textContent = dir === "rtl" ? "⇄ 144→0h" : "⇄ 0→144h";
-      }
-    }
+    this._updateDirectionButton();
   }
 
   setProgress({ loaded, total, pct, cacheHits = 0, cancelled = false } = {}) {
@@ -660,6 +689,21 @@ export class TimeHeightPanel {
 
   setData(matrix) {
     this.matrix = matrix;
+    if (matrix?.leads && matrix.leads.length > 0) {
+      const start = Math.min(...matrix.leads);
+      const end = Math.max(...matrix.leads);
+      this.startHour = start;
+      this.endHour = end;
+      this.options.startHour = start;
+      this.options.endHour = end;
+      if (this.container) {
+        const inputStart = this.container.querySelector(".th-input-start");
+        const inputEnd = this.container.querySelector(".th-input-end");
+        if (inputStart) inputStart.value = start;
+        if (inputEnd) inputEnd.value = end;
+      }
+      this._updateDirectionButton();
+    }
     if (this.canvasRenderer) {
       this.canvasRenderer.setData(matrix);
     }
