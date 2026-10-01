@@ -29,6 +29,8 @@ export {
   filterFieldToConfigFlag,
   getViewAutoCheckPatch,
   VIEW_LOGIC,
+  hasActiveRules,
+  isFieldFiltered,
 } from "./station/stationFilter.js";
 
 export {

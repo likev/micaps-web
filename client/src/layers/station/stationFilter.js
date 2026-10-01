@@ -13,9 +13,21 @@ export function isViewOnly(cfg) {
 
 const VIEW_FIELD_ALIASES = {
   TT: "TT",
+  TEMP: "TT",
+  TMP: "TT",
+  TEMPERATURE: "TT",
+  TEM: "TT",
   TD: "Td",
+  DEW: "Td",
+  DEWPOINT: "Td",
+  DEW_POINT: "Td",
+  DPT: "Td",
   DTD: "DTD",
   WIND: "Wind",
+  WIN: "Wind",
+  WS: "Wind",
+  WIND_SPEED: "Wind",
+  WINDSPEED: "Wind",
   RAIN: "Rain",
   RAIN6: "Rain6",
   RAIN6H: "Rain6",
@@ -23,6 +35,8 @@ const VIEW_FIELD_ALIASES = {
   VIS: "Visibility",
   VV: "Visibility",
   SLP: "SLP",
+  PRS: "SLP",
+  PRESSURE: "SLP",
   HEIGHT: "Height",
   HGT: "Height",
 };
@@ -89,6 +103,23 @@ export function hasActiveStationFilters(cfg) {
 }
 
 export const hasActiveFilters = hasActiveStationFilters;
+
+export function hasActiveRules(cfg) {
+  if (!cfg) return false;
+  return collectActiveRules(cfg).length > 0;
+}
+
+export function isFieldFiltered(cfg, field) {
+  const canonical = normalizeFilterField(field);
+  if (!canonical) return false;
+  return collectActiveRules(cfg).some((r) => {
+    const rc = normalizeFilterField(r.field);
+    if (rc === canonical) return true;
+    if ((canonical === "Rain" || canonical === "Rain6") && (rc === "Rain" || rc === "Rain6")) return true;
+    if ((canonical === "SLP" || canonical === "Height") && (rc === "SLP" || rc === "Height")) return true;
+    return false;
+  });
+}
 
 // ViewOnly element gate: an element is drawn iff every active rule on its
 // own field passes. Fields without rules (or unknown fields) default to

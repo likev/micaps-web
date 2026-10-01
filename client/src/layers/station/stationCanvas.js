@@ -5,7 +5,14 @@ import {
   setLastStationGeoJSON,
 } from "./stationState.js";
 import { hashStation } from "./stationExtract.js";
-import { compileStationFilter, hasActiveStationFilters } from "./stationFilter.js";
+import {
+  compileStationFilter,
+  hasActiveStationFilters,
+  collectActiveRules,
+  normalizeFilterField,
+  isViewOnly,
+  isFieldVisibleInView,
+} from "./stationFilter.js";
 import { renderStationPlotToCanvas } from "./stationPlot.js";
 import {
   onStationMouseMove,
@@ -302,40 +309,94 @@ export function drawStationCanvas(map) {
     const lCfg = { ...(state.config || {}), ...(layerEntry.config || {}) };
     const isSoftStale = lCfg.status === "soft-stale" || lCfg.isSoftStale;
     const isHardStale = lCfg.status === "hard-stale" || lCfg.isHardStale;
-    const isFilterActive = hasActiveStationFilters(lCfg);
-    const filterFn = compileStationFilter(lCfg);
 
-    // 1. Data filtering filters the candidate list FIRST
+    const activeRules = collectActiveRules(lCfg);
+    const hasRules = activeRules.length > 0;
+    const viewMode = isViewOnly(lCfg);
+    const isWholeFilter = hasRules && !viewMode;
+
+    const rawMinZoom = lCfg.minZoom ?? lCfg.minzoom;
+    const minZ = (rawMinZoom !== undefined && rawMinZoom !== null) ? Number(rawMinZoom) : null;
+    const hasMinZoom = minZ !== null && !isNaN(minZ);
+    const isBelowMinZoom = hasMinZoom && curZoom < minZ;
+
+    const UNFILTERED_BIN_CAP = 5;
+    const FILTERED_BIN_CAP = 10;
+    const DENSE_FILTER_THRESHOLD = 500;
+
+    // Track filtered canonical fields
+    const filteredRuleFields = new Set();
+    for (const r of activeRules) {
+      const canonical = normalizeFilterField(r.field);
+      if (canonical) filteredRuleFields.add(canonical);
+    }
+    const isFieldFiltered = (f) => {
+      const canon = normalizeFilterField(f) || f;
+      if (filteredRuleFields.has(canon)) return true;
+      if ((canon === "Rain" || canon === "Rain6") && (filteredRuleFields.has("Rain") || filteredRuleFields.has("Rain6"))) return true;
+      if ((canon === "SLP" || canon === "Height") && (filteredRuleFields.has("SLP") || filteredRuleFields.has("Height"))) return true;
+      return false;
+    };
+
+    // 1. Data filtering and matching counts
     const rawFeatures = layerEntry.geojson?.features || [];
     const candidateFeatures = [];
     let validCount = 0;
-    for (let i = 0; i < rawFeatures.length; i++) {
-      const f = rawFeatures[i];
-      if (!f.geometry || !Array.isArray(f.geometry.coordinates) || f.geometry.coordinates.length < 2) continue;
-      validCount++;
-      if (!filterFn(f.properties || {})) continue;
-      candidateFeatures.push(f);
-    }
+    let filteredMatchCount = 0;
 
-    const filteredCount = candidateFeatures.length;
-    // Filtering is active if data filter rules exist on the layer, or if candidate count was reduced by filtering
-    const isFiltered = isFilterActive || (validCount > 0 && filteredCount < validCount);
-    // Sparse means the filtered result has <= 500 stations, or is notably reduced (< 75% of valid stations)
-    const isSparse = isFiltered && (filteredCount <= 500 || (validCount > 0 && filteredCount < validCount * 0.75));
-    // Bypass decluttering completely when filtered station set is sparse, showing all matching stations
-    const bypassDeclutter = isFiltered && isSparse;
-
-    // Min-zoom gating: if layer specifies minZoom, respect it in full-density mode,
-    // but relax/bypass when data filter rules are active or filtered station set is sparse.
-    const rawMinZoom = lCfg.minZoom ?? lCfg.minzoom;
-    if (rawMinZoom !== undefined && rawMinZoom !== null) {
-      const minZ = Number(rawMinZoom);
-      if (!isNaN(minZ) && curZoom < minZ && !isFiltered) {
-        continue;
+    if (isWholeFilter) {
+      const filterFn = compileStationFilter(lCfg);
+      for (let i = 0; i < rawFeatures.length; i++) {
+        const f = rawFeatures[i];
+        if (!f.geometry || !Array.isArray(f.geometry.coordinates) || f.geometry.coordinates.length < 2) continue;
+        validCount++;
+        if (!filterFn(f.properties || {})) continue;
+        candidateFeatures.push(f);
+      }
+      filteredMatchCount = candidateFeatures.length;
+    } else if (viewMode && hasRules) {
+      for (let i = 0; i < rawFeatures.length; i++) {
+        const f = rawFeatures[i];
+        if (!f.geometry || !Array.isArray(f.geometry.coordinates) || f.geometry.coordinates.length < 2) continue;
+        validCount++;
+        const p = f.properties || {};
+        let matchesAnyFiltered = false;
+        for (const field of filteredRuleFields) {
+          if (isFieldVisibleInView(p, lCfg, field)) {
+            matchesAnyFiltered = true;
+            break;
+          }
+        }
+        if (matchesAnyFiltered) filteredMatchCount++;
+        // If curZoom < minZoom, unfiltered elements are culled.
+        // Stations without matching filtered elements have nothing to show, so skip early!
+        if (isBelowMinZoom && !matchesAnyFiltered) continue;
+        candidateFeatures.push(f);
+      }
+    } else {
+      // Unfiltered
+      for (let i = 0; i < rawFeatures.length; i++) {
+        const f = rawFeatures[i];
+        if (!f.geometry || !Array.isArray(f.geometry.coordinates) || f.geometry.coordinates.length < 2) continue;
+        validCount++;
+        candidateFeatures.push(f);
       }
     }
 
+    // Zoom-level culling (minZoom):
+    // 1. Without rules: cull completely if curZoom < minZoom.
+    // 2. With whole filter rules: if filtered dataset is dense (>= 500), do NOT bypass minZoom!
+    // 3. ViewOnly mode: minZoom culling operates per element (unfiltered elements culled, sparse filtered kept).
+    if (!hasRules && isBelowMinZoom) {
+      continue;
+    }
+    const isDenseFiltered = isWholeFilter && filteredMatchCount >= DENSE_FILTER_THRESHOLD;
+    if (isBelowMinZoom && isDenseFiltered) {
+      continue;
+    }
+
     const screenBins = new Map();
+    const binSize = 100;
 
     for (let i = 0; i < candidateFeatures.length; i++) {
       const f = candidateFeatures[i];
@@ -356,7 +417,6 @@ export function drawStationCanvas(map) {
       const pt = map.project([lon, lat]);
       if (pt.x < -60 || pt.x > w + 60 || pt.y < -60 || pt.y > h + 60) continue;
 
-      const binSize = (isFiltered && !bypassDeclutter) ? 50 : 100;
       const binKey = `${Math.floor(pt.x / binSize)},${Math.floor(pt.y / binSize)}`;
       let list = screenBins.get(binKey);
       if (!list) {
@@ -368,37 +428,148 @@ export function drawStationCanvas(map) {
     }
 
     const selectedStations = [];
+
     for (const [binKey, list] of screenBins.entries()) {
-      let chosen;
-      if (bypassDeclutter) {
-        chosen = list;
-      } else if (isFiltered) {
-        if (list.length <= 20) {
+      if (!hasRules) {
+        // Full-density unfiltered mode: LoD caps at UNFILTERED_BIN_CAP (5)
+        let chosen;
+        if (list.length <= UNFILTERED_BIN_CAP) {
           chosen = list;
         } else {
           list.sort((a, b) => a.hash - b.hash);
-          chosen = list.slice(0, 20);
+          chosen = list.slice(0, UNFILTERED_BIN_CAP);
+        }
+        for (let i = 0; i < chosen.length; i++) {
+          const item = chosen[i];
+          item.allowedFields = null;
+          selectedStations.push(item);
+        }
+      } else if (isWholeFilter) {
+        // Whole-station filtered mode:
+        // Sparse cells keep all matching stations; dense cells are decluttered to FILTERED_BIN_CAP (10)
+        let chosen;
+        if (list.length <= FILTERED_BIN_CAP) {
+          chosen = list;
+        } else {
+          list.sort((a, b) => a.hash - b.hash);
+          chosen = list.slice(0, FILTERED_BIN_CAP);
+        }
+        for (let i = 0; i < chosen.length; i++) {
+          const item = chosen[i];
+          item.allowedFields = null;
+          selectedStations.push(item);
         }
       } else {
-        if (list.length <= 5) {
-          chosen = list;
-        } else {
-          list.sort((a, b) => a.hash - b.hash);
-          chosen = list.slice(0, 5);
-        }
-      }
+        // ViewOnly mode: culling & decluttering operate PER ELEMENT
+        const filteredMatches = [];
+        const unfilteredCandidates = [];
 
-      for (let i = 0; i < chosen.length; i++) {
-        const item = chosen[i];
-        const hoverBinKey = `${Math.floor(item.pt.x / 100)},${Math.floor(item.pt.y / 100)}`;
-        let existingBin = activeBins.get(hoverBinKey);
-        if (!existingBin) {
-          existingBin = [];
-          activeBins.set(hoverBinKey, existingBin);
+        for (let i = 0; i < list.length; i++) {
+          const item = list[i];
+          const p = item.feature.properties || {};
+          const matchedFields = [];
+          for (const field of filteredRuleFields) {
+            if (isFieldVisibleInView(p, lCfg, field)) {
+              matchedFields.push(field);
+            }
+          }
+          item._matchedFields = matchedFields;
+          if (matchedFields.length > 0) {
+            filteredMatches.push(item);
+          } else {
+            unfilteredCandidates.push(item);
+          }
         }
-        existingBin.push(item);
-        selectedStations.push(item);
+
+        // 1. Filtered elements: prioritize stations matching active filter rules.
+        // Sparse cells keep all matching stations (up to FILTERED_BIN_CAP);
+        // dense cells are decluttered to FILTERED_BIN_CAP to prevent overlapping.
+        let chosenFiltered;
+        if (filteredMatches.length <= FILTERED_BIN_CAP) {
+          chosenFiltered = filteredMatches;
+        } else {
+          filteredMatches.sort((a, b) => a.hash - b.hash);
+          chosenFiltered = filteredMatches.slice(0, FILTERED_BIN_CAP);
+        }
+
+        const ALL_CANDIDATE_FIELDS = [
+          "TT", "Td", "DTD", "Wind", "Rain", "Rain6",
+          "Visibility", "SLP", "Height", "Cloud", "Weather", "Tendency"
+        ];
+
+        // For each chosen filtered station:
+        // - Allow matched filtered fields
+        // - If curZoom >= minZoom (!isBelowMinZoom), ALSO allow all unfiltered candidate fields
+        for (let i = 0; i < chosenFiltered.length; i++) {
+          const item = chosenFiltered[i];
+          const allowed = new Set();
+          if (item._matchedFields) {
+            for (const f of item._matchedFields) {
+              allowed.add(f);
+              if (f === "Rain6" || f === "Rain") {
+                allowed.add("Rain");
+                allowed.add("Rain6");
+              }
+              if (f === "SLP" || f === "Height") {
+                allowed.add("SLP");
+                allowed.add("Height");
+              }
+            }
+          }
+          if (!isBelowMinZoom) {
+            for (const f of ALL_CANDIDATE_FIELDS) {
+              if (!isFieldFiltered(f)) {
+                allowed.add(f);
+              }
+            }
+          }
+          if (allowed.size > 0) {
+            item.allowedFields = allowed;
+            selectedStations.push(item);
+          }
+        }
+
+        // 2. Unfiltered stations (did not match any filtered rule):
+        // If curZoom < minZoom, unfiltered elements are culled completely!
+        // If curZoom >= minZoom, declutter unfiltered stations to fill remaining capacity up to UNFILTERED_BIN_CAP
+        if (!isBelowMinZoom) {
+          const remainingSlots = Math.max(0, UNFILTERED_BIN_CAP - chosenFiltered.length);
+          if (remainingSlots > 0 && unfilteredCandidates.length > 0) {
+            let chosenOther;
+            if (unfilteredCandidates.length <= remainingSlots) {
+              chosenOther = unfilteredCandidates;
+            } else {
+              unfilteredCandidates.sort((a, b) => a.hash - b.hash);
+              chosenOther = unfilteredCandidates.slice(0, remainingSlots);
+            }
+            for (let i = 0; i < chosenOther.length; i++) {
+              const item = chosenOther[i];
+              const allowed = new Set();
+              for (const f of ALL_CANDIDATE_FIELDS) {
+                if (!isFieldFiltered(f)) {
+                  allowed.add(f);
+                }
+              }
+              if (allowed.size > 0) {
+                item.allowedFields = allowed;
+                selectedStations.push(item);
+              }
+            }
+          }
+        }
       }
+    }
+
+    // Register active hover bins
+    for (let i = 0; i < selectedStations.length; i++) {
+      const item = selectedStations[i];
+      const hoverBinKey = `${Math.floor(item.pt.x / 100)},${Math.floor(item.pt.y / 100)}`;
+      let existingBin = activeBins.get(hoverBinKey);
+      if (!existingBin) {
+        existingBin = [];
+        activeBins.set(hoverBinKey, existingBin);
+      }
+      existingBin.push(item);
     }
 
     ctx.save();
@@ -414,7 +585,7 @@ export function drawStationCanvas(map) {
 
     for (let i = 0; i < selectedStations.length; i++) {
       const s = selectedStations[i];
-      renderStationPlotToCanvas(ctx, s.feature.properties || {}, s.pt.x, s.pt.y, lCfg, scale);
+      renderStationPlotToCanvas(ctx, s.feature.properties || {}, s.pt.x, s.pt.y, lCfg, scale, s.allowedFields);
 
       // Diagonal hatch overlay for hard-stale (§2.4)
       if (isHardStale) {

@@ -7,6 +7,7 @@ import {
   drawStationCanvas,
   hasActiveStationFilters,
   compileStationFilter,
+  renderStationPlotToCanvas,
 } from "../../src/layers/stationLayer.js";
 
 function createMockContext2D() {
@@ -15,6 +16,7 @@ function createMockContext2D() {
     beginPath: 0,
     fillText: [],
     strokeText: [],
+    stroke: 0,
     save: 0,
     restore: 0,
     setTransform: [],
@@ -34,7 +36,7 @@ function createMockContext2D() {
     moveTo: () => {},
     lineTo: () => {},
     arc: () => {},
-    stroke: () => {},
+    stroke: () => calls.stroke++,
     fill: () => {},
     closePath: () => {},
     fillText: (text, x, y) => calls.fillText.push({ text, x, y }),
@@ -349,7 +351,7 @@ describe("Station Data Filtering & Zoom Declutter Bypass", () => {
     })).toBe(true);
   });
 
-  test("dense active filter still bypasses layer minZoom gating", () => {
+  test("dense active filter respects layer minZoom gating when curZoom < minZoom, and renders when zoomed in", () => {
     // 600 stations with wind > 10 (dense filtered set)
     const features = [];
     for (let i = 1; i <= 600; i++) {
@@ -367,8 +369,239 @@ describe("Station Data Filtering & Zoom Declutter Bypass", () => {
       filterRules: [{ field: "Wind", op: ">", val: 10 }],
     });
 
-    // Active filter must bypass minZoom gating even when dense
+    // Dense active filter does NOT bypass minZoom gating; it is culled below minZoom
+    expect(globalThis.__STATION_LAYER__.getVisibleCount(map)).toBe(0);
+
+    // When zoomed in (curZoom >= minZoom), dense active filter renders
+    map.setZoom(7);
+    drawStationCanvas(map);
     expect(globalThis.__STATION_LAYER__.getVisibleCount(map)).toBeGreaterThan(0);
   });
+
+  test("dense grid cell with active filter declutters to bin cap to prevent overlapping", () => {
+    // 25 stations all in the exact same 100x100px bin with wind > 5
+    const features = [];
+    for (let i = 1; i <= 25; i++) {
+      features.push({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [80.0 + i * 0.003, 45.0 + i * 0.003] },
+        properties: { station_id: `STN_DENSE_${i}`, wind_speed: 12.0 },
+      });
+    }
+    const geojson = { type: "FeatureCollection", features };
+
+    renderStationWeatherPlots(map, geojson, true, {
+      filterRules: [{ field: "Wind", op: ">", val: 5 }],
+      filterLogic: "AND",
+    });
+
+    // Decluttering must NOT be completely bypassed: dense cell caps at 10 to keep view clean
+    expect(globalThis.__STATION_LAYER__.getVisibleCount(map)).toBe(10);
+  });
+
+  test("ViewOnly mode: curZoom < minZoom culls unfiltered visibility while keeping sparse filtered wind", () => {
+    // 7 stations with wind > 5, 10 stations with wind <= 5
+    // All stations have visibility
+    const features = [];
+    for (let i = 1; i <= 7; i++) {
+      features.push({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [80.0 + i * 0.005, 45.0 + i * 0.005] },
+        properties: { station_id: `STN_GALE_${i}`, wind_speed: 14.0, visibility: 8000 },
+      });
+    }
+    for (let i = 1; i <= 10; i++) {
+      features.push({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [81.0 + i * 0.005, 46.0 + i * 0.005] },
+        properties: { station_id: `STN_CALM_${i}`, wind_speed: 2.0, visibility: 5000 },
+      });
+    }
+    const geojson = { type: "FeatureCollection", features };
+
+    // At low zoom (zoom = 3), below layer minZoom = 6
+    map.setZoom(3);
+    renderStationWeatherPlots(map, geojson, true, {
+      minZoom: 6,
+      filterRules: [{ field: "Wind", op: ">", val: 5 }],
+      filterLogic: "VIEW",
+      showWind: true,
+      showVisibility: true,
+      showTemp: false,
+      showDewpoint: false,
+    });
+
+    // Unfiltered visibility is culled by minZoom.
+    // Sparse matching wind (> 5) stations remain visible!
+    expect(globalThis.__STATION_LAYER__.getVisibleCount(map)).toBe(7);
+
+    // Canvas drew wind barbs (stroke > 0), but no visibility text was drawn
+    expect(ctx.calls.stroke).toBeGreaterThan(0);
+    expect(ctx.calls.fillText.some((f) => f.text === "8" || f.text === "5")).toBe(false);
+  });
+
+  test("ViewOnly mode: curZoom >= minZoom declutters unfiltered visibility to 5 per bin while preserving filtered wind", () => {
+    // 3 stations with wind > 5 and visibility
+    // 12 stations with wind <= 5 and visibility (all in same bin)
+    const features = [];
+    for (let i = 1; i <= 3; i++) {
+      features.push({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [80.0 + i * 0.004, 45.0 + i * 0.004] },
+        properties: { station_id: `STN_WIND_${i}`, wind_speed: 15.0, visibility: 9000 },
+      });
+    }
+    for (let i = 1; i <= 12; i++) {
+      features.push({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [80.0 + (i + 3) * 0.004, 45.0 + (i + 3) * 0.004] },
+        properties: { station_id: `STN_OTHER_${i}`, wind_speed: 1.0, visibility: 6000 },
+      });
+    }
+    const geojson = { type: "FeatureCollection", features };
+
+    map.setZoom(7); // curZoom >= minZoom
+    renderStationWeatherPlots(map, geojson, true, {
+      minZoom: 6,
+      filterRules: [{ field: "Wind", op: ">", val: 5 }],
+      filterLogic: "VIEW",
+      showWind: true,
+      showVisibility: true,
+      showTemp: false,
+      showDewpoint: false,
+    });
+
+    // All 3 filtered wind stations are preserved.
+    // Unfiltered visibility is decluttered so exactly 5 stations in the bin display visibility.
+    // Filtered stations are prioritized and no overlapping occurs.
+    const count = globalThis.__STATION_LAYER__.getVisibleCount(map);
+    expect(count).toBe(5);
+
+    // Text for visibility ("6" or "9") is rendered
+    expect(ctx.calls.fillText.some((f) => f.text === "6" || f.text === "9")).toBe(true);
+  });
+
+  test("ViewOnly mode: dense filtered stations in a cell declutter to FILTERED_BIN_CAP to prevent overlapping", () => {
+    // 25 stations all in the same 100x100px bin with wind > 5 in VIEW mode
+    const features = [];
+    for (let i = 1; i <= 25; i++) {
+      features.push({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [80.0 + i * 0.003, 45.0 + i * 0.003] },
+        properties: { station_id: `STN_VIEW_DENSE_${i}`, wind_speed: 14.0 },
+      });
+    }
+    const geojson = { type: "FeatureCollection", features };
+
+    map.setZoom(3);
+    renderStationWeatherPlots(map, geojson, true, {
+      minZoom: 6,
+      filterRules: [{ field: "Wind", op: ">", val: 5 }],
+      filterLogic: "VIEW",
+      showWind: true,
+      showVisibility: true,
+    });
+
+    // Capped at 10 stations even at low zoom to avoid barb clutter
+    expect(globalThis.__STATION_LAYER__.getVisibleCount(map)).toBe(10);
+  });
+
+  test("ViewOnly mode: multiple simultaneous active rules operate cleanly per element", () => {
+    // Stn 1: Gale + Heavy Rain
+    // Stn 2: Gale only
+    // Stn 3: Heavy Rain only
+    // Stn 4: Calm + Light Rain
+    const features = [
+      {
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [80.0, 45.0] },
+        properties: { station_id: "STN_BOTH", wind_speed: 15.0, rain_6h: 25.0, visibility: 5000 },
+      },
+      {
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [80.5, 45.0] },
+        properties: { station_id: "STN_WIND_ONLY", wind_speed: 15.0, rain_6h: 1.0, visibility: 5000 },
+      },
+      {
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [81.0, 45.0] },
+        properties: { station_id: "STN_RAIN_ONLY", wind_speed: 2.0, rain_6h: 25.0, visibility: 5000 },
+      },
+      {
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [81.5, 45.0] },
+        properties: { station_id: "STN_NEITHER", wind_speed: 2.0, rain_6h: 1.0, visibility: 5000 },
+      },
+    ];
+    const geojson = { type: "FeatureCollection", features };
+
+    map.setZoom(3); // curZoom < minZoom
+    renderStationWeatherPlots(map, geojson, true, {
+      minZoom: 6,
+      filterRules: [
+        { field: "Wind", op: ">", val: 5 },
+        { field: "Rain", op: ">", val: 10 },
+      ],
+      filterLogic: "VIEW",
+      showWind: true,
+      showRain6: true,
+      showVisibility: true,
+    });
+
+    // Stations 1, 2, 3 have matching filtered elements; Station 4 has none and is culled below minZoom
+    expect(globalThis.__STATION_LAYER__.getVisibleCount(map)).toBe(3);
+
+    // Rain text "25" is drawn
+    expect(ctx.calls.fillText.some((f) => f.text === "25")).toBe(true);
+    // Unfiltered visibility "5" is NOT drawn below minZoom
+    expect(ctx.calls.fillText.some((f) => f.text === "5")).toBe(false);
+  });
+
+  test("ViewOnly mode: large filtered dataset (>= 500 stations) does NOT get blanket-culled at zoom < minZoom", () => {
+    // 600 stations with wind > 10 in VIEW mode
+    const features = [];
+    for (let i = 1; i <= 600; i++) {
+      features.push({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [75.0 + (i % 20) * 0.5, 20.0 + Math.floor(i / 20) * 0.5] },
+        properties: { station_id: `STN_${i}`, wind_speed: 15.0 },
+      });
+    }
+    const geojson = { type: "FeatureCollection", features };
+
+    map.setZoom(3);
+    renderStationWeatherPlots(map, geojson, true, {
+      minZoom: 6,
+      filterRules: [{ field: "Wind", op: ">", val: 10 }],
+      filterLogic: "VIEW",
+      showWind: true,
+    });
+
+    // In ViewOnly mode, filtered wind is NOT blanket-culled across the whole map
+    expect(globalThis.__STATION_LAYER__.getVisibleCount(map)).toBeGreaterThan(0);
+  });
+
+  test("Weather (ww) and Visibility (vis) do not collide at the same x-coordinate without DTD", () => {
+    const p = {
+      weather_code: 61, // rain symbol "•"
+      visibility: 5000, // 5 km
+    };
+    renderStationPlotToCanvas(ctx, p, 100, 100, {
+      showWeather: true,
+      showVisibility: true,
+      showDTD: false,
+    }, 1.0);
+
+    const wwCall = ctx.calls.fillText.find((c) => c.text === "•");
+    const visCall = ctx.calls.fillText.find((c) => c.text === "5");
+
+    expect(wwCall).toBeDefined();
+    expect(visCall).toBeDefined();
+    // ww is at cx - 8 (92), vis is at cx - 22 (78); they must have distinct x coordinates
+    expect(wwCall.x).toBe(92);
+    expect(visCall.x).toBe(78);
+    expect(wwCall.x).not.toBe(visCall.x);
+  });
 });
+
 

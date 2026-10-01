@@ -15,7 +15,7 @@ import {
 } from "./stationFilter.js";
 import { getPlotTokens } from "../../map/themeTokens.js";
 
-export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0) {
+export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0, allowedFields = null) {
   const rawT = extractTemp(p, ["temperature", "temp", "TEM", "TT", "T", "TMP", "t", "temp_max", "tem"]);
   const tt = rawT !== null ? Math.round(rawT).toString() : "";
 
@@ -77,18 +77,29 @@ export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0)
   // aliases must pass for those slots to draw.
   const viewMode = isViewOnly(cfg);
   const allowField = (field) => !viewMode || isFieldVisibleInView(p, cfg, field);
-  const hasDTDPlot = Boolean(showDTD && dtd && allowField("DTD"));
-  const hasVisPlot = Boolean(showVisibility && vis && allowField("Visibility"));
+
+  // Per-element zoom culling and grid decluttering gate
+  const effectiveAllowed = allowedFields || cfg?._allowedFields || null;
+  const isAllowed = (field) => {
+    if (!effectiveAllowed) return true;
+    if (effectiveAllowed instanceof Set) return effectiveAllowed.has(field);
+    if (Array.isArray(effectiveAllowed)) return effectiveAllowed.includes(field);
+    if (typeof effectiveAllowed === "function") return effectiveAllowed(field);
+    return true;
+  };
+
+  const hasDTDPlot = Boolean(showDTD && dtd && isAllowed("DTD") && allowField("DTD"));
+  const hasVisPlot = Boolean(showVisibility && vis && isAllowed("Visibility") && allowField("Visibility"));
 
   // 1. Wind Barb
-  if (showWind && allowField("Wind") && ws !== null && ws >= 1.5) {
+  if (showWind && isAllowed("Wind") && allowField("Wind") && ws !== null && ws >= 1.5) {
     if (wd !== null && wd >= 0 && wd <= 360) {
       drawWindBarbCanvas(ctx, cx, cy, ws, wd, scale, theme.wind.color);
     }
   }
 
   // 2. Center Sky Cover or Station Dot
-  if (showCloud) {
+  if (showCloud && isAllowed("Cloud")) {
     drawSkyCoverCanvas(ctx, cx, cy, cloudCover, scale, theme.sky);
   } else {
     ctx.beginPath();
@@ -115,7 +126,7 @@ export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0)
   }
 
   // 3. TT (Temperature) - Top-Left
-  if (showTemp && allowField("TT") && tt) {
+  if (showTemp && isAllowed("TT") && allowField("TT") && tt) {
     drawPlotText(tt, cx - 8 * scale, cy - 12 * scale, "tt", "right");
   }
 
@@ -125,19 +136,19 @@ export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0)
   }
 
   // 5. TdTd (Dew Point) - Bottom-Left
-  if (showDewpoint && allowField("Td") && td) {
+  if (showDewpoint && isAllowed("Td") && allowField("Td") && td) {
     drawPlotText(td, cx - 8 * scale, cy + 12 * scale, "td", "right");
   }
 
   // 6. Weather (ww) and Visibility (VV) with DTD displacement collision rules
   if (hasDTDPlot) {
-    if (!hasVisPlot && showWeather && ww) {
+    if (!hasVisPlot && showWeather && ww && isAllowed("Weather")) {
       drawPlotText(ww, cx - 22 * scale, cy, "ww", "center");
     } else if (hasVisPlot) {
       drawPlotText(vis, cx - 22 * scale, cy, "vis", "right");
     }
   } else {
-    if (showWeather && ww) {
+    if (showWeather && ww && isAllowed("Weather")) {
       drawPlotText(ww, cx - 8 * scale, cy, "ww", "center");
     }
     if (hasVisPlot) {
@@ -146,17 +157,17 @@ export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0)
   }
 
   // 7. PPP (Pressure or Height) - Top-Right
-  if (showPressure && ppp && allowField("SLP") && allowField("Height")) {
+  if (showPressure && ppp && (isAllowed("SLP") || isAllowed("Height")) && allowField("SLP") && allowField("Height")) {
     drawPlotText(ppp, cx + 8 * scale, cy - 12 * scale, "ppp", "left");
   }
 
   // 8. R6 (6h Rain) - Middle-Right
-  if (showRain6 && rain6 && allowField("Rain") && allowField("Rain6")) {
+  if (showRain6 && rain6 && (isAllowed("Rain") || isAllowed("Rain6")) && allowField("Rain") && allowField("Rain6")) {
     drawPlotText(rain6, cx + 8 * scale, cy, "rain", "left");
   }
 
   // 9. ppa (3h Pressure Tendency & Diff) - Bottom-Right
-  if (showTendency && (pDiff || pTend)) {
+  if (showTendency && (pDiff || pTend) && isAllowed("Tendency")) {
     drawPlotText(`${pDiff}${pTend}`, cx + 8 * scale, cy + 12 * scale, "tend", "left");
   }
 }
