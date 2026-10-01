@@ -96,7 +96,10 @@ export function analyzeAndRenderSurfaceContours(map, stationsGeoJSON, rawElement
       return null;
     }
 
-    const interpolated = interpolateAndSmoothGrid(points, values, x, y, 1, 0.45);
+    const maxDistance = typeof options.maxDistance === "number"
+      ? options.maxDistance
+      : (options.maxDistance === false || options.maxDistance === null ? null : 3.0);
+    const interpolated = interpolateAndSmoothGrid(points, values, x, y, 1, 0.45, maxDistance);
     if (!interpolated) {
       console.warn(`[SurfaceAnalysis] Grid interpolation failed for ${cfg.name}`);
       return null;

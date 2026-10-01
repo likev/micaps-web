@@ -87,18 +87,89 @@ export function computeDomain(points, padding = 2.5, dDeg = 0.5, regionBounds = 
   };
 }
 
-export function interpolateAndSmoothGrid(points, values, x, y, smoothIterations = 1, smoothWeight = 0.45) {
+export function maskGridByStationDistance(grid, x, y, points, maxDistanceDeg) {
+  if (!grid || !x || !y || !points || points.length === 0 || !maxDistanceDeg || maxDistanceDeg <= 0) {
+    return grid;
+  }
+
+  const nCols = x.length;
+  const nRows = y.length;
+  const maxDegSq = maxDistanceDeg * maxDistanceDeg;
+  const bucketSize = Math.max(2.0, maxDistanceDeg);
+
+  // Spatial hashing buckets for high-performance station neighbor queries
+  const buckets = new Map();
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    const bx = Math.floor(p[0] / bucketSize);
+    const by = Math.floor(p[1] / bucketSize);
+    const key = (bx << 16) | (by & 0xffff);
+    let b = buckets.get(key);
+    if (!b) {
+      b = [];
+      buckets.set(key, b);
+    }
+    b.push(p);
+  }
+
+  const out = new Float64Array(grid);
+
+  for (let r = 0; r < nRows; r++) {
+    const lat = y[r];
+    const cosLat = Math.cos((lat * Math.PI) / 180);
+    const by = Math.floor(lat / bucketSize);
+    const rowOffset = r * nCols;
+
+    for (let c = 0; c < nCols; c++) {
+      const idx = rowOffset + c;
+      const val = out[idx];
+      if (typeof val !== "number" || isNaN(val)) continue;
+
+      const lon = x[c];
+      const bx = Math.floor(lon / bucketSize);
+
+      let within = false;
+      for (let dbx = -1; dbx <= 1 && !within; dbx++) {
+        for (let dby = -1; dby <= 1 && !within; dby++) {
+          const key = ((bx + dbx) << 16) | ((by + dby) & 0xffff);
+          const b = buckets.get(key);
+          if (!b) continue;
+          for (let i = 0; i < b.length; i++) {
+            const p = b[i];
+            const dLon = (lon - p[0]) * cosLat;
+            const dLat = lat - p[1];
+            if (dLon * dLon + dLat * dLat <= maxDegSq) {
+              within = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!within) {
+        out[idx] = NaN;
+      }
+    }
+  }
+
+  return out;
+}
+
+export function interpolateAndSmoothGrid(points, values, x, y, smoothIterations = 1, smoothWeight = 0.45, maxStationDistance = null) {
   const [X, Y] = griddata.meshgrid(x, y);
   const xi = [X, Y];
-  const avgVal = values.reduce((a, b) => a + b, 0) / values.length;
 
   let interpolated = griddata.griddata(points, values, xi, {
     method: "linear",
-    fillValue: avgVal,
+    fillValue: NaN,
   });
 
   if (!interpolated || interpolated.length < y.length * x.length) {
     return null;
+  }
+
+  if (typeof maxStationDistance === "number" && maxStationDistance > 0 && points.length > 0) {
+    interpolated = maskGridByStationDistance(interpolated, x, y, points, maxStationDistance);
   }
 
   return smoothGrid2D(interpolated, smoothIterations, smoothWeight, y.length, x.length);

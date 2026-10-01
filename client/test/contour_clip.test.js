@@ -9,6 +9,10 @@ import {
   clipFeatureCollectionToBBox,
 } from "../src/utils/geometry/clip.js";
 import {
+  maskGridByStationDistance,
+  interpolateAndSmoothGrid,
+} from "../src/layers/analysis/objectiveAnalysis.js";
+import {
   calculateFieldContours,
   analyzeAndRenderSoundingElementContour,
   analyzeAndRenderSoundingKinematicContour,
@@ -516,3 +520,113 @@ describe("Surface Observation Contour Cropping to Region Bounding Box", () => {
     expect(isolineSrc).not.toBeNull();
   });
 });
+
+describe("Observation Boundary Distance Masking and Open Isoline Termination", () => {
+  test("maskGridByStationDistance masks grid points beyond maxDistance to NaN", () => {
+    // 3x3 grid: lon 100, 105, 110; lat 20, 25, 30
+    const x = [100, 105, 110];
+    const y = [20, 25, 30];
+    const grid = new Float64Array([
+      10, 12, 14, // r=0: lat 20
+      20, 22, 24, // r=1: lat 25
+      30, 32, 34, // r=2: lat 30
+    ]);
+    // Single station at center (105, 25)
+    const points = [[105, 25]];
+    const maxDist = 3.0; // deg
+
+    const masked = maskGridByStationDistance(grid, x, y, points, maxDist);
+    expect(masked).toBeDefined();
+
+    // Center point (r=1, c=1: idx 4) is distance 0 <= 3.0, must retain value 22
+    expect(masked[4]).toBe(22);
+
+    // Corner points (r=0, c=0: 100, 20) are ~7 degrees away, must be masked to NaN
+    expect(Number.isNaN(masked[0])).toBe(true);
+    expect(Number.isNaN(masked[2])).toBe(true);
+    expect(Number.isNaN(masked[6])).toBe(true);
+    expect(Number.isNaN(masked[8])).toBe(true);
+  });
+
+  test("maskGridByStationDistance handles edge cases gracefully", () => {
+    const grid = new Float64Array([1, 2, 3, 4]);
+    expect(maskGridByStationDistance(null, [1, 2], [1, 2], [[1, 1]], 5)).toBeNull();
+    expect(maskGridByStationDistance(grid, [1, 2], [1, 2], [], 5)).toBe(grid);
+    expect(maskGridByStationDistance(grid, [1, 2], [1, 2], [[1, 1]], 0)).toBe(grid);
+    expect(maskGridByStationDistance(grid, [1, 2], [1, 2], [[1, 1]], -1)).toBe(grid);
+  });
+
+  test("interpolateAndSmoothGrid uses NaN fillValue and distance masking", () => {
+    const points = [
+      [110, 30],
+      [115, 30],
+      [112.5, 35],
+    ];
+    const values = [500, 520, 510];
+    const x = [100, 105, 110, 115, 120, 125];
+    const y = [20, 25, 30, 35, 40];
+
+    const grid = interpolateAndSmoothGrid(points, values, x, y, 1, 0.45, 4.0);
+    expect(grid).not.toBeNull();
+    expect(grid.length).toBe(x.length * y.length);
+
+    // Far-away points (e.g. lon=100, lat=20) must be NaN, NOT avgVal
+    expect(Number.isNaN(grid[0])).toBe(true);
+    expect(Number.isNaN(grid[grid.length - 1])).toBe(true);
+
+    // Points inside the triangle (near 112.5, 31) should have numeric values
+    // lon index 2 (110) or 3 (115), lat index 2 (30) -> idx = 2*6 + 2 = 14
+    expect(Number.isNaN(grid[14])).toBe(false);
+  });
+
+  test("upper-air contours terminate naturally as open polylines without looping around perimeter", () => {
+    const stns = createSampleSoundingStations();
+    // 4 stations: Beijing, Shanghai, Guangzhou, Chengdu
+    const res = calculateFieldContours(stns, (p) => p.height, {
+      element: "HGT",
+      padding: 3.0,
+      maxDistance: 6.0,
+    }, 500);
+
+    expect(res).not.toBeNull();
+    expect(res.lines.length).toBeGreaterThan(0);
+
+    // Check that isolines do NOT hug the outer bounding box edge
+    const [minLon, minLat, maxLon, maxLat] = res.bounds;
+    for (const f of res.lines) {
+      const coords = f.geometry.type === "LineString"
+        ? [f.geometry.coordinates]
+        : f.geometry.coordinates;
+
+      for (const line of coords) {
+        // If a line is open, first and last coords should not be identical
+        let pointsOnBoundary = 0;
+        for (const [lon, lat] of line) {
+          const onEdge =
+            Math.abs(lon - minLon) < 1e-4 ||
+            Math.abs(lon - maxLon) < 1e-4 ||
+            Math.abs(lat - minLat) < 1e-4 ||
+            Math.abs(lat - maxLat) < 1e-4;
+          if (onEdge) pointsOnBoundary++;
+        }
+        // No line should have all its vertices hugging the bounding box edge
+        expect(pointsOnBoundary).toBeLessThan(line.length);
+      }
+    }
+
+    // Verify there are open polylines (contours ending at the data edge)
+    const hasOpenLines = res.lines.some((f) => {
+      const coords = f.geometry.type === "LineString"
+        ? [f.geometry.coordinates]
+        : f.geometry.coordinates;
+      return coords.some((line) => {
+        if (line.length < 2) return false;
+        const p0 = line[0];
+        const p1 = line[line.length - 1];
+        return Math.hypot(p0[0] - p1[0], p0[1] - p1[1]) > 0.1;
+      });
+    });
+    expect(hasOpenLines).toBe(true);
+  });
+});
+

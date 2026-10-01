@@ -114,12 +114,8 @@ export function analyzeKinematicContours({
     const nCols = x.length;
     const nRows = y.length;
 
-    // Fill NaNs with field average for contour extraction
-    const avgVal = stats.mean || 0;
-    const filledValues = new Float32Array(values.length);
-    for (let i = 0; i < values.length; i++) {
-      filledValues[i] = Number.isNaN(values[i]) ? avgVal : values[i];
-    }
+    // Keep natural NaNs so contours cleanly terminate at observation edge
+    const filledValues = values;
 
     const customLevels = resolveRenderLevels(options);
     let levels = customLevels;

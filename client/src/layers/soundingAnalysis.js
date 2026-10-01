@@ -57,7 +57,10 @@ export function calculateFieldContours(stationsGeoJSON, valueExtractor, config =
   const { x, y, dDeg, bounds, rawBounds } = computeDomain(points, padding, 0.5, config.regionBounds || config.clipBounds);
   if (x.length < 2 || y.length < 2) return null;
 
-  const interpolated = interpolateAndSmoothGrid(points, values, x, y, 1, 0.45);
+  const maxDistance = typeof config.maxDistance === "number"
+    ? config.maxDistance
+    : (config.maxDistance === false || config.maxDistance === null ? null : 6.0);
+  const interpolated = interpolateAndSmoothGrid(points, values, x, y, 1, 0.45, maxDistance);
   if (!interpolated) {
     console.warn(`[SoundingAnalysis] Grid interpolation failed for ${config.element || "contour"}`);
     return null;
