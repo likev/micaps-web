@@ -77,11 +77,12 @@ func main() {
 	}
 
 	catH := &handler.CatalogHandler{Client: cqlClient, MockMode: cfg.MockMode}
-	gridH := &handler.GridHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode}
+	derivedH := &handler.DerivedHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode}
+	gridH := &handler.GridHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode, Derived: derivedH}
 	profileH := &handler.ProfileHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode}
 	lineH := &handler.LineHeightHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode}
 	hovH := &handler.HovmollerHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode}
-	statH := &handler.StationHandler{Client: cqlClient, MockMode: cfg.MockMode}
+	statH := &handler.StationHandler{Client: cqlClient, MockMode: cfg.MockMode, Derived: derivedH}
 	tlogpH := &handler.TLogPHandler{Client: cqlClient, MockMode: cfg.MockMode}
 	staticH := &handler.StaticHandler{Cfg: cfg, FileCache: fc}
 
@@ -96,6 +97,8 @@ func main() {
 	mux.HandleFunc("/api/catalog/latest", catH.LatestHandler)
 	mux.HandleFunc("/api/data/grid", gridH.JSONHandler)
 	mux.HandleFunc("/api/data/grid/binary", gridH.BinaryHandler)
+	// Derived layer virtual direct endpoints
+	mux.HandleFunc("/api/derived/", derivedH.DirectHandler)
 	// Time-Height profile streaming endpoint (WriteTimeout: 60s exempted inside handler via http.ResponseController)
 	mux.HandleFunc("/api/data/timeheight/profile", profileH.Handler)
 	mux.HandleFunc("/api/data/lineheight/profile", lineH.Handler)

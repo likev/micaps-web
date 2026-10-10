@@ -1,0 +1,1305 @@
+package handler
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"math"
+	"net/http"
+	"strconv"
+	"strings"
+
+	"micaps-web/db"
+	"micaps-web/filecache"
+	"micaps-web/mock"
+	"micaps-web/model"
+	"micaps-web/parser"
+)
+
+// DerivedHandler coordinates real-time server-side calculation of derived layers
+type DerivedHandler struct {
+	Client   *db.CQLClient
+	Cache    *filecache.Cache
+	MockMode bool
+}
+
+// DirectHandler handles direct HTTP requests to /api/derived/*
+func (h *DerivedHandler) DirectHandler(w http.ResponseWriter, r *http.Request) {
+	queryFile := r.URL.Query().Get("file")
+	dReq, ok := ParseDerivedPath(r.URL.Path, queryFile)
+	if !ok || dReq == nil {
+		reqPath := r.URL.Path
+		if strings.HasPrefix(reqPath, "/api/derived") {
+			reqPath = reqPath[len("/api/derived"):]
+		}
+		dReq, ok = ParseDerivedPath(reqPath, queryFile)
+	}
+	if !ok || dReq == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": fmt.Sprintf("invalid derived virtual path: %s", r.URL.Path),
+		})
+		return
+	}
+
+	if dReq.File == "" {
+		dReq.File = queryFile
+	}
+	if dReq.File == "" || dReq.File == "latest" {
+		underlying := ResolveUnderlyingCatalogPath(dReq)
+		if h.Client != nil && !h.MockMode {
+			latest, err := db.GetLatestCycle(h.Client, underlying, "")
+			if err == nil && latest != "" {
+				dReq.File = latest
+			}
+		}
+		if dReq.File == "" || dReq.File == "latest" {
+			if dReq.IsStation {
+				dReq.File = "20261010080000.000"
+			} else {
+				dReq.File = "26100920.012"
+			}
+		}
+	}
+
+	if dReq.IsStation {
+		w.Header().Set("Content-Type", "application/json")
+		stns, err := h.CalculateDerivedStation(dReq)
+		if err != nil {
+			log.Printf("[DerivedHandler] Error calculating derived station layer: %v", err)
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"type":     "FeatureCollection",
+				"features": []interface{}{},
+				"error":    err.Error(),
+			})
+			return
+		}
+		json.NewEncoder(w).Encode(stns)
+		return
+	}
+
+	isBinary := r.URL.Query().Get("binary") == "true" ||
+		strings.HasSuffix(r.URL.Path, ".bin") ||
+		strings.Contains(r.Header.Get("Accept"), "application/octet-stream")
+
+	gridResp, err := h.CalculateDerivedGrid(dReq)
+	if err != nil {
+		log.Printf("[DerivedHandler] Error calculating derived grid layer: %v", err)
+		if isBinary {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(err.Error()))
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		}
+		return
+	}
+
+	if isBinary {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		bin := parser.EncodeBinaryStream(gridResp)
+		w.Header().Set("Content-Length", strconv.Itoa(len(bin)))
+		w.Write(bin)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(gridResp)
+}
+
+func (h *DerivedHandler) fetchGridLevel(modelName, element, level, file string) (*model.GridResponse, error) {
+	if h.MockMode || h.Client == nil {
+		lvlF := float32(850)
+		if l, err := strconv.ParseFloat(level, 32); err == nil {
+			lvlF = float32(l)
+		}
+		period := int32(24)
+		if fileParts := strings.Split(file, "."); len(fileParts) >= 2 {
+			if p, err := strconv.Atoi(fileParts[len(fileParts)-1]); err == nil {
+				period = int32(p)
+			}
+		}
+		return mock.GenerateMockGrid(element, lvlF, period), nil
+	}
+
+	fullPath := modelName + "/" + element + "/" + level
+	table := modelName
+	subDataPath := element + "/" + level
+
+	if h.Cache != nil {
+		if cachedBlob, _, ok := h.Cache.Get(table, subDataPath, file); ok {
+			decompressed, err := parser.DecompressGzip(cachedBlob)
+			if err == nil {
+				return parser.ParseGridData(decompressed)
+			}
+		}
+	}
+
+	rawBlob, err := db.GetBlob(h.Client, fullPath, file)
+	if err != nil {
+		return nil, fmt.Errorf("fetchGridLevel (%s, %s): %w", fullPath, file, err)
+	}
+
+	if h.Cache != nil {
+		_ = h.Cache.Put(table, subDataPath, file, rawBlob, nil)
+	}
+
+	decompressed, err := parser.DecompressGzip(rawBlob)
+	if err != nil {
+		return nil, fmt.Errorf("decompress %s: %w", fullPath, err)
+	}
+
+	return parser.ParseGridData(decompressed)
+}
+
+func (h *DerivedHandler) fetchStationLevel(subPath, level, file string) (*model.GeoJSONFeatureCollection, error) {
+	fullPath := "UPPER_AIR/" + subPath + "/" + level
+
+	if h.MockMode || h.Client == nil {
+		return mock.GenerateMockStationsForPath(fullPath), nil
+	}
+
+	rawBlob, err := db.GetBlob(h.Client, fullPath, file)
+	if err != nil && !strings.HasSuffix(file, ".000") && len(file) == 14 {
+		rawBlob, err = db.GetBlob(h.Client, fullPath, file+".000")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("fetchStationLevel (%s, %s): %w", fullPath, file, err)
+	}
+
+	decompressed, err := parser.DecompressGzip(rawBlob)
+	if err != nil {
+		return nil, fmt.Errorf("decompress %s: %w", fullPath, err)
+	}
+
+	return parser.ParseStationData(decompressed)
+}
+
+func (h *DerivedHandler) fetchDewpointGrid(modelName, level, file string, tempGrid *model.GridResponse) []float64 {
+	nPoints := len(tempGrid.Values)
+	tds := make([]float64, nPoints)
+
+	rh, err := h.fetchGridLevel(modelName, "RH", level, file)
+	if err != nil {
+		rh, _ = h.fetchGridLevel(modelName, "TD", level, file)
+	}
+
+	for i := 0; i < nPoints; i++ {
+		t := float64(tempGrid.Values[i])
+		if rh != nil && i < len(rh.Values) && rh.Values[i] > -9000 {
+			if rh.Header.Element == "TD" {
+				tds[i] = float64(rh.Values[i])
+			} else {
+				tds[i] = DewpointFromRH(t, float64(rh.Values[i]))
+			}
+		} else {
+			// default meteorological fallback when humidity observation is absent
+			tds[i] = t - 5.0
+		}
+	}
+	return tds
+}
+
+// CalculateDerivedGrid executes real-time server-side derivation for NWP grids
+func (h *DerivedHandler) CalculateDerivedGrid(req *DerivedRequest) (*model.GridResponse, error) {
+	file := req.File
+	if file == "" {
+		return nil, fmt.Errorf("file parameter required for derived grid")
+	}
+
+	lvl1 := req.Level1
+	if lvl1 == "" {
+		lvl1 = "850"
+	}
+	lvl2 := req.Level2
+	if lvl2 == "" {
+		lvl2 = "500"
+	}
+
+	switch req.DerivedType {
+	case "DIFF":
+		grid1, err1 := h.fetchGridLevel(req.Model, req.Element, lvl1, file)
+		if err1 != nil {
+			return nil, fmt.Errorf("layer 1 (%s/%s/%s): %w", req.Model, req.Element, lvl1, err1)
+		}
+		grid2, err2 := h.fetchGridLevel(req.Model, req.Element, lvl2, file)
+		if err2 != nil {
+			return nil, fmt.Errorf("layer 2 (%s/%s/%s): %w", req.Model, req.Element, lvl2, err2)
+		}
+
+		nPoints := len(grid1.Values)
+		if len(grid2.Values) != nPoints {
+			return nil, fmt.Errorf("grid dimensions mismatch between level %s (%d) and %s (%d)", lvl1, nPoints, lvl2, len(grid2.Values))
+		}
+
+		resValues := make([]float32, nPoints)
+		var minVal float32 = math.MaxFloat32
+		var maxVal float32 = -math.MaxFloat32
+		var sumVal float32 = 0
+		validCount := 0
+
+		isHgt := req.Element == "HGT"
+
+		for i := 0; i < nPoints; i++ {
+			v1 := grid1.Values[i]
+			v2 := grid2.Values[i]
+			if v1 <= -9000 || v2 <= -9000 || math.IsNaN(float64(v1)) || math.IsNaN(float64(v2)) {
+				resValues[i] = -9999
+				continue
+			}
+
+			var diff float32
+			if isHgt {
+				diff = float32(math.Abs(float64(v1 - v2)))
+			} else {
+				diff = v1 - v2
+			}
+
+			resValues[i] = diff
+			if diff < minVal {
+				minVal = diff
+			}
+			if diff > maxVal {
+				maxVal = diff
+			}
+			sumVal += diff
+			validCount++
+		}
+
+		resp := &model.GridResponse{
+			Header: grid1.Header,
+			X:      grid1.X,
+			Y:      grid1.Y,
+			Values: resValues,
+		}
+		resp.Header.ModelName = req.Model
+		resp.Header.Element = req.Element
+		if l, err := strconv.ParseFloat(lvl1, 32); err == nil {
+			resp.Header.Level = float32(l)
+		}
+		if validCount > 0 {
+			resp.Stats = model.GridStats{
+				Min:  minVal,
+				Max:  maxVal,
+				Mean: sumVal / float32(validCount),
+			}
+		}
+		return resp, nil
+
+	case "THICKNESS":
+		grid1, err1 := h.fetchGridLevel(req.Model, "HGT", lvl1, file)
+		if err1 != nil {
+			return nil, fmt.Errorf("HGT %s: %w", lvl1, err1)
+		}
+		grid2, err2 := h.fetchGridLevel(req.Model, "HGT", lvl2, file)
+		if err2 != nil {
+			return nil, fmt.Errorf("HGT %s: %w", lvl2, err2)
+		}
+
+		nPoints := len(grid1.Values)
+		resValues := make([]float32, nPoints)
+		var minVal float32 = math.MaxFloat32
+		var maxVal float32 = -math.MaxFloat32
+		var sumVal float32 = 0
+		validCount := 0
+
+		for i := 0; i < nPoints; i++ {
+			v1 := grid1.Values[i]
+			v2 := grid2.Values[i]
+			if v1 <= -9000 || v2 <= -9000 || math.IsNaN(float64(v1)) || math.IsNaN(float64(v2)) {
+				resValues[i] = -9999
+				continue
+			}
+			diff := float32(math.Abs(float64(v1 - v2)))
+			resValues[i] = diff
+			if diff < minVal {
+				minVal = diff
+			}
+			if diff > maxVal {
+				maxVal = diff
+			}
+			sumVal += diff
+			validCount++
+		}
+
+		resp := &model.GridResponse{
+			Header: grid1.Header,
+			X:      grid1.X,
+			Y:      grid1.Y,
+			Values: resValues,
+		}
+		resp.Header.Element = "THICKNESS"
+		if validCount > 0 {
+			resp.Stats = model.GridStats{Min: minVal, Max: maxVal, Mean: sumVal / float32(validCount)}
+		}
+		return resp, nil
+
+	case "SHEAR":
+		wind1, err1 := h.fetchGridLevel(req.Model, "WIND", lvl1, file)
+		if err1 != nil {
+			return nil, fmt.Errorf("WIND %s: %w", lvl1, err1)
+		}
+		wind2, err2 := h.fetchGridLevel(req.Model, "WIND", lvl2, file)
+		if err2 != nil {
+			return nil, fmt.Errorf("WIND %s: %w", lvl2, err2)
+		}
+
+		nPoints := len(wind1.Values)
+		resValues := make([]float32, nPoints)
+		var minVal float32 = math.MaxFloat32
+		var maxVal float32 = -math.MaxFloat32
+		var sumVal float32 = 0
+		validCount := 0
+
+		hasVectors := len(wind1.U) == nPoints && len(wind1.V) == nPoints &&
+			len(wind2.U) == nPoints && len(wind2.V) == nPoints
+
+		for i := 0; i < nPoints; i++ {
+			if hasVectors {
+				u1, v1 := wind1.U[i], wind1.V[i]
+				u2, v2 := wind2.U[i], wind2.V[i]
+				if u1 <= -9000 || u2 <= -9000 {
+					resValues[i] = -9999
+					continue
+				}
+				shear := float32(CalculateWindShear(float64(u1), float64(v1), float64(u2), float64(v2)))
+				resValues[i] = shear
+				if shear < minVal {
+					minVal = shear
+				}
+				if shear > maxVal {
+					maxVal = shear
+				}
+				sumVal += shear
+				validCount++
+			} else {
+				s1, s2 := wind1.Values[i], wind2.Values[i]
+				if s1 <= -9000 || s2 <= -9000 {
+					resValues[i] = -9999
+					continue
+				}
+				shear := float32(math.Abs(float64(s1 - s2)))
+				resValues[i] = shear
+				if shear < minVal {
+					minVal = shear
+				}
+				if shear > maxVal {
+					maxVal = shear
+				}
+				sumVal += shear
+				validCount++
+			}
+		}
+
+		resp := &model.GridResponse{
+			Header: wind1.Header,
+			X:      wind1.X,
+			Y:      wind1.Y,
+			Values: resValues,
+		}
+		resp.Header.Element = "SHEAR"
+		if validCount > 0 {
+			resp.Stats = model.GridStats{Min: minVal, Max: maxVal, Mean: sumVal / float32(validCount)}
+		}
+		return resp, nil
+
+	case "K-INDEX":
+		t850, err := h.fetchGridLevel(req.Model, "TMP", "850", file)
+		if err != nil {
+			return nil, err
+		}
+		t700, err := h.fetchGridLevel(req.Model, "TMP", "700", file)
+		if err != nil {
+			return nil, err
+		}
+		t500, err := h.fetchGridLevel(req.Model, "TMP", "500", file)
+		if err != nil {
+			return nil, err
+		}
+
+		td850 := h.fetchDewpointGrid(req.Model, "850", file, t850)
+		td700 := h.fetchDewpointGrid(req.Model, "700", file, t700)
+
+		nPoints := len(t850.Values)
+		resValues := make([]float32, nPoints)
+		var minVal float32 = math.MaxFloat32
+		var maxVal float32 = -math.MaxFloat32
+		var sumVal float32 = 0
+		validCount := 0
+
+		for i := 0; i < nPoints; i++ {
+			temp850 := t850.Values[i]
+			temp700 := t700.Values[i]
+			temp500 := t500.Values[i]
+			if temp850 <= -9000 || temp700 <= -9000 || temp500 <= -9000 {
+				resValues[i] = -9999
+				continue
+			}
+
+			kVal := float32(CalculateKIndex(float64(temp850), td850[i], float64(temp700), td700[i], float64(temp500)))
+			resValues[i] = kVal
+			if kVal < minVal {
+				minVal = kVal
+			}
+			if kVal > maxVal {
+				maxVal = kVal
+			}
+			sumVal += kVal
+			validCount++
+		}
+
+		resp := &model.GridResponse{
+			Header: t850.Header,
+			X:      t850.X,
+			Y:      t850.Y,
+			Values: resValues,
+		}
+		resp.Header.Element = "K-INDEX"
+		if validCount > 0 {
+			resp.Stats = model.GridStats{Min: minVal, Max: maxVal, Mean: sumVal / float32(validCount)}
+		}
+		return resp, nil
+
+	case "SHOWALTER":
+		t850, err := h.fetchGridLevel(req.Model, "TMP", "850", file)
+		if err != nil {
+			return nil, err
+		}
+		t500, err := h.fetchGridLevel(req.Model, "TMP", "500", file)
+		if err != nil {
+			return nil, err
+		}
+		td850 := h.fetchDewpointGrid(req.Model, "850", file, t850)
+
+		nPoints := len(t850.Values)
+		resValues := make([]float32, nPoints)
+		var minVal float32 = math.MaxFloat32
+		var maxVal float32 = -math.MaxFloat32
+		var sumVal float32 = 0
+		validCount := 0
+
+		for i := 0; i < nPoints; i++ {
+			temp850 := t850.Values[i]
+			temp500 := t500.Values[i]
+			if temp850 <= -9000 || temp500 <= -9000 {
+				resValues[i] = -9999
+				continue
+			}
+
+			ssi := float32(CalculateShowalter(float64(temp850), td850[i], float64(temp500)))
+			resValues[i] = ssi
+			if ssi < minVal {
+				minVal = ssi
+			}
+			if ssi > maxVal {
+				maxVal = ssi
+			}
+			sumVal += ssi
+			validCount++
+		}
+
+		resp := &model.GridResponse{
+			Header: t850.Header,
+			X:      t850.X,
+			Y:      t850.Y,
+			Values: resValues,
+		}
+		resp.Header.Element = "SHOWALTER"
+		if validCount > 0 {
+			resp.Stats = model.GridStats{Min: minVal, Max: maxVal, Mean: sumVal / float32(validCount)}
+		}
+		return resp, nil
+
+	case "LIFTED":
+		t850, err := h.fetchGridLevel(req.Model, "TMP", "850", file)
+		if err != nil {
+			return nil, err
+		}
+		t500, err := h.fetchGridLevel(req.Model, "TMP", "500", file)
+		if err != nil {
+			return nil, err
+		}
+		td850 := h.fetchDewpointGrid(req.Model, "850", file, t850)
+
+		nPoints := len(t850.Values)
+		resValues := make([]float32, nPoints)
+		var minVal float32 = math.MaxFloat32
+		var maxVal float32 = -math.MaxFloat32
+		var sumVal float32 = 0
+		validCount := 0
+
+		for i := 0; i < nPoints; i++ {
+			temp850 := t850.Values[i]
+			temp500 := t500.Values[i]
+			if temp850 <= -9000 || temp500 <= -9000 {
+				resValues[i] = -9999
+				continue
+			}
+
+			li := float32(CalculateLiftedIndex(float64(temp850), td850[i], 850.0, float64(temp500)))
+			resValues[i] = li
+			if li < minVal {
+				minVal = li
+			}
+			if li > maxVal {
+				maxVal = li
+			}
+			sumVal += li
+			validCount++
+		}
+
+		resp := &model.GridResponse{
+			Header: t850.Header,
+			X:      t850.X,
+			Y:      t850.Y,
+			Values: resValues,
+		}
+		resp.Header.Element = "LIFTED"
+		if validCount > 0 {
+			resp.Stats = model.GridStats{Min: minVal, Max: maxVal, Mean: sumVal / float32(validCount)}
+		}
+		return resp, nil
+
+	case "SWEAT":
+		t850, err := h.fetchGridLevel(req.Model, "TMP", "850", file)
+		if err != nil {
+			return nil, err
+		}
+		t500, err := h.fetchGridLevel(req.Model, "TMP", "500", file)
+		if err != nil {
+			return nil, err
+		}
+		td850 := h.fetchDewpointGrid(req.Model, "850", file, t850)
+		wind850, _ := h.fetchGridLevel(req.Model, "WIND", "850", file)
+		wind500, _ := h.fetchGridLevel(req.Model, "WIND", "500", file)
+
+		nPoints := len(t850.Values)
+		resValues := make([]float32, nPoints)
+		var minVal float32 = math.MaxFloat32
+		var maxVal float32 = -math.MaxFloat32
+		var sumVal float32 = 0
+		validCount := 0
+
+		for i := 0; i < nPoints; i++ {
+			temp850 := t850.Values[i]
+			temp500 := t500.Values[i]
+			if temp850 <= -9000 || temp500 <= -9000 {
+				resValues[i] = -9999
+				continue
+			}
+
+			td850Val := td850[i]
+
+			var ws850, wd850 float64 = 8.0, 200.0
+			if wind850 != nil && i < len(wind850.Values) && wind850.Values[i] > -9000 {
+				ws850 = float64(wind850.Values[i])
+				if len(wind850.U) == nPoints && len(wind850.V) == nPoints {
+					u := float64(wind850.U[i])
+					v := float64(wind850.V[i])
+					// Meteorological wind direction: direction FROM which wind blows
+					deg := math.Atan2(-u, -v) * 180.0 / math.Pi
+					if deg < 0 {
+						deg += 360.0
+					}
+					wd850 = deg
+				}
+			}
+
+			var ws500, wd500 float64 = 15.0, 250.0
+			if wind500 != nil && i < len(wind500.Values) && wind500.Values[i] > -9000 {
+				ws500 = float64(wind500.Values[i])
+				if len(wind500.U) == nPoints && len(wind500.V) == nPoints {
+					u := float64(wind500.U[i])
+					v := float64(wind500.V[i])
+					deg := math.Atan2(-u, -v) * 180.0 / math.Pi
+					if deg < 0 {
+						deg += 360.0
+					}
+					wd500 = deg
+				}
+			}
+
+			sweat := float32(CalculateSWEAT(float64(temp850), td850Val, float64(temp500), ws850, wd850, ws500, wd500))
+			resValues[i] = sweat
+			if sweat < minVal {
+				minVal = sweat
+			}
+			if sweat > maxVal {
+				maxVal = sweat
+			}
+			sumVal += sweat
+			validCount++
+		}
+
+		resp := &model.GridResponse{
+			Header: t850.Header,
+			X:      t850.X,
+			Y:      t850.Y,
+			Values: resValues,
+		}
+		resp.Header.Element = "SWEAT"
+		if validCount > 0 {
+			resp.Stats = model.GridStats{Min: minVal, Max: maxVal, Mean: sumVal / float32(validCount)}
+		}
+		return resp, nil
+
+	case "TT":
+		t850, err := h.fetchGridLevel(req.Model, "TMP", "850", file)
+		if err != nil {
+			return nil, err
+		}
+		t500, err := h.fetchGridLevel(req.Model, "TMP", "500", file)
+		if err != nil {
+			return nil, err
+		}
+		td850 := h.fetchDewpointGrid(req.Model, "850", file, t850)
+
+		nPoints := len(t850.Values)
+		resValues := make([]float32, nPoints)
+		var minVal float32 = math.MaxFloat32
+		var maxVal float32 = -math.MaxFloat32
+		var sumVal float32 = 0
+		validCount := 0
+
+		for i := 0; i < nPoints; i++ {
+			temp850 := t850.Values[i]
+			temp500 := t500.Values[i]
+			if temp850 <= -9000 || temp500 <= -9000 {
+				resValues[i] = -9999
+				continue
+			}
+
+			tt := float32(CalculateTotalTotals(float64(temp850), td850[i], float64(temp500)))
+			resValues[i] = tt
+			if tt < minVal {
+				minVal = tt
+			}
+			if tt > maxVal {
+				maxVal = tt
+			}
+			sumVal += tt
+			validCount++
+		}
+
+		resp := &model.GridResponse{
+			Header: t850.Header,
+			X:      t850.X,
+			Y:      t850.Y,
+			Values: resValues,
+		}
+		resp.Header.Element = "TT"
+		if validCount > 0 {
+			resp.Stats = model.GridStats{Min: minVal, Max: maxVal, Mean: sumVal / float32(validCount)}
+		}
+		return resp, nil
+
+	default:
+		return nil, fmt.Errorf("unsupported derived type: %s", req.DerivedType)
+	}
+}
+
+// CalculateDerivedStation executes real-time server-side derivation for UPPER_AIR sounding stations
+func (h *DerivedHandler) CalculateDerivedStation(req *DerivedRequest) (*model.GeoJSONFeatureCollection, error) {
+	file := req.File
+	if file == "" {
+		return nil, fmt.Errorf("file parameter required for derived station layer")
+	}
+
+	lvl1 := req.Level1
+	if lvl1 == "" {
+		lvl1 = "850"
+	}
+	lvl2 := req.Level2
+	if lvl2 == "" {
+		lvl2 = "500"
+	}
+
+	switch req.DerivedType {
+	case "DIFF":
+		stn1, err1 := h.fetchStationLevel(req.SubPath, lvl1, file)
+		if err1 != nil {
+			return nil, fmt.Errorf("station layer 1 (%s): %w", lvl1, err1)
+		}
+		stn2, err2 := h.fetchStationLevel(req.SubPath, lvl2, file)
+		if err2 != nil {
+			return nil, fmt.Errorf("station layer 2 (%s): %w", lvl2, err2)
+		}
+
+		stn2Map := make(map[int32]model.GeoJSONFeature, len(stn2.Features))
+		for _, f := range stn2.Features {
+			if idVal, ok := f.Properties["station_id"]; ok {
+				var id int32
+				switch v := idVal.(type) {
+				case float64:
+					id = int32(v)
+				case int32:
+					id = v
+				case int:
+					id = int32(v)
+				}
+				if id > 0 {
+					stn2Map[id] = f
+				}
+			}
+		}
+
+		features := make([]model.GeoJSONFeature, 0, len(stn1.Features))
+		elemKey := strings.ToLower(req.Element)
+		if elemKey == "tmp" || elemKey == "tmp_diff" || strings.HasPrefix(elemKey, "t") {
+			elemKey = "temperature"
+		} else if elemKey == "hgt" || elemKey == "thickness" {
+			elemKey = "height"
+		} else if elemKey == "td" {
+			elemKey = "dewpoint"
+		} else if elemKey == "wind" {
+			elemKey = "wind_speed"
+		}
+
+		for _, f1 := range stn1.Features {
+			id := extractStationID(f1)
+			if id <= 0 {
+				continue
+			}
+
+			f2, ok := stn2Map[id]
+			if !ok {
+				continue
+			}
+
+			v1, ok1 := extractFloat(f1.Properties[elemKey])
+			v2, ok2 := extractFloat(f2.Properties[elemKey])
+			if !ok1 || !ok2 || v1 <= -9000 || v2 <= -9000 {
+				continue
+			}
+
+			var diff float64
+			if elemKey == "height" {
+				diff = math.Abs(v1 - v2)
+			} else {
+				diff = v1 - v2
+			}
+
+			newProps := make(map[string]interface{})
+			for k, v := range f1.Properties {
+				newProps[k] = v
+			}
+			newProps[elemKey] = diff
+			newProps["tmp_diff"] = diff
+			newProps["temperature"] = diff // Enables standard contour extractor to read smoothly
+			newProps["val"] = diff
+			newProps["value"] = diff
+			newProps["level1"] = lvl1
+			newProps["level2"] = lvl2
+
+			features = append(features, model.GeoJSONFeature{
+				Type:       "Feature",
+				Geometry:   f1.Geometry,
+				Properties: newProps,
+			})
+		}
+
+		return &model.GeoJSONFeatureCollection{
+			Type:     "FeatureCollection",
+			Features: features,
+		}, nil
+
+	case "K-INDEX":
+		stn850, err1 := h.fetchStationLevel(req.SubPath, "850", file)
+		if err1 != nil {
+			return nil, err1
+		}
+		stn700, err2 := h.fetchStationLevel(req.SubPath, "700", file)
+		if err2 != nil {
+			return nil, err2
+		}
+		stn500, err3 := h.fetchStationLevel(req.SubPath, "500", file)
+		if err3 != nil {
+			return nil, err3
+		}
+
+		stn700Map := make(map[int32]model.GeoJSONFeature, len(stn700.Features))
+		for _, f := range stn700.Features {
+			if id := extractStationID(f); id > 0 {
+				stn700Map[id] = f
+			}
+		}
+		stn500Map := make(map[int32]model.GeoJSONFeature, len(stn500.Features))
+		for _, f := range stn500.Features {
+			if id := extractStationID(f); id > 0 {
+				stn500Map[id] = f
+			}
+		}
+
+		features := make([]model.GeoJSONFeature, 0, len(stn850.Features))
+		for _, f850 := range stn850.Features {
+			id := extractStationID(f850)
+			if id <= 0 {
+				continue
+			}
+			f700, ok700 := stn700Map[id]
+			f500, ok500 := stn500Map[id]
+			if !ok700 || !ok500 {
+				continue
+			}
+
+			t850, okT850 := extractFloat(f850.Properties["temperature"])
+			td850, okTd850 := extractFloat(f850.Properties["dewpoint"])
+			t700, okT700 := extractFloat(f700.Properties["temperature"])
+			td700, okTd700 := extractFloat(f700.Properties["dewpoint"])
+			t500, okT500 := extractFloat(f500.Properties["temperature"])
+
+			if !okT850 || !okTd850 || !okT700 || !okTd700 || !okT500 {
+				continue
+			}
+			if t850 <= -9000 || td850 <= -9000 || t700 <= -9000 || td700 <= -9000 || t500 <= -9000 {
+				continue
+			}
+
+			kVal := CalculateKIndex(t850, td850, t700, td700, t500)
+			newProps := copyProps(f850.Properties)
+			newProps["k_index"] = kVal
+			newProps["temperature"] = kVal
+			newProps["val"] = kVal
+			newProps["value"] = kVal
+
+			features = append(features, model.GeoJSONFeature{
+				Type:       "Feature",
+				Geometry:   f850.Geometry,
+				Properties: newProps,
+			})
+		}
+
+		return &model.GeoJSONFeatureCollection{
+			Type:     "FeatureCollection",
+			Features: features,
+		}, nil
+
+	case "SHOWALTER":
+		stn850, err1 := h.fetchStationLevel(req.SubPath, "850", file)
+		if err1 != nil {
+			return nil, err1
+		}
+		stn500, err2 := h.fetchStationLevel(req.SubPath, "500", file)
+		if err2 != nil {
+			return nil, err2
+		}
+
+		stn500Map := make(map[int32]model.GeoJSONFeature, len(stn500.Features))
+		for _, f := range stn500.Features {
+			if id := extractStationID(f); id > 0 {
+				stn500Map[id] = f
+			}
+		}
+
+		features := make([]model.GeoJSONFeature, 0, len(stn850.Features))
+		for _, f850 := range stn850.Features {
+			id := extractStationID(f850)
+			if id <= 0 {
+				continue
+			}
+			f500, ok500 := stn500Map[id]
+			if !ok500 {
+				continue
+			}
+
+			t850, okT850 := extractFloat(f850.Properties["temperature"])
+			td850, okTd850 := extractFloat(f850.Properties["dewpoint"])
+			t500, okT500 := extractFloat(f500.Properties["temperature"])
+
+			if !okT850 || !okTd850 || !okT500 || t850 <= -9000 || td850 <= -9000 || t500 <= -9000 {
+				continue
+			}
+
+			ssi := CalculateShowalter(t850, td850, t500)
+			newProps := copyProps(f850.Properties)
+			newProps["showalter"] = ssi
+			newProps["ssi"] = ssi
+			newProps["temperature"] = ssi
+			newProps["val"] = ssi
+			newProps["value"] = ssi
+
+			features = append(features, model.GeoJSONFeature{
+				Type:       "Feature",
+				Geometry:   f850.Geometry,
+				Properties: newProps,
+			})
+		}
+
+		return &model.GeoJSONFeatureCollection{
+			Type:     "FeatureCollection",
+			Features: features,
+		}, nil
+
+	case "LIFTED":
+		stn850, err1 := h.fetchStationLevel(req.SubPath, "850", file)
+		if err1 != nil {
+			return nil, err1
+		}
+		stn500, err2 := h.fetchStationLevel(req.SubPath, "500", file)
+		if err2 != nil {
+			return nil, err2
+		}
+
+		stn500Map := make(map[int32]model.GeoJSONFeature, len(stn500.Features))
+		for _, f := range stn500.Features {
+			if id := extractStationID(f); id > 0 {
+				stn500Map[id] = f
+			}
+		}
+
+		features := make([]model.GeoJSONFeature, 0, len(stn850.Features))
+		for _, f850 := range stn850.Features {
+			id := extractStationID(f850)
+			if id <= 0 {
+				continue
+			}
+			f500, ok500 := stn500Map[id]
+			if !ok500 {
+				continue
+			}
+
+			t850, okT850 := extractFloat(f850.Properties["temperature"])
+			td850, okTd850 := extractFloat(f850.Properties["dewpoint"])
+			t500, okT500 := extractFloat(f500.Properties["temperature"])
+
+			if !okT850 || !okTd850 || !okT500 || t850 <= -9000 || td850 <= -9000 || t500 <= -9000 {
+				continue
+			}
+
+			li := CalculateLiftedIndex(t850, td850, 850.0, t500)
+			newProps := copyProps(f850.Properties)
+			newProps["lifted"] = li
+			newProps["li"] = li
+			newProps["temperature"] = li
+			newProps["val"] = li
+			newProps["value"] = li
+
+			features = append(features, model.GeoJSONFeature{
+				Type:       "Feature",
+				Geometry:   f850.Geometry,
+				Properties: newProps,
+			})
+		}
+
+		return &model.GeoJSONFeatureCollection{
+			Type:     "FeatureCollection",
+			Features: features,
+		}, nil
+
+	case "SWEAT":
+		stn850, err1 := h.fetchStationLevel(req.SubPath, "850", file)
+		if err1 != nil {
+			return nil, err1
+		}
+		stn500, err2 := h.fetchStationLevel(req.SubPath, "500", file)
+		if err2 != nil {
+			return nil, err2
+		}
+
+		stn500Map := make(map[int32]model.GeoJSONFeature, len(stn500.Features))
+		for _, f := range stn500.Features {
+			if id := extractStationID(f); id > 0 {
+				stn500Map[id] = f
+			}
+		}
+
+		features := make([]model.GeoJSONFeature, 0, len(stn850.Features))
+		for _, f850 := range stn850.Features {
+			id := extractStationID(f850)
+			if id <= 0 {
+				continue
+			}
+			f500, ok500 := stn500Map[id]
+			if !ok500 {
+				continue
+			}
+
+			t850, okT850 := extractFloat(f850.Properties["temperature"])
+			td850, okTd850 := extractFloat(f850.Properties["dewpoint"])
+			t500, okT500 := extractFloat(f500.Properties["temperature"])
+
+			if !okT850 || !okTd850 || !okT500 || t850 <= -9000 || td850 <= -9000 || t500 <= -9000 {
+				continue
+			}
+
+			ws850, _ := extractFloat(f850.Properties["wind_speed"])
+			wd850, _ := extractFloat(f850.Properties["wind_dir"])
+			ws500, _ := extractFloat(f500.Properties["wind_speed"])
+			wd500, _ := extractFloat(f500.Properties["wind_dir"])
+			if ws850 < 0 || ws850 > 250 {
+				ws850 = 0
+			}
+			if ws500 < 0 || ws500 > 250 {
+				ws500 = 0
+			}
+			if wd850 < 0 || wd850 > 360 {
+				wd850 = 0
+			}
+			if wd500 < 0 || wd500 > 360 {
+				wd500 = 0
+			}
+
+			sweat := CalculateSWEAT(t850, td850, t500, ws850, wd850, ws500, wd500)
+			newProps := copyProps(f850.Properties)
+			newProps["sweat"] = sweat
+			newProps["temperature"] = sweat
+			newProps["val"] = sweat
+			newProps["value"] = sweat
+
+			features = append(features, model.GeoJSONFeature{
+				Type:       "Feature",
+				Geometry:   f850.Geometry,
+				Properties: newProps,
+			})
+		}
+
+		return &model.GeoJSONFeatureCollection{
+			Type:     "FeatureCollection",
+			Features: features,
+		}, nil
+
+	case "TT":
+		stn850, err1 := h.fetchStationLevel(req.SubPath, "850", file)
+		if err1 != nil {
+			return nil, err1
+		}
+		stn500, err2 := h.fetchStationLevel(req.SubPath, "500", file)
+		if err2 != nil {
+			return nil, err2
+		}
+
+		stn500Map := make(map[int32]model.GeoJSONFeature, len(stn500.Features))
+		for _, f := range stn500.Features {
+			if id := extractStationID(f); id > 0 {
+				stn500Map[id] = f
+			}
+		}
+
+		features := make([]model.GeoJSONFeature, 0, len(stn850.Features))
+		for _, f850 := range stn850.Features {
+			id := extractStationID(f850)
+			if id <= 0 {
+				continue
+			}
+			f500, ok500 := stn500Map[id]
+			if !ok500 {
+				continue
+			}
+
+			t850, okT850 := extractFloat(f850.Properties["temperature"])
+			td850, okTd850 := extractFloat(f850.Properties["dewpoint"])
+			t500, okT500 := extractFloat(f500.Properties["temperature"])
+
+			if !okT850 || !okTd850 || !okT500 || t850 <= -9000 || td850 <= -9000 || t500 <= -9000 {
+				continue
+			}
+
+			tt := CalculateTotalTotals(t850, td850, t500)
+			newProps := copyProps(f850.Properties)
+			newProps["tt"] = tt
+			newProps["temperature"] = tt
+			newProps["val"] = tt
+			newProps["value"] = tt
+
+			features = append(features, model.GeoJSONFeature{
+				Type:       "Feature",
+				Geometry:   f850.Geometry,
+				Properties: newProps,
+			})
+		}
+
+		return &model.GeoJSONFeatureCollection{
+			Type:     "FeatureCollection",
+			Features: features,
+		}, nil
+
+	case "SHEAR":
+		stn1, err1 := h.fetchStationLevel(req.SubPath, lvl1, file)
+		if err1 != nil {
+			return nil, err1
+		}
+		stn2, err2 := h.fetchStationLevel(req.SubPath, lvl2, file)
+		if err2 != nil {
+			return nil, err2
+		}
+
+		stn2Map := make(map[int32]model.GeoJSONFeature, len(stn2.Features))
+		for _, f := range stn2.Features {
+			if id := extractStationID(f); id > 0 {
+				stn2Map[id] = f
+			}
+		}
+
+		features := make([]model.GeoJSONFeature, 0, len(stn1.Features))
+		for _, f1 := range stn1.Features {
+			id := extractStationID(f1)
+			if id <= 0 {
+				continue
+			}
+			f2, ok2 := stn2Map[id]
+			if !ok2 {
+				continue
+			}
+
+			ws1, okWs1 := extractFloat(f1.Properties["wind_speed"])
+			wd1, okWd1 := extractFloat(f1.Properties["wind_dir"])
+			ws2, okWs2 := extractFloat(f2.Properties["wind_speed"])
+			wd2, okWd2 := extractFloat(f2.Properties["wind_dir"])
+
+			if !okWs1 || !okWs2 || ws1 < 0 || ws2 < 0 {
+				continue
+			}
+
+			var shear float64
+			if okWd1 && okWd2 {
+				rad1 := wd1 * math.Pi / 180.0
+				rad2 := wd2 * math.Pi / 180.0
+				u1 := -ws1 * math.Sin(rad1)
+				v1 := -ws1 * math.Cos(rad1)
+				u2 := -ws2 * math.Sin(rad2)
+				v2 := -ws2 * math.Cos(rad2)
+				shear = CalculateWindShear(u1, v1, u2, v2)
+			} else {
+				shear = math.Abs(ws1 - ws2)
+			}
+
+			newProps := copyProps(f1.Properties)
+			newProps["shear"] = shear
+			newProps["wind_speed"] = shear
+			newProps["val"] = shear
+			newProps["value"] = shear
+			newProps["level1"] = lvl1
+			newProps["level2"] = lvl2
+
+			features = append(features, model.GeoJSONFeature{
+				Type:       "Feature",
+				Geometry:   f1.Geometry,
+				Properties: newProps,
+			})
+		}
+
+		return &model.GeoJSONFeatureCollection{
+			Type:     "FeatureCollection",
+			Features: features,
+		}, nil
+
+	case "THICKNESS":
+		lvl1 := req.Level1
+		if lvl1 == "" {
+			lvl1 = "1000"
+		}
+		lvl2 := req.Level2
+		if lvl2 == "" {
+			lvl2 = "500"
+		}
+		stn1, err1 := h.fetchStationLevel(req.SubPath, lvl1, file)
+		if err1 != nil {
+			return nil, fmt.Errorf("station thickness layer 1 (%s): %w", lvl1, err1)
+		}
+		stn2, err2 := h.fetchStationLevel(req.SubPath, lvl2, file)
+		if err2 != nil {
+			return nil, fmt.Errorf("station thickness layer 2 (%s): %w", lvl2, err2)
+		}
+
+		stn2Map := make(map[int32]model.GeoJSONFeature, len(stn2.Features))
+		for _, f := range stn2.Features {
+			if id := extractStationID(f); id > 0 {
+				stn2Map[id] = f
+			}
+		}
+
+		features := make([]model.GeoJSONFeature, 0, len(stn1.Features))
+		for _, f1 := range stn1.Features {
+			id := extractStationID(f1)
+			if id <= 0 {
+				continue
+			}
+			f2, ok2 := stn2Map[id]
+			if !ok2 {
+				continue
+			}
+
+			h1, okH1 := extractFloat(f1.Properties["height"])
+			h2, okH2 := extractFloat(f2.Properties["height"])
+			if !okH1 || !okH2 || h1 <= -9000 || h2 <= -9000 {
+				continue
+			}
+
+			diff := math.Abs(h1 - h2)
+			newProps := copyProps(f1.Properties)
+			newProps["thickness"] = diff
+			newProps["height"] = diff
+			newProps["val"] = diff
+			newProps["value"] = diff
+			newProps["level1"] = lvl1
+			newProps["level2"] = lvl2
+
+			features = append(features, model.GeoJSONFeature{
+				Type:       "Feature",
+				Geometry:   f1.Geometry,
+				Properties: newProps,
+			})
+		}
+
+		return &model.GeoJSONFeatureCollection{
+			Type:     "FeatureCollection",
+			Features: features,
+		}, nil
+
+	default:
+		return nil, fmt.Errorf("unsupported derived station type: %s", req.DerivedType)
+	}
+}
+
+func extractStationID(f model.GeoJSONFeature) int32 {
+	if idVal, ok := f.Properties["station_id"]; ok {
+		switch v := idVal.(type) {
+		case float64:
+			return int32(v)
+		case float32:
+			return int32(v)
+		case int32:
+			return v
+		case int:
+			return int32(v)
+		case int64:
+			return int32(v)
+		case string:
+			if id, err := strconv.Atoi(v); err == nil {
+				return int32(id)
+			}
+		}
+	}
+	return 0
+}
+
+func extractFloat(val interface{}) (float64, bool) {
+	if val == nil {
+		return 0, false
+	}
+	switch v := val.(type) {
+	case float64:
+		return v, true
+	case float32:
+		return float64(v), true
+	case int:
+		return float64(v), true
+	case int32:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	default:
+		return 0, false
+	}
+}
+
+func copyProps(props map[string]interface{}) map[string]interface{} {
+	m := make(map[string]interface{}, len(props)+4)
+	for k, v := range props {
+		m[k] = v
+	}
+	return m
+}

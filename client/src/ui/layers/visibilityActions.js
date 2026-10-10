@@ -123,7 +123,7 @@ export function layerNeedsRecalc(layer, winObj, map) {
 
 export async function recalcAndRerenderLayer(map, layer, winObj) {
   if (!map || !layer) return;
-  const isUpper = layer.model === "UPPER_AIR" || (layer.id && layer.id.startsWith("contour-sounding-"));
+  const isUpper = layer.model === "UPPER_AIR" || (layer.id && layer.id.startsWith("contour-sounding-")) || (layer.path && layer.path.includes("UPPER_AIR"));
   const isSurface = layer.model === "SURFACE" || layer.model === "SURFACE_ANALYSIS" || (layer.id && layer.id.startsWith("contour-surface-"));
   const elem = (layer.element || "").toUpperCase();
   const isNwpKinematic = (elem === "VOR" || elem === "DIV" || (elem === "WIND" && layer.type === "contour")) && !isUpper && !isSurface;
@@ -132,7 +132,7 @@ export async function recalcAndRerenderLayer(map, layer, winObj) {
 
   if (isUpper && layer.type === "contour") {
     const curLevel = (winObj?.level !== undefined && winObj?.level !== null) ? winObj.level : (layer.level || 500);
-    const targetId = `contour-sounding-${(layer.element || "HGT").toLowerCase()}-${curLevel}`;
+    const targetId = layer.id || `contour-sounding-${(layer.element || "HGT").toLowerCase()}-${curLevel}`;
     layer.id = targetId;
     layer.level = curLevel;
     layer.obsTime = winObj?.obsTime || layer.obsTime;
@@ -140,12 +140,12 @@ export async function recalcAndRerenderLayer(map, layer, winObj) {
 
     const winLayers = getLayersForWindow(winObj);
     const stnLayer = winLayers.find((l) => l.type === "station" && l.model === "UPPER_AIR");
-    let stations = stnLayer?.stationsGeoJSON || (typeof getStationGeoJSON === "function" ? getStationGeoJSON(map) : null);
+    let stations = (layer.path && layer.path.includes("/api/derived/")) ? null : (stnLayer?.stationsGeoJSON || (typeof getStationGeoJSON === "function" ? getStationGeoJSON(map) : null));
 
     if (!stations || !stations.features || stations.features.length < 3) {
       try {
         const { fetchStationObservations } = await import("../../api/catalogApi.js");
-        const obsPath = `UPPER_AIR/PLOT/${curLevel}`;
+        const obsPath = (layer.path && layer.path.includes("/api/derived/")) ? layer.path : `UPPER_AIR/PLOT/${curLevel}`;
         stations = await fetchStationObservations(obsPath, winObj?.obsTime);
       } catch {}
     }
@@ -248,6 +248,9 @@ export async function recalcAndRerenderLayer(map, layer, winObj) {
     const rendered = getLayerById(layer.id, winObj);
     syncLegendForLayer(rendered || layer, winObj, true);
   } else if (layer.type === "contour") {
+    if (layer.model === "UPPER_AIR" || (layer.path && layer.path.includes("UPPER_AIR"))) {
+      return recalcAndRerenderLayer(map, layer, winObj);
+    }
     const { loadWeatherField } = await import("../../services/weatherLoader.js");
     const targetLevel = (layer.model === "SURFACE" || layer.level === 0)
       ? null

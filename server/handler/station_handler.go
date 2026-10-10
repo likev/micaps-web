@@ -18,10 +18,24 @@ import (
 type StationHandler struct {
 	Client   *db.CQLClient
 	MockMode bool
+	Derived  *DerivedHandler
 }
 
 // StationGeoJSONHandler handles /api/data/station returning GeoJSON Point FeatureCollection
 func (h *StationHandler) StationGeoJSONHandler(w http.ResponseWriter, r *http.Request) {
+	dataPath := SanitizeGridPath(r.URL.Query().Get("path"))
+	cleanPath := strings.Trim(strings.ToLower(dataPath), "/")
+	if strings.HasPrefix(cleanPath, "derived/") || cleanPath == "derived" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"type":     "FeatureCollection",
+			"features": []interface{}{},
+			"error":    "route /derived/ has been removed; use /api/derived/",
+		})
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 
 	stations, err := h.fetchStations(r)
@@ -47,6 +61,30 @@ func (h *StationHandler) StationGeoJSONHandler(w http.ResponseWriter, r *http.Re
 func (h *StationHandler) fetchStations(r *http.Request) (*model.GeoJSONFeatureCollection, error) {
 	dataPath := SanitizeGridPath(r.URL.Query().Get("path"))
 	file := SanitizeFile(r.URL.Query().Get("file"))
+
+	// Check if this is a derived station path (e.g. /api/derived/UPPER_AIR/PLOT/TMP/850-500)
+	if dReq, ok := ParseDerivedPath(dataPath, file); ok && dReq != nil && dReq.IsStation {
+		if dReq.File == "" {
+			dReq.File = file
+		}
+		if dReq.File == "" || dReq.File == "latest" {
+			underlying := ResolveUnderlyingCatalogPath(dReq)
+			if h.Client != nil && !h.MockMode {
+				latest, err := db.GetLatestCycle(h.Client, underlying, "")
+				if err == nil && latest != "" {
+					dReq.File = latest
+				}
+			}
+			if dReq.File == "" || dReq.File == "latest" {
+				dReq.File = "20261010080000.000"
+			}
+		}
+		if h.Derived != nil {
+			return h.Derived.CalculateDerivedStation(dReq)
+		}
+		dH := &DerivedHandler{Client: h.Client, MockMode: h.MockMode}
+		return dH.CalculateDerivedStation(dReq)
+	}
 
 	if strings.Contains(dataPath, "TLOGP") {
 		dataPath = "UPPER_AIR/TLOGP"

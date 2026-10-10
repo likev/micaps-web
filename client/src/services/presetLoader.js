@@ -19,7 +19,10 @@ import { loadObservationProduct } from "./derivedContours.js";
 import { schedulePrefetch } from "./prefetchService.js";
 import { loadPresetGroups, PRESET_GROUPS } from "../config/presets.js";
 import { resolveLayerTime, parseTimestamp } from "../utils/timeResolver.js";
-import { fetchTree } from "../api/catalogApi.js";
+import { fetchTree, fetchStationObservations } from "../api/catalogApi.js";
+import { analyzeAndRenderSoundingElementContour } from "../layers/soundingAnalysis.js";
+import { triggerRasterOverlay } from "../ui/layerActions.js";
+import { updateLegend } from "../ui/legend.js";
 import { filterObsFilesByStep } from "../ui/timeline/timelineMath.js";
 
 export function clearAllWeatherLayersFromMap(map, win = null, { resetVisibility = false } = {}) {
@@ -251,11 +254,109 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
       }
 
       if (layer.type === "contour" || layer.type === "wind") {
+        const isUpperAirContour = (layer.model === "UPPER_AIR" || (layer.path && layer.path.includes("/api/derived/UPPER_AIR")));
+        const stnLayer = group.layers.find((l) => l.type === "station" && (l.model === "UPPER_AIR" || (l.path && l.path.includes("UPPER_AIR"))));
+
         if (layer.derivedFrom && (layer.model === "SURFACE" || layer.model === "UPPER_AIR")) {
           // Skip loadWeatherField for station-derived contours;
           // station pass derives them once station data is fetched.
           return;
         }
+
+        if (isUpperAirContour && stnLayer) {
+          if (!layer.derivedFrom) {
+            layer.derivedFrom = stnLayer.id || `upperair-obs-${stnLayer.level || targetLevel || 500}`;
+          }
+          return;
+        }
+
+        if (isUpperAirContour && !stnLayer) {
+          // Standalone upper-air derived contour layer (no station layer in preset group)
+          const obsPath = layer.path || `UPPER_AIR/${layer.element || "PLOT"}/${targetLevel || 500}`;
+          let availableFiles = [];
+          if (Array.isArray(layer.sampleTimes) && layer.sampleTimes.length > 0) {
+            availableFiles = [...layer.sampleTimes].sort((a, b) => a.localeCompare(b));
+          } else if (win?._obsTimelinePath === obsPath && Array.isArray(win?._obsTimeline?.files) && win._obsTimeline.files.length > 0) {
+            availableFiles = [...win._obsTimeline.files].sort((a, b) => a.localeCompare(b));
+          } else {
+            try {
+              const entries = await fetchTree(obsPath, 100);
+              if (Array.isArray(entries) && entries.length > 0) {
+                availableFiles = entries.map((e) => e.name).filter(Boolean).sort((a, b) => a.localeCompare(b));
+              }
+            } catch (e) {
+              console.warn(`[PresetGroup] fetchTree failed for ${obsPath}:`, e);
+            }
+          }
+
+          let file = win?.obsTime;
+          if (typeof file === "string" && file.length === 14 && !file.includes(".")) {
+            file = `${file}.000`;
+            if (win) win.obsTime = file;
+          }
+          if (!file || freshObsLoad || !win?._obsTimeline) {
+            file = await syncObservationTimeline(obsPath, freshObsLoad ? null : (win?.obsTime || file), winTitle, win, { forceLatest: freshObsLoad });
+            if (win) {
+              win.obsTime = file;
+              if (getActiveWindow() === win) appState.set("obsTime", file);
+              updateWindowTitle(win);
+            }
+          }
+
+          let targetFile = file || win?.obsTime;
+          const isLive = group.mode === "live" || win?.timelineMode === "live";
+          const effectiveCursorTime = win?.wallClockCursor ||
+            (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
+            cursorTime;
+
+          if (availableFiles.length > 0) {
+            const match = resolveLayerTime({ ...layer, sampleTimes: availableFiles }, effectiveCursorTime, { forceLatestAt: isLive });
+            if (match?.sampleFile) targetFile = match.sampleFile;
+            else targetFile = availableFiles[availableFiles.length - 1];
+            layer.resolved = match;
+          }
+          if (typeof targetFile === "string" && targetFile.length === 14 && !targetFile.includes(".")) {
+            targetFile = `${targetFile}.000`;
+          }
+          layer.file = targetFile;
+          if (!win?.obsTime && targetFile && win) {
+            win.obsTime = targetFile;
+          }
+
+          const render = layer.render || {};
+          const targetId = layer.id || `contour-sounding-${(layer.element || "").toLowerCase()}-${targetLevel || 500}`;
+          const stations = await fetchStationObservations(obsPath, targetFile);
+
+          const cfg = {
+            ...render,
+            id: targetId,
+            layerId: targetId,
+            name: layer.name,
+            path: obsPath,
+            visible: layer.visible !== false,
+            colormap: resolveColormap(group, render, targetLevel),
+            file: targetFile,
+            obsTime: targetFile,
+          };
+
+          analyzeAndRenderSoundingElementContour(map, stations, targetLevel || 500, layer.element, cfg, win);
+          const renderedLayer = getLayersForWindow(win).find((l) => l.id === targetId);
+          if (renderedLayer && (renderedLayer.config?.showRaster || render.showRaster) && cfg.visible) {
+            await triggerRasterOverlay(map, renderedLayer, win);
+          }
+          const hasShading = cfg.visible && (Boolean(renderedLayer?.config?.showFill ?? cfg.showFill) || Boolean(renderedLayer?.config?.showRaster ?? render.showRaster));
+          if (hasShading) {
+            const colormap = renderedLayer?.colormap || cfg.colormap || layer.element;
+            updateLegend(layer.element, colormap, renderedLayer?.gridData?.stats?.min, renderedLayer?.gridData?.stats?.max, win, {
+              layerId: targetId,
+              id: targetId,
+              name: layer.name,
+              resolved: layer.resolved,
+            });
+          }
+          return;
+        }
+
         const layerResolved = resolveLayerTime(layer, cursorTime);
         layer.resolved = layerResolved;
         const render = layer.render || {};

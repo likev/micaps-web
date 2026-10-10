@@ -210,6 +210,12 @@ func (h *StaticHandler) SPAHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Unhandled /api/ routes and removed /derived/ routes must return 404, not the SPA index.html
+	if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/derived/") || r.URL.Path == "/derived" {
+		http.NotFound(w, r)
+		return
+	}
+
 	distDir := h.Cfg.StaticDir
 	path := filepath.Join(distDir, filepath.Clean(r.URL.Path))
 

@@ -20,10 +20,20 @@ type GridHandler struct {
 	Client   *db.CQLClient
 	Cache    *filecache.Cache
 	MockMode bool
+	Derived  *DerivedHandler
 }
 
 // JSONHandler handles /api/data/grid
 func (h *GridHandler) JSONHandler(w http.ResponseWriter, r *http.Request) {
+	dataPath := sanitizeGridPath(r.URL.Query().Get("path"))
+	cleanPath := strings.Trim(strings.ToLower(dataPath), "/")
+	if strings.HasPrefix(cleanPath, "derived/") || cleanPath == "derived" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "route /derived/ has been removed; use /api/derived/"})
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 
 	gridResp, err := h.fetchGrid(r)
@@ -44,6 +54,15 @@ func (h *GridHandler) JSONHandler(w http.ResponseWriter, r *http.Request) {
 
 // BinaryHandler handles /api/data/grid/binary
 func (h *GridHandler) BinaryHandler(w http.ResponseWriter, r *http.Request) {
+	dataPath := sanitizeGridPath(r.URL.Query().Get("path"))
+	cleanPath := strings.Trim(strings.ToLower(dataPath), "/")
+	if strings.HasPrefix(cleanPath, "derived/") || cleanPath == "derived" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "route /derived/ has been removed; use /api/derived/"})
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/octet-stream")
 
 	gridResp, err := h.fetchGrid(r)
@@ -67,6 +86,30 @@ func (h *GridHandler) BinaryHandler(w http.ResponseWriter, r *http.Request) {
 func (h *GridHandler) fetchGrid(r *http.Request) (*model.GridResponse, error) {
 	dataPath := sanitizeGridPath(r.URL.Query().Get("path"))
 	file := sanitizeFile(r.URL.Query().Get("file"))
+
+	// Check if this is a derived grid path (e.g. /api/derived/ECMWF_HR/TMP/850-500)
+	if dReq, ok := ParseDerivedPath(dataPath, file); ok && dReq != nil && !dReq.IsStation {
+		if dReq.File == "" {
+			dReq.File = file
+		}
+		if dReq.File == "" || dReq.File == "latest" {
+			underlying := ResolveUnderlyingCatalogPath(dReq)
+			if h.Client != nil && !h.MockMode {
+				latest, err := db.GetLatestCycle(h.Client, underlying, "")
+				if err == nil && latest != "" {
+					dReq.File = latest
+				}
+			}
+			if dReq.File == "" || dReq.File == "latest" {
+				dReq.File = "26100920.012"
+			}
+		}
+		if h.Derived != nil {
+			return h.Derived.CalculateDerivedGrid(dReq)
+		}
+		dH := &DerivedHandler{Client: h.Client, Cache: h.Cache, MockMode: h.MockMode}
+		return dH.CalculateDerivedGrid(dReq)
+	}
 
 	if h.Client == nil || dataPath == "" || file == "" {
 		if h.MockMode {

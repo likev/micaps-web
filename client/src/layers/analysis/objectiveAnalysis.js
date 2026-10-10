@@ -313,6 +313,7 @@ export function buildContourLayerMeta({ layerId, name, element, model, level, de
     model,
     level,
     derivedFrom,
+    path: options.path || undefined,
     file: options.file || options.obsTime || null,
     obsTime: options.obsTime || options.file || null,
     visible: options.visible !== false,

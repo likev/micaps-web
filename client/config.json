@@ -343,6 +343,69 @@
         "color": [255, 255, 255, 255],
         "val": 350
       }
+    ],
+    "K_INDEX": [
+      { "color": [240, 240, 240, 0], "val": 0 },
+      { "color": [160, 220, 240, 180], "val": 15 },
+      { "color": [100, 190, 220, 220], "val": 20 },
+      { "color": [120, 210, 120, 240], "val": 25 },
+      { "color": [240, 220, 60, 255], "val": 30 },
+      { "color": [245, 140, 40, 255], "val": 35 },
+      { "color": [230, 40, 40, 255], "val": 40 },
+      { "color": [160, 20, 160, 255], "val": 45 }
+    ],
+    "SHOWALTER": [
+      { "color": [160, 20, 160, 255], "val": -8 },
+      { "color": [220, 30, 30, 255], "val": -6 },
+      { "color": [245, 120, 30, 255], "val": -4 },
+      { "color": [245, 200, 50, 255], "val": -2 },
+      { "color": [240, 240, 240, 0], "val": 0 },
+      { "color": [140, 210, 230, 180], "val": 2 },
+      { "color": [60, 140, 210, 240], "val": 6 }
+    ],
+    "LIFTED": [
+      { "color": [160, 20, 160, 255], "val": -8 },
+      { "color": [220, 30, 30, 255], "val": -6 },
+      { "color": [245, 120, 30, 255], "val": -4 },
+      { "color": [245, 200, 50, 255], "val": -2 },
+      { "color": [240, 240, 240, 0], "val": 0 },
+      { "color": [140, 210, 230, 180], "val": 2 },
+      { "color": [60, 140, 210, 240], "val": 6 }
+    ],
+    "SWEAT": [
+      { "color": [240, 240, 240, 0], "val": 100 },
+      { "color": [100, 200, 220, 200], "val": 200 },
+      { "color": [120, 220, 100, 240], "val": 250 },
+      { "color": [240, 210, 50, 255], "val": 300 },
+      { "color": [240, 130, 30, 255], "val": 350 },
+      { "color": [220, 30, 30, 255], "val": 400 },
+      { "color": [160, 20, 160, 255], "val": 500 }
+    ],
+    "TT": [
+      { "color": [240, 240, 240, 0], "val": 35 },
+      { "color": [100, 200, 220, 220], "val": 44 },
+      { "color": [240, 210, 50, 255], "val": 48 },
+      { "color": [240, 130, 30, 255], "val": 52 },
+      { "color": [220, 30, 30, 255], "val": 56 },
+      { "color": [160, 20, 160, 255], "val": 65 }
+    ],
+    "SHEAR": [
+      { "color": [240, 240, 240, 0], "val": 0 },
+      { "color": [120, 190, 245, 140], "val": 6 },
+      { "color": [70, 200, 120, 180], "val": 12 },
+      { "color": [230, 210, 50, 220], "val": 18 },
+      { "color": [240, 120, 40, 240], "val": 25 },
+      { "color": [230, 40, 40, 255], "val": 35 },
+      { "color": [160, 20, 120, 255], "val": 45 }
+    ],
+    "THICKNESS": [
+      { "color": [30, 50, 140, 255], "val": 5100 },
+      { "color": [70, 160, 235, 255], "val": 5280 },
+      { "color": [100, 210, 200, 255], "val": 5400 },
+      { "color": [140, 230, 130, 255], "val": 5520 },
+      { "color": [230, 220, 50, 255], "val": 5640 },
+      { "color": [245, 140, 40, 255], "val": 5760 },
+      { "color": [230, 50, 40, 255], "val": 5880 }
     ]
   },
   "performance": {
@@ -1119,6 +1182,120 @@
           },
           "tolerance": "30m",
           "type": "station"
+        }
+      ]
+    },
+    {
+      "category": "Derived Diagnostics",
+      "hasLevel": false,
+      "id": "composite-derived-stability",
+      "name": "NWP Derived Stability & Severe Indices (ECMWF)",
+      "layers": [
+        {
+          "element": "K-INDEX",
+          "id": "derived-ecmwf-k-index",
+          "model": "ECMWF_HR",
+          "name": "Derived K-Index (ECMWF)",
+          "path": "/api/derived/ECMWF_HR/K-INDEX",
+          "type": "contour",
+          "render": {
+            "colormap": "K_INDEX",
+            "lineColor": "#f85149",
+            "lineWidth": 2,
+            "opacity": 0.65,
+            "showFill": true,
+            "showLabels": true,
+            "showLine": true,
+            "smooth": true,
+            "smoothIterations": 2
+          }
+        },
+        {
+          "element": "TT",
+          "id": "derived-ecmwf-tt",
+          "model": "ECMWF_HR",
+          "name": "Derived Total Totals TT (ECMWF)",
+          "path": "/api/derived/ECMWF_HR/TT",
+          "type": "contour",
+          "render": {
+            "colormap": "TT",
+            "lineColor": "#d29922",
+            "lineWidth": 2,
+            "opacity": 0.75,
+            "showFill": false,
+            "showLabels": true,
+            "showLine": true,
+            "smooth": true,
+            "smoothIterations": 2
+          }
+        },
+        {
+          "element": "TMP",
+          "level": "850-500",
+          "id": "derived-ecmwf-t850-500",
+          "model": "ECMWF_HR",
+          "name": "Derived T850-500 Lapse Rate (ECMWF)",
+          "path": "/api/derived/ECMWF_HR/TMP/850-500",
+          "type": "contour",
+          "render": {
+            "colormap": "TMP",
+            "lineColor": "#e3b341",
+            "lineWidth": 2,
+            "opacity": 0.75,
+            "showFill": false,
+            "showLabels": true,
+            "showLine": true,
+            "smooth": true,
+            "smoothIterations": 2
+          }
+        }
+      ]
+    },
+    {
+      "category": "Upper-Air Observations",
+      "hasLevel": false,
+      "isObservation": true,
+      "id": "composite-upperair-derived",
+      "name": "Sounding Derived Multi-Level Analysis",
+      "layers": [
+        {
+          "element": "K-INDEX",
+          "id": "derived-sounding-k-index",
+          "model": "UPPER_AIR",
+          "name": "Sounding Derived K-Index",
+          "path": "/api/derived/UPPER_AIR/PLOT/K-INDEX",
+          "type": "contour",
+          "render": {
+            "colormap": "K_INDEX",
+            "lineColor": "#f85149",
+            "lineWidth": 2,
+            "opacity": 0.65,
+            "showFill": true,
+            "showLabels": true,
+            "showLine": true,
+            "smooth": true,
+            "smoothIterations": 2
+          }
+        },
+        {
+          "element": "TMP",
+          "level": "850-500",
+          "id": "derived-sounding-t850-500",
+          "model": "UPPER_AIR",
+          "name": "Sounding Derived T850-500 Difference",
+          "path": "/api/derived/UPPER_AIR/PLOT/TMP/850-500",
+          "type": "contour",
+          "render": {
+            "colormap": "TMP",
+            "lineColor": "#f85149",
+            "lineWidth": 2,
+            "opacity": 0.75,
+            "showFill": false,
+            "showLabels": true,
+            "showLine": true,
+            "smooth": true,
+            "smoothIterations": 2
+          }
         }
       ]
     }

@@ -222,6 +222,12 @@ function collectNwpItems(win, targetPeriod, cycle, hasRasterActive, direction, o
         continue;
       }
       if (layer.derivedFrom) {
+        if (layer.path && layer.path.includes("/api/derived/")) {
+          if (layer.model !== "SURFACE" && layer.model !== "UPPER_AIR") {
+            items.push({ type: "grid", path: layer.path, file, direction, level: layer.level, period: targetPeriod });
+          }
+          continue;
+        }
         // Skip derived contour layers computed from station observations
         if (layer.model === "SURFACE" || layer.model === "UPPER_AIR") {
           continue;

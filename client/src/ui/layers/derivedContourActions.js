@@ -28,7 +28,212 @@ function syncDerivedLayerToWindowPreset(activeGroup, layerEntry) {
   }
 }
 
+const DERIVED_INDEX_KEYS = new Set([
+  "K-INDEX",
+  "K_INDEX",
+  "SHOWALTER",
+  "LIFTED",
+  "SWEAT",
+  "TT",
+  "SHEAR",
+  "THICKNESS",
+  "TMP_DIFF",
+]);
+
+export function isServerDerivedElement(val) {
+  const norm = (val || "").toUpperCase().trim();
+  if (DERIVED_INDEX_KEYS.has(norm)) return true;
+  if (/^T?(\d+)[-_](\d+)$/.test(norm)) return true;
+  return false;
+}
+
+export async function handleDerivedServerContourAction(map, layer, value, winObj) {
+  const normVal = (value || "").toUpperCase().trim();
+  const rangeMatch = normVal.match(/^T?(\d+)[-_](\d+)$/);
+
+  const isStation =
+    layer?.type === "station" ||
+    layer?.model === "UPPER_AIR" ||
+    (layer?.id && layer.id.includes("upper")) ||
+    (layer?.name && (layer.name.includes("Sounding") || layer.name.includes("Upper"))) ||
+    (!layer?.model && winObj?.model === "UPPER_AIR");
+
+  const activeGroup = winObj?.activeGroup || appState.get("activeGroup");
+
+  if (isStation) {
+    let elem = "K_INDEX";
+    let lvl = "850-500";
+    let virtualPath = "";
+    let elemName = "";
+    let colormap = "K_INDEX";
+
+    if (rangeMatch) {
+      elem = "TMP_DIFF";
+      lvl = `${rangeMatch[1]}-${rangeMatch[2]}`;
+      virtualPath = `/api/derived/UPPER_AIR/PLOT/TMP/${lvl}`;
+      elemName = `T${lvl} Difference`;
+      colormap = "TMP";
+    } else {
+      const idx = normVal === "K-INDEX" || normVal === "K" ? "K_INDEX" : normVal;
+      elem = idx;
+      const pathIdx = normVal === "K_INDEX" ? "K-INDEX" : normVal;
+      virtualPath = `/api/derived/UPPER_AIR/PLOT/${pathIdx}`;
+      elemName = idx;
+      colormap = idx;
+    }
+
+    const liveLayerId = `contour-sounding-${elem.toLowerCase().replace(/_/g, "-")}-${lvl}`;
+    const derivedFrom = layer?.id || `upperair-obs-${lvl}`;
+    const file = layer?.file || winObj?.obsTime || winObj?.file || "";
+
+    const { SOUNDING_CONTOUR_CONFIGS, analyzeAndRenderSoundingElementContour } = await import(
+      "../../layers/soundingAnalysis.js"
+    );
+    const { fetchStationObservations } = await import("../../api/catalogApi.js");
+
+    let stnData = null;
+    try {
+      stnData = await fetchStationObservations(virtualPath, file);
+    } catch (err) {
+      console.warn("[derivedContourActions] fetchStationObservations failed:", err);
+    }
+
+    const geojson =
+      stnData && Array.isArray(stnData.features) && stnData.features.length >= 3
+        ? stnData
+        : layer?.stationsGeoJSON || getStationGeoJSON(map) || winObj?.stationsGeoJSON || appState.get("stationData");
+
+    if (!geojson || !Array.isArray(geojson.features) || geojson.features.length < 3) {
+      notifyError(`Insufficient station observations to generate derived ${elemName}.`);
+      return;
+    }
+
+    const cfg = SOUNDING_CONTOUR_CONFIGS[elem] || SOUNDING_CONTOUR_CONFIGS.TMP_DIFF || {};
+    const defaultColor = cfg.defaultColor || "#f85149";
+
+    const res = analyzeAndRenderSoundingElementContour(
+      map,
+      geojson,
+      lvl,
+      elem,
+      {
+        layerId: liveLayerId,
+        lineColor: defaultColor,
+        derivedFrom,
+        path: virtualPath,
+        colormap,
+        showFill: Boolean(cfg.showFill),
+        showLine: true,
+        showRaster: false,
+      },
+      winObj
+    );
+
+    const renderedLayer = getLayersForWindow(winObj).find((l) => l.id === liveLayerId);
+    if (renderedLayer) {
+      renderedLayer.path = virtualPath;
+    }
+
+    if (res && activeGroup?.id) {
+      const derivedEntry = {
+        id: liveLayerId,
+        model: "UPPER_AIR",
+        element: elem,
+        level: lvl,
+        name: `Derived ${cfg.name || elemName}`,
+        path: virtualPath,
+        type: "contour",
+        derivedFrom,
+        render: {
+          showFill: Boolean(cfg.showFill),
+          showLine: true,
+          showRaster: false,
+          lineColor: defaultColor,
+          colormap,
+        },
+      };
+      upsertDerivedLayerToPreset(activeGroup.id, derivedEntry);
+      syncDerivedLayerToWindowPreset(activeGroup, derivedEntry);
+    }
+    return;
+  }
+
+  // Model Grid Derivation (ECMWF_HR, JAPAN_MR, etc.)
+  const model = layer?.model || winObj?.model || "ECMWF_HR";
+  let elem = "TMP";
+  let lvl = "850-500";
+  let virtualPath = "";
+  let elemName = "";
+  let colormap = "TMP";
+
+  if (rangeMatch) {
+    elem = "TMP";
+    lvl = `${rangeMatch[1]}-${rangeMatch[2]}`;
+    virtualPath = `/api/derived/${model}/TMP/${lvl}`;
+    elemName = `T${lvl} Lapse Rate`;
+    colormap = "TMP";
+  } else {
+    elem = normVal === "K_INDEX" ? "K-INDEX" : normVal;
+    virtualPath = `/api/derived/${model}/${elem}`;
+    elemName = elem;
+    colormap = elem.replace(/-/g, "_");
+  }
+
+  const liveLayerId = `contour-${model}-${elem.toLowerCase().replace(/_/g, "-")}-${lvl}`;
+  const derivedFrom = layer?.id || `model-${model}`;
+  const period = winObj?.period ?? layer?.period ?? 24;
+
+  const { loadWeatherField } = await import("../../services/weatherLoader.js");
+  const layerName = `Derived ${elemName} (${model})`;
+
+  await loadWeatherField(
+    map,
+    model,
+    elem,
+    lvl,
+    period,
+    {
+      id: liveLayerId,
+      name: layerName,
+      path: virtualPath,
+      colormap,
+      derivedFrom,
+    },
+    winObj
+  );
+
+  if (activeGroup?.id) {
+    const derivedEntry = {
+      id: liveLayerId,
+      model,
+      element: elem,
+      level: lvl,
+      name: layerName,
+      path: virtualPath,
+      type: "contour",
+      derivedFrom,
+      render: {
+        colormap,
+        lineColor: "#f85149",
+        lineWidth: 2,
+        showFill: Boolean(colormap === "K_INDEX" || colormap === "RH"),
+        showLine: true,
+        showRaster: false,
+        smooth: true,
+        smoothIterations: 2,
+      },
+    };
+    upsertDerivedLayerToPreset(activeGroup.id, derivedEntry);
+    syncDerivedLayerToWindowPreset(activeGroup, derivedEntry);
+  }
+}
+
 export function handleAddContourAction(map, layer, value, winObj) {
+  if (isServerDerivedElement(value)) {
+    handleDerivedServerContourAction(map, layer, value, winObj);
+    return;
+  }
+
   let elem = (value || "SLP").toUpperCase();
   if (elem === "VORT" || elem === "VORTICITY" || elem === "RVOR" || elem === "REL_VOR") elem = "VOR";
   if (elem === "DIVERGENCE") elem = "DIV";

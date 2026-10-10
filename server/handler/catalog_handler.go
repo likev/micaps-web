@@ -31,6 +31,18 @@ func (h *CatalogHandler) TreeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cleanPath := strings.Trim(strings.ToLower(dataPath), "/")
+	if strings.HasPrefix(cleanPath, "derived/") || cleanPath == "derived" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "route /derived/ has been removed; use /api/derived/"})
+		return
+	}
+
+	if dReq, ok := ParseDerivedPath(dataPath, ""); ok && dReq != nil {
+		dataPath = ResolveUnderlyingCatalogPath(dReq)
+	}
+
 	if h.MockMode {
 		isObs := strings.HasPrefix(dataPath, "SURFACE") || strings.HasPrefix(dataPath, "UPPER_AIR")
 		if isObs {
@@ -88,6 +100,18 @@ func (h *CatalogHandler) LevelsHandler(w http.ResponseWriter, r *http.Request) {
 		dataPath = "ECMWF_HR/TMP"
 	}
 
+	cleanPath := strings.Trim(strings.ToLower(dataPath), "/")
+	if strings.HasPrefix(cleanPath, "derived/") || cleanPath == "derived" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "route /derived/ has been removed; use /api/derived/"})
+		return
+	}
+
+	if dReq, ok := ParseDerivedPath(dataPath, ""); ok && dReq != nil {
+		dataPath = ResolveUnderlyingCatalogPath(dReq)
+	}
+
 	if h.MockMode {
 		if strings.Contains(dataPath, "SHANGHAI_MR") || strings.Contains(dataPath, "GRAPES_3KM") {
 			json.NewEncoder(w).Encode([]int{1000, 925, 850})
@@ -120,6 +144,19 @@ func (h *CatalogHandler) LatestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cleanPath := strings.Trim(strings.ToLower(dataPath), "/")
+	if strings.HasPrefix(cleanPath, "derived/") || cleanPath == "derived" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "route /derived/ has been removed; use /api/derived/"})
+		return
+	}
+
+	rawPath := dataPath
+	if dReq, ok := ParseDerivedPath(dataPath, ""); ok && dReq != nil {
+		dataPath = ResolveUnderlyingCatalogPath(dReq)
+	}
+
 	suffix := r.URL.Query().Get("suffix")
 	if suffix == "" {
 		suffix = "*.024"
@@ -127,7 +164,7 @@ func (h *CatalogHandler) LatestHandler(w http.ResponseWriter, r *http.Request) {
 
 	if h.MockMode {
 		json.NewEncoder(w).Encode(map[string]string{
-			"dataPath": dataPath,
+			"dataPath": rawPath,
 			"latest":   "26082708.024",
 		})
 		return
@@ -145,7 +182,7 @@ func (h *CatalogHandler) LatestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]string{
-		"dataPath": dataPath,
+		"dataPath": rawPath,
 		"latest":   latest,
 	})
 }

@@ -68,12 +68,15 @@ export async function loadWeatherField(map, model, element, level, period, custo
     Date.now();
 
   let targetLevel = level;
+  const pathRangeMatch = (customOptions?.path || "").match(/\/(\d+[-_]\d+)(?:\/|$)/);
   if (targetLevel === null || targetLevel === undefined || targetLevel === "null" || targetLevel === "undefined" || String(targetLevel).trim() === "") {
     if (customOptions?.level !== undefined && customOptions?.level !== null) {
       targetLevel = customOptions.level;
-    } else if (win?.level !== undefined && win?.level !== null) {
+    } else if (pathRangeMatch) {
+      targetLevel = pathRangeMatch[1];
+    } else if (win?.level !== undefined && win?.level !== null && !customOptions?.path?.includes("/api/derived/")) {
       targetLevel = win.level;
-    } else if (win?.activeGroup?.defaultLevel !== undefined && win?.activeGroup?.defaultLevel !== null) {
+    } else if (win?.activeGroup?.defaultLevel !== undefined && win?.activeGroup?.defaultLevel !== null && !customOptions?.path?.includes("/api/derived/")) {
       targetLevel = win.activeGroup.defaultLevel;
     }
   }
@@ -102,7 +105,9 @@ export async function loadWeatherField(map, model, element, level, period, custo
         const isLevelDirs = fileEntries.every((e) => /^\d+$/.test(e.name) && (e.size === 0 || !e.name.includes(".")));
         if (isLevelDirs) {
           const chosenLvl = targetLevel || 500;
-          dataPath = `${dataPath}/${chosenLvl}`;
+          if (!dataPath.endsWith(`/${chosenLvl}`)) {
+            dataPath = `${dataPath}/${chosenLvl}`;
+          }
           path = dataPath;
           targetLevel = chosenLvl;
           fileEntries = await fetchTree(dataPath, 100);
