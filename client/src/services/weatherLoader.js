@@ -93,13 +93,20 @@ export async function loadWeatherField(map, model, element, level, period, custo
       : (hasLevel ? `${targetLevel} hPa ${element} (${model})` : `${element} (${model})`));
   const name = customOptions?.name || defaultName;
 
+  const existingLayer = getLayerById(layerId, win);
+  const snap = win?.layerSnapshots?.find((s) => s.id === layerId || (s.element === element && s.model === model));
+  const isVisible = existingLayer
+    ? (existingLayer.visible !== false)
+    : (snap ? snap.visible !== false : (customOptions?.visible !== undefined ? customOptions.visible !== false : true));
+
   // Retrieve available real files for dataPath from catalog or customOptions
   let availableFiles = [];
-  if (Array.isArray(customOptions?.sampleTimes) && customOptions.sampleTimes.length > 0) {
-    availableFiles = customOptions.sampleTimes;
-  } else {
-    try {
-      let fileEntries = await fetchTree(dataPath, 100);
+  if (isVisible) {
+    if (Array.isArray(customOptions?.sampleTimes) && customOptions.sampleTimes.length > 0) {
+      availableFiles = customOptions.sampleTimes;
+    } else {
+      try {
+        let fileEntries = await fetchTree(dataPath, 100);
       if (Array.isArray(fileEntries) && fileEntries.length > 0) {
         // If fileEntries are subdirectories representing levels (e.g. 1000, 925, 850, 500), dive into the level
         const isLevelDirs = fileEntries.every((e) => /^\d+$/.test(e.name) && (e.size === 0 || !e.name.includes(".")));
@@ -121,6 +128,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
     } catch (err) {
       console.warn(`[weatherLoader] fetchTree failed for ${dataPath}:`, err);
     }
+  }
   }
 
   if (availableFiles.length > 0) {
@@ -242,8 +250,6 @@ export async function loadWeatherField(map, model, element, level, period, custo
     resolved = resolveLayerTime(layerMetaDummy, cursorTime, { forceLatestAt: isLive });
   }
 
-  const existingLayer = getLayerById(layerId, win);
-  const snap = win?.layerSnapshots?.find((s) => s.id === layerId || (s.element === element && s.model === model));
   const exCfg = existingLayer?.config || snap?.config || {};
 
   const isHeight = element === "HGT";
@@ -278,9 +284,6 @@ export async function loadWeatherField(map, model, element, level, period, custo
   };
   const pickedPalette = pickPalettePath(exCfg, customOptions, snap?.config);
   const savedPalettePath = pickedPalette === undefined ? null : pickedPalette;
-  const isVisible = existingLayer
-    ? (existingLayer.visible !== false)
-    : (snap ? snap.visible !== false : (customOptions?.visible !== undefined ? customOptions.visible !== false : true));
   const smooth = exCfg.smooth ?? customOptions?.smooth ?? true;
   const smoothIterations = exCfg.smoothIterations ?? customOptions?.smoothIterations ?? 2;
   const labelSize = exCfg.labelSize ?? customOptions?.labelSize;

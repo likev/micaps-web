@@ -1,8 +1,9 @@
 // catalogApi.js - Weather dataset catalog and metadata helpers
 import { fetchJson, fetchBinary } from "./apiClient.js";
 
-export async function fetchStatus() {
-  return await fetchJson("/api/status");
+export async function fetchStatus(options = {}) {
+  const opts = options instanceof AbortSignal ? { signal: options } : options;
+  return await fetchJson("/api/status", {}, opts);
 }
 
 export async function fetchModels() {

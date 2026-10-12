@@ -218,8 +218,14 @@ export function stepWindowTimeline(tl, delta) {
       let minIdx = -1;
       let maxIdx = -1;
       for (let i = 0; i < len; i++) {
-        const ts = parseTimestamp(tl.obsFiles[i]);
-        if (ts !== null && ts >= loopStart && ts <= loopEnd) {
+        let inRange = false;
+        if (loopStart > 100000000) {
+          const ts = parseTimestamp(tl.obsFiles[i]);
+          inRange = ts !== null && ts >= loopStart && ts <= loopEnd;
+        } else {
+          inRange = i >= loopStart && i <= loopEnd;
+        }
+        if (inRange) {
           if (minIdx === -1) minIdx = i;
           maxIdx = i;
         }
@@ -260,18 +266,24 @@ export function stepWindowTimeline(tl, delta) {
     const numSteps = Math.max(1, Math.abs(delta));
     let nextIdx = (typeof tl.currentPeriodIdx === "number" && tl.currentPeriodIdx >= 0) ? tl.currentPeriodIdx : 0;
 
-    if (loopActive && tl.currentInitCycle) {
-      const cycleTs = parseTimestamp(tl.currentInitCycle);
-      if (cycleTs) {
-        let minIdx = -1;
-        let maxIdx = -1;
-        for (let i = 0; i < len; i++) {
-          const validTs = cycleTs + Number(tl.discretePeriods[i]) * 3600 * 1000;
-          if (validTs >= loopStart && validTs <= loopEnd) {
-            if (minIdx === -1) minIdx = i;
-            maxIdx = i;
-          }
+    if (loopActive) {
+      const cycleTs = tl.currentInitCycle ? parseTimestamp(tl.currentInitCycle) : null;
+      let minIdx = -1;
+      let maxIdx = -1;
+      for (let i = 0; i < len; i++) {
+        const p = Number(tl.discretePeriods[i]);
+        let inRange = false;
+        if (loopStart > 100000000 && cycleTs) {
+          const validTs = cycleTs + p * 3600 * 1000;
+          inRange = validTs >= loopStart && validTs <= loopEnd;
+        } else {
+          inRange = p >= loopStart && p <= loopEnd;
         }
+        if (inRange) {
+          if (minIdx === -1) minIdx = i;
+          maxIdx = i;
+        }
+      }
         if (minIdx !== -1 && maxIdx !== -1 && minIdx <= maxIdx) {
           if (delta > 0) {
             if (tl.currentPeriodIdx < minIdx || tl.currentPeriodIdx >= maxIdx) {
@@ -288,7 +300,7 @@ export function stepWindowTimeline(tl, delta) {
           }
           tl.currentPeriodIdx = nextIdx;
           const p = tl.discretePeriods[tl.currentPeriodIdx];
-          const validTs = cycleTs + Number(p) * 3600 * 1000;
+          const validTs = cycleTs ? (cycleTs + Number(p) * 3600 * 1000) : null;
           tl.wallClockCursor = validTs;
           return {
             isObs: false,
@@ -298,7 +310,6 @@ export function stepWindowTimeline(tl, delta) {
             _seq: ++tl.periodStepSeq,
           };
         }
-      }
     }
 
     const hasDisabled = Boolean(

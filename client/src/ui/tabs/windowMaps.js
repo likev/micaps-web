@@ -161,7 +161,7 @@ export function registerWindowMapSync(win, map, opts = {}) {
 export function initWindowMap(win, opts = {}) {
   const existing = resolveMap(win?.id, win);
   if (existing) return existing;
-  const container = typeof document !== "undefined" ? document.getElementById(win.domId) : null;
+  const container = (typeof document !== "undefined" && typeof document.getElementById === "function") ? document.getElementById(win.domId) : null;
   if (!container) return null;
 
   const map = createMapInstance(container);

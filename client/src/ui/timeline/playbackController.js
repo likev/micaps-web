@@ -11,7 +11,7 @@ import {
 export { DEFAULT_PLAYBACK_MS };
 
 export function setPlayButtonBusy(isBusy) {
-  if (typeof document === "undefined") return;
+  if (typeof document === "undefined" || typeof document.getElementById !== "function") return;
   const btnPlay = document.getElementById("btn-play");
   if (btnPlay) {
     if (isBusy) {
@@ -25,7 +25,7 @@ export function setPlayButtonBusy(isBusy) {
 }
 
 export function updatePlayButtonDisabledState() {
-  if (typeof document === "undefined") return;
+  if (typeof document === "undefined" || typeof document.getElementById !== "function") return;
   const btnPlay = document.getElementById("btn-play");
   if (!btnPlay) return;
 
@@ -217,7 +217,7 @@ export function startPlayback(options = {}) {
 
   timelineState.playbackLoopOptions = { loop: options.loop !== false };
 
-  if (typeof document !== "undefined") {
+  if (typeof document !== "undefined" && typeof document.getElementById === "function") {
     const btnPlay = document.getElementById("btn-play");
     if (btnPlay) {
       btnPlay.textContent = "❚❚";
@@ -245,7 +245,7 @@ export function pausePlayback() {
   }
   timelineState.isTickLoading = false;
   setPlayButtonBusy(false);
-  if (typeof document !== "undefined") {
+  if (typeof document !== "undefined" && typeof document.getElementById === "function") {
     const btnPlay = document.getElementById("btn-play");
     if (btnPlay) {
       btnPlay.textContent = "▶";
@@ -260,7 +260,7 @@ export function pausePlayback() {
 export function setPlaybackSpeed(speedMs) {
   const speed = parseInt(speedMs, 10) || DEFAULT_PLAYBACK_MS;
   appState.set("playbackSpeed", speed);
-  if (typeof document !== "undefined") {
+  if (typeof document !== "undefined" && typeof document.getElementById === "function") {
     const sel = document.getElementById("select-playback-speed");
     if (sel && sel.value !== String(speed)) {
       sel.value = String(speed);
@@ -275,7 +275,7 @@ export function setPlaybackSpeed(speedMs) {
 
 appState.subscribe("playbackSpeed", (speed) => {
   const speedVal = parseInt(speed, 10) || DEFAULT_PLAYBACK_MS;
-  if (typeof document !== "undefined") {
+  if (typeof document !== "undefined" && typeof document.getElementById === "function") {
     const sel = document.getElementById("select-playback-speed");
     if (sel && sel.value !== String(speedVal)) {
       sel.value = String(speedVal);

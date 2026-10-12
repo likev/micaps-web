@@ -14,8 +14,6 @@
   import {
     formatLeadTime,
     formatObsTimestamp,
-    formatForecastInitTime,
-    formatForecastValidTime,
   } from "../utils/formatters.js";
   import { getPeriodsForStep, filterObsFilesByStep, selectObsChipsWindow, findClosestFile } from "../lib/stores/timelineMath.js";
   import { stepWindowTimeline } from "../lib/services/appWorkflow.js";
@@ -166,19 +164,6 @@
         app.period = p;
         emitTimeChange({ period: p, cycle: currentCycle, _seq: ++timeline.periodStepSeq });
       }
-    }
-  }
-
-  function handleCycleChange(e) {
-    const cycle = e.target.value;
-    timeline.currentInitCycle = cycle;
-    app.cycle = cycle;
-    if (onTimeChange) {
-      emitTimeChange({
-        cycle,
-        period: activePeriod,
-        _seq: ++timeline.periodStepSeq,
-      });
     }
   }
 
@@ -356,6 +341,102 @@
     }
   });
 
+  let loopA = $derived(timeline.loopRange?.start ?? null);
+  let loopB = $derived(timeline.loopRange?.end ?? null);
+  let isLoopActive = $derived(Boolean(timeline.loopRange?.active));
+
+  function ensureLoopRange() {
+    if (!timeline.loopRange) {
+      timeline.loopRange = { active: false, start: null, end: null };
+    }
+  }
+
+  function handleSetLoopA() {
+    ensureLoopRange();
+    const curVal = isObs ? (timeline.currentObsIdx ?? 0) : activePeriod;
+    timeline.loopRange.start = curVal;
+    if (timeline.loopRange.end != null && timeline.loopRange.start > timeline.loopRange.end) {
+      const tmp = timeline.loopRange.start;
+      timeline.loopRange.start = timeline.loopRange.end;
+      timeline.loopRange.end = tmp;
+    }
+  }
+
+  function handleSetLoopB() {
+    ensureLoopRange();
+    const curVal = isObs ? (timeline.currentObsIdx ?? 0) : activePeriod;
+    timeline.loopRange.end = curVal;
+    if (timeline.loopRange.start != null && timeline.loopRange.start > timeline.loopRange.end) {
+      const tmp = timeline.loopRange.start;
+      timeline.loopRange.start = timeline.loopRange.end;
+      timeline.loopRange.end = tmp;
+    }
+  }
+
+  function handleToggleLoop() {
+    ensureLoopRange();
+    if (timeline.loopRange.start == null || timeline.loopRange.end == null) {
+      if (isObs) {
+        timeline.loopRange.start = 0;
+        timeline.loopRange.end = Math.max(0, obsFiles.length - 1);
+      } else {
+        timeline.loopRange.start = periods[0] ?? 0;
+        timeline.loopRange.end = periods[periods.length - 1] ?? 72;
+      }
+    }
+    timeline.loopRange.active = !timeline.loopRange.active;
+  }
+
+  function handleClearLoop() {
+    timeline.loopRange = { active: false, start: null, end: null };
+  }
+
+  function formatLoopPoint(pt) {
+    if (pt == null) return "--";
+    if (isObs) {
+      const f = obsFiles[pt];
+      return f ? (f.length >= 10 ? `${f.slice(4, 6)}/${f.slice(6, 8)} ${f.slice(8, 10)}h` : f) : `Idx ${pt}`;
+    }
+    return pt === 0 ? "000h" : `+${pt}h`;
+  }
+
+  function isPeriodInLoop(p) {
+    if (!isLoopActive || loopA == null || loopB == null) return false;
+    const min = Math.min(loopA, loopB);
+    const max = Math.max(loopA, loopB);
+    return Number(p) >= min && Number(p) <= max;
+  }
+
+  function isPeriodPointA(p) {
+    return loopA != null && Number(p) === Number(loopA);
+  }
+
+  function isPeriodPointB(p) {
+    return loopB != null && Number(p) === Number(loopB);
+  }
+
+  function isObsInLoop(idx) {
+    if (!isLoopActive || loopA == null || loopB == null) return false;
+    const min = Math.min(loopA, loopB);
+    const max = Math.max(loopA, loopB);
+    return idx >= min && idx <= max;
+  }
+
+  function isObsPointA(idx) {
+    return loopA != null && idx === Number(loopA);
+  }
+
+  function isObsPointB(idx) {
+    return loopB != null && idx === Number(loopB);
+  }
+
+  function getPrecipSparkHeight(p) {
+    if (p == null) return 0;
+    const num = Number(p);
+    if (!Number.isFinite(num) || num <= 0) return 3;
+    return Math.min(18, Math.max(4, Math.round((num / 72) * 16) + 2));
+  }
+
   onDestroy(() => {
     if (playTimer) {
       clearInterval(playTimer);
@@ -454,6 +535,52 @@
         </select>
       </div>
 
+      <!-- Item F: A-B Loop Range Controls -->
+      <div class="loop-range-controls" aria-label="A-B Loop Controls">
+        <button
+          type="button"
+          id="sl-btn-loop-a"
+          class="btn-loop-pt"
+          class:set={loopA != null}
+          title={loopA != null ? `Loop Start A: ${formatLoopPoint(loopA)}` : "Set Loop Start A to current position"}
+          onclick={handleSetLoopA}
+        >
+          A
+        </button>
+        <button
+          type="button"
+          id="sl-btn-loop-b"
+          class="btn-loop-pt"
+          class:set={loopB != null}
+          title={loopB != null ? `Loop End B: ${formatLoopPoint(loopB)}` : "Set Loop End B to current position"}
+          onclick={handleSetLoopB}
+        >
+          B
+        </button>
+        <button
+          type="button"
+          id="sl-btn-loop-toggle"
+          class="btn-loop-toggle"
+          class:active={isLoopActive}
+          title={isLoopActive ? "Disable A-B Loop" : "Enable A-B Loop Playback"}
+          aria-label="Toggle A-B loop"
+          onclick={handleToggleLoop}
+        >
+          🔁
+        </button>
+        {#if loopA != null || loopB != null}
+          <button
+            type="button"
+            id="sl-btn-loop-clear"
+            class="btn-loop-clear"
+            title="Clear A-B Loop Range"
+            onclick={handleClearLoop}
+          >
+            ✕
+          </button>
+        {/if}
+      </div>
+
       <button
         type="button"
         id="sl-btn-toggle-multitrack"
@@ -469,49 +596,18 @@
     </div>
 
     <div class="timeline-body">
-      <div class="timeline-info">
-        <span class="mode-badge" class:obs-badge={isObs}>
-          {isObs ? "OBSERVATION" : "NWP FORECAST"}
-        </span>
-
-        {#if !isObs}
-          <div class="init-time-control">
-            <label for="sl-select-forecast-cycle" class="init-time-label">Init:</label>
-            <select
-              id="sl-select-forecast-cycle"
-              class="init-time-select"
-              value={currentCycle}
-              onchange={handleCycleChange}
-            >
-              {#each cycles as cycle}
-                <option value={cycle}>{formatForecastInitTime(cycle)}</option>
-              {/each}
-            </select>
-          </div>
-        {/if}
-
-        <div id="sl-time-lead-wrapper">
-          {isObs ? "Observation Time: " : "Forecast Lead: "}
-          <strong id="sl-time-lead-label">
-            {isObs ? (activeObsFile ? formatObsTimestamp(activeObsFile) : "--") : formatLeadTime(activePeriod)}
-          </strong>
-        </div>
-
-        <div id="sl-time-valid-label" class="valid-label">
-          {#if isObs}
-            Real-time Observation (Step: {timeline.currentStepLength || 3}h)
-          {:else if currentCycle}
-            Valid: {formatForecastValidTime(currentCycle, activePeriod)} (Step: {timeline.currentStepLength || 6}h)
-          {/if}
-        </div>
-      </div>
-
       <div id="sl-timeline-chips" class="timeline-chips" role="tablist" aria-label={isObs ? "Observation time steps" : "Forecast lead time steps"}>
         {#if isObs}
           {#each obsFiles as file, idx}
+            {@const isInLoop = isObsInLoop(idx)}
+            {@const isPtA = isObsPointA(idx)}
+            {@const isPtB = isObsPointB(idx)}
             <button
               class="chip-btn"
               class:active={idx === timeline.currentObsIdx}
+              class:in-loop-range={isInLoop}
+              class:loop-pt-a={isPtA}
+              class:loop-pt-b={isPtB}
               role="tab"
               aria-selected={idx === timeline.currentObsIdx}
               onclick={() => handleChipClick(idx)}
@@ -519,16 +615,25 @@
               data-file={file}
             >
               {file.length >= 10 ? `${file.slice(4, 6)}/${file.slice(6, 8)} ${file.slice(8, 10)}:${file.slice(10, 12) || "00"}` : file}
+              {#if isPtA}<span class="chip-loop-tag tag-a">A</span>{/if}
+              {#if isPtB}<span class="chip-loop-tag tag-b">B</span>{/if}
             </button>
           {/each}
         {:else}
           {#each periods as p, idx}
             {@const isPeriodDisabled = (isRainAccum && Number(p) < rainAccumHours) ||
               (Array.isArray(timeline.disabledPeriods) && (timeline.disabledPeriods.includes(p) || timeline.disabledPeriods.includes(Number(p))))}
+            {@const isInLoop = isPeriodInLoop(p)}
+            {@const isPtA = isPeriodPointA(p)}
+            {@const isPtB = isPeriodPointB(p)}
+            {@const sparkHeight = getPrecipSparkHeight(p)}
             <button
               class="chip-btn"
               class:active={idx === timeline.currentPeriodIdx}
               class:disabled={isPeriodDisabled}
+              class:in-loop-range={isInLoop}
+              class:loop-pt-a={isPtA}
+              class:loop-pt-b={isPtB}
               disabled={isPeriodDisabled}
               role="tab"
               aria-selected={idx === timeline.currentPeriodIdx}
@@ -543,7 +648,12 @@
                     : "Not available (forecast lead time does not exist for accumulation period)")
                 : undefined}
             >
+              {#if sparkHeight > 0}
+                <div class="chip-sparkline-bar" style:height="{sparkHeight}px" title="Precipitation accum: ~{p}h"></div>
+              {/if}
               {p === 0 ? "000h" : `+${p}h`}
+              {#if isPtA}<span class="chip-loop-tag tag-a">A</span>{/if}
+              {#if isPtB}<span class="chip-loop-tag tag-b">B</span>{/if}
             </button>
           {/each}
         {/if}
@@ -710,50 +820,6 @@
     min-width: 0;
   }
 
-  .timeline-info {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    row-gap: 4px;
-    column-gap: 12px;
-    font-size: 12px;
-    font-family: var(--font-mono, monospace);
-    min-width: 0;
-  }
-
-  .mode-badge {
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: rgba(56, 139, 253, 0.2);
-    border: 1px solid var(--accent-blue, #388bfd);
-    color: #79c0ff;
-    font-size: 10px;
-    font-weight: bold;
-  }
-
-  .mode-badge.obs-badge {
-    background: rgba(46, 160, 67, 0.2);
-    border-color: #2ea043;
-    color: #56d364;
-  }
-
-  #sl-time-lead-wrapper {
-    min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .valid-label {
-    margin-left: auto;
-    color: #8b949e;
-    font-size: 11px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    min-width: 0;
-  }
-
   .timeline-chips {
     display: flex;
     align-items: center;
@@ -795,5 +861,121 @@
     cursor: not-allowed !important;
     pointer-events: none !important;
     border-style: dashed !important;
+  }
+
+  .loop-range-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: #161b22;
+    padding: 2px 4px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    margin-left: 4px;
+  }
+
+  .btn-loop-pt {
+    background: #21262d;
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15));
+    color: var(--text-secondary, #8b949e);
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: var(--font-mono, monospace);
+    transition: all 0.15s ease;
+  }
+
+  .btn-loop-pt:hover {
+    color: #ffffff;
+    border-color: #58a6ff;
+    background: #30363d;
+  }
+
+  .btn-loop-pt.set {
+    background: rgba(56, 139, 253, 0.25);
+    border-color: #388bfd;
+    color: #58a6ff;
+  }
+
+  .btn-loop-toggle {
+    background: transparent;
+    border: 1px solid transparent;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: all 0.15s ease;
+    opacity: 0.6;
+  }
+
+  .btn-loop-toggle:hover {
+    opacity: 1;
+    background: #30363d;
+  }
+
+  .btn-loop-toggle.active {
+    opacity: 1;
+    background: rgba(46, 160, 67, 0.25);
+    border-color: #2ea043;
+    color: #3fb950;
+    box-shadow: 0 0 6px rgba(46, 160, 67, 0.3);
+  }
+
+  .btn-loop-clear {
+    background: transparent;
+    border: none;
+    color: #8b949e;
+    font-size: 10px;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 3px;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+
+  .btn-loop-clear:hover {
+    color: #f85149;
+  }
+
+  .chip-btn.in-loop-range {
+    border-color: rgba(56, 139, 253, 0.6);
+    background: rgba(56, 139, 253, 0.12);
+  }
+
+  .chip-btn.loop-pt-a {
+    border-left: 2px solid #58a6ff;
+  }
+
+  .chip-btn.loop-pt-b {
+    border-right: 2px solid #58a6ff;
+  }
+
+  .chip-sparkline-bar {
+    width: 100%;
+    background: linear-gradient(180deg, rgba(88, 166, 255, 0.7), rgba(46, 160, 67, 0.8));
+    border-radius: 2px 2px 0 0;
+    margin-bottom: 2px;
+  }
+
+  .chip-loop-tag {
+    font-size: 9px;
+    font-weight: 800;
+    padding: 0 3px;
+    border-radius: 3px;
+    margin-left: 3px;
+    line-height: 1.2;
+    display: inline-block;
+  }
+
+  .chip-loop-tag.tag-a {
+    background: #388bfd;
+    color: #ffffff;
+  }
+
+  .chip-loop-tag.tag-b {
+    background: #2ea043;
+    color: #ffffff;
   }
 </style>

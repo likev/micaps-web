@@ -9,6 +9,8 @@ import {
   getCurrentActiveWinTitle,
   setCurrentActiveWinTitle,
   setOnLayersChangeCallback,
+  reorderLayers as coreReorderLayers,
+  syncMapLayerOrder,
 } from "./layersCore.js";
 
 // Svelte 5 reactive layers map: { [winId]: Layer[] }
@@ -45,9 +47,16 @@ export function clearLayers(winId = getCurrentActiveWinId()) {
   syncLayersState(winId);
 }
 
+export function reorderLayers(fromIdx, toIdx, winId = getCurrentActiveWinId()) {
+  const list = coreReorderLayers(fromIdx, toIdx, winId);
+  syncLayersState(winId);
+  return list;
+}
+
 export {
   getCurrentActiveWinId,
   setCurrentActiveWinId,
   getCurrentActiveWinTitle,
   setCurrentActiveWinTitle,
+  syncMapLayerOrder,
 };

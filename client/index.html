@@ -13,6 +13,13 @@
     const _origLog = console.log, _origErr = console.error;
     console.log = (...args) => { window.__LOGS__.push('LOG: ' + args.join(' ')); _origLog(...args); };
     console.error = (...args) => { window.__LOGS__.push('CERR: ' + args.join(' ')); _origErr(...args); };
+    try {
+      const storedTheme = localStorage.getItem('micaps-ui-theme') || localStorage.getItem('micaps-basemap-scheme') || 'dark';
+      if (storedTheme) {
+        document.documentElement.setAttribute('data-theme', storedTheme);
+        document.documentElement.setAttribute('data-scheme', storedTheme);
+      }
+    } catch {}
   </script>
 </head>
 <body>

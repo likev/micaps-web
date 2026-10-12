@@ -11,9 +11,10 @@ export function setToastBridge(fn) {
 }
 
 export function ensureErrorToast() {
-  if (typeof document === "undefined") return null;
+  if (typeof document === "undefined" || typeof document.getElementById !== "function") return null;
   let el = document.getElementById("error-toast");
   if (!el) {
+    if (typeof document.createElement !== "function" || !document.body) return null;
     el = document.createElement("div");
     el.id = "error-toast";
     el.className = "hidden";
@@ -26,7 +27,7 @@ export function ensureErrorToast() {
 }
 
 export function showErrorToast(msg) {
-  if (typeof document === "undefined" && !toastBridge) return;
+  if ((typeof document === "undefined" || typeof document.getElementById !== "function") && !toastBridge) return;
   if (toastBridge) {
     try { toastBridge(msg); } catch {}
     return;

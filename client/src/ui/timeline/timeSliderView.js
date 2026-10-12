@@ -28,7 +28,7 @@ import {
 } from "./playbackController.js";
 
 export function updateStepLengthOptions(isUpper, currentStep) {
-  if (typeof document === "undefined") {
+  if (typeof document === "undefined" || typeof document.getElementById !== "function") {
     timelineState.currentStepLength = parseInt(currentStep, 10) || (isUpper ? 12 : 6);
     return;
   }
@@ -69,14 +69,14 @@ export function updateStepLengthOptions(isUpper, currentStep) {
 }
 
 export function setTimeSliderVisible(visible = true) {
-  if (typeof document === "undefined") return;
+  if (typeof document === "undefined" || typeof document.getElementById !== "function") return;
   const container = document.getElementById("timeslider-container");
   if (!container) return;
   container.classList.toggle("hidden", !visible);
 }
 
 export function renderChips() {
-  if (typeof document === "undefined") return;
+  if (typeof document === "undefined" || typeof document.getElementById !== "function") return;
   const chipsContainer = document.getElementById("timeline-chips");
   if (!chipsContainer) return;
   chipsContainer.innerHTML = "";
@@ -165,7 +165,7 @@ export function renderChips() {
 }
 
 export function updateLabels() {
-  if (typeof document === "undefined") return;
+  if (typeof document === "undefined" || typeof document.getElementById !== "function") return;
   const badge = document.getElementById("time-badge");
   const winBadge = document.getElementById("time-win-badge");
   const initWrapper = document.getElementById("time-init-wrapper");
@@ -396,6 +396,7 @@ export function setTimelineMode(mode, customData = {}) {
 }
 
 export function initTimeSlider(containerId = "timeslider-container", onTimeChange) {
+  if (typeof document === "undefined" || typeof document.getElementById !== "function") return;
   const container = document.getElementById(containerId);
   if (!container) return;
   pausePlayback();

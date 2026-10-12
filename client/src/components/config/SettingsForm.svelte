@@ -27,8 +27,10 @@
   });
 
   let basemap = $derived(draft.basemap || {});
+  import { setGlobalTheme } from "../../lib/stores/theme.svelte.js";
+
   let perf = $derived(draft.performance || {});
-  let scheme = $derived(basemap.scheme || "dark");
+  let scheme = $derived(draft.theme || basemap.scheme || "dark");
   let projection = $derived(basemap.projection || "mercator");
   let cells = $derived(Number.isFinite(perf.maxEffectiveCells) ? perf.maxEffectiveCells : DEFAULT_MAX_EFFECTIVE_CELLS);
 
@@ -36,7 +38,9 @@
     formState.updateDraft((d) => {
       if (!d.basemap) d.basemap = {};
       d.basemap.scheme = newScheme;
+      d.theme = newScheme;
     });
+    setGlobalTheme(newScheme);
   }
 
   function setProjection(newProj) {
@@ -99,7 +103,7 @@
             <span class="radio-card-title">Paper</span>
             <span class="radio-card-sub">Light</span>
           </label>
-          <label class="radio-card" class:selected={scheme === "micaps"}>
+          <label class="radio-card" class:selected={scheme === "micaps"} title="MICAPS Classic Green">
             <input
               type="radio"
               name="basemap-scheme"
@@ -107,9 +111,9 @@
               checked={scheme === "micaps"}
               onchange={() => setScheme("micaps")}
             />
-            <span class="radio-card-icon">🌐</span>
-            <span class="radio-card-title">Slate Blue</span>
-            <span class="radio-card-sub">Navy</span>
+            <span class="radio-card-icon">🟩</span>
+            <span class="radio-card-title">MICAPS</span>
+            <span class="radio-card-sub">Classic Green</span>
           </label>
         </div>
       </div>

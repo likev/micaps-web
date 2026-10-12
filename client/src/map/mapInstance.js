@@ -120,6 +120,7 @@ export function createMapInstance(containerIdOrEl, options = {}) {
     maxZoom: 14,
     attributionControl: false,
     keyboard: false,
+    preserveDrawingBuffer: options.preserveDrawingBuffer ?? true,
   });
 
   if (mapInstance.keyboard) {
@@ -159,22 +160,38 @@ export function setBasemapScheme(map, schemeName) {
   const m = map || getActiveMap();
   if (!m) return;
   const scheme = getBasemapScheme(schemeName);
-  if (m.isStyleLoaded && m.isStyleLoaded()) {
+  const apply = () => {
     applyBasemapScheme(m, scheme.id);
     updateGraticuleScheme(m, scheme.id);
     m.__basemapScheme = scheme.id;
+    try {
+      const state = getState(m);
+      if (state && state.config) {
+        state.config.__themeId = scheme.id;
+        drawStationCanvas(m);
+      }
+    } catch {}
+  };
+
+  if (m.isStyleLoaded && m.isStyleLoaded()) {
+    apply();
+  } else if (typeof m.once === "function") {
+    m.once("load", apply);
   } else {
-    m.once("load", () => {
-      applyBasemapScheme(m, scheme.id);
-      updateGraticuleScheme(m, scheme.id);
-      m.__basemapScheme = scheme.id;
-    });
+    apply();
   }
-  try { if (typeof localStorage !== "undefined") localStorage.setItem("micaps-basemap-scheme", scheme.id); } catch {}
+
+  try {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem("micaps-basemap-scheme", scheme.id);
+      localStorage.setItem("micaps-ui-theme", scheme.id);
+    }
+  } catch {}
   // also persist to CURRENT_CONFIG if available
   try {
     if (typeof window !== "undefined" && window.__MICAPS_CONFIG__) {
       window.__MICAPS_CONFIG__.basemap = { ...(window.__MICAPS_CONFIG__.basemap || {}), scheme: scheme.id };
+      window.__MICAPS_CONFIG__.theme = scheme.id;
     }
   } catch {}
 }

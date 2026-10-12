@@ -49,7 +49,7 @@ function renderLegendPanel(winOrId, panelId = "legend-panel") {
   // Svelte-managed nodes and cause partial renders. Only write when no
   // Svelte owner exists (tests, non-Svelte contexts).
   if (hasSvelteLegendOwner()) return;
-  if (typeof document === "undefined") return;
+  if (typeof document === "undefined" || typeof document.getElementById !== "function") return;
   const panel = document.getElementById(panelId);
   if (!panel) return;
 

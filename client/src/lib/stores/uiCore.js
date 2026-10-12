@@ -12,6 +12,7 @@ export function createInitialUIState() {
     expandedLayerId: null,
     windowContextMenu: null,
     isFullscreen: false,
+    commandPaletteOpen: false,
   };
 }
 

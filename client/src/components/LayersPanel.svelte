@@ -6,6 +6,7 @@
     getLayers,
     addLayer,
     deleteLayer,
+    reorderLayers,
     getCurrentActiveWinId,
     getCurrentActiveWinTitle,
   } from "../lib/stores/layers.svelte.js";
@@ -122,6 +123,39 @@
     }
   }
 
+  let draggedIdx = $state(null);
+
+  function handleMoveLayer(fromIdx, toIdx) {
+    if (toIdx < 0 || toIdx >= layers.length || fromIdx === toIdx) return;
+    reorderLayers(fromIdx, toIdx, activeWinId);
+    if (onLayerAction) {
+      onLayerAction({ action: "reorder", fromIdx, toIdx, winId: activeWinId });
+    }
+  }
+
+  function handleDragStart(e, idx) {
+    draggedIdx = idx;
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(idx));
+    }
+  }
+
+  function handleDragOver(e, idx) {
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "move";
+    }
+  }
+
+  function handleDrop(e, idx) {
+    e.preventDefault();
+    if (draggedIdx !== null && draggedIdx !== idx) {
+      handleMoveLayer(draggedIdx, idx);
+    }
+    draggedIdx = null;
+  }
+
   function handleRowAction(event) {
     if (onLayerAction) {
       onLayerAction({ ...event, winId: event?.winId || activeWinId });
@@ -178,16 +212,29 @@
 
     {#if panelTab === "layers"}
       <div class="layers-manage-container" id="layers-list">
-        {#each layers as layer (layer.id)}
-          <LayerRow
-            {layer}
-            {cursorTime}
-            expanded={ui.expandedLayerId === layer.id}
-            onToggleExpanded={() => handleToggleExpanded(layer.id)}
-            onToggleVisible={() => handleToggleVisible(layer)}
-            onRemove={() => handleRemoveLayer(layer)}
-            onLayerAction={handleRowAction}
-          />
+        {#each layers as layer, index (layer.id)}
+          <div
+            class="layer-row-drag-wrapper"
+            draggable="true"
+            role="listitem"
+            ondragstart={(e) => handleDragStart(e, index)}
+            ondragover={(e) => handleDragOver(e, index)}
+            ondrop={(e) => handleDrop(e, index)}
+          >
+            <LayerRow
+              {layer}
+              {cursorTime}
+              expanded={ui.expandedLayerId === layer.id}
+              isFirst={index === 0}
+              isLast={index === layers.length - 1}
+              onMoveUp={() => handleMoveLayer(index, index - 1)}
+              onMoveDown={() => handleMoveLayer(index, index + 1)}
+              onToggleExpanded={() => handleToggleExpanded(layer.id)}
+              onToggleVisible={() => handleToggleVisible(layer)}
+              onRemove={() => handleRemoveLayer(layer)}
+              onLayerAction={handleRowAction}
+            />
+          </div>
         {/each}
       </div>
     {:else}
@@ -219,6 +266,11 @@
 {/if}
 
 <style>
+  .layer-row-drag-wrapper {
+    cursor: default;
+    transition: transform 0.1s ease;
+  }
+
   .compat-hidden-tests {
     display: none !important;
   }

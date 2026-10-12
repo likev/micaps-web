@@ -73,7 +73,13 @@ export function validateConfig(draft) {
     }
   }
 
-  // 2. Basemap validation
+  // 2. Basemap & Global Theme validation
+  if (draft.theme !== undefined && draft.theme !== null) {
+    if (!ALLOWED_BASEMAP_SCHEMES.has(draft.theme)) {
+      addError("theme", `theme must be one of: light, dark, micaps`);
+    }
+  }
+
   if (draft.basemap !== undefined && draft.basemap !== null) {
     if (typeof draft.basemap !== "object" || Array.isArray(draft.basemap)) {
       addError("basemap", "basemap must be an object");

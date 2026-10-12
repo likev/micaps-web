@@ -10,11 +10,13 @@
   import Toast from "./components/Toast.svelte";
   import FullscreenButton from "./components/FullscreenButton.svelte";
   import ConfigEditor from "./components/ConfigEditor.svelte";
+  import StatusBar from "./components/StatusBar.svelte";
+  import CommandPalette from "./components/CommandPalette.svelte";
 
   import { ui, showToast, showTooltip, hideTooltip } from "./lib/stores/ui.svelte.js";
   import { app } from "./lib/stores/app.svelte.js";
   import { tabsState, getVisibleWindows, getWindowById, setMapInstance, getMapInstance, mapInstances } from "./lib/stores/tabs.svelte.js";
-  import { syncLayersState } from "./lib/stores/layers.svelte.js";
+  import { syncLayersState, reorderLayers, syncMapLayerOrder, getLayers } from "./lib/stores/layers.svelte.js";
   import { syncLegendState, deleteWindowLegends } from "./lib/stores/legend.svelte.js";
   import { getOrCreateTimeline, playback, selectObsChipsWindow, filterObsFilesByStep, getPeriodsForStep, timelinesByWindow } from "./lib/stores/timeline.svelte.js";
   import { setLiveTimelineResolver, cancelScheduledPrefetch } from "./services/prefetchService.js";
@@ -86,6 +88,7 @@
     getDisabledPeriodsForRain,
   } from "./utils/rain12.js";
   import { updateWindowTitle } from "./ui/tabs/windowTitles.js";
+  import { initGlobalTheme } from "./lib/stores/theme.svelte.js";
 
   let activeTab = $derived(tabsState.tabs.find((t) => t.id === tabsState.activeTabId) || tabsState.tabs[0] || null);
   let activeWin = $derived(activeTab && activeTab.windows ? (activeTab.windows[activeTab.activeWinIdx] || activeTab.windows[0]) : null);
@@ -181,6 +184,7 @@
 
   onMount(async () => {
     ensureInitialTab();
+    initGlobalTheme();
     forecastRefreshTimer = setInterval(() => {
       if (activeWin) refreshForecastTimeline(activeWin, true);
     }, 60 * 1000);
@@ -1369,6 +1373,15 @@
         syncProfilePanelsForWindow(win, map);
       } catch {}
     }
+    if (event.action === "reorder") {
+      const fromIdx = event.fromIdx;
+      const toIdx = event.toIdx;
+      reorderLayers(fromIdx, toIdx, win.id);
+      if (map) {
+        const updated = getLayers(win.id);
+        syncMapLayerOrder(map, updated);
+      }
+    }
     if (event.action === "config" && event.layer) {
       if (valPayload && typeof valPayload === "object" && win.activeGroup?.layers) {
         const presetLayer = win.activeGroup.layers.find((candidate) =>
@@ -1588,6 +1601,63 @@
     }
   }
 
+  async function handleModelSelect(newModel, targetWin = activeWin) {
+    const win = targetWin;
+    if (!win || !newModel) return;
+    win.model = newModel;
+    if (win === activeWin) app.model = newModel;
+
+    try {
+      if (timeHeightController.isActive(win)) {
+        await timeHeightController.setModel(newModel, win);
+        updateWindowTitle(win);
+        return;
+      }
+      if (lineHeightController.isActive(win)) {
+        await lineHeightController.setModel(newModel, win);
+        updateWindowTitle(win);
+        return;
+      }
+      if (hovmollerController.isActive(win)) {
+        await hovmollerController.setModel(newModel, win);
+        updateWindowTitle(win);
+        return;
+      }
+    } catch (err) {
+      console.warn("[App] Profile model change error:", err);
+    }
+
+    const map = getMapInstance(win.id);
+    if (!map) return;
+    const loadSeq = (win.loadSeq || 0) + 1;
+    win.loadSeq = loadSeq;
+    if (win.activeGroup) {
+      const groupCopy = JSON.parse(JSON.stringify(win.activeGroup));
+      if (Array.isArray(groupCopy.layers)) {
+        for (const l of groupCopy.layers) {
+          if (l.type === "contour" || l.type === "wind" || l.type === "raster") {
+            l.model = newModel;
+            if (typeof l.path === "string" && l.path.includes("/")) {
+              l.path = l.path.replace(/^[^\/]+/, newModel);
+            }
+          }
+        }
+      }
+      win.activeGroup = groupCopy;
+      await loadPresetGroup(map, groupCopy, win.period, win.level, win, false, loadSeq);
+    } else if (win.element) {
+      clearAllWeatherLayersFromMap(map, win);
+      await loadWeatherField(map, newModel, win.element, win.level, win.period, null, win, false, loadSeq);
+    }
+    if (!win.isObservation) {
+      refreshForecastTimeline(win, true);
+    }
+    updateWindowTitle(win);
+    syncLayersState(win.id);
+    syncLegendState(win.id);
+  }
+
+
   async function stepVerticalLevel(delta) {
     const isSplit = activeTab?.layout !== "1x1";
     const alloc = activeTab?.autoAllocation;
@@ -1744,8 +1814,17 @@
   async function handleKeydown(e) {
     if (e.key === "Escape") {
       ui.configOpen = false;
+      ui.commandPaletteOpen = false;
       return;
     }
+
+    const isCmdPalette = ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) || (!isTextInput(e.target) && e.key === "/");
+    if (isCmdPalette) {
+      e.preventDefault();
+      ui.commandPaletteOpen = !ui.commandPaletteOpen;
+      return;
+    }
+
     if (isTextInput(e.target)) {
       return;
     }
@@ -1802,11 +1881,15 @@
   <NavBar
     {presetGroups}
     presetId={activeWin?.activeGroup?.id || ""}
+    activeGroup={activeWin?.activeGroup || null}
+    activeWin={activeWin}
     level={app.level}
     onPresetSelect={handlePresetSelect}
     onLoadData={handleLoadData}
     onLevelSelect={handleLevelSelect}
+    onModelSelect={handleModelSelect}
     onOpenConfig={handleToggleConfig}
+    onOpenCommandPalette={() => { ui.commandPaletteOpen = true; }}
   />
 
   <TabsBar
@@ -1848,9 +1931,21 @@
     <Tooltip />
     <Toast />
     <ConfigEditor onConfigSaved={handleConfigSaved} />
+    <CommandPalette
+      {presetGroups}
+      activeMap={activeWin ? getMapInstance(activeWin.id) : null}
+      onSelectPreset={(p) => handlePresetSelect(p)}
+      onSelectLayout={(layout) => handleChangeLayout(layout)}
+      onOpenConfig={handleToggleConfig}
+    />
   </main>
 
   <TimeSlider
+    winId={activeWin?.id}
+    onTimeChange={handleTimeChange}
+  />
+
+  <StatusBar
     winId={activeWin?.id}
     onTimeChange={handleTimeChange}
   />
@@ -1917,5 +2012,33 @@
     grid-template-columns: repeat(2, 1fr);
     grid-template-rows: repeat(3, 1fr);
     gap: 2px;
+  }
+
+  @media print {
+    :global(#navbar),
+    :global(#tabs-bar),
+    :global(#sl-timeslider),
+    :global(.timeslider-container),
+    :global(#status-bar),
+    :global(.status-bar),
+    :global(.layers-panel),
+    :global(.legend-panel),
+    :global(#btn-fullscreen),
+    :global(.help-modal-overlay),
+    :global(#toast-container),
+    :global(#tooltip),
+    :global(.tooltip) {
+      display: none !important;
+    }
+
+    .app-container,
+    .main-content,
+    :global(#workspace-container) {
+      width: 100% !important;
+      height: 100% !important;
+      position: static !important;
+      overflow: visible !important;
+      background: #ffffff !important;
+    }
   }
 </style>

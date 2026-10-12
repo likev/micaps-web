@@ -171,3 +171,39 @@ export function addOrUpdateLayer(arg1, arg2 = null) {
 
   return curLayer;
 }
+
+export function reorderLayers(fromIdx, toIdx, winOrId = null) {
+  const winId = typeof winOrId === "object" ? (winOrId?.id || currentActiveWinId) : (winOrId || currentActiveWinId || "default");
+  const layers = getLayersForWindow(winId);
+  if (!layers || fromIdx < 0 || fromIdx >= layers.length || toIdx < 0 || toIdx >= layers.length || fromIdx === toIdx) {
+    return layers;
+  }
+  const [moved] = layers.splice(fromIdx, 1);
+  layers.splice(toIdx, 0, moved);
+  notifyLayersChanged(winId);
+  return layers;
+}
+
+export function syncMapLayerOrder(map, layers) {
+  if (!map || !Array.isArray(layers)) return;
+  for (let i = layers.length - 1; i >= 0; i--) {
+    const layer = layers[i];
+    if (!layer || !layer.id) continue;
+    const subLayerIds = [
+      `${layer.id}-raster`,
+      `${layer.id}-fill`,
+      `${layer.id}-isoband`,
+      `${layer.id}-line`,
+      `${layer.id}-isoline`,
+      `${layer.id}-label`,
+      layer.id,
+    ];
+    for (const subId of subLayerIds) {
+      try {
+        if (map.getLayer && map.getLayer(subId)) {
+          map.moveLayer(subId);
+        }
+      } catch {}
+    }
+  }
+}

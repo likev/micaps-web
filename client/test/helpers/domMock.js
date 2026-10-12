@@ -37,7 +37,9 @@ export function setupMockDOM() {
       return results;
     },
     body: createMockElement("body", "", "BODY", elementsMap),
+    documentElement: createMockElement("html", "", "HTML", elementsMap),
   };
+  doc.body.contains = () => true;
 
   globalThis.document = doc;
   if (!globalThis.window) {

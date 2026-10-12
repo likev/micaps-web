@@ -132,11 +132,15 @@ export async function fetchJson(endpoint, params = {}, options = {}) {
 
   const fetchPromise = (async () => {
     try {
-      const resp = await fetch(url, {
+      const fetchOpts = {
         headers: {
           Accept: "application/json",
         },
-      });
+      };
+      if (options?.signal) {
+        fetchOpts.signal = options.signal;
+      }
+      const resp = await fetch(url, fetchOpts);
 
       if (!resp.ok) {
         throw new Error(`HTTP ${resp.status} fetching ${url}: ${resp.statusText}`);

@@ -21,6 +21,13 @@ export function keyboardShortcuts(node, options = {}) {
   const REPEAT_THROTTLE_MS = 150;
 
   const handleKeyDown = async (e) => {
+    const isCmdPalette = ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) || (!isTextInput(e.target) && e.key === "/");
+    if (isCmdPalette) {
+      e.preventDefault();
+      opts.onOpenCommandPalette?.(e);
+      return;
+    }
+
     if (isTextInput(e.target)) return;
 
     const isLeft = e.key === "ArrowLeft" || e.key === "Left" || e.code === "ArrowLeft";

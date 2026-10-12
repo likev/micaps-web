@@ -7,7 +7,7 @@
 // structural writes, so they cannot fight Svelte reconciliation.
 
 export function setNavBarLevel(level) {
-  if (typeof document === "undefined") return;
+  if (typeof document === "undefined" || typeof document.getElementById !== "function") return;
   const select = document.getElementById("select-nav-level");
   if (!select) return;
   const strVal = level !== null && level !== undefined && level !== "" ? String(level) : "";
@@ -17,11 +17,28 @@ export function setNavBarLevel(level) {
 }
 
 export function setNavBarPreset(groupId) {
-  if (typeof document === "undefined") return;
+  if (typeof document === "undefined" || typeof document.getElementById !== "function") return;
   const select = document.getElementById("select-preset");
   if (select) {
     select.value = groupId || "";
+    try {
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    } catch {}
     const btn = document.getElementById("btn-load-data");
     if (btn) btn.disabled = !select.value;
   }
 }
+
+export function setNavBarModel(model) {
+  if (typeof document === "undefined" || typeof document.getElementById !== "function") return;
+  const select = document.getElementById("select-nav-model");
+  if (!select) return;
+  const strVal = model ? String(model) : "";
+  if (select.value !== strVal) {
+    select.value = strVal;
+    try {
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    } catch {}
+  }
+}
+
