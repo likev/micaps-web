@@ -524,12 +524,6 @@
     return loopB != null && idx === Number(loopB);
   }
 
-  function getPrecipSparkHeight(p) {
-    if (p == null) return 0;
-    const num = Number(p);
-    if (!Number.isFinite(num) || num <= 0) return 3;
-    return Math.min(18, Math.max(4, Math.round((num / 72) * 16) + 2));
-  }
 
   onDestroy(() => {
     if (playTimer) {
@@ -718,7 +712,6 @@
             {@const isInLoop = isPeriodInLoop(p)}
             {@const isPtA = isPeriodPointA(p)}
             {@const isPtB = isPeriodPointB(p)}
-            {@const sparkHeight = getPrecipSparkHeight(p)}
             {#if isLooping && idx === loopStartIdx}
               <div
                 class="timeline-loop-line timeline-loop-line-a"
@@ -760,9 +753,6 @@
                     : "Not available (forecast lead time does not exist for accumulation period)")
                 : undefined}
             >
-              {#if sparkHeight > 0}
-                <div class="chip-sparkline-bar" style:height="{sparkHeight}px" title="Precipitation accum: ~{p}h"></div>
-              {/if}
               {p === 0 ? "000h" : `+${p}h`}
               {#if isPtA}<span class="chip-loop-tag tag-a">A</span>{/if}
               {#if isPtB}<span class="chip-loop-tag tag-b">B</span>{/if}
@@ -849,19 +839,21 @@
     width: 28px;
     height: 28px;
     border-radius: 4px;
-    background: #21262d;
-    color: #c9d1d9;
+    background: var(--bg-card, #21262d);
+    color: var(--text-primary, #c9d1d9);
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     font-size: 11px;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   }
 
   .step-nav-btn:hover {
-    background: #30363d;
-    color: #ffffff;
+    background: var(--bg-hover, #30363d);
+    color: var(--text-primary, #ffffff);
+    border-color: var(--accent-blue, #58a6ff);
   }
 
   .step-length-control,
@@ -876,14 +868,14 @@
 
   .step-length-label {
     font-size: 11px;
-    color: #8b949e;
+    color: var(--text-secondary, #8b949e);
     font-weight: 500;
   }
 
   .step-length-select,
   .init-time-select {
-    background: #21262d;
-    color: #58a6ff;
+    background: var(--bg-card, #21262d);
+    color: var(--accent-blue, #58a6ff);
     font-weight: 600;
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
     border-radius: 4px;
@@ -896,9 +888,9 @@
   }
 
   .multitrack-toggle-btn {
-    background: #21262d;
+    background: var(--bg-card, #21262d);
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.18));
-    color: #c9d1d9;
+    color: var(--text-secondary, #c9d1d9);
     border-radius: 4px;
     padding: 3px 8px;
     font-size: 11px;
@@ -910,9 +902,9 @@
   }
 
   .multitrack-toggle-btn:hover {
-    background: #30363d;
-    color: #ffffff;
-    border-color: #58a6ff;
+    background: var(--bg-hover, #30363d);
+    color: var(--text-primary, #ffffff);
+    border-color: var(--accent-blue, #58a6ff);
   }
 
   .multitrack-toggle-btn.active {
@@ -927,7 +919,7 @@
   .step-length-select:focus,
   .init-time-select:focus {
     border-color: var(--accent-blue, #388bfd);
-    background: #282e37;
+    background: var(--bg-hover, #282e37);
   }
 
   .init-time-control {
@@ -963,9 +955,9 @@
   .chip-btn {
     padding: 4px 10px;
     border-radius: 12px;
-    background: #21262d;
+    background: var(--bg-card, #21262d);
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
-    color: #8b949e;
+    color: var(--text-secondary, #8b949e);
     font-family: var(--font-mono, monospace);
     font-size: 11px;
     cursor: pointer;
@@ -974,8 +966,8 @@
   }
 
   .chip-btn:hover {
-    background: #30363d;
-    color: #c9d1d9;
+    background: var(--bg-hover, #30363d);
+    color: var(--text-primary, #c9d1d9);
   }
 
   .chip-btn.active {
@@ -1065,13 +1057,6 @@
 
   .chip-btn.loop-pt-b {
     border-right: 2px solid #58a6ff;
-  }
-
-  .chip-sparkline-bar {
-    width: 100%;
-    background: linear-gradient(180deg, rgba(88, 166, 255, 0.7), rgba(46, 160, 67, 0.8));
-    border-radius: 2px 2px 0 0;
-    margin-bottom: 2px;
   }
 
   .chip-loop-tag {

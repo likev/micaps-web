@@ -55,18 +55,18 @@
   border-radius: 4px;
 }
 
-.step-nav-btn { width: 28px; height: 28px; border-radius: 4px; background: #21262d; color: #c9d1d9; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 11px; }
-.step-nav-btn:hover { background: #30363d; color: #ffffff; }
+.step-nav-btn { width: 28px; height: 28px; border-radius: 4px; background: var(--bg-card, #21262d); color: var(--text-primary, #c9d1d9); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 11px; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease; }
+.step-nav-btn:hover { background: var(--bg-hover, #30363d); color: var(--text-primary, #ffffff); border-color: var(--accent-blue, #58a6ff); }
 
 .step-length-control, .playback-speed-control { display: flex; align-items: center; gap: 4px; margin-left: 6px; font-size: 11px; color: var(--text-secondary); }
-.step-length-label { font-size: 11px; color: #8b949e; font-weight: 500; }
-.step-length-select { background: #21262d; color: #58a6ff; font-weight: 600; border: 1px solid var(--border-color); border-radius: 4px; padding: 3px 6px; font-size: 11px; font-family: var(--font-mono); outline: none; cursor: pointer; transition: all 0.15s ease; }
-.step-length-select:hover, .step-length-select:focus { border-color: var(--accent-blue); background: #282e37; }
+.step-length-label { font-size: 11px; color: var(--text-secondary, #8b949e); font-weight: 500; }
+.step-length-select { background: var(--bg-card, #21262d); color: var(--accent-blue, #58a6ff); font-weight: 600; border: 1px solid var(--border-color); border-radius: 4px; padding: 3px 6px; font-size: 11px; font-family: var(--font-mono); outline: none; cursor: pointer; transition: all 0.15s ease; }
+.step-length-select:hover, .step-length-select:focus { border-color: var(--accent-blue); background: var(--bg-hover, #282e37); }
 
 .init-time-control { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary); }
-.init-time-label { font-size: 11px; color: #8b949e; font-weight: 500; }
-.init-time-select { background: #21262d; color: #58a6ff; font-weight: 600; border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 6px; font-size: 11px; font-family: var(--font-mono); outline: none; cursor: pointer; transition: all 0.15s ease; }
-.init-time-select:hover, .init-time-select:focus { border-color: var(--accent-blue); background: #282e37; }
+.init-time-label { font-size: 11px; color: var(--text-secondary, #8b949e); font-weight: 500; }
+.init-time-select { background: var(--bg-card, #21262d); color: var(--accent-blue, #58a6ff); font-weight: 600; border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 6px; font-size: 11px; font-family: var(--font-mono); outline: none; cursor: pointer; transition: all 0.15s ease; }
+.init-time-select:hover, .init-time-select:focus { border-color: var(--accent-blue); background: var(--bg-hover, #282e37); }
 
 .timeline-body {
   flex: 1;
@@ -120,7 +120,7 @@
   min-width: 0;
 }
 .timeline-chips { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
-.chip-btn { padding: 4px 10px; border-radius: 12px; background: #21262d; border: 1px solid var(--border-color); color: #8b949e; font-family: var(--font-mono); font-size: 11px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease; }
-.chip-btn:hover { background: #30363d; color: #c9d1d9; }
+.chip-btn { padding: 4px 10px; border-radius: 12px; background: var(--bg-card, #21262d); border: 1px solid var(--border-color); color: var(--text-secondary, #8b949e); font-family: var(--font-mono); font-size: 11px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease; }
+.chip-btn:hover { background: var(--bg-hover, #30363d); color: var(--text-primary, #c9d1d9); }
 .chip-btn.active { background: var(--accent-blue); border-color: #58a6ff; color: #ffffff; font-weight: bold; box-shadow: 0 0 8px rgba(56, 139, 253, 0.4); }
 .chip-btn:disabled, .chip-btn.disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; border-style: dashed; }

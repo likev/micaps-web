@@ -944,9 +944,9 @@
     font-weight: 600;
     padding: 3px 10px;
     border-radius: 4px;
-    background: #21262d;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: #c9d1d9;
+    background: var(--bg-card, #21262d);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    color: var(--text-primary, #c9d1d9);
     cursor: pointer;
     transition: all 0.15s ease;
   }
@@ -975,9 +975,9 @@
     font-weight: 600;
     padding: 3px 8px;
     border-radius: 4px;
-    background: #21262d;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: #8b949e;
+    background: var(--bg-card, #21262d);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    color: var(--text-secondary, #8b949e);
     cursor: pointer;
   }
 
@@ -991,9 +991,9 @@
     font-size: 11px;
     padding: 3px 8px;
     border-radius: 4px;
-    background: #21262d;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: #c9d1d9;
+    background: var(--bg-card, #21262d);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    color: var(--text-primary, #c9d1d9);
     cursor: pointer;
   }
 
@@ -1105,7 +1105,7 @@
     position: relative;
     overflow: hidden;
     cursor: ew-resize;
-    background: #0d1117;
+    background: var(--bg-primary, #0d1117);
   }
 
   .time-ruler {
@@ -1279,25 +1279,26 @@
   }
 
   .ctrl-btn {
-    background: #21262d;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: #c9d1d9;
+    background: var(--bg-card, #21262d);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    color: var(--text-primary, #c9d1d9);
     padding: 3px 10px;
     border-radius: 4px;
     font-size: 11px;
     font-weight: 600;
     cursor: pointer;
+    transition: all 0.15s ease;
   }
 
   .ctrl-btn:hover {
-    background: #30363d;
-    color: #ffffff;
+    background: var(--bg-hover, #30363d);
+    color: var(--text-primary, #ffffff);
   }
 
   .play-pause-btn.is-playing {
-    background: #1f6feb;
+    background: var(--accent-blue, #1f6feb);
     color: #ffffff;
-    border-color: #58a6ff;
+    border-color: var(--accent-blue, #58a6ff);
   }
 
   .pacemaker-selector,
@@ -1325,13 +1326,14 @@
   }
 
   .loop-toggle-btn {
-    background: #21262d;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: #8b949e;
+    background: var(--bg-card, #21262d);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    color: var(--text-secondary, #8b949e);
     padding: 3px 8px;
     border-radius: 4px;
     font-size: 11px;
     cursor: pointer;
+    transition: all 0.15s ease;
   }
 
   .loop-toggle-btn.active {

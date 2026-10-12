@@ -54,28 +54,28 @@ export class LineHeightPanel {
           <button class="lh-btn-close" title="Close diagram" style="background:transparent;border:1px solid #30363d;color:#8b949e;border-radius:4px;width:26px;height:26px;cursor:pointer;">✕</button>
         </div>
       </div>
-      <div class="lh-controls-row" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:6px 12px;background:#161b22;border-bottom:1px solid #21262d;font-size:11px;color:#c9d1d9;flex-shrink:0;">
+      <div class="lh-controls-row" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:6px 12px;background:var(--bg-secondary, #161b22);border-bottom:1px solid var(--border-color, #21262d);font-size:11px;color:var(--text-primary, #c9d1d9);flex-shrink:0;">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
           <span>Model:</span>
-          <select class="lh-select-model" style="background:#0d1117;border:1px solid #30363d;color:#58a6ff;border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer;">
+          <select class="lh-select-model" style="background:var(--bg-card, #0d1117);border:1px solid var(--border-color, #30363d);color:#58a6ff;border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer;">
             ${DEFAULT_MODELS.map((m) => `<option value="${m}" ${m === this.model ? "selected" : ""}>${m}</option>`).join("")}
           </select>
           <span>Init:</span>
-          <select class="lh-select-cycle" style="background:#0d1117;border:1px solid #30363d;color:#58a6ff;border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer;"></select>
+          <select class="lh-select-cycle" style="background:var(--bg-card, #0d1117);border:1px solid var(--border-color, #30363d);color:#58a6ff;border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer;"></select>
           <span>A:</span>
-          <input type="number" class="lh-input-alon" step="0.25" style="width:60px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:4px;padding:2px 4px;text-align:center;font-size:11px;" />
-          <input type="number" class="lh-input-alat" step="0.25" style="width:60px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:4px;padding:2px 4px;text-align:center;font-size:11px;" />
+          <input type="number" class="lh-input-alon" step="0.25" style="width:60px;background:var(--bg-card, #0d1117);border:1px solid var(--border-color, #30363d);color:var(--text-primary, #e6edf3);border-radius:4px;padding:2px 4px;text-align:center;font-size:11px;" />
+          <input type="number" class="lh-input-alat" step="0.25" style="width:60px;background:var(--bg-card, #0d1117);border:1px solid var(--border-color, #30363d);color:var(--text-primary, #e6edf3);border-radius:4px;padding:2px 4px;text-align:center;font-size:11px;" />
           <span>B:</span>
-          <input type="number" class="lh-input-blon" step="0.25" style="width:60px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:4px;padding:2px 4px;text-align:center;font-size:11px;" />
-          <input type="number" class="lh-input-blat" step="0.25" style="width:60px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:4px;padding:2px 4px;text-align:center;font-size:11px;" />
-          <select class="lh-select-n" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:4px;padding:2px 4px;font-size:11px;cursor:pointer;"></select>
-          <button class="lh-btn-apply" style="background:#21262d;border:1px solid #30363d;color:#58a6ff;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;">Apply</button>
+          <input type="number" class="lh-input-blon" step="0.25" style="width:60px;background:var(--bg-card, #0d1117);border:1px solid var(--border-color, #30363d);color:var(--text-primary, #e6edf3);border-radius:4px;padding:2px 4px;text-align:center;font-size:11px;" />
+          <input type="number" class="lh-input-blat" step="0.25" style="width:60px;background:var(--bg-card, #0d1117);border:1px solid var(--border-color, #30363d);color:var(--text-primary, #e6edf3);border-radius:4px;padding:2px 4px;text-align:center;font-size:11px;" />
+          <select class="lh-select-n" style="background:var(--bg-card, #0d1117);border:1px solid var(--border-color, #30363d);color:var(--text-primary, #e6edf3);border-radius:4px;padding:2px 4px;font-size:11px;cursor:pointer;"></select>
+          <button class="lh-btn-apply" style="background:var(--bg-card, #21262d);border:1px solid var(--border-color, #30363d);color:#58a6ff;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;">Apply</button>
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-          <button class="lh-btn-draw" title="Two-click draw: click map for A, again for B" style="background:#21262d;border:1px solid #30363d;color:#e3b341;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;">✏ Draw line</button>
-          <button class="lh-btn-seta" title="Next map click sets A" style="background:#21262d;border:1px solid #30363d;color:#c9d1d9;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;">Set A from map</button>
-          <button class="lh-btn-setb" title="Next map click sets B" style="background:#21262d;border:1px solid #30363d;color:#c9d1d9;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;">Set B from map</button>
-          <button class="lh-btn-flip" title="Mirror A<->B display only" style="background:#21262d;border:1px solid #30363d;color:#e3b341;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;">⇄ A→B</button>
+          <button class="lh-btn-draw" title="Two-click draw: click map for A, again for B" style="background:var(--bg-card, #21262d);border:1px solid var(--border-color, #30363d);color:#e3b341;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;">✏ Draw line</button>
+          <button class="lh-btn-seta" title="Next map click sets A" style="background:var(--bg-card, #21262d);border:1px solid var(--border-color, #30363d);color:var(--text-primary, #c9d1d9);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;">Set A from map</button>
+          <button class="lh-btn-setb" title="Next map click sets B" style="background:var(--bg-card, #21262d);border:1px solid var(--border-color, #30363d);color:var(--text-primary, #c9d1d9);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;">Set B from map</button>
+          <button class="lh-btn-flip" title="Mirror A<->B display only" style="background:var(--bg-card, #21262d);border:1px solid var(--border-color, #30363d);color:#e3b341;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;">⇄ A→B</button>
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="lh-cb-rh" checked /> <span style="color:#56d4dd;">RH</span></label>
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="lh-cb-temp" checked /> <span style="color:#f85149;">T</span></label>
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="lh-cb-vvel" checked /> <span style="color:#39c5bb;">VVEL</span></label>

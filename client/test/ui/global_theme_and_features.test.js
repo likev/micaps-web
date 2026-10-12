@@ -328,7 +328,7 @@ describe("Item F: Timeline A-B Loop Range & Draggable Lines", () => {
     expect(timeSliderSrc).toContain('class:end-timeline-chip');
     expect(timeSliderSrc).toContain('isLooping');
     expect(timeSliderSrc).toContain('draggable="true"');
-    expect(timeSliderSrc).toContain('class="chip-sparkline-bar"');
+    expect(timeSliderSrc).not.toContain('chip-sparkline-bar');
     expect(timeSliderSrc).toContain("chip-loop-tag");
   });
 });

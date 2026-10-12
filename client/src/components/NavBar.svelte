@@ -645,6 +645,7 @@
     font-size: 15px;
     letter-spacing: 0.5px;
     flex-shrink: 0;
+    margin-right: 80px;
   }
 
   .brand-link {
@@ -761,7 +762,7 @@
   }
 
   .nav-select {
-    background: #21262d;
+    background: var(--bg-card, #21262d);
     color: var(--text-primary, #e6edf3);
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
     border-radius: 4px;
@@ -769,6 +770,11 @@
     font-size: 12px;
     outline: none;
     cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+
+  .nav-select:hover {
+    background: var(--bg-hover, #30363d);
   }
 
   .nav-select:focus {
@@ -799,7 +805,7 @@
     width: 32px;
     height: 30px;
     padding: 0;
-    background: #21262d;
+    background: var(--bg-card, #21262d);
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
     border-radius: 4px;
     color: var(--text-primary, #e6edf3);
@@ -811,9 +817,9 @@
 
   .btn-menu:hover,
   .btn-menu.active {
-    background: #30363d;
-    border-color: rgba(255, 255, 255, 0.25);
-    color: #58a6ff;
+    background: var(--bg-hover, #30363d);
+    border-color: var(--accent-blue, rgba(255, 255, 255, 0.25));
+    color: var(--accent-blue, #58a6ff);
   }
 
   .hamburger-icon {
@@ -827,7 +833,7 @@
     top: calc(100% + 4px);
     right: 0;
     min-width: 160px;
-    background: #161b22;
+    background: var(--bg-secondary, #161b22);
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15));
     border-radius: 6px;
     padding: 4px;
@@ -857,8 +863,8 @@
 
   .nav-menu-item:hover,
   .nav-menu-item:focus {
-    background: #21262d;
-    color: #58a6ff;
+    background: var(--bg-hover, #21262d);
+    color: var(--accent-blue, #58a6ff);
     outline: none;
   }
 

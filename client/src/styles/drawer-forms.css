@@ -57,13 +57,14 @@
 }
 
 .form-select, .form-input {
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--bg-card, rgba(0, 0, 0, 0.4));
   border: 1px solid var(--border-color);
   color: var(--text-primary);
   padding: 6px 10px;
   border-radius: 6px;
   font-size: 13px;
   outline: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .form-select:focus, .form-input:focus { border-color: var(--accent-blue); }

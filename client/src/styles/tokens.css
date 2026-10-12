@@ -71,13 +71,33 @@
 [data-theme="light"] .nav-dropdown-menu,
 [data-theme="light"] .preset-dropdown,
 [data-theme="light"] .preset-submenu,
+[data-theme="light"] .preset-menu-trigger,
+[data-theme="light"] #btn-preset-menu,
 [data-theme="light"] .panel,
 [data-theme="light"] .layer-row,
+[data-theme="light"] .layer-item,
+[data-theme="light"] .layer-config,
 [data-theme="light"] .chip-btn,
+[data-theme="light"] .step-nav-btn,
+[data-theme="light"] #sl-btn-step-prev,
+[data-theme="light"] #sl-btn-step-next,
+[data-theme="light"] .step-length-select,
+[data-theme="light"] #sl-select-step-length,
+[data-theme="light"] #sl-select-playback-speed,
 [data-theme="light"] .layout-btn,
+[data-theme="light"] .layout-select,
+[data-theme="light"] #sel-auto-alloc,
+[data-theme="light"] #btn-layout-select,
 [data-theme="light"] .btn-add-tab,
 [data-theme="light"] .btn-toggle-layers,
 [data-theme="light"] .init-time-select,
+[data-theme="light"] .config-subtab-btn,
+[data-theme="light"] .btn-inline,
+[data-theme="light"] .btn-offset-preset,
+[data-theme="light"] .multitrack-toggle-btn,
+[data-theme="light"] .btn-filter-preset,
+[data-theme="light"] .btn-add-rule,
+[data-theme="light"] .btn-clear-rules,
 [data-theme="light"] .status-cursor-probe,
 [data-theme="light"] .quick-pill,
 [data-theme="light"] .cmd-palette-modal,
@@ -85,6 +105,11 @@
 [data-theme="light"] .btn-loop-pt,
 [data-theme="light"] .btn-loop-toggle,
 [data-theme="light"] .btn-loop-clear,
+[data-theme="light"] .ctrl-btn,
+[data-theme="light"] .snap-toggle-btn,
+[data-theme="light"] .mode-toggle-btn,
+[data-theme="light"] .collapse-btn,
+[data-theme="light"] .loop-toggle-btn,
 [data-theme="light"] .config-editor-modal,
 [data-theme="light"] .config-card,
 [data-theme="light"] .radio-card,
@@ -96,10 +121,32 @@
 
 [data-theme="light"] .layout-btn.active,
 [data-theme="light"] .btn-toggle-layers.active,
-[data-theme="light"] .chip-btn.active {
+[data-theme="light"] .chip-btn.active,
+[data-theme="light"] .layout-select.active,
+[data-theme="light"] #sel-auto-alloc.active,
+[data-theme="light"] .config-subtab-btn.active {
   background-color: rgba(9, 105, 218, 0.12) !important;
   border-color: var(--accent-blue) !important;
   color: var(--accent-blue) !important;
+}
+
+[data-theme="light"] .preset-menu-trigger:hover,
+[data-theme="light"] #btn-preset-menu:hover,
+[data-theme="light"] .step-nav-btn:hover,
+[data-theme="light"] #sl-btn-step-prev:hover,
+[data-theme="light"] #sl-btn-step-next:hover,
+[data-theme="light"] .layout-btn:hover,
+[data-theme="light"] .layout-select:hover,
+[data-theme="light"] #sel-auto-alloc:hover,
+[data-theme="light"] .step-length-select:hover,
+[data-theme="light"] .init-time-select:hover,
+[data-theme="light"] .multitrack-toggle-btn:hover,
+[data-theme="light"] .config-subtab-btn:hover,
+[data-theme="light"] .btn-inline:hover,
+[data-theme="light"] .btn-offset-preset:hover,
+[data-theme="light"] .ctrl-btn:hover {
+  background-color: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
 }
 
 [data-theme="light"] .toggle-switch-ui {
@@ -183,13 +230,33 @@
 [data-theme="micaps"] .nav-dropdown-menu,
 [data-theme="micaps"] .preset-dropdown,
 [data-theme="micaps"] .preset-submenu,
+[data-theme="micaps"] .preset-menu-trigger,
+[data-theme="micaps"] #btn-preset-menu,
 [data-theme="micaps"] .panel,
 [data-theme="micaps"] .layer-row,
+[data-theme="micaps"] .layer-item,
+[data-theme="micaps"] .layer-config,
 [data-theme="micaps"] .chip-btn,
+[data-theme="micaps"] .step-nav-btn,
+[data-theme="micaps"] #sl-btn-step-prev,
+[data-theme="micaps"] #sl-btn-step-next,
+[data-theme="micaps"] .step-length-select,
+[data-theme="micaps"] #sl-select-step-length,
+[data-theme="micaps"] #sl-select-playback-speed,
 [data-theme="micaps"] .layout-btn,
+[data-theme="micaps"] .layout-select,
+[data-theme="micaps"] #sel-auto-alloc,
+[data-theme="micaps"] #btn-layout-select,
 [data-theme="micaps"] .btn-add-tab,
 [data-theme="micaps"] .btn-toggle-layers,
 [data-theme="micaps"] .init-time-select,
+[data-theme="micaps"] .config-subtab-btn,
+[data-theme="micaps"] .btn-inline,
+[data-theme="micaps"] .btn-offset-preset,
+[data-theme="micaps"] .multitrack-toggle-btn,
+[data-theme="micaps"] .btn-filter-preset,
+[data-theme="micaps"] .btn-add-rule,
+[data-theme="micaps"] .btn-clear-rules,
 [data-theme="micaps"] .status-cursor-probe,
 [data-theme="micaps"] .quick-pill,
 [data-theme="micaps"] .cmd-palette-modal,
@@ -197,6 +264,11 @@
 [data-theme="micaps"] .btn-loop-pt,
 [data-theme="micaps"] .btn-loop-toggle,
 [data-theme="micaps"] .btn-loop-clear,
+[data-theme="micaps"] .ctrl-btn,
+[data-theme="micaps"] .snap-toggle-btn,
+[data-theme="micaps"] .mode-toggle-btn,
+[data-theme="micaps"] .collapse-btn,
+[data-theme="micaps"] .loop-toggle-btn,
 [data-theme="micaps"] .config-editor-modal,
 [data-theme="micaps"] .config-card,
 [data-theme="micaps"] .radio-card,
@@ -208,10 +280,32 @@
 
 [data-theme="micaps"] .layout-btn.active,
 [data-theme="micaps"] .btn-toggle-layers.active,
-[data-theme="micaps"] .chip-btn.active {
+[data-theme="micaps"] .chip-btn.active,
+[data-theme="micaps"] .layout-select.active,
+[data-theme="micaps"] #sel-auto-alloc.active,
+[data-theme="micaps"] .config-subtab-btn.active {
   background-color: rgba(46, 160, 67, 0.25) !important;
   border-color: var(--accent-green) !important;
   color: #7ee787 !important;
+}
+
+[data-theme="micaps"] .preset-menu-trigger:hover,
+[data-theme="micaps"] #btn-preset-menu:hover,
+[data-theme="micaps"] .step-nav-btn:hover,
+[data-theme="micaps"] #sl-btn-step-prev:hover,
+[data-theme="micaps"] #sl-btn-step-next:hover,
+[data-theme="micaps"] .layout-btn:hover,
+[data-theme="micaps"] .layout-select:hover,
+[data-theme="micaps"] #sel-auto-alloc:hover,
+[data-theme="micaps"] .step-length-select:hover,
+[data-theme="micaps"] .init-time-select:hover,
+[data-theme="micaps"] .multitrack-toggle-btn:hover,
+[data-theme="micaps"] .config-subtab-btn:hover,
+[data-theme="micaps"] .btn-inline:hover,
+[data-theme="micaps"] .btn-offset-preset:hover,
+[data-theme="micaps"] .ctrl-btn:hover {
+  background-color: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
 }
 
 [data-theme="micaps"] .toggle-switch-ui {

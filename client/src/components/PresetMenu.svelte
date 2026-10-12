@@ -368,7 +368,7 @@
     height: 28px;
     font-size: 12px;
     font-weight: 600;
-    background: #21262d;
+    background: var(--bg-card, #21262d);
     color: var(--text-primary, #e6edf3);
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15));
     border-radius: 4px;
@@ -380,9 +380,9 @@
 
   .preset-menu-trigger:hover,
   .preset-menu-trigger[aria-expanded="true"] {
-    background: #30363d;
+    background: var(--bg-hover, #30363d);
     border-color: var(--accent-blue, #388bfd);
-    color: #ffffff;
+    color: var(--text-primary, #ffffff);
   }
 
   .preset-trigger-icon {
@@ -462,7 +462,7 @@
 
   .category-count {
     font-size: 10px;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--bg-hover, rgba(255, 255, 255, 0.08));
     color: var(--text-secondary, #8b949e);
     border-radius: 10px;
     padding: 1px 6px;
@@ -540,7 +540,7 @@
     font-size: 10px;
     padding: 1px 5px;
     border-radius: 3px;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--bg-hover, rgba(255, 255, 255, 0.08));
     color: var(--text-secondary, #8b949e);
     flex-shrink: 0;
   }

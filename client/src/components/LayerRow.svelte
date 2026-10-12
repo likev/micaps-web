@@ -893,11 +893,11 @@
 
 <style>
   .layer-item {
-    background: rgba(22, 27, 34, 0.85);
+    background: var(--bg-card, rgba(22, 27, 34, 0.85));
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
     border-radius: 6px;
     overflow: hidden;
-    transition: border-color 0.15s ease;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
     box-sizing: border-box;
   }
 
@@ -917,7 +917,7 @@
   }
 
   .layer-row:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--bg-hover, rgba(255, 255, 255, 0.04));
   }
 
   .btn-vis {
@@ -1003,8 +1003,8 @@
 
   .layer-config {
     padding: 8px 10px 10px 10px;
-    border-top: 1px solid rgba(48, 54, 61, 0.6);
-    background: rgba(13, 17, 23, 0.6);
+    border-top: 1px solid var(--border-color, rgba(48, 54, 61, 0.6));
+    background: var(--bg-subtle, rgba(13, 17, 23, 0.6));
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -1015,7 +1015,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
     padding-bottom: 6px;
     margin-bottom: 2px;
     overflow-x: auto;
@@ -1026,8 +1026,8 @@
     align-items: center;
     gap: 4px;
     padding: 3px 8px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--bg-card, rgba(255, 255, 255, 0.04));
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
     border-radius: 4px;
     font-size: 11px;
     color: var(--text-secondary, #8b949e);
@@ -1039,9 +1039,9 @@
   }
 
   .config-subtab-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--bg-hover, rgba(255, 255, 255, 0.08));
     color: var(--text-primary, #c9d1d9);
-    border-color: rgba(255, 255, 255, 0.16);
+    border-color: var(--accent-blue, rgba(255, 255, 255, 0.16));
   }
 
   .config-subtab-btn.active {
@@ -1130,18 +1130,20 @@
 
   .btn-inline {
     padding: 3px 7px;
-    background: #21262d;
+    background: var(--bg-card, #21262d);
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
     border-radius: 4px;
     color: var(--text-primary, #e6edf3);
     font-size: 10px;
     cursor: pointer;
     white-space: nowrap;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   }
 
   .btn-inline:hover {
-    border-color: #58a6ff;
-    color: #58a6ff;
+    background: var(--bg-hover, #30363d);
+    border-color: var(--accent-blue, #58a6ff);
+    color: var(--accent-blue, #58a6ff);
   }
 
   .palette-row {
@@ -1324,8 +1326,8 @@
     flex-direction: column;
     gap: 8px;
     padding: 10px;
-    background: rgba(0, 0, 0, 0.25);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--bg-card, rgba(0, 0, 0, 0.25));
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
     border-radius: 6px;
     margin-top: 6px;
   }
@@ -1396,21 +1398,21 @@
   }
 
   .btn-offset-preset {
-    background: #21262d;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: #c9d1d9;
+    background: var(--bg-card, #21262d);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    color: var(--text-primary, #c9d1d9);
     border-radius: 4px;
     padding: 2px 7px;
     font-size: 10px;
     cursor: pointer;
     font-family: var(--font-mono, monospace);
-    transition: background 0.15s ease;
+    transition: background 0.15s ease, border-color 0.15s ease;
   }
 
   .btn-offset-preset:hover {
-    background: #30363d;
-    color: #ffffff;
-    border-color: #58a6ff;
+    background: var(--bg-hover, #30363d);
+    color: var(--accent-blue, #58a6ff);
+    border-color: var(--accent-blue, #58a6ff);
   }
 
   .sel-time-policy,

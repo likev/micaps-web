@@ -6,11 +6,11 @@
 }
 
 .layer-item {
-  background: rgba(22, 27, 34, 0.85);
+  background: var(--bg-card, rgba(22, 27, 34, 0.85));
   border: 1px solid var(--border-color);
   border-radius: 6px;
   overflow: hidden;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
   box-sizing: border-box;
 }
 
@@ -27,7 +27,7 @@
   box-sizing: border-box;
 }
 
-.layer-row:hover { background: rgba(255, 255, 255, 0.04); }
+.layer-row:hover { background: var(--bg-hover, rgba(255, 255, 255, 0.04)); }
 
 .btn-vis {
   background: transparent;
@@ -108,8 +108,8 @@
 
 .layer-config {
   padding: 8px 10px 10px 10px;
-  border-top: 1px solid rgba(48, 54, 61, 0.6);
-  background: rgba(13, 17, 23, 0.6);
+  border-top: 1px solid var(--border-color, rgba(48, 54, 61, 0.6));
+  background: var(--bg-subtle, rgba(13, 17, 23, 0.6));
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -123,7 +123,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
   padding-bottom: 6px;
   margin-bottom: 2px;
   overflow-x: auto;
@@ -134,8 +134,8 @@
   align-items: center;
   gap: 4px;
   padding: 3px 8px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-card, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
   border-radius: 4px;
   font-size: 11px;
   color: var(--text-secondary, #8b949e);
@@ -147,9 +147,9 @@
 }
 
 .config-subtab-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-hover, rgba(255, 255, 255, 0.08));
   color: var(--text-primary, #c9d1d9);
-  border-color: rgba(255, 255, 255, 0.16);
+  border-color: var(--accent-blue, rgba(255, 255, 255, 0.16));
 }
 
 .config-subtab-btn.active {

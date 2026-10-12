@@ -205,7 +205,7 @@
   .status-bar {
     height: 32px;
     min-height: 32px;
-    background: #0d1117;
+    background: var(--bg-footer, #0d1117);
     border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
     display: flex;
     align-items: center;
@@ -242,8 +242,8 @@
     gap: 6px;
     padding: 2px 8px;
     border-radius: 4px;
-    background: #21262d;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: var(--bg-card, #21262d);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
     color: var(--text-primary, #e6edf3);
     font-size: 11px;
     font-weight: 500;
@@ -252,8 +252,8 @@
   }
 
   .btn-toggle-layers:hover {
-    background: #30363d;
-    border-color: rgba(255, 255, 255, 0.2);
+    background: var(--bg-hover, #30363d);
+    border-color: var(--accent-blue, rgba(255, 255, 255, 0.2));
   }
 
   .btn-toggle-layers.active {
@@ -277,13 +277,13 @@
     display: inline-block;
     width: 24px;
     height: 13px;
-    background: #30363d;
+    background: var(--bg-hover, #30363d);
     border-radius: 7px;
     transition: background-color 0.2s ease;
   }
 
   .toggle-switch-ui.on {
-    background: #238636;
+    background: var(--accent-green, #238636);
   }
 
   .toggle-thumb {
@@ -306,8 +306,8 @@
     font-weight: 700;
     padding: 1px 4px;
     border-radius: 3px;
-    background: #30363d;
-    color: #8b949e;
+    background: var(--bg-card, #30363d);
+    color: var(--text-secondary, #8b949e);
     font-family: var(--font-mono, monospace);
   }
 
@@ -351,22 +351,25 @@
   }
 
   .init-time-label {
-    color: #8b949e;
+    color: var(--text-secondary, #8b949e);
   }
 
   .init-time-select {
-    background: #21262d;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: var(--bg-card, #21262d);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
     border-radius: 3px;
-    color: #e6edf3;
+    color: var(--text-primary, #e6edf3);
     font-family: var(--font-mono, monospace);
     font-size: 11px;
     padding: 1px 4px;
     outline: none;
     cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
   }
 
+  .init-time-select:hover,
   .init-time-select:focus {
+    background: var(--bg-hover, #30363d);
     border-color: var(--accent-blue, #388bfd);
   }
 

@@ -254,6 +254,124 @@ describe("Screenshot & Print Utilities (screenshot.js)", () => {
       globalThis.window = origWindow;
     }
   });
+
+  test("captureScreenshot composites window title header and active legend overlay", () => {
+    const textCalls = [];
+    const rectCalls = [];
+    const mockCanvas = {
+      width: 800,
+      height: 600,
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
+      toDataURL: () => "data:image/png;base64,mockCanvasData",
+    };
+    const mockHeader = {
+      classList: { contains: () => false },
+      getBoundingClientRect: () => ({ left: 250, top: 10, width: 300, height: 32 }),
+      querySelector: (sel) => {
+        if (sel === ".win-badge") return { textContent: "W1" };
+        if (sel === ".win-title") return { textContent: "ECMWF Surface 2m Temperature" };
+        return null;
+      },
+    };
+    const mockLegendItem = {
+      querySelector: (sel) => {
+        if (sel === ".legend-title") return { textContent: "2m Temperature" };
+        if (sel === ".legend-unit") return { textContent: "(°C)" };
+        if (sel === ".legend-bar") return {
+          style: { background: "linear-gradient(to right, rgb(0,0,255) 0% 50%, rgb(255,0,0) 50% 100%)" },
+          getAttribute: () => "background: linear-gradient(to right, rgb(0,0,255) 0% 50%, rgb(255,0,0) 50% 100%)",
+        };
+        return null;
+      },
+      querySelectorAll: (sel) => {
+        if (sel === ".legend-tick") {
+          return [
+            { style: { left: "0%" }, querySelector: () => ({ textContent: "-20" }), classList: { contains: (c) => c === "tick-first" } },
+            { style: { left: "50%" }, querySelector: () => ({ textContent: "0" }), classList: { contains: () => false } },
+            { style: { left: "100%" }, querySelector: () => ({ textContent: "40" }), classList: { contains: (c) => c === "tick-last" } },
+          ];
+        }
+        return [];
+      },
+    };
+    const mockLegendPanel = {
+      classList: { contains: () => false },
+      getBoundingClientRect: () => ({ left: 200, top: 520, width: 400, height: 60 }),
+      querySelectorAll: (sel) => sel.includes("legend-item") ? [mockLegendItem] : [],
+      querySelector: (sel) => null,
+    };
+    const compositeCanvas = {
+      width: 0,
+      height: 0,
+      getContext: () => ({
+        drawImage: () => {},
+        fillRect: (x, y, w, h) => { rectCalls.push({ type: "fill", x, y, w, h }); },
+        strokeRect: (x, y, w, h) => { rectCalls.push({ type: "stroke", x, y, w, h }); },
+        fillText: (txt, x, y) => { textCalls.push({ txt, x, y }); },
+        measureText: (txt) => ({ width: txt.length * 8 }),
+        beginPath: () => {},
+        closePath: () => {},
+        moveTo: () => {},
+        lineTo: () => {},
+        quadraticCurveTo: () => {},
+        fill: () => {},
+        stroke: () => {},
+        save: () => {},
+        restore: () => {},
+        createLinearGradient: () => ({ addColorStop: () => {} }),
+      }),
+      toDataURL: () => "data:image/png;base64,compositeSuccess",
+    };
+    let downloadedUrl = "";
+    const mockLink = {
+      click: () => { downloadedUrl = mockLink.href; },
+      remove: () => {},
+    };
+    const fakeContainer = {
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
+      querySelectorAll: (sel) => {
+        if (sel.includes("canvas")) return [mockCanvas];
+        if (sel.includes("win-header")) return [mockHeader];
+        return [];
+      },
+      querySelector: (sel) => {
+        if (sel.includes("win-header")) return mockHeader;
+        if (sel.includes("legend")) return mockLegendPanel;
+        return null;
+      },
+    };
+    const fakeDoc = {
+      querySelector: (sel) => {
+        if (sel.includes("window-panel")) return fakeContainer;
+        if (sel.includes("legend")) return mockLegendPanel;
+        return null;
+      },
+      querySelectorAll: (sel) => {
+        if (sel.includes("canvas")) return [mockCanvas];
+        if (sel.includes("win-header")) return [mockHeader];
+        return [];
+      },
+      body: { appendChild: () => {} },
+      createElement: (tag) => {
+        if (tag === "canvas") return compositeCanvas;
+        if (tag === "a") return mockLink;
+        return {};
+      },
+    };
+
+    const res = captureScreenshot(fakeDoc);
+    expect(res).toBe(true);
+    expect(downloadedUrl).toBe("data:image/png;base64,compositeSuccess");
+    const texts = textCalls.map((t) => t.txt);
+    expect(texts).toContain("W1");
+    expect(texts).toContain("ECMWF Surface 2m Temperature");
+    expect(texts).toContain("2m Temperature");
+    expect(texts).toContain("(°C)");
+    expect(texts).toContain("-20");
+    expect(texts).toContain("0");
+    expect(texts).toContain("40");
+  });
+
 });
 
 describe("HelpModal Component (HelpModal.svelte)", () => {
