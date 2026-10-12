@@ -311,33 +311,36 @@ describe("Item D: Synchronized Multi-Window Cursor Crosshair", () => {
   });
 });
 
-describe("Item F: Timeline A-B Loop Range & Sparkline Preview", () => {
+describe("Item F: Timeline A-B Loop Range & Draggable Lines", () => {
   const timeSliderSrc = readSrcText("components/TimeSlider.svelte");
 
-  test("TimeSlider renders A-B loop controls and chip badges", () => {
-    expect(timeSliderSrc).toContain('id="sl-btn-loop-a"');
-    expect(timeSliderSrc).toContain('id="sl-btn-loop-b"');
-    expect(timeSliderSrc).toContain('id="sl-btn-loop-toggle"');
-    expect(timeSliderSrc).toContain('class="loop-range-controls"');
+  test("TimeSlider removed loop-range-controls and places draggable vertical lines A and B", () => {
+    expect(timeSliderSrc).not.toContain('class="loop-range-controls"');
+    expect(timeSliderSrc).not.toContain('id="sl-btn-loop-a"');
+    expect(timeSliderSrc).not.toContain('id="sl-btn-loop-b"');
+    expect(timeSliderSrc).toContain('timeline-loop-line-a');
+    expect(timeSliderSrc).toContain('timeline-loop-line-b');
+    expect(timeSliderSrc).toContain('id="timeline-loop-line-a"');
+    expect(timeSliderSrc).toContain('id="timeline-loop-line-b"');
+    expect(timeSliderSrc).toContain('data-testid="timeline-loop-line-a"');
+    expect(timeSliderSrc).toContain('data-testid="timeline-loop-line-b"');
+    expect(timeSliderSrc).toContain('class:begin-timeline-chip');
+    expect(timeSliderSrc).toContain('class:end-timeline-chip');
+    expect(timeSliderSrc).toContain('isLooping');
+    expect(timeSliderSrc).toContain('draggable="true"');
     expect(timeSliderSrc).toContain('class="chip-sparkline-bar"');
     expect(timeSliderSrc).toContain("chip-loop-tag");
   });
 });
 
-describe("Item G: Quick Layer Opacity Slider & Z-Index Reordering", () => {
+describe("Item G: Layer Header Cleanup & Drag-and-Drop Z-Index Reordering", () => {
   const layersPanelSrc = readSrcText("components/LayersPanel.svelte");
   const layerRowSrc = readSrcText("components/LayerRow.svelte");
 
-  test("LayerRow renders quick opacity slider on row header without expanding", () => {
-    expect(layerRowSrc).toContain('class="layer-quick-opacity-wrap"');
-    expect(layerRowSrc).toContain('class="layer-quick-opacity"');
-    expect(layerRowSrc).toContain('class="quick-opacity-val"');
-  });
-
-  test("LayerRow renders Move Up / Down buttons for layer reordering", () => {
-    expect(layerRowSrc).toContain('class="layer-reorder-buttons"');
-    expect(layerRowSrc).toContain('class="btn-layer-move btn-layer-up"');
-    expect(layerRowSrc).toContain('class="btn-layer-move btn-layer-down"');
+  test("LayerRow removes quick opacity and move buttons to preserve space for layer-name", () => {
+    expect(layerRowSrc).not.toContain('class="layer-quick-opacity-wrap"');
+    expect(layerRowSrc).not.toContain('class="layer-reorder-buttons"');
+    expect(layerRowSrc).toContain('class="layer-name"');
   });
 
   test("LayersPanel supports drag-and-drop attributes for reordering", () => {
@@ -380,5 +383,55 @@ describe("Item G: Quick Layer Opacity Slider & Z-Index Reordering", () => {
 
     expect(moved).toContain("l2-line");
     expect(moved).toContain("l1-line");
+  });
+});
+
+describe("Tasks 1-6 Alignment & Theme Hardening", () => {
+  const navBarSrc = readSrcText("components/NavBar.svelte");
+  const presetMenuSrc = readSrcText("components/PresetMenu.svelte");
+  const statusBarSrc = readSrcText("components/StatusBar.svelte");
+  const tokensCss = readSrcText("styles/tokens.css");
+
+  test("Item 2: nav-left is placed after nav-brand and has overflow: visible", () => {
+    expect(navBarSrc).toContain('class="nav-left"');
+    const brandIdx = navBarSrc.indexOf('class="nav-brand"');
+    const leftIdx = navBarSrc.indexOf('class="nav-left"');
+    expect(leftIdx).toBeGreaterThan(brandIdx);
+
+    const navbarCss = readSrcText("styles/navbar.css");
+    expect(navbarCss).toMatch(/\.nav-left\s*\{[^}]*overflow:\s*visible/);
+  });
+
+  test("Item 3: preset-dropdown has overflow: visible", () => {
+    expect(presetMenuSrc).toContain("overflow: visible;");
+    expect(tokensCss).toMatch(/\[data-theme="light"\]\s+\.preset-dropdown\s*\{[^}]*overflow:\s*visible/);
+  });
+
+  test("Item 5: StatusBar places nav-status-indicator on left and btn-toggle-layers on right", () => {
+    const leftContainerIdx = statusBarSrc.indexOf('class="status-bar-left"');
+    const rightContainerIdx = statusBarSrc.indexOf('class="status-bar-right"');
+    const statusIndicatorIdx = statusBarSrc.indexOf('id="nav-status-indicator"');
+    const toggleLayersIdx = statusBarSrc.indexOf('id="btn-toggle-layers"');
+
+    expect(statusIndicatorIdx).toBeGreaterThan(leftContainerIdx);
+    expect(statusIndicatorIdx).toBeLessThan(rightContainerIdx);
+    expect(toggleLayersIdx).toBeGreaterThan(rightContainerIdx);
+  });
+
+  test("Item 6: tabpanel, preset-menu-container, timeline-stepper, layout-controls background-color changes per theme", () => {
+    expect(tokensCss).toMatch(/\[data-theme="light"\][^{]*tabpanel/);
+    expect(tokensCss).toMatch(/\[data-theme="light"\][^{]*\.preset-menu-container/);
+    expect(tokensCss).toMatch(/\[data-theme="light"\][^{]*\.timeline-stepper/);
+    expect(tokensCss).toMatch(/\[data-theme="light"\][^{]*\.layout-controls/);
+
+    expect(tokensCss).toMatch(/\[data-theme="micaps"\][^{]*tabpanel/);
+    expect(tokensCss).toMatch(/\[data-theme="micaps"\][^{]*\.preset-menu-container/);
+    expect(tokensCss).toMatch(/\[data-theme="micaps"\][^{]*\.timeline-stepper/);
+    expect(tokensCss).toMatch(/\[data-theme="micaps"\][^{]*\.layout-controls/);
+
+    expect(tokensCss).toMatch(/\[data-theme="dark"\][^{]*tabpanel/);
+    expect(tokensCss).toMatch(/\[data-theme="dark"\][^{]*\.preset-menu-container/);
+    expect(tokensCss).toMatch(/\[data-theme="dark"\][^{]*\.timeline-stepper/);
+    expect(tokensCss).toMatch(/\[data-theme="dark"\][^{]*\.layout-controls/);
   });
 });

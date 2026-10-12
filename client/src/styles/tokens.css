@@ -127,6 +127,21 @@
   background-color: var(--bg-hover) !important;
 }
 
+[data-theme="light"] tabpanel,
+[data-theme="light"] [role="tabpanel"],
+[data-theme="light"] .tabpanel,
+[data-theme="light"] .window-panel,
+[data-theme="light"] .preset-menu-container,
+[data-theme="light"] .timeline-stepper,
+[data-theme="light"] .layout-controls {
+  background-color: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="light"] .preset-dropdown {
+  overflow: visible !important;
+}
+
 [data-theme="micaps"] .navbar,
 [data-theme="micaps"] #navbar,
 [data-theme="micaps"] .status-bar,
@@ -222,6 +237,36 @@
 [data-theme="micaps"] .cmd-result-item:hover,
 [data-theme="micaps"] .cmd-result-item.selected {
   background-color: var(--bg-hover) !important;
+}
+
+[data-theme="micaps"] tabpanel,
+[data-theme="micaps"] [role="tabpanel"],
+[data-theme="micaps"] .tabpanel,
+[data-theme="micaps"] .window-panel,
+[data-theme="micaps"] .preset-menu-container,
+[data-theme="micaps"] .timeline-stepper,
+[data-theme="micaps"] .layout-controls {
+  background-color: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="micaps"] .preset-dropdown {
+  overflow: visible !important;
+}
+
+[data-theme="dark"] tabpanel,
+[data-theme="dark"] [role="tabpanel"],
+[data-theme="dark"] .tabpanel,
+[data-theme="dark"] .window-panel,
+[data-theme="dark"] .preset-menu-container,
+[data-theme="dark"] .timeline-stepper,
+[data-theme="dark"] .layout-controls {
+  background-color: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .preset-dropdown {
+  overflow: visible !important;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }

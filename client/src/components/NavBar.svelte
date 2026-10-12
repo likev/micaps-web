@@ -315,7 +315,7 @@
     <span class="brand-badge">PRO</span>
   </div>
 
-  <div class="nav-middle">
+  <div class="nav-left">
     <div class="nav-control-group nav-preset-section">
       <PresetMenu
         presetGroups={effectivePresetGroups}
@@ -675,6 +675,16 @@
     gap: 12px;
     overflow-x: auto;
     min-width: 0;
+    margin-right: auto;
+  }
+
+  .nav-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    overflow: visible;
+    min-width: 0;
+    margin-right: auto;
   }
 
   .nav-control-group {

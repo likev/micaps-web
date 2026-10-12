@@ -455,6 +455,10 @@
     align-items: center;
     gap: 8px;
     flex-shrink: 0;
+    background-color: var(--bg-card, transparent);
+    border-radius: 4px;
+    padding: 2px 4px;
+    transition: background-color 0.15s ease;
   }
 
   .layout-label {

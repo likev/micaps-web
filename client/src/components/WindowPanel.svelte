@@ -51,7 +51,8 @@
 </script>
 
 <div
-  class="window-panel"
+  class="window-panel tabpanel"
+  role="tabpanel"
   class:active={isActive}
   class:hidden={!isVisible}
   class:slot-visible={isVisible}
@@ -142,7 +143,7 @@
     flex-direction: column;
     position: relative;
     overflow: hidden;
-    background: #0d1117;
+    background: var(--bg-card, #0d1117);
     border: 1px solid rgba(255, 255, 255, 0.12);
     box-sizing: border-box;
     width: 100%;

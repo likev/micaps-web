@@ -227,55 +227,7 @@
       </span>
     {/if}
 
-    <!-- Quick Opacity Slider (§Item G) -->
-    <div
-      class="layer-quick-opacity-wrap"
-      title="Layer Opacity: {Math.round((layer.config?.opacity ?? 0.75) * 100)}%"
-      role="none"
-      onclick={(e) => e.stopPropagation()}
-    >
-      <input
-        type="range"
-        class="layer-quick-opacity"
-        min="10"
-        max="100"
-        step="5"
-        value={Math.round((layer.config?.opacity ?? 0.75) * 100)}
-        oninput={(e) => {
-          e.stopPropagation();
-          const val = Number(e.target.value) / 100;
-          handleConfigChange("opacity", val);
-        }}
-        aria-label="Quick layer opacity"
-      />
-      <span class="quick-opacity-val">{Math.round((layer.config?.opacity ?? 0.75) * 100)}%</span>
-    </div>
 
-    <!-- Layer Reorder Up/Down buttons (§Item G) -->
-    <div class="layer-reorder-buttons" role="none" onclick={(e) => e.stopPropagation()}>
-      <button
-        type="button"
-        class="btn-layer-move btn-layer-up"
-        disabled={isFirst}
-        title="Move layer up (increase stack precedence)"
-        aria-label="Move layer up"
-        onclick={(e) => {
-          e.stopPropagation();
-          if (onMoveUp) onMoveUp();
-        }}
-      >▲</button>
-      <button
-        type="button"
-        class="btn-layer-move btn-layer-down"
-        disabled={isLast}
-        title="Move layer down (decrease stack precedence)"
-        aria-label="Move layer down"
-        onclick={(e) => {
-          e.stopPropagation();
-          if (onMoveDown) onMoveDown();
-        }}
-      >▼</button>
-    </div>
 
     <button
       type="button"
@@ -1472,57 +1424,6 @@
     outline: none;
   }
 
-  .layer-quick-opacity-wrap {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    margin-left: auto;
-    margin-right: 4px;
-    padding: 0 4px;
-  }
 
-  .layer-quick-opacity {
-    width: 48px;
-    height: 4px;
-    cursor: pointer;
-    accent-color: var(--accent-blue, #58a6ff);
-  }
-
-  .quick-opacity-val {
-    font-size: 10px;
-    color: var(--text-secondary, #8b949e);
-    font-family: var(--font-mono, monospace);
-    min-width: 24px;
-    text-align: right;
-  }
-
-  .layer-reorder-buttons {
-    display: inline-flex;
-    flex-direction: column;
-    gap: 1px;
-    margin-right: 4px;
-  }
-
-  .btn-layer-move {
-    background: transparent;
-    border: none;
-    color: var(--text-secondary, #8b949e);
-    font-size: 8px;
-    line-height: 8px;
-    padding: 1px 3px;
-    cursor: pointer;
-    border-radius: 2px;
-    transition: all 0.15s ease;
-  }
-
-  .btn-layer-move:hover:not(:disabled) {
-    color: #ffffff;
-    background: #30363d;
-  }
-
-  .btn-layer-move:disabled {
-    opacity: 0.25;
-    cursor: not-allowed;
-  }
 </style>
 

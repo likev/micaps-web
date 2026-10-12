@@ -73,8 +73,141 @@ func ParseClusterIPs(data []byte) []string {
 	return ips
 }
 
+// ParseClusterPort extracts ClusterPort from XML data if present
+func ParseClusterPort(data []byte) int {
+	var xmlCfg xmlConfiguration
+	if err := xml.Unmarshal(data, &xmlCfg); err == nil {
+		for _, entry := range xmlCfg.AppSettings.AddEntries {
+			if strings.EqualFold(entry.Key, "clusterport") {
+				if p, err := strconv.Atoi(strings.TrimSpace(entry.Value)); err == nil && p > 0 {
+					return p
+				}
+			}
+		}
+	}
+	re := regexp.MustCompile(`(?i)<add\s+[^>]*key=["']ClusterPort["'][^>]*value=["'](\d+)["']`)
+	if m := re.FindSubmatch(data); len(m) > 1 {
+		if p, err := strconv.Atoi(string(m[1])); err == nil && p > 0 {
+			return p
+		}
+	}
+	return 0
+}
+
+// NetDialTimeoutFunc is the dial function used for verifying IP accessibility.
+// Can be substituted in tests for deterministic mocking.
+var NetDialTimeoutFunc = net.DialTimeout
+
+// IsIPAccessible checks whether a host/IP is accessible via TCP on any of the specified ports
+// within the timeout duration.
+func IsIPAccessible(ip string, timeout time.Duration, ports ...int) bool {
+	if timeout <= 0 {
+		timeout = 800 * time.Millisecond
+	}
+	ip = strings.TrimSpace(ip)
+	if ip == "" {
+		return false
+	}
+
+	// If ip already specifies both host and port
+	if host, portStr, err := net.SplitHostPort(ip); err == nil {
+		target := net.JoinHostPort(host, portStr)
+		conn, err := NetDialTimeoutFunc("tcp", target, timeout)
+		if err == nil {
+			_ = conn.Close()
+			return true
+		}
+		return false
+	}
+
+	// Deduplicate valid port list
+	var uniquePorts []int
+	seen := make(map[int]bool)
+	for _, p := range ports {
+		if p > 0 && !seen[p] {
+			seen[p] = true
+			uniquePorts = append(uniquePorts, p)
+		}
+	}
+	if len(uniquePorts) == 0 {
+		uniquePorts = []int{9042, 9170}
+	}
+
+	for _, p := range uniquePorts {
+		target := net.JoinHostPort(ip, strconv.Itoa(p))
+		conn, err := NetDialTimeoutFunc("tcp", target, timeout)
+		if err == nil {
+			_ = conn.Close()
+			return true
+		}
+	}
+	return false
+}
+
+// SelectAccessibleClusterIP verifies accessibility of candidate IPs and selects a random accessible one.
+// Dead/unreachable IPs are verified and excluded. Returns an error if none of the candidates are accessible.
+func SelectAccessibleClusterIP(ips []string, timeout time.Duration, ports ...int) (string, error) {
+	if len(ips) == 0 {
+		return "", fmt.Errorf("no candidate IPs provided")
+	}
+
+	var uniqueIPs []string
+	seen := make(map[string]bool)
+	for _, ip := range ips {
+		trimmed := strings.TrimSpace(ip)
+		if trimmed != "" && !seen[trimmed] {
+			seen[trimmed] = true
+			uniqueIPs = append(uniqueIPs, trimmed)
+		}
+	}
+	if len(uniqueIPs) == 0 {
+		return "", fmt.Errorf("no candidate IPs provided")
+	}
+
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	shuffled := make([]string, len(uniqueIPs))
+	copy(shuffled, uniqueIPs)
+	r.Shuffle(len(shuffled), func(i, j int) {
+		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+	})
+
+	type checkResult struct {
+		ip         string
+		accessible bool
+	}
+
+	ch := make(chan checkResult, len(shuffled))
+	for _, ip := range shuffled {
+		go func(targetIP string) {
+			ok := IsIPAccessible(targetIP, timeout, ports...)
+			ch <- checkResult{ip: targetIP, accessible: ok}
+		}(ip)
+	}
+
+	var accessible []string
+	for range shuffled {
+		res := <-ch
+		if res.accessible {
+			accessible = append(accessible, res.ip)
+		}
+	}
+
+	if len(accessible) == 0 {
+		return "", fmt.Errorf("none of the %d ClusterIPAddress entries are accessible", len(uniqueIPs))
+	}
+
+	return accessible[r.Intn(len(accessible))], nil
+}
+
+// FindAccessibleClusterIP checks if MICAPS.exe.config exists in candidate locations
+// and selects an accessible ClusterIPAddress from it.
+func FindAccessibleClusterIP() (string, string, error) {
+	return FindRandomClusterIP()
+}
+
 // FindRandomClusterIP checks if MICAPS.exe.config exists in the same directory as the executable
-// or in the working directory, and selects one random ClusterIPAddress from it.
+// or in the working directory, and selects one accessible ClusterIPAddress from it.
+// Dead/unreachable IPs are tested and excluded.
 func FindRandomClusterIP() (string, string, error) {
 	var candidates []string
 
@@ -96,9 +229,17 @@ func FindRandomClusterIP() (string, string, error) {
 		}
 		ips := ParseClusterIPs(data)
 		if len(ips) > 0 {
-			r := rand.New(rand.NewSource(time.Now().UnixNano()))
-			selected := ips[r.Intn(len(ips))]
-			return selected, path, nil
+			var checkPorts []int
+			if p := ParseClusterPort(data); p > 0 {
+				checkPorts = append(checkPorts, p)
+			}
+			checkPorts = append(checkPorts, 9042, 9170)
+
+			selected, err := SelectAccessibleClusterIP(ips, 800*time.Millisecond, checkPorts...)
+			if err == nil {
+				return selected, path, nil
+			}
+			log.Printf("[Config] Candidate IPs at %s checked but none were accessible: %v", path, err)
 		}
 	}
 	return "", "", os.ErrNotExist

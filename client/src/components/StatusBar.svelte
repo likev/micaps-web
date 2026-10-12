@@ -106,30 +106,16 @@
 </script>
 
 <footer id="status-bar" class="status-bar statebar" aria-label="Status Bar">
-  <!-- Left section: btn-toggle-layers with toggle switch UI -->
+  <!-- Left section: nav-status-indicator -->
   <div class="status-bar-left">
-    <button
-      id="btn-toggle-layers"
-      type="button"
-      class="btn-toggle-layers"
-      class:active={ui.layersOpen}
-      role="switch"
-      aria-checked={ui.layersOpen}
-      aria-label="Toggle Layers Panel"
-      title={ui.layersOpen ? "Hide Layers Panel" : "Show Layers Panel"}
-      onclick={toggleLayers}
-    >
-      <span class="layers-icon" aria-hidden="true">
-        <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor">
-          <path d="m8 1.5 6 3-6 3-6-3 6-3zm0 5.25L13.5 4 14 4.25v2.5L8 10 2 6.75v-2.5L2.5 4 8 6.75zM2 9.25 2.5 9 8 11.75 13.5 9l.5.25v2.5L8 15l-6-3.25v-2.5z"/>
-        </svg>
-      </span>
-      <span class="layers-label">Layers</span>
-      <span class="toggle-switch-ui" class:on={ui.layersOpen} aria-hidden="true">
-        <span class="toggle-thumb"></span>
-      </span>
-      <span class="toggle-state-pill" class:active={ui.layersOpen}>{ui.layersOpen ? "ON" : "OFF"}</span>
-    </button>
+    <div id="nav-status-indicator" class="nav-status status-indicator" title="Backend Server Status: {statusText}">
+      <span
+        class="status-dot"
+        class:warning={statusState === "warning"}
+        class:disconnected={statusState === "disconnected"}
+      ></span>
+      <span id="nav-status-text" class="status-text">{statusText}</span>
+    </div>
   </div>
 
   <!-- Center section: timeline-info -->
@@ -188,16 +174,30 @@
     </div>
   </div>
 
-  <!-- Right section: nav-status-indicator -->
+  <!-- Right section: btn-toggle-layers with toggle switch UI -->
   <div class="status-bar-right">
-    <div id="nav-status-indicator" class="nav-status status-indicator" title="Backend Server Status: {statusText}">
-      <span
-        class="status-dot"
-        class:warning={statusState === "warning"}
-        class:disconnected={statusState === "disconnected"}
-      ></span>
-      <span id="nav-status-text" class="status-text">{statusText}</span>
-    </div>
+    <button
+      id="btn-toggle-layers"
+      type="button"
+      class="btn-toggle-layers"
+      class:active={ui.layersOpen}
+      role="switch"
+      aria-checked={ui.layersOpen}
+      aria-label="Toggle Layers Panel"
+      title={ui.layersOpen ? "Hide Layers Panel" : "Show Layers Panel"}
+      onclick={toggleLayers}
+    >
+      <span class="layers-icon" aria-hidden="true">
+        <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor">
+          <path d="m8 1.5 6 3-6 3-6-3 6-3zm0 5.25L13.5 4 14 4.25v2.5L8 10 2 6.75v-2.5L2.5 4 8 6.75zM2 9.25 2.5 9 8 11.75 13.5 9l.5.25v2.5L8 15l-6-3.25v-2.5z"/>
+        </svg>
+      </span>
+      <span class="layers-label">Layers</span>
+      <span class="toggle-switch-ui" class:on={ui.layersOpen} aria-hidden="true">
+        <span class="toggle-thumb"></span>
+      </span>
+      <span class="toggle-state-pill" class:active={ui.layersOpen}>{ui.layersOpen ? "ON" : "OFF"}</span>
+    </button>
   </div>
 </footer>
 

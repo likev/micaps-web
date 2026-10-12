@@ -51,6 +51,8 @@
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  background-color: var(--bg-card, transparent);
+  border-radius: 4px;
 }
 
 .step-nav-btn { width: 28px; height: 28px; border-radius: 4px; background: #21262d; color: #c9d1d9; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 11px; }

@@ -355,6 +355,9 @@
   .preset-menu-container {
     position: relative;
     display: inline-block;
+    background-color: var(--bg-card, transparent);
+    border-radius: 4px;
+    transition: background-color 0.15s ease;
   }
 
   .preset-menu-trigger {
@@ -412,6 +415,7 @@
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
     padding: 4px 0;
     z-index: 1100;
+    overflow: visible;
   }
 
   .preset-category-item {

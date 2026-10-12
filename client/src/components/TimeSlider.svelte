@@ -285,6 +285,17 @@
   function start() {
     playback.isPlaying = true;
     app.isPlaying = true;
+    ensureLoopRange();
+    timeline.loopRange.active = true;
+    if (timeline.loopRange.start == null || timeline.loopRange.end == null) {
+      if (isObs) {
+        timeline.loopRange.start = 0;
+        timeline.loopRange.end = Math.max(0, obsFiles.length - 1);
+      } else {
+        timeline.loopRange.start = periods[0] ?? 0;
+        timeline.loopRange.end = periods[periods.length - 1] ?? 72;
+      }
+    }
     if (playTimer) clearInterval(playTimer);
     playTimer = setInterval(() => {
       handleStep(1, { fromPlay: true });
@@ -294,6 +305,9 @@
   function pause() {
     playback.isPlaying = false;
     app.isPlaying = false;
+    if (timeline.loopRange) {
+      timeline.loopRange.active = false;
+    }
     if (playTimer) {
       clearInterval(playTimer);
       playTimer = null;
@@ -341,9 +355,48 @@
     }
   });
 
+  let isLooping = $derived(Boolean(playback.isPlaying));
   let loopA = $derived(timeline.loopRange?.start ?? null);
   let loopB = $derived(timeline.loopRange?.end ?? null);
   let isLoopActive = $derived(Boolean(timeline.loopRange?.active));
+
+  let loopStartIdx = $derived.by(() => {
+    if (!periods.length) return 0;
+    if (timeline.loopRange?.start != null) {
+      const idx = periods.indexOf(timeline.loopRange.start);
+      if (idx !== -1) return idx;
+    }
+    return 0;
+  });
+
+  let loopEndIdx = $derived.by(() => {
+    if (!periods.length) return 0;
+    if (timeline.loopRange?.end != null) {
+      const idx = periods.indexOf(timeline.loopRange.end);
+      if (idx !== -1) return idx;
+    }
+    return periods.length - 1;
+  });
+
+  let obsLoopStartIdx = $derived.by(() => {
+    if (!obsFiles.length) return 0;
+    if (timeline.loopRange?.start != null) {
+      const idx = Number(timeline.loopRange.start);
+      if (Number.isFinite(idx) && idx >= 0 && idx < obsFiles.length) return idx;
+    }
+    return 0;
+  });
+
+  let obsLoopEndIdx = $derived.by(() => {
+    if (!obsFiles.length) return 0;
+    if (timeline.loopRange?.end != null) {
+      const idx = Number(timeline.loopRange.end);
+      if (Number.isFinite(idx) && idx >= 0 && idx < obsFiles.length) return idx;
+    }
+    return obsFiles.length - 1;
+  });
+
+  let draggingLine = $state(null);
 
   function ensureLoopRange() {
     if (!timeline.loopRange) {
@@ -351,44 +404,85 @@
     }
   }
 
-  function handleSetLoopA() {
-    ensureLoopRange();
-    const curVal = isObs ? (timeline.currentObsIdx ?? 0) : activePeriod;
-    timeline.loopRange.start = curVal;
-    if (timeline.loopRange.end != null && timeline.loopRange.start > timeline.loopRange.end) {
-      const tmp = timeline.loopRange.start;
-      timeline.loopRange.start = timeline.loopRange.end;
-      timeline.loopRange.end = tmp;
+  function startDrag(e, marker) {
+    e.preventDefault();
+    e.stopPropagation();
+    draggingLine = marker;
+    const chipsContainer = document.getElementById("sl-timeline-chips");
+
+    function onPointerMove(moveEvent) {
+      if (!draggingLine) return;
+      const chipElements = chipsContainer?.querySelectorAll(".chip-btn");
+      if (!chipElements || chipElements.length === 0) return;
+
+      let closestIdx = 0;
+      let minDistance = Infinity;
+      chipElements.forEach((el, idx) => {
+        const rect = el.getBoundingClientRect();
+        const center = rect.left + rect.width / 2;
+        const dist = Math.abs(moveEvent.clientX - center);
+        if (dist < minDistance) {
+          minDistance = dist;
+          closestIdx = idx;
+        }
+      });
+
+      updateLoopMarkerIndex(draggingLine, closestIdx);
+    }
+
+    function onPointerUp() {
+      draggingLine = null;
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+    }
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+  }
+
+  function handleLineDragStart(e, marker) {
+    draggingLine = marker;
+    if (e.dataTransfer) {
+      e.dataTransfer.setData("text/plain", marker);
+      e.dataTransfer.effectAllowed = "move";
     }
   }
 
-  function handleSetLoopB() {
-    ensureLoopRange();
-    const curVal = isObs ? (timeline.currentObsIdx ?? 0) : activePeriod;
-    timeline.loopRange.end = curVal;
-    if (timeline.loopRange.start != null && timeline.loopRange.start > timeline.loopRange.end) {
-      const tmp = timeline.loopRange.start;
-      timeline.loopRange.start = timeline.loopRange.end;
-      timeline.loopRange.end = tmp;
+  function handleChipDragOver(e, idx) {
+    e.preventDefault();
+    if (draggingLine) {
+      updateLoopMarkerIndex(draggingLine, idx);
     }
   }
 
-  function handleToggleLoop() {
-    ensureLoopRange();
-    if (timeline.loopRange.start == null || timeline.loopRange.end == null) {
-      if (isObs) {
-        timeline.loopRange.start = 0;
-        timeline.loopRange.end = Math.max(0, obsFiles.length - 1);
-      } else {
-        timeline.loopRange.start = periods[0] ?? 0;
-        timeline.loopRange.end = periods[periods.length - 1] ?? 72;
-      }
-    }
-    timeline.loopRange.active = !timeline.loopRange.active;
+  function handleLineDragEnd() {
+    draggingLine = null;
   }
 
-  function handleClearLoop() {
-    timeline.loopRange = { active: false, start: null, end: null };
+  function updateLoopMarkerIndex(marker, idx) {
+    ensureLoopRange();
+    const len = isObs ? obsFiles.length : periods.length;
+    if (len === 0) return;
+    const clampedIdx = Math.max(0, Math.min(len - 1, idx));
+
+    let curStart = isObs ? obsLoopStartIdx : loopStartIdx;
+    let curEnd = isObs ? obsLoopEndIdx : loopEndIdx;
+
+    if (marker === "A") {
+      curStart = Math.min(clampedIdx, curEnd);
+    } else if (marker === "B") {
+      curEnd = Math.max(clampedIdx, curStart);
+    }
+
+    if (isObs) {
+      timeline.loopRange.start = curStart;
+      timeline.loopRange.end = curEnd;
+    } else {
+      timeline.loopRange.start = periods[curStart];
+      timeline.loopRange.end = periods[curEnd];
+    }
   }
 
   function formatLoopPoint(pt) {
@@ -535,52 +629,6 @@
         </select>
       </div>
 
-      <!-- Item F: A-B Loop Range Controls -->
-      <div class="loop-range-controls" aria-label="A-B Loop Controls">
-        <button
-          type="button"
-          id="sl-btn-loop-a"
-          class="btn-loop-pt"
-          class:set={loopA != null}
-          title={loopA != null ? `Loop Start A: ${formatLoopPoint(loopA)}` : "Set Loop Start A to current position"}
-          onclick={handleSetLoopA}
-        >
-          A
-        </button>
-        <button
-          type="button"
-          id="sl-btn-loop-b"
-          class="btn-loop-pt"
-          class:set={loopB != null}
-          title={loopB != null ? `Loop End B: ${formatLoopPoint(loopB)}` : "Set Loop End B to current position"}
-          onclick={handleSetLoopB}
-        >
-          B
-        </button>
-        <button
-          type="button"
-          id="sl-btn-loop-toggle"
-          class="btn-loop-toggle"
-          class:active={isLoopActive}
-          title={isLoopActive ? "Disable A-B Loop" : "Enable A-B Loop Playback"}
-          aria-label="Toggle A-B loop"
-          onclick={handleToggleLoop}
-        >
-          🔁
-        </button>
-        {#if loopA != null || loopB != null}
-          <button
-            type="button"
-            id="sl-btn-loop-clear"
-            class="btn-loop-clear"
-            title="Clear A-B Loop Range"
-            onclick={handleClearLoop}
-          >
-            ✕
-          </button>
-        {/if}
-      </div>
-
       <button
         type="button"
         id="sl-btn-toggle-multitrack"
@@ -596,21 +644,48 @@
     </div>
 
     <div class="timeline-body">
-      <div id="sl-timeline-chips" class="timeline-chips" role="tablist" aria-label={isObs ? "Observation time steps" : "Forecast lead time steps"}>
+      <div
+        id="sl-timeline-chips"
+        class="timeline-chips"
+        role="tablist"
+        aria-label={isObs ? "Observation time steps" : "Forecast lead time steps"}
+        ondragover={(e) => e.preventDefault()}
+        ondrop={(e) => { e.preventDefault(); handleLineDragEnd(); }}
+      >
         {#if isObs}
           {#each obsFiles as file, idx}
             {@const isInLoop = isObsInLoop(idx)}
             {@const isPtA = isObsPointA(idx)}
             {@const isPtB = isObsPointB(idx)}
+            {#if isLooping && idx === obsLoopStartIdx}
+              <div
+                class="timeline-loop-line timeline-loop-line-a"
+                id="timeline-loop-line-a"
+                data-testid="timeline-loop-line-a"
+                role="separator"
+                aria-label="Loop Start A"
+                title="Loop Start A (Drag to adjust)"
+                draggable="true"
+                onpointerdown={(e) => startDrag(e, 'A')}
+                ondragstart={(e) => handleLineDragStart(e, 'A')}
+                ondragend={handleLineDragEnd}
+              >
+                <div class="loop-line-bar"></div>
+                <span class="loop-line-badge badge-a">A</span>
+              </div>
+            {/if}
             <button
               class="chip-btn"
               class:active={idx === timeline.currentObsIdx}
               class:in-loop-range={isInLoop}
+              class:begin-timeline-chip={idx === obsLoopStartIdx}
+              class:end-timeline-chip={idx === obsLoopEndIdx}
               class:loop-pt-a={isPtA}
               class:loop-pt-b={isPtB}
               role="tab"
               aria-selected={idx === timeline.currentObsIdx}
               onclick={() => handleChipClick(idx)}
+              ondragover={(e) => handleChipDragOver(e, idx)}
               data-testid="timeline-chip"
               data-file={file}
             >
@@ -618,6 +693,23 @@
               {#if isPtA}<span class="chip-loop-tag tag-a">A</span>{/if}
               {#if isPtB}<span class="chip-loop-tag tag-b">B</span>{/if}
             </button>
+            {#if isLooping && idx === obsLoopEndIdx}
+              <div
+                class="timeline-loop-line timeline-loop-line-b"
+                id="timeline-loop-line-b"
+                data-testid="timeline-loop-line-b"
+                role="separator"
+                aria-label="Loop End B"
+                title="Loop End B (Drag to adjust)"
+                draggable="true"
+                onpointerdown={(e) => startDrag(e, 'B')}
+                ondragstart={(e) => handleLineDragStart(e, 'B')}
+                ondragend={handleLineDragEnd}
+              >
+                <div class="loop-line-bar"></div>
+                <span class="loop-line-badge badge-b">B</span>
+              </div>
+            {/if}
           {/each}
         {:else}
           {#each periods as p, idx}
@@ -627,17 +719,37 @@
             {@const isPtA = isPeriodPointA(p)}
             {@const isPtB = isPeriodPointB(p)}
             {@const sparkHeight = getPrecipSparkHeight(p)}
+            {#if isLooping && idx === loopStartIdx}
+              <div
+                class="timeline-loop-line timeline-loop-line-a"
+                id="timeline-loop-line-a"
+                data-testid="timeline-loop-line-a"
+                role="separator"
+                aria-label="Loop Start A"
+                title="Loop Start A (Drag to adjust)"
+                draggable="true"
+                onpointerdown={(e) => startDrag(e, 'A')}
+                ondragstart={(e) => handleLineDragStart(e, 'A')}
+                ondragend={handleLineDragEnd}
+              >
+                <div class="loop-line-bar"></div>
+                <span class="loop-line-badge badge-a">A</span>
+              </div>
+            {/if}
             <button
               class="chip-btn"
               class:active={idx === timeline.currentPeriodIdx}
               class:disabled={isPeriodDisabled}
               class:in-loop-range={isInLoop}
+              class:begin-timeline-chip={idx === loopStartIdx}
+              class:end-timeline-chip={idx === loopEndIdx}
               class:loop-pt-a={isPtA}
               class:loop-pt-b={isPtB}
               disabled={isPeriodDisabled}
               role="tab"
               aria-selected={idx === timeline.currentPeriodIdx}
               onclick={() => !isPeriodDisabled && handleChipClick(idx)}
+              ondragover={(e) => handleChipDragOver(e, idx)}
               data-testid="timeline-chip"
               data-period={p}
               title={isPeriodDisabled
@@ -655,6 +767,23 @@
               {#if isPtA}<span class="chip-loop-tag tag-a">A</span>{/if}
               {#if isPtB}<span class="chip-loop-tag tag-b">B</span>{/if}
             </button>
+            {#if isLooping && idx === loopEndIdx}
+              <div
+                class="timeline-loop-line timeline-loop-line-b"
+                id="timeline-loop-line-b"
+                data-testid="timeline-loop-line-b"
+                role="separator"
+                aria-label="Loop End B"
+                title="Loop End B (Drag to adjust)"
+                draggable="true"
+                onpointerdown={(e) => startDrag(e, 'B')}
+                ondragstart={(e) => handleLineDragStart(e, 'B')}
+                ondragend={handleLineDragEnd}
+              >
+                <div class="loop-line-bar"></div>
+                <span class="loop-line-badge badge-b">B</span>
+              </div>
+            {/if}
           {/each}
         {/if}
       </div>
@@ -711,6 +840,9 @@
     align-items: center;
     gap: 6px;
     flex-shrink: 0;
+    background-color: var(--bg-card, transparent);
+    border-radius: 4px;
+    transition: background-color 0.15s ease;
   }
 
   .step-nav-btn {
@@ -863,80 +995,63 @@
     border-style: dashed !important;
   }
 
-  .loop-range-controls {
+  .timeline-loop-line {
     display: inline-flex;
+    flex-direction: column;
     align-items: center;
-    gap: 3px;
-    background: #161b22;
-    padding: 2px 4px;
-    border-radius: 4px;
-    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
-    margin-left: 4px;
+    justify-content: center;
+    position: relative;
+    cursor: col-resize;
+    user-select: none;
+    touch-action: none;
+    z-index: 10;
+    margin: 0 2px;
+    height: 30px;
+    padding: 0 2px;
+    flex-shrink: 0;
   }
 
-  .btn-loop-pt {
-    background: #21262d;
-    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15));
-    color: var(--text-secondary, #8b949e);
-    border-radius: 3px;
-    padding: 2px 6px;
-    font-size: 11px;
-    font-weight: 700;
-    cursor: pointer;
-    font-family: var(--font-mono, monospace);
-    transition: all 0.15s ease;
+  .timeline-loop-line .loop-line-bar {
+    width: 3px;
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.15s ease, box-shadow 0.15s ease;
   }
 
-  .btn-loop-pt:hover {
-    color: #ffffff;
-    border-color: #58a6ff;
-    background: #30363d;
+  .timeline-loop-line-a .loop-line-bar {
+    background: #388bfd;
+    box-shadow: 0 0 6px rgba(56, 139, 253, 0.6);
   }
 
-  .btn-loop-pt.set {
-    background: rgba(56, 139, 253, 0.25);
-    border-color: #388bfd;
-    color: #58a6ff;
+  .timeline-loop-line-b .loop-line-bar {
+    background: #2ea043;
+    box-shadow: 0 0 6px rgba(46, 160, 67, 0.6);
   }
 
-  .btn-loop-toggle {
-    background: transparent;
-    border: 1px solid transparent;
-    font-size: 12px;
-    cursor: pointer;
-    padding: 2px 4px;
-    border-radius: 3px;
-    transition: all 0.15s ease;
-    opacity: 0.6;
-  }
-
-  .btn-loop-toggle:hover {
-    opacity: 1;
-    background: #30363d;
-  }
-
-  .btn-loop-toggle.active {
-    opacity: 1;
-    background: rgba(46, 160, 67, 0.25);
-    border-color: #2ea043;
-    color: #3fb950;
-    box-shadow: 0 0 6px rgba(46, 160, 67, 0.3);
-  }
-
-  .btn-loop-clear {
-    background: transparent;
-    border: none;
-    color: #8b949e;
+  .loop-line-badge {
+    position: absolute;
+    top: -14px;
     font-size: 10px;
-    cursor: pointer;
+    font-weight: 800;
+    font-family: var(--font-mono, monospace);
+    line-height: 1;
     padding: 2px 4px;
     border-radius: 3px;
-    line-height: 1;
-    transition: color 0.15s;
+    color: #ffffff;
+    pointer-events: none;
   }
 
-  .btn-loop-clear:hover {
-    color: #f85149;
+  .loop-line-badge.badge-a {
+    background: #388bfd;
+  }
+
+  .loop-line-badge.badge-b {
+    background: #2ea043;
+  }
+
+  .timeline-loop-line:hover .loop-line-bar,
+  .timeline-loop-line:active .loop-line-bar {
+    width: 5px;
   }
 
   .chip-btn.in-loop-range {
