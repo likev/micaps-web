@@ -165,6 +165,8 @@ export function applyPresetToWindow(win, group, overrideLevel = null, timelinesM
           window.__MICAPS_CURSOR__ = nwpValid;
         }
       }
+    } else if (typeof window !== "undefined") {
+      window.__MICAPS_CURSOR__ = null;
     }
   } else if (previousGroupId !== groupCopy.id) {
     win.wallClockCursor = null;

@@ -164,7 +164,7 @@ class LineHeightController {
     map.on("click", s.mapClick);
     map.on("mousemove", s.mapMouseMove);
     if (typeof map.on === "function") { try { map.on("contextmenu", s.mapContext); } catch {} }
-    if (typeof window !== "undefined") window.addEventListener("keydown", s.escHandler);
+    if (typeof window !== "undefined" && typeof window.addEventListener === "function") window.addEventListener("keydown", s.escHandler);
   }
   _detachMapListeners(map, win = null) {
     const s = this._getState(win);
@@ -174,7 +174,7 @@ class LineHeightController {
       if (s.mapMouseMove) m.off("mousemove", s.mapMouseMove);
       if (s.mapContext) { try { m.off("contextmenu", s.mapContext); } catch {} }
     }
-    if (s.escHandler && typeof window !== "undefined") window.removeEventListener("keydown", s.escHandler);
+    if (s.escHandler && typeof window !== "undefined" && typeof window.removeEventListener === "function") window.removeEventListener("keydown", s.escHandler);
     s.mapClick = s.mapMouseMove = s.mapContext = s.escHandler = null;
   }
 

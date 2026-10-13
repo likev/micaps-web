@@ -61,11 +61,15 @@ export async function loadWeatherField(map, model, element, level, period, custo
     }
   }
 
-  const cursorTime = win?.wallClockCursor ||
-    (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
-    (win?.forecastCycle ? { cycle: win.forecastCycle, period: period ?? win.period } : null) ||
-    (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
-    Date.now();
+  const cursorTime = win?.isObservation
+    ? (win?.wallClockCursor ||
+       (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
+       (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
+       Date.now())
+    : (win?.wallClockCursor ||
+       (win?.forecastCycle ? parseTimestamp({ cycle: win.forecastCycle, period: period ?? win?.period ?? 0 }) : null) ||
+       (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
+       Date.now());
 
   let targetLevel = level;
   const pathRangeMatch = (customOptions?.path || "").match(/\/(\d+[-_]\d+)(?:\/|$)/);

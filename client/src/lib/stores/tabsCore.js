@@ -135,7 +135,7 @@ export function isModelLayerSupported(model, element, level) {
  * Returns candidate models for auto-allocation Mode 'model', omitting models
  * for which all layers in the preset/window do not exist at the given level.
  */
-export function getEligibleModelsForAllocation(groupOrWin, level = 500, models = DEFAULT_MODELS) {
+export function getEligibleModelsForAllocation(groupOrWin, level = null, models = DEFAULT_MODELS) {
   if (!Array.isArray(models) || models.length === 0) return DEFAULT_MODELS;
 
   const layers = (Array.isArray(groupOrWin?.activeGroup?.layers) && groupOrWin.activeGroup.layers.length > 0)
@@ -149,31 +149,20 @@ export function getEligibleModelsForAllocation(groupOrWin, level = 500, models =
   }
 
   // When groupOrWin.hasLevel === false or layers.every(l => l.hasLevel === false || !l.level), DO NOT filter by vertical pressure level!
-  const hasNoLevel =
-    groupOrWin?.hasLevel === false ||
-    groupOrWin?.activeGroup?.hasLevel === false ||
-    layers.every((l) => l.hasLevel === false) ||
-    level === null ||
-    (
-      (level === undefined || level === null) &&
-      groupOrWin?.level == null &&
-      groupOrWin?.activeGroup?.level == null &&
-      groupOrWin?.defaultLevel == null &&
-      groupOrWin?.activeGroup?.defaultLevel == null &&
-      layers.every((l) => l.hasLevel === false || !l.level)
-    );
-
-  if (hasNoLevel) {
-    return models;
-  }
-
   const effectiveLevel = level !== null && level !== undefined
     ? parseInt(level, 10)
     : (groupOrWin?.level !== null && groupOrWin?.level !== undefined
       ? parseInt(groupOrWin.level, 10)
       : (groupOrWin?.defaultLevel ? parseInt(groupOrWin.defaultLevel, 10) : null));
 
-  if (effectiveLevel === null || isNaN(effectiveLevel)) {
+  const hasNoLevel =
+    groupOrWin?.hasLevel === false ||
+    groupOrWin?.activeGroup?.hasLevel === false ||
+    layers.every((l) => l.hasLevel === false) ||
+    effectiveLevel === null ||
+    isNaN(effectiveLevel);
+
+  if (hasNoLevel) {
     return models;
   }
 
@@ -195,7 +184,7 @@ export function getEligibleModelsForAllocation(groupOrWin, level = 500, models =
 /**
  * Asynchronous version that ensures all model level queries from server complete before evaluating eligibility.
  */
-export async function getEligibleModelsForAllocationAsync(groupOrWin, level = 500, models = DEFAULT_MODELS) {
+export async function getEligibleModelsForAllocationAsync(groupOrWin, level = null, models = DEFAULT_MODELS) {
   if (!Array.isArray(models) || models.length === 0) return DEFAULT_MODELS;
 
   const layers = (Array.isArray(groupOrWin?.activeGroup?.layers) && groupOrWin.activeGroup.layers.length > 0)
@@ -208,19 +197,18 @@ export async function getEligibleModelsForAllocationAsync(groupOrWin, level = 50
     return models;
   }
 
+  const effectiveLevel = level !== null && level !== undefined
+    ? parseInt(level, 10)
+    : (groupOrWin?.level !== null && groupOrWin?.level !== undefined
+      ? parseInt(groupOrWin.level, 10)
+      : (groupOrWin?.defaultLevel ? parseInt(groupOrWin.defaultLevel, 10) : null));
+
   const hasNoLevel =
     groupOrWin?.hasLevel === false ||
     groupOrWin?.activeGroup?.hasLevel === false ||
     layers.every((l) => l.hasLevel === false) ||
-    level === null ||
-    (
-      (level === undefined || level === null) &&
-      groupOrWin?.level == null &&
-      groupOrWin?.activeGroup?.level == null &&
-      groupOrWin?.defaultLevel == null &&
-      groupOrWin?.activeGroup?.defaultLevel == null &&
-      layers.every((l) => l.hasLevel === false || !l.level)
-    );
+    effectiveLevel === null ||
+    isNaN(effectiveLevel);
 
   if (hasNoLevel) {
     return models;
@@ -460,9 +448,13 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {  if (
   const win0HasNoLevel =
     win0.hasLevel === false ||
     win0.activeGroup?.hasLevel === false ||
-    (Array.isArray(win0Layers) && win0Layers.length > 0 && win0Layers.every((l) => l.hasLevel === false || !l.level));
+    (win0.level == null &&
+     win0.activeGroup?.level == null &&
+     win0.defaultLevel == null &&
+     win0.activeGroup?.defaultLevel == null &&
+     Array.isArray(win0Layers) && win0Layers.length > 0 && win0Layers.every((l) => l.hasLevel === false || !l.level));
 
-  const baseLevel = win0HasNoLevel ? (win0.level ?? null) : (win0.level ?? 500);
+  const baseLevel = win0HasNoLevel ? null : (win0.level ?? 500);
   const baseModel = win0.model ||
     win0.activeGroup?.model ||
     (Array.isArray(win0.activeGroup?.layers) && win0.activeGroup.layers[0]?.model) ||
@@ -531,7 +523,17 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {  if (
       win.obsTime = baseObsTime;
       if (win.activeGroup && Array.isArray(win.activeGroup.layers)) {
         for (const l of win.activeGroup.layers) {
-          if (l && (l.type === "contour" || l.type === "wind" || l.type === "raster")) {
+          if (l && (l.type === "contour" || l.type === "wind" || l.type === "raster" || (l.model && l.model !== "SURFACE" && l.model !== "UPPER_AIR"))) {
+            l.model = win.model;
+            if (typeof l.path === "string" && l.path.includes("/")) {
+              l.path = l.path.replace(/^[^\/]+/, win.model);
+            }
+          }
+        }
+      }
+      if (Array.isArray(win.layers)) {
+        for (const l of win.layers) {
+          if (l && (l.type === "contour" || l.type === "wind" || l.type === "raster" || (l.model && l.model !== "SURFACE" && l.model !== "UPPER_AIR"))) {
             l.model = win.model;
             if (typeof l.path === "string" && l.path.includes("/")) {
               l.path = l.path.replace(/^[^\/]+/, win.model);
@@ -751,6 +753,31 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
 
   const targetBase = baseWin || (tab.activeWinIdx != null ? tab.windows[tab.activeWinIdx] : null) || tab.windows[0];
 
+  const targetLayers = (Array.isArray(targetBase?.activeGroup?.layers) && targetBase.activeGroup.layers.length > 0)
+    ? targetBase.activeGroup.layers
+    : (Array.isArray(targetBase?.layers) && targetBase.layers.length > 0
+      ? targetBase.layers
+      : null);
+  const targetHasNoLevel =
+    targetBase?.hasLevel === false ||
+    targetBase?.activeGroup?.hasLevel === false ||
+    (targetBase?.level == null &&
+     targetBase?.activeGroup?.level == null &&
+     targetBase?.defaultLevel == null &&
+     targetBase?.activeGroup?.defaultLevel == null &&
+     Array.isArray(targetLayers) && targetLayers.length > 0 && targetLayers.every((l) => l.hasLevel === false || !l.level));
+  const effectiveBaseLevel = targetHasNoLevel ? null : (targetBase?.level ?? 500);
+
+  if (targetBase) {
+    if (targetHasNoLevel) {
+      targetBase.level = null;
+    }
+    if (tab.autoAllocation === "model" && !targetBase.model) {
+      const eligible = getEligibleModelsForAllocation(targetBase, effectiveBaseLevel, DEFAULT_MODELS);
+      targetBase.model = eligible[0];
+    }
+  }
+
   if (wasTab) {
     const emptyWins = [];
     const busyWins = [];
@@ -774,6 +801,21 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
     const usedEmpty = emptyWins.slice(0, neededExtra);
     const unusedEmpty = emptyWins.slice(neededExtra);
 
+    usedEmpty.forEach((winObj, idx) => {
+      const posIdx = 1 + idx;
+      if (targetHasNoLevel || targetBase?.level === null) {
+        winObj.level = targetBase?.level ?? null;
+      }
+      if (tab.autoAllocation && tab.autoAllocation !== "none") {
+        winObj.isAutoAllocated = true;
+        if (targetBase) winObj.allocParentId = targetBase.id;
+        if (tab.autoAllocation === "model") {
+          const eligible = getEligibleModelsForAllocation(targetBase, effectiveBaseLevel, DEFAULT_MODELS);
+          winObj.model = eligible[posIdx % eligible.length];
+        }
+      }
+    });
+
     const createdWins = [];
     while (usedEmpty.length + createdWins.length < neededExtra) {
       const uid = getNextWindowUid(tab);
@@ -781,11 +823,14 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
       const winObj = createDefaultWindow(posIdx, tab.id);
       winObj.uid = uid;
       winObj.id = `tab-${tab.id}-win-${uid}`;
+      if (targetHasNoLevel || targetBase?.level === null) {
+        winObj.level = targetBase?.level ?? null;
+      }
       if (tab.autoAllocation && tab.autoAllocation !== "none") {
         winObj.isAutoAllocated = true;
         if (targetBase) winObj.allocParentId = targetBase.id;
         if (tab.autoAllocation === "model") {
-          const eligible = getEligibleModelsForAllocation(targetBase, targetBase?.level, DEFAULT_MODELS);
+          const eligible = getEligibleModelsForAllocation(targetBase, effectiveBaseLevel, DEFAULT_MODELS);
           winObj.model = eligible[posIdx % eligible.length];
         }
       }
@@ -823,6 +868,21 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
     const usedEmpty = emptyWins.slice(0, Math.max(0, neededExtra));
     const unusedEmpty = emptyWins.slice(Math.max(0, neededExtra));
 
+    usedEmpty.forEach((winObj, idx) => {
+      const posIdx = currentSplit.length + idx;
+      if (targetHasNoLevel || targetBase?.level === null) {
+        winObj.level = targetBase?.level ?? null;
+      }
+      if (tab.autoAllocation && tab.autoAllocation !== "none") {
+        winObj.isAutoAllocated = true;
+        if (targetBase) winObj.allocParentId = targetBase.id;
+        if (tab.autoAllocation === "model") {
+          const eligible = getEligibleModelsForAllocation(targetBase, effectiveBaseLevel, DEFAULT_MODELS);
+          winObj.model = eligible[posIdx % eligible.length];
+        }
+      }
+    });
+
     const createdWins = [];
     while (currentSplit.length + usedEmpty.length + createdWins.length < numNeeded) {
       const uid = getNextWindowUid(tab);
@@ -830,11 +890,14 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
       const winObj = createDefaultWindow(posIdx, tab.id);
       winObj.uid = uid;
       winObj.id = `tab-${tab.id}-win-${uid}`;
+      if (targetHasNoLevel || targetBase?.level === null) {
+        winObj.level = targetBase?.level ?? null;
+      }
       if (tab.autoAllocation && tab.autoAllocation !== "none") {
         winObj.isAutoAllocated = true;
         if (targetBase) winObj.allocParentId = targetBase.id;
         if (tab.autoAllocation === "model") {
-          const eligible = getEligibleModelsForAllocation(targetBase, targetBase?.level, DEFAULT_MODELS);
+          const eligible = getEligibleModelsForAllocation(targetBase, effectiveBaseLevel, DEFAULT_MODELS);
           winObj.model = eligible[posIdx % eligible.length];
         }
       }

@@ -18,9 +18,11 @@ import { resolveLayerTime, parseTimestamp } from "../src/utils/timeResolver.js";
 
 describe("Bug Fix Verification: NWP chip-age +1068h and 6-Model Split Allocation", () => {
   let originalFetch;
+  let originalWindow;
 
   beforeAll(async () => {
     originalFetch = globalThis.fetch;
+    originalWindow = globalThis.window;
     globalThis.fetch = async (url) => {
       const urlStr = String(url);
       if (urlStr.includes("/api/catalog/levels")) {
@@ -44,7 +46,26 @@ describe("Bug Fix Verification: NWP chip-age +1068h and 6-Model Split Allocation
         ]));
       }
       if (urlStr.includes("/api/data/grid")) {
-        return new Response(new ArrayBuffer(1024));
+        return new Response(JSON.stringify({
+          header: {
+            element: "RAIN12",
+            level: 0,
+            period: 24,
+            start_lat: 55,
+            end_lat: 15,
+            start_lon: 70,
+            end_lon: 140,
+            n_lat: 10,
+            n_lon: 10,
+            d_lat: -4,
+            d_lon: 7,
+          },
+          values: Array.from({ length: 10 }, () => Array.from({ length: 10 }, () => 20)),
+          stats: { min: 0, max: 50 },
+        }), { status: 200 });
+      }
+      if (typeof originalFetch === "function") {
+        return originalFetch(url);
       }
       return new Response(JSON.stringify([]));
     };
@@ -58,6 +79,11 @@ describe("Bug Fix Verification: NWP chip-age +1068h and 6-Model Split Allocation
 
   afterAll(() => {
     globalThis.fetch = originalFetch;
+    if (originalWindow === undefined) {
+      delete globalThis.window;
+    } else {
+      globalThis.window = originalWindow;
+    }
   });
 
   describe("Issue 1: NWP chip-age +1068h cursor mismatch fix", () => {
@@ -91,6 +117,46 @@ describe("Bug Fix Verification: NWP chip-age +1068h and 6-Model Split Allocation
       expect(win.obsTime).toBeNull();
       expect(win.wallClockCursor).toBeNull();
       expect(win.level).toBeNull();
+    });
+
+    it("applyPresetToWindow clears window.__MICAPS_CURSOR__ when switching to NWP preset without cycle", () => {
+      const prevWin = globalThis.window;
+      globalThis.window = globalThis.window || {
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      };
+      globalThis.window.__MICAPS_CURSOR__ = parseTimestamp("26082820.000");
+
+      try {
+        const win = createDefaultWindow(0, 1);
+        win.isObservation = true;
+        win.obsTime = "26082820.000";
+
+        const rainPreset = {
+          id: "multi-model-rain12",
+          hasLevel: false,
+          isObservation: false,
+          layers: [{ id: "rain12-ec", model: "ECMWF_HR", element: "RAIN12" }],
+        };
+
+        applyPresetToWindow(win, rainPreset);
+        expect(globalThis.window.__MICAPS_CURSOR__).toBeNull();
+
+        // When forecastCycle is provided on group, it initializes window.__MICAPS_CURSOR__
+        const rainWithCycle = {
+          ...rainPreset,
+          forecastCycle: "26101208",
+          period: 24,
+        };
+        applyPresetToWindow(win, rainWithCycle);
+        expect(globalThis.window.__MICAPS_CURSOR__).toBe(parseTimestamp({ cycle: "26101208", period: 24 }));
+      } finally {
+        if (prevWin === undefined) {
+          delete globalThis.window;
+        } else {
+          globalThis.window = prevWin;
+        }
+      }
     });
 
     it("loadPresetGroup initializes win.wallClockCursor to NWP forecast valid time", async () => {
@@ -205,15 +271,29 @@ describe("Bug Fix Verification: NWP chip-age +1068h and 6-Model Split Allocation
       ]);
     });
 
-    it("getEligibleModelsForAllocation does NOT filter by level when layers declare no level", () => {
+    it("getEligibleModelsForAllocation does NOT filter by level when layers declare no level (even with default level=500)", () => {
       const surfaceWindow = {
         layers: [
-          { element: "RAIN12", hasLevel: false },
+          { element: "RAIN12" }, // Note: no hasLevel: false or level property on layer!
         ],
       };
 
-      const eligible = getEligibleModelsForAllocation(surfaceWindow, null, DEFAULT_MODELS);
+      // Calling without specifying level uses default level=null
+      const eligible = getEligibleModelsForAllocation(surfaceWindow);
       expect(eligible).toEqual(DEFAULT_MODELS);
+      expect(eligible).toHaveLength(6);
+    });
+
+    it("getEligibleModelsForAllocationAsync does NOT filter by level when layers declare no level (uses default level=null)", async () => {
+      const surfaceWindow = {
+        layers: [
+          { element: "RAIN12" },
+        ],
+      };
+
+      const eligible = await getEligibleModelsForAllocationAsync(surfaceWindow);
+      expect(eligible).toEqual(DEFAULT_MODELS);
+      expect(eligible).toHaveLength(6);
     });
 
     it("preserves 500 hPa exclusion for upper-air presets that actually have vertical levels", () => {
@@ -372,6 +452,44 @@ describe("Bug Fix Verification: NWP chip-age +1068h and 6-Model Split Allocation
         "BEIJING_MR",
         "JAPAN_MR",
       ]);
+      expect(tab.windows.every((w) => w.level === null)).toBe(true);
+    });
+
+    it("prepareSplitWindows assigns models and sets level null across existing empty windows when autoAllocation is model", () => {
+      const tab = createDefaultTab(1);
+      tab.layout = "2x3";
+      tab.autoAllocation = "model";
+
+      const rainPreset = {
+        id: "multi-model-rain12",
+        hasLevel: false,
+        layers: [{ element: "RAIN12", model: "ECMWF_HR", type: "contour" }],
+      };
+
+      const win0 = {
+        ...createDefaultWindow(0, 1),
+        model: "ECMWF_HR",
+        level: null,
+        hasLevel: false,
+        activeGroup: rainPreset,
+      };
+      // Window 1 and 2 are empty windows already in tab.windows
+      const win1 = createDefaultWindow(1, 1);
+      const win2 = createDefaultWindow(2, 1);
+      tab.windows = [win0, win1, win2];
+
+      prepareSplitWindows(tab, 6, win0, (w) => !w.layers || w.layers.length === 0, true);
+
+      expect(tab.windows).toHaveLength(6);
+      expect(tab.windows.map((w) => w.model)).toEqual([
+        "ECMWF_HR",
+        "GRAPES_GFS",
+        "GRAPES_3KM",
+        "SHANGHAI_MR",
+        "BEIJING_MR",
+        "JAPAN_MR",
+      ]);
+      expect(tab.windows.every((w) => w.level === null)).toBe(true);
     });
   });
 });

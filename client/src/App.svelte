@@ -327,7 +327,19 @@
     const posIdx = activeTab.windows.length;
     const winObj = createDefaultWindow(posIdx, activeTab.id);
     winObj.uid = uid;
-    const activeHasNoLevel = activeWin?.hasLevel === false || activeWin?.activeGroup?.hasLevel === false;
+    const activeLayers = (Array.isArray(activeWin?.activeGroup?.layers) && activeWin.activeGroup.layers.length > 0)
+      ? activeWin.activeGroup.layers
+      : (Array.isArray(activeWin?.layers) && activeWin.layers.length > 0
+        ? activeWin.layers
+        : null);
+    const activeHasNoLevel =
+      activeWin?.hasLevel === false ||
+      activeWin?.activeGroup?.hasLevel === false ||
+      (activeWin?.level == null &&
+       activeWin?.activeGroup?.level == null &&
+       activeWin?.defaultLevel == null &&
+       activeWin?.activeGroup?.defaultLevel == null &&
+       Array.isArray(activeLayers) && activeLayers.length > 0 && activeLayers.every((l) => l.hasLevel === false || !l.level));
     winObj.level = (activeTab.autoAllocation === "level")
       ? (DEFAULT_LEVELS[posIdx] ?? 500)
       : (activeHasNoLevel ? (activeWin?.level ?? null) : (activeWin?.level ?? 500));

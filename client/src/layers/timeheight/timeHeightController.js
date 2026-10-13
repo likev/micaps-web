@@ -333,7 +333,7 @@ class TimeHeightController {
     map.on("click", state.mapClickListener);
     map.on("mousemove", state.mapMouseMoveListener);
     try { map.on("contextmenu", state.mapContextListener); } catch {}
-    if (typeof window !== "undefined") window.addEventListener("keydown", state.escHandler);
+    if (typeof window !== "undefined" && typeof window.addEventListener === "function") window.addEventListener("keydown", state.escHandler);
   }
 
   _detachMapListeners(map, win = null) {
@@ -344,7 +344,7 @@ class TimeHeightController {
       if (state.mapMouseMoveListener) m.off("mousemove", state.mapMouseMoveListener);
       if (state.mapContextListener) { try { m.off("contextmenu", state.mapContextListener); } catch {} }
     }
-    if (state.escHandler && typeof window !== "undefined") window.removeEventListener("keydown", state.escHandler);
+    if (state.escHandler && typeof window !== "undefined" && typeof window.removeEventListener === "function") window.removeEventListener("keydown", state.escHandler);
     state.mapClickListener = state.mapMouseMoveListener = state.mapContextListener = state.escHandler = null;
   }
 
