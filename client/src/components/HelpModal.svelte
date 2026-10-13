@@ -96,7 +96,7 @@
           <h3 class="section-title">🧭 Quick Guide / 核心功能导航</h3>
           <ul class="guide-list">
             <li>
-              <strong>Presets (组合图):</strong> Select meteorological combinations (Upper-air, Surface, ECMWF, CMA-GFS) from the top nav bar. Supports keyboard navigation and hover submenus.
+              <strong>Presets (组合图):</strong> Select meteorological combinations (Upper-air, Surface, ECMWF, GRAPES-GFS) from the top nav bar. Supports keyboard navigation and hover submenus.
             </li>
             <li>
               <strong>Status Bar (状态栏):</strong> Located at the bottom of the window, displaying the Layers toggle switch, active NWP/OBS mode, forecast init cycle, valid times, and backend connection status.

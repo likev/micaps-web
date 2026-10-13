@@ -13,7 +13,7 @@
     { value: "tlogp", label: "T-lnP Sounding Diagram (探空图)" },
   ];
 
-  const COMMON_MODELS = ["ECMWF_HR", "CMA_GFS", "SURFACE", "UPPER_AIR"];
+  const COMMON_MODELS = ["ECMWF_HR", "GRAPES_GFS", "SURFACE", "UPPER_AIR"];
   const COMMON_ELEMENTS = ["TMP", "HGT", "WIND", "RH", "MSLP", "APCP", "TLOGP", "STATION"];
 
   function mutateField(field, val) {

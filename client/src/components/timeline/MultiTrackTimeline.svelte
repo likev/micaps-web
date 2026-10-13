@@ -286,8 +286,7 @@
     );
     const hasForecast = weatherLayers.some((l) =>
       l.model === "ECMWF_HR" ||
-      l.model === "GFS" ||
-      l.model === "CMA_GFS" ||
+      l.model === "GRAPES_GFS" ||
       l.type === "forecast" ||
       (l.model && l.model !== "SURFACE" && l.model !== "UPPER_AIR" && !l.element?.includes("RADAR") && !l.element?.includes("SAT")) ||
       (l.period !== undefined && l.period !== null)

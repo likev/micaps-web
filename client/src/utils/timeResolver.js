@@ -25,7 +25,7 @@ export const DEFAULT_TOLERANCES = {
   TLOGP: 720,
   SOUNDING: 720,
   ECMWF_HR: 360,
-  GFS: 360,
+  GRAPES_GFS: 360,
   TMP: 360,
   HGT: 360,
   WIND: 360,
@@ -195,6 +195,18 @@ export function parseTimestamp(input) {
   }
 
   const str = String(input).trim();
+
+  // Space or dash-separated date/time string e.g. "20261013 02:00" or "2026-10-13 02:00"
+  const formattedMatch = str.match(/^(\d{4})[-/]?(\d{2})[-/]?(\d{2})[\sT](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (formattedMatch) {
+    const y = parseInt(formattedMatch[1], 10);
+    const m = parseInt(formattedMatch[2], 10) - 1;
+    const d = parseInt(formattedMatch[3], 10);
+    const h = parseInt(formattedMatch[4], 10);
+    const min = parseInt(formattedMatch[5], 10);
+    const sec = formattedMatch[6] ? parseInt(formattedMatch[6], 10) : 0;
+    return Date.UTC(y, m, d, h, min, sec);
+  }
 
   // ISO string
   if (str.includes("T") || str.includes("-")) {

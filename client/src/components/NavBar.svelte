@@ -14,6 +14,8 @@
     presetGroups = [],
     presetId = "",
     level = 500,
+    layout = "1x1",
+    autoAllocation = "none",
     activeGroup = null,
     activeWin = null,
     onPresetSelect = null,
@@ -22,6 +24,8 @@
     onLoadData = null,
     onOpenConfig = null,
     onOpenCommandPalette = null,
+    onChangeLayout = null,
+    onSelectAutoAlloc = null,
   } = $props();
 
   const levels = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
@@ -53,8 +57,9 @@
 
   // Focused window's group drives whether a vertical level applies.
   let currentGroup = $derived(
+    activeWin?.activeGroup ||
     activeGroup ||
-    effectivePresetGroups.find((g) => !isDivider(g) && g.id === currentPresetId) ||
+    (currentPresetId ? effectivePresetGroups.find((g) => !isDivider(g) && g.id === currentPresetId) : null) ||
     null
   );
 
@@ -99,9 +104,7 @@
 
   const BASE_NWP_MODELS = [
     "ECMWF_HR",
-    "CMA_GFS",
     "GRAPES_GFS",
-    "GFS",
     "GRAPES_3KM",
     "SHANGHAI_MR",
     "BEIJING_MR",
@@ -131,6 +134,48 @@
     app.model ||
     "ECMWF_HR"
   );
+
+  let isSurface = $derived(Boolean(
+    activeWin?.model === "SURFACE" ||
+    activeWin?.model === "SURFACE_PLOT" ||
+    currentGroup?.id?.toLowerCase().includes("surface") ||
+    activeWin?.element?.toLowerCase?.().includes("surface")
+  ));
+  let isUpperAir = $derived(Boolean(
+    activeWin?.model === "UPPER_AIR" ||
+    currentGroup?.id?.toLowerCase().includes("upper") ||
+    currentGroup?.id?.toLowerCase().includes("tlogp")
+  ));
+  let isObs = $derived(Boolean(
+    !isNwpData && (isSurface || isUpperAir || activeWin?.isObservation || currentGroup?.isObservation)
+  ));
+
+  let isLayoutMenuOpen = $state(false);
+  let hoveredLayoutSubmenu = $state(null);
+  let layoutDropdownRef = $state(null);
+
+  const SPLIT_LAYOUTS = [
+    { key: "1x2", label: "1x2 Split", icon: "◫" },
+    { key: "2x2", label: "2x2 Split", icon: "⊞" },
+    { key: "2x3", label: "2x3 Split", icon: "▦" },
+    { key: "3x2", label: "3x2 Split", icon: "▦" },
+  ];
+
+  function toggleLayoutMenu() {
+    isLayoutMenuOpen = !isLayoutMenuOpen;
+    hoveredLayoutSubmenu = null;
+  }
+
+  function handleLayoutSelect(layoutKey, allocMode = null) {
+    isLayoutMenuOpen = false;
+    hoveredLayoutSubmenu = null;
+    if (allocMode !== null && onSelectAutoAlloc) {
+      onSelectAutoAlloc(allocMode);
+    }
+    if (onChangeLayout) {
+      onChangeLayout(layoutKey, allocMode);
+    }
+  }
 
   let isMenuOpen = $state(false);
   let showHelpModal = $state(false);
@@ -173,10 +218,18 @@
     if (isMenuOpen && menuContainerRef && !menuContainerRef.contains(e.target)) {
       isMenuOpen = false;
     }
+    if (isLayoutMenuOpen && layoutDropdownRef && !layoutDropdownRef.contains(e.target)) {
+      isLayoutMenuOpen = false;
+      hoveredLayoutSubmenu = null;
+    }
   }
 
   async function handleMenuKeydown(e) {
     if (e.key === "Escape") {
+      if (isLayoutMenuOpen) {
+        isLayoutMenuOpen = false;
+        hoveredLayoutSubmenu = null;
+      }
       if (isMenuOpen) {
         e.stopPropagation();
         e.preventDefault();
@@ -367,6 +420,113 @@
           </button>
         </div>
       {/if}
+
+      <!-- Unified [ ⊞ Layout ▾ ] dropdown in NavBar directly to the right of .preset-active-indicator -->
+      <div class="nav-layout-dropdown-container" bind:this={layoutDropdownRef}>
+        <button
+          type="button"
+          id="btn-nav-layout"
+          class="btn-nav-layout"
+          class:active={layout !== "1x1"}
+          aria-haspopup="true"
+          aria-expanded={isLayoutMenuOpen}
+          onclick={toggleLayoutMenu}
+          title="Window Layout and Multi-Window Auto-Allocation"
+        >
+          <span class="layout-icon">⊞</span>
+          <span class="layout-label-text">Layout</span>
+          <span class="dropdown-caret">▾</span>
+        </button>
+
+        {#if isLayoutMenuOpen}
+          <div class="nav-layout-menu" role="menu">
+            <div class="layout-menu-item">
+              <button
+                type="button"
+                class="layout-item-btn"
+                class:selected={layout === "1x1"}
+                onclick={() => handleLayoutSelect("1x1", "none")}
+              >
+                <span class="layout-item-icon">⊟</span>
+                <span class="layout-item-label">1x1 (Tabs)</span>
+              </button>
+            </div>
+
+            {#each SPLIT_LAYOUTS as item}
+              <div
+                class="layout-menu-item"
+                class:active={hoveredLayoutSubmenu === item.key}
+                onmouseenter={() => (hoveredLayoutSubmenu = item.key)}
+                onmouseleave={() => (hoveredLayoutSubmenu = null)}
+              >
+                <button
+                  type="button"
+                  class="layout-item-btn"
+                  class:selected={layout === item.key}
+                  onclick={() => {
+                    if (hoveredLayoutSubmenu !== item.key) {
+                      hoveredLayoutSubmenu = item.key;
+                    } else {
+                      handleLayoutSelect(item.key);
+                    }
+                  }}
+                >
+                  <span class="layout-item-icon">{item.icon}</span>
+                  <span class="layout-item-label">{item.label}</span>
+                  <span class="submenu-arrow">▸</span>
+                </button>
+                {#if hoveredLayoutSubmenu === item.key}
+                  <div class="layout-submenu" role="menu">
+                    <button
+                      type="button"
+                      class="layout-sub-item-btn"
+                      class:selected={layout === item.key && autoAllocation === "none"}
+                      onclick={() => handleLayoutSelect(item.key, "none")}
+                    >
+                      <span>Empty (none)</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="layout-sub-item-btn"
+                      class:selected={layout === item.key && autoAllocation === "time"}
+                      onclick={() => handleLayoutSelect(item.key, "time")}
+                    >
+                      <span>{isObs ? "Multi-Time Contrast" : "Multi-Init Contrast"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="layout-sub-item-btn"
+                      class:selected={layout === item.key && autoAllocation === "step"}
+                      disabled={isSurface || isUpperAir}
+                      onclick={() => handleLayoutSelect(item.key, "step")}
+                    >
+                      <span>Multi-Step Contrast</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="layout-sub-item-btn"
+                      class:selected={layout === item.key && autoAllocation === "level"}
+                      disabled={isSurface}
+                      onclick={() => handleLayoutSelect(item.key, "level")}
+                    >
+                      <span>Multi-Level Contrast</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="layout-sub-item-btn"
+                      class:selected={layout === item.key && autoAllocation === "model"}
+                      disabled={isSurface || isUpperAir}
+                      onclick={() => handleLayoutSelect(item.key, "model")}
+                    >
+                      <span>Multi-Model Contrast</span>
+                    </button>
+                  </div>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
 
       <!-- Backward-compatible hidden controls for tests & external sync helpers -->
       <select
@@ -967,5 +1127,157 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* Layout Dropdown Styles */
+  .nav-layout-dropdown-container {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    margin-left: 6px;
+  }
+
+  .btn-nav-layout {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 3px 8px;
+    background: var(--bg-card, #21262d);
+    color: var(--text-primary, #e6edf3);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15));
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    white-space: nowrap;
+    user-select: none;
+    box-sizing: border-box;
+  }
+
+  .btn-nav-layout:hover,
+  .btn-nav-layout[aria-expanded="true"] {
+    background: var(--bg-hover, #30363d);
+    border-color: var(--accent-blue, #388bfd);
+    color: var(--text-primary, #ffffff);
+  }
+
+  .btn-nav-layout.active {
+    background: rgba(56, 139, 253, 0.15);
+    border-color: var(--accent-blue, #58a6ff);
+    color: var(--accent-blue, #58a6ff);
+  }
+
+  .layout-icon {
+    font-size: 13px;
+    line-height: 1;
+  }
+
+  .dropdown-caret {
+    font-size: 10px;
+    color: var(--text-secondary, #8b949e);
+    margin-left: 1px;
+  }
+
+  .nav-layout-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 170px;
+    background: var(--bg-secondary, #161b22);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.18));
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+    padding: 4px 0;
+    z-index: 2500;
+  }
+
+  .layout-menu-item {
+    position: relative;
+  }
+
+  .layout-item-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 12px;
+    font-size: 12px;
+    color: var(--text-primary, #e6edf3);
+    background: transparent;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+
+  .layout-item-btn:hover,
+  .layout-menu-item.active > .layout-item-btn {
+    background: var(--bg-hover, #21262d);
+    color: var(--accent-blue, #58a6ff);
+  }
+
+  .layout-item-btn.selected {
+    background: rgba(56, 139, 253, 0.15);
+    color: var(--accent-blue, #58a6ff);
+    font-weight: 600;
+  }
+
+  .layout-item-label {
+    flex: 1;
+    white-space: nowrap;
+  }
+
+  .submenu-arrow {
+    font-size: 10px;
+    color: var(--text-secondary, #8b949e);
+  }
+
+  .layout-submenu {
+    position: absolute;
+    left: 100%;
+    top: -4px;
+    min-width: 190px;
+    background: var(--bg-secondary, #161b22);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.18));
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    padding: 4px 0;
+    z-index: 2510;
+    margin-left: 2px;
+  }
+
+  .layout-sub-item-btn {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 6px 12px;
+    font-size: 12px;
+    color: var(--text-primary, #e6edf3);
+    background: transparent;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+
+  .layout-sub-item-btn:hover:not(:disabled) {
+    background: rgba(56, 139, 253, 0.22);
+    color: #79c0ff;
+  }
+
+  .layout-sub-item-btn.selected {
+    background: rgba(56, 139, 253, 0.15);
+    color: var(--accent-blue, #58a6ff);
+    font-weight: 600;
+  }
+
+  .layout-sub-item-btn:disabled {
+    color: var(--text-disabled, rgba(255, 255, 255, 0.3));
+    cursor: not-allowed;
+    opacity: 0.5;
   }
 </style>

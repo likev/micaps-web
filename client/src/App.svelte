@@ -238,11 +238,15 @@
     const timeline = getOrCreateTimeline(win.id);
     const previousCycles = timeline.forecastCycles || [];
     const previousCycle = timeline.currentInitCycle || win.forecastCycle;
-    const wasFollowingLatest = !previousCycle || !previousCycles.length || previousCycle === previousCycles[0];
-    const nextCycle = wasFollowingLatest || !cycles.includes(previousCycle) ? cycles[0] : previousCycle;
+    const nextCycle = (previousCycle && (cycles.includes(previousCycle) || cycles.length === 0))
+      ? previousCycle
+      : (previousCycle || cycles[0]);
+    const effectiveCycles = (cycles && nextCycle && !cycles.includes(nextCycle))
+      ? [nextCycle, ...cycles]
+      : cycles;
 
     timeline.currentMode = "nwp";
-    timeline.forecastCycles = cycles;
+    timeline.forecastCycles = effectiveCycles;
     timeline.currentInitCycle = nextCycle;
     const rainHours = getRainAccumulationHoursForWindow(win) ??
       getRainAccumulationHours(win.element) ??
@@ -476,8 +480,11 @@
     handleChangeLayout(newLayout);
   }
 
-  async function handleChangeLayout(layout) {
+  async function handleChangeLayout(layout, explicitAllocMode = null) {
     if (!activeTab) return;
+    if (explicitAllocMode !== null) {
+      activeTab.autoAllocation = explicitAllocMode;
+    }
     const prevLayout = activeTab.layout;
     activeTab.layout = layout;
     const numNeeded = getNumVisible(layout);
@@ -485,9 +492,9 @@
     const isSplit = layout !== "1x1";
     const wasTab = prevLayout === "1x1";
 
-    const baseWin = (activeWin && activeWin.activeGroup)
-      ? activeWin
-      : (activeTab.windows.find((w) => w && w.activeGroup) || activeWin || activeTab.windows[0]);
+    const baseWin = (activeTab.windows && activeTab.activeWinIdx != null && activeTab.windows[activeTab.activeWinIdx])
+      ? activeTab.windows[activeTab.activeWinIdx]
+      : (activeWin || activeTab.windows?.[0] || null);
 
     if (isProfilePanelWindow(baseWin)) {
       activeTab.autoAllocation = "none";
@@ -559,7 +566,9 @@
     const allocSeq = (tab._allocSeq || 0) + 1;
     tab._allocSeq = allocSeq;
     tab.autoAllocation = mode;
-    const baseWin = (activeWin && activeWin.activeGroup) ? activeWin : (tab.windows.find((w) => w && w.activeGroup) || activeWin || tab.windows[0]);
+    const baseWin = (tab.windows && tab.activeWinIdx != null && tab.windows[tab.activeWinIdx])
+      ? tab.windows[tab.activeWinIdx]
+      : (activeWin || tab.windows?.[0] || null);
 
     if (isProfilePanelWindow(baseWin)) {
       tab.autoAllocation = "none";
@@ -676,6 +685,14 @@
           }
         }
       } else if (mode === "model") {
+        const tl = getOrCreateTimeline(w.id);
+        if (tl && w.forecastCycle) {
+          tl.currentMode = "nwp";
+          tl.currentInitCycle = w.forecastCycle;
+          if (Array.isArray(w.forecastCycles)) {
+            tl.forecastCycles = [...w.forecastCycles];
+          }
+        }
         if (w.activeGroup) {
           const groupCopy = JSON.parse(JSON.stringify(w.activeGroup));
           if (Array.isArray(groupCopy.layers)) {
@@ -811,12 +828,15 @@
 
   async function handleSelectAutoAlloc(mode) {
     if (!activeTab) return;
-    if (isProfilePanelWindow(activeWin)) {
+    const focusedWin = (activeTab.windows && activeTab.activeWinIdx != null && activeTab.windows[activeTab.activeWinIdx])
+      ? activeTab.windows[activeTab.activeWinIdx]
+      : (activeWin || activeTab.windows?.[0] || null);
+    if (isProfilePanelWindow(focusedWin)) {
       activeTab.autoAllocation = "none";
       return;
     }
-    const isSurf = isSurfaceWindow(activeWin);
-    const isUp = isUpperAirWindow(activeWin);
+    const isSurf = isSurfaceWindow(focusedWin);
+    const isUp = isUpperAirWindow(focusedWin);
     if (isSurf && (mode === "step" || mode === "level" || mode === "model")) {
       activeTab.autoAllocation = "none";
       return;
@@ -1884,12 +1904,16 @@
     activeGroup={activeWin?.activeGroup || null}
     activeWin={activeWin}
     level={app.level}
+    layout={activeTab?.layout || "1x1"}
+    autoAllocation={activeTab?.autoAllocation || "none"}
     onPresetSelect={handlePresetSelect}
     onLoadData={handleLoadData}
     onLevelSelect={handleLevelSelect}
     onModelSelect={handleModelSelect}
     onOpenConfig={handleToggleConfig}
     onOpenCommandPalette={() => { ui.commandPaletteOpen = true; }}
+    onChangeLayout={handleChangeLayout}
+    onSelectAutoAlloc={handleSelectAutoAlloc}
   />
 
   <TabsBar

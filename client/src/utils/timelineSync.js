@@ -21,13 +21,15 @@ export function generateDynamicForecastCycles(base = null, count = 10) {
   let initHour;
 
   if (typeof base === "string" && base.length >= 8) {
-    const clean = base.split(".")[0];
-    const y = parseInt(clean.length === 8 ? `20${clean.slice(0, 2)}` : clean.slice(0, 4), 10);
-    const m = parseInt(clean.length === 8 ? clean.slice(2, 4) : clean.slice(4, 6), 10) - 1;
-    const d = parseInt(clean.length === 8 ? clean.slice(4, 6) : clean.slice(6, 8), 10);
-    const h = parseInt(clean.length === 8 ? clean.slice(6, 8) : clean.slice(8, 10), 10);
-    initHour = h >= 20 ? 20 : 8;
-    baseDate = new Date(Date.UTC(y, m, d, initHour));
+    const digits = base.split(".")[0].replace(/\D/g, "");
+    if (digits.length >= 8) {
+      const y = parseInt(digits.length === 8 ? `20${digits.slice(0, 2)}` : digits.slice(0, 4), 10);
+      const m = parseInt(digits.length === 8 ? digits.slice(2, 4) : digits.slice(4, 6), 10) - 1;
+      const d = parseInt(digits.length === 8 ? digits.slice(4, 6) : digits.slice(6, 8), 10);
+      const h = parseInt(digits.length === 8 ? digits.slice(6, 8) : digits.slice(8, 10), 10);
+      initHour = Number.isInteger(h) && h >= 0 && h <= 23 ? h : (h >= 20 ? 20 : 8);
+      baseDate = new Date(Date.UTC(y, m, d, initHour));
+    }
   } else if (base instanceof Date) {
     const bjt = new Date(base.getTime() + 8 * 3600 * 1000);
     const bjtHour = bjt.getUTCHours();

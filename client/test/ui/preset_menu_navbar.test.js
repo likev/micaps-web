@@ -273,11 +273,10 @@ describe("Option A: Level & Model Selector Dynamics", () => {
     expect(shouldShowModel({ isObservation: false }, rainGroup, true)).toBe(true);
   });
 
-  test("Model selector includes ECMWF_HR, CMA_GFS, GFS, etc. and invokes onModelSelect", () => {
+  test("Model selector includes ECMWF_HR, GRAPES_GFS, etc. and invokes onModelSelect", () => {
     expect(navBarSrc).toContain("availableModels");
     expect(navBarSrc).toContain("ECMWF_HR");
-    expect(navBarSrc).toContain("CMA_GFS");
-    expect(navBarSrc).toContain("GFS");
+    expect(navBarSrc).toContain("GRAPES_GFS");
     expect(navBarSrc).toContain("handleModelChange");
     expect(navBarSrc).toContain("onModelSelect");
   });

@@ -1,7 +1,6 @@
 // ui_review2_fixes.test.js - Automated tests verifying all issues from UI Review 2
 import { test, expect, describe, beforeEach } from "bun:test";
-import fs from "fs";
-import { readStyleCss } from "./helpers/cssText.js";
+import { readStyleCss, readSrcText } from "./helpers/cssText.js";
 import { updateLegend, removeLegend, clearLegends } from "../src/ui/legend.js";
 import { setLayerIsolineStyle } from "../src/layers/contourLayer.js";
 import { setStationConfig, renderStationWeatherPlots } from "../src/layers/stationLayer.js";
@@ -54,7 +53,7 @@ function createMockMap() {
 
 describe("UI Review 2: CSS Overflow Verifications", () => {
   const styleCss = readStyleCss();
-  const tabsCss = fs.readFileSync("./src/tabs.css", "utf8");
+  const tabsCss = readSrcText("tabs.css");
 
   test("O1: .panel has overflow-y: auto and .layers-manage-container expands naturally without max-height clipping", () => {
     expect(styleCss).toMatch(/\.panel\s*\{[^}]*overflow-y:\s*auto/);
@@ -90,7 +89,7 @@ describe("UI Review 2: CSS Overflow Verifications", () => {
 
 describe("UI Review 2: Operator & Interactive Status", () => {
   const styleCss = readStyleCss();
-  const layerRowSvelte = fs.readFileSync("./src/components/LayerRow.svelte", "utf8");
+  const layerRowSvelte = readSrcText("components/LayerRow.svelte");
 
   test("S1: Eye icon uses 👁 / 🚫 and toggles layer-hidden class with strikethrough", () => {
     // Live drawer is components/LayerRow.svelte (legacy string renderer removed)
@@ -139,7 +138,7 @@ describe("UI Review 2: Operator & Interactive Status", () => {
 
 describe("UI Review 2: Layer Consistency & Addenda", () => {
   test("C3: unhide re-triggers raster overlay when source is missing (no-op setVisibility fixed)", () => {
-    const src = fs.readFileSync("./src/ui/layerActions.js", "utf8");
+    const src = readSrcText("ui/layerActions.js");
     // Unhide branch must re-trigger instead of bare setRasterVisibility
     expect(src).toMatch(/if \(value\) \{[\s\S]*?triggerRasterOverlay\(map, layer, win\)/);
     const map = createMockMap();
@@ -232,7 +231,7 @@ describe("UI Review 2: Layer Consistency & Addenda", () => {
   });
 
   test("Contour label layer does not use data expressions in text-ignore-placement and prioritizes bold via symbol-sort-key", () => {
-    const contourLayerJs = fs.readFileSync("./src/layers/contourLayer.js", "utf8");
+    const contourLayerJs = readSrcText("layers/contourLayer.js");
     expect(contourLayerJs).not.toMatch(/"text-ignore-placement":\s*\[/);
     expect(contourLayerJs).toContain('"symbol-sort-key"');
   });

@@ -408,11 +408,11 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {  if (
     return;
   }
   const visible = getVisibleWindows(tab);
-  const win0 = (baseWin && typeof baseWin === "object" && baseWin.activeGroup)
+  const win0 = (baseWin && typeof baseWin === "object")
     ? baseWin
-    : (tab.windows.find((w) => w && w.activeGroup) || (baseWin && typeof baseWin === "object" ? baseWin : null) || tab.windows[tab.activeWinIdx] || tab.windows[0] || {});
+    : ((tab.activeWinIdx != null && tab.windows[tab.activeWinIdx]) ? tab.windows[tab.activeWinIdx] : (tab.windows[0] || {}));
   const baseLevel = win0.level ?? 500;
-  const baseModel = win0.model || tab.windows[tab.activeWinIdx]?.model || tab.windows[0]?.model || "ECMWF_HR";
+  const baseModel = win0.model || (tab.activeWinIdx != null ? tab.windows[tab.activeWinIdx]?.model : null) || tab.windows[0]?.model || "ECMWF_HR";
   const baseElement = win0.element || "TMP";
   const rainHours = getRainAccumulationHoursForWindow(win0) ??
     getRainAccumulationHours(baseElement) ??
@@ -426,9 +426,9 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {  if (
     }
   }
   const baseCycle = win0.forecastCycle || (Array.isArray(win0.forecastCycles) && win0.forecastCycles[0]) || "26092608";
-  const isObs = Boolean(win0.isObservation || win0.activeGroup?.isObservation || tab.windows.some((w) => w.isObservation));
+  const isObs = Boolean(win0.isObservation || win0.activeGroup?.isObservation || (win0.model === "SURFACE" || win0.model === "UPPER_AIR"));
   const isSurface = baseModel === "SURFACE" || baseModel === "SURFACE_PLOT" || (typeof win0.element === "string" && win0.element.toLowerCase().includes("surface")) || win0.activeGroup?.id?.toLowerCase().includes("surface");
-  let baseObsTime = win0.obsTime || tab.windows.find((w) => w.obsTime)?.obsTime || "26092608";
+  let baseObsTime = win0.obsTime || (tab.activeWinIdx != null ? tab.windows[tab.activeWinIdx]?.obsTime : null) || tab.windows[0]?.obsTime || "26092608";
   const defaultStep = isObs ? (isSurface ? 3 : 12) : 6;
   const stepLen = win0.stepLength || defaultStep;
 
@@ -468,6 +468,16 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {  if (
       win.period = basePeriod;
       win.forecastCycle = baseCycle;
       win.obsTime = baseObsTime;
+      if (win.activeGroup && Array.isArray(win.activeGroup.layers)) {
+        for (const l of win.activeGroup.layers) {
+          if (l && (l.type === "contour" || l.type === "wind" || l.type === "raster")) {
+            l.model = win.model;
+            if (typeof l.path === "string" && l.path.includes("/")) {
+              l.path = l.path.replace(/^[^\/]+/, win.model);
+            }
+          }
+        }
+      }
     } else if (mode === "step") {
       win.model = baseModel;
       win.level = baseLevel;
@@ -678,7 +688,7 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
   if (!tab || !Array.isArray(tab.windows)) return [];
   if (numNeeded <= 1) return tab.windows;
 
-  const targetBase = baseWin || tab.windows[tab.activeWinIdx] || tab.windows[0];
+  const targetBase = baseWin || (tab.activeWinIdx != null ? tab.windows[tab.activeWinIdx] : null) || tab.windows[0];
 
   if (wasTab) {
     const emptyWins = [];
@@ -719,6 +729,9 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
 
     const splitWins = [targetBase, ...usedEmpty, ...createdWins];
     tab.windows = [...splitWins, ...busyWins, ...unusedEmpty];
+    if (targetBase) {
+      tab.activeWinIdx = Math.max(0, tab.windows.indexOf(targetBase));
+    }
   } else {
     // When already in split mode, only windows that were in the previous visible split
     // are kept in currentSplit. Any windows outside the previous visible split that have

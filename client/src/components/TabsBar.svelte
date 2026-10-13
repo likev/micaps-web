@@ -461,6 +461,12 @@
     transition: background-color 0.15s ease;
   }
 
+  .tabs-bar #layout-controls .auto-alloc-container,
+  .tabs-bar #layout-controls .layout-label,
+  .tabs-bar #layout-controls #btn-layout-select {
+    display: none !important;
+  }
+
   .layout-label {
     font-size: 11px;
     color: var(--text-secondary, #8b949e);
@@ -564,5 +570,19 @@
     box-shadow: 0 0 8px rgba(88, 166, 255, 0.9);
     pointer-events: none;
     flex-shrink: 0;
+  }
+
+  .visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
   }
 </style>
