@@ -1,7 +1,12 @@
 // actions.test.js - Unit tests for Svelte actions and helpers
-import { test, expect, describe, beforeEach, afterEach } from "bun:test";
+import { test, expect, describe, beforeEach, afterEach, beforeAll } from "bun:test";
 import { isTextInput, keyboardShortcuts } from "../../src/actions/keyboardShortcuts.js";
 import { focusRestore } from "../../src/actions/focusRestore.js";
+import { setupMockDOM } from "../helpers/domMock.js";
+
+beforeAll(() => {
+  setupMockDOM();
+});
 
 describe("Svelte Actions & Navigation Helpers", () => {
   describe("isTextInput helper", () => {

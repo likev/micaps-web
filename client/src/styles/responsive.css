@@ -1,4 +1,16 @@
 /* responsive.css - Responsive media query overrides */
+@media (max-width: 900px) {
+  .nav-quick-pills {
+    max-width: 240px;
+  }
+  .preset-active-indicator {
+    max-width: 220px;
+  }
+  .active-title {
+    max-width: 120px;
+  }
+}
+
 @media (max-width: 768px) {
   .nav-keyboard-hint,
   .layout-label,
@@ -8,6 +20,31 @@
   }
   .nav-status {
     max-width: 110px;
+  }
+  .nav-quick-pills {
+    max-width: 150px;
+  }
+  .nav-brand {
+    margin-right: 10px;
+    padding-right: 10px;
+  }
+  .nav-tag-capsule label {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .nav-quick-pills {
+    display: none !important;
+  }
+  .active-tag {
+    display: none !important;
+  }
+  .preset-active-indicator {
+    max-width: 140px;
+  }
+  .active-title {
+    max-width: 90px;
   }
 }
 
