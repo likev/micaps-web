@@ -50,6 +50,7 @@
     hasWeatherLayers,
     getNextWindowUid,
     shouldSkipWindowReload,
+    replaceModelInPath,
   } from "./lib/stores/tabsCore.js";
   import { getLayersForWindow, clearLayersForWindow } from "./lib/stores/layersCore.js";
   import { deleteWindowTimeline } from "./lib/stores/timeline.svelte.js";
@@ -714,7 +715,7 @@
               if (l.type === "contour" || l.type === "wind" || l.type === "raster") {
                 l.model = w.model;
                 if (typeof l.path === "string" && l.path.includes("/")) {
-                  l.path = l.path.replace(/^[^\/]+/, w.model);
+                  l.path = replaceModelInPath(l.path, w.model);
                 }
               }
             }
@@ -1704,7 +1705,7 @@
           if (l.type === "contour" || l.type === "wind" || l.type === "raster") {
             l.model = newModel;
             if (typeof l.path === "string" && l.path.includes("/")) {
-              l.path = l.path.replace(/^[^\/]+/, newModel);
+              l.path = replaceModelInPath(l.path, newModel);
             }
           }
         }

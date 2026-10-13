@@ -430,6 +430,14 @@ export function shouldSkipWindowReload(w, baseWin, prevBaseState, mode) {
   return false;
 }
 
+export function replaceModelInPath(path, newModel) {
+  if (typeof path !== "string" || !path.includes("/")) return path;
+  if (path.startsWith("/api/derived/")) {
+    return path.replace(/^\/api\/derived\/[^\/]+/, `/api/derived/${newModel}`);
+  }
+  return path.replace(/^[^\/]+/, newModel);
+}
+
 export function applyAutoAllocation(tab, mode = "level", baseWin = null) {  if (!tab || !Array.isArray(tab.windows)) return;
   tab.autoAllocation = mode;
   if (mode === "none") {
@@ -526,7 +534,7 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {  if (
           if (l && (l.type === "contour" || l.type === "wind" || l.type === "raster" || (l.model && l.model !== "SURFACE" && l.model !== "UPPER_AIR"))) {
             l.model = win.model;
             if (typeof l.path === "string" && l.path.includes("/")) {
-              l.path = l.path.replace(/^[^\/]+/, win.model);
+              l.path = replaceModelInPath(l.path, win.model);
             }
           }
         }
@@ -536,7 +544,7 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {  if (
           if (l && (l.type === "contour" || l.type === "wind" || l.type === "raster" || (l.model && l.model !== "SURFACE" && l.model !== "UPPER_AIR"))) {
             l.model = win.model;
             if (typeof l.path === "string" && l.path.includes("/")) {
-              l.path = l.path.replace(/^[^\/]+/, win.model);
+              l.path = replaceModelInPath(l.path, win.model);
             }
           }
         }

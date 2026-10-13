@@ -1298,6 +1298,727 @@
           }
         }
       ]
-    }
+    },
+      {
+        "category": "Upper-Air Observations",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-sounding-k-index",
+        "name": "Sounding Derived K-Index",
+        "layers": [
+          {
+            "element": "K-INDEX",
+            "id": "derived-sounding-k-index-layer",
+            "model": "UPPER_AIR",
+            "name": "Sounding Derived K-Index",
+            "path": "/api/derived/UPPER_AIR/PLOT/K-INDEX",
+            "type": "contour",
+            "render": {
+              "colormap": "K_INDEX",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.65,
+              "showFill": true,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Upper-Air Observations",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-sounding-showalter",
+        "name": "Sounding Derived Showalter Index",
+        "layers": [
+          {
+            "element": "SHOWALTER",
+            "id": "derived-sounding-showalter-layer",
+            "model": "UPPER_AIR",
+            "name": "Sounding Derived Showalter Index",
+            "path": "/api/derived/UPPER_AIR/PLOT/SHOWALTER",
+            "type": "contour",
+            "render": {
+              "colormap": "SHOWALTER",
+              "lineColor": "#e3b341",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Upper-Air Observations",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-sounding-lifted",
+        "name": "Sounding Derived Lifted Index",
+        "layers": [
+          {
+            "element": "LIFTED",
+            "id": "derived-sounding-lifted-layer",
+            "model": "UPPER_AIR",
+            "name": "Sounding Derived Lifted Index",
+            "path": "/api/derived/UPPER_AIR/PLOT/LIFTED",
+            "type": "contour",
+            "render": {
+              "colormap": "LIFTED",
+              "lineColor": "#e3b341",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Upper-Air Observations",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-sounding-sweat",
+        "name": "Sounding Derived SWEAT Index",
+        "layers": [
+          {
+            "element": "SWEAT",
+            "id": "derived-sounding-sweat-layer",
+            "model": "UPPER_AIR",
+            "name": "Sounding Derived SWEAT Index",
+            "path": "/api/derived/UPPER_AIR/PLOT/SWEAT",
+            "type": "contour",
+            "render": {
+              "colormap": "SWEAT",
+              "lineColor": "#da3633",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Upper-Air Observations",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-sounding-tt",
+        "name": "Sounding Derived Total Totals TT",
+        "layers": [
+          {
+            "element": "TT",
+            "id": "derived-sounding-tt-layer",
+            "model": "UPPER_AIR",
+            "name": "Sounding Derived Total Totals TT",
+            "path": "/api/derived/UPPER_AIR/PLOT/TT",
+            "type": "contour",
+            "render": {
+              "colormap": "TT",
+              "lineColor": "#d29922",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Upper-Air Observations",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-sounding-shear",
+        "name": "Sounding Derived Vertical Wind Shear",
+        "layers": [
+          {
+            "element": "SHEAR",
+            "level": "850-500",
+            "id": "derived-sounding-shear-layer",
+            "model": "UPPER_AIR",
+            "name": "Sounding Derived Vertical Wind Shear",
+            "path": "/api/derived/UPPER_AIR/PLOT/SHEAR",
+            "type": "contour",
+            "render": {
+              "colormap": "SHEAR",
+              "lineColor": "#58a6ff",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Upper-Air Observations",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-sounding-thickness",
+        "name": "Sounding Derived 1000-500hPa Thickness",
+        "layers": [
+          {
+            "element": "THICKNESS",
+            "level": "1000-500",
+            "id": "derived-sounding-thickness-layer",
+            "model": "UPPER_AIR",
+            "name": "Sounding Derived 1000-500hPa Thickness",
+            "path": "/api/derived/UPPER_AIR/PLOT/THICKNESS",
+            "type": "contour",
+            "render": {
+              "colormap": "THICKNESS",
+              "lineColor": "#58a6ff",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Upper-Air Observations",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-sounding-t850-500",
+        "name": "Sounding Derived T850-500 Difference",
+        "layers": [
+          {
+            "element": "TMP",
+            "level": "850-500",
+            "id": "derived-sounding-t850-500-layer",
+            "model": "UPPER_AIR",
+            "name": "Sounding Derived T850-500 Difference",
+            "path": "/api/derived/UPPER_AIR/PLOT/TMP/850-500",
+            "type": "contour",
+            "render": {
+              "colormap": "TMP",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "id": "derived-ecmwf-k-index",
+        "name": "Derived K-Index (ECMWF)",
+        "layers": [
+          {
+            "element": "K-INDEX",
+            "id": "derived-ecmwf-k-index-layer",
+            "model": "ECMWF_HR",
+            "name": "Derived K-Index (ECMWF)",
+            "path": "/api/derived/ECMWF_HR/K-INDEX",
+            "type": "contour",
+            "render": {
+              "colormap": "K_INDEX",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.65,
+              "showFill": true,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "id": "derived-ecmwf-showalter",
+        "name": "Derived Showalter Index (ECMWF)",
+        "layers": [
+          {
+            "element": "SHOWALTER",
+            "id": "derived-ecmwf-showalter-layer",
+            "model": "ECMWF_HR",
+            "name": "Derived Showalter Index (ECMWF)",
+            "path": "/api/derived/ECMWF_HR/SHOWALTER",
+            "type": "contour",
+            "render": {
+              "colormap": "SHOWALTER",
+              "lineColor": "#e3b341",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "id": "derived-ecmwf-lifted",
+        "name": "Derived Lifted Index (ECMWF)",
+        "layers": [
+          {
+            "element": "LIFTED",
+            "id": "derived-ecmwf-lifted-layer",
+            "model": "ECMWF_HR",
+            "name": "Derived Lifted Index (ECMWF)",
+            "path": "/api/derived/ECMWF_HR/LIFTED",
+            "type": "contour",
+            "render": {
+              "colormap": "LIFTED",
+              "lineColor": "#e3b341",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "id": "derived-ecmwf-sweat",
+        "name": "Derived SWEAT Index (ECMWF)",
+        "layers": [
+          {
+            "element": "SWEAT",
+            "id": "derived-ecmwf-sweat-layer",
+            "model": "ECMWF_HR",
+            "name": "Derived SWEAT Index (ECMWF)",
+            "path": "/api/derived/ECMWF_HR/SWEAT",
+            "type": "contour",
+            "render": {
+              "colormap": "SWEAT",
+              "lineColor": "#da3633",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "id": "derived-ecmwf-tt",
+        "name": "Derived Total Totals TT (ECMWF)",
+        "layers": [
+          {
+            "element": "TT",
+            "id": "derived-ecmwf-tt-layer",
+            "model": "ECMWF_HR",
+            "name": "Derived Total Totals TT (ECMWF)",
+            "path": "/api/derived/ECMWF_HR/TT",
+            "type": "contour",
+            "render": {
+              "colormap": "TT",
+              "lineColor": "#d29922",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "id": "derived-ecmwf-shear",
+        "name": "Derived Vertical Wind Shear (ECMWF)",
+        "layers": [
+          {
+            "element": "SHEAR",
+            "level": "850-500",
+            "id": "derived-ecmwf-shear-layer",
+            "model": "ECMWF_HR",
+            "name": "Derived Vertical Wind Shear (ECMWF)",
+            "path": "/api/derived/ECMWF_HR/SHEAR",
+            "type": "contour",
+            "render": {
+              "colormap": "SHEAR",
+              "lineColor": "#58a6ff",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "id": "derived-ecmwf-thickness",
+        "name": "Derived 1000-500hPa Thickness (ECMWF)",
+        "layers": [
+          {
+            "element": "THICKNESS",
+            "level": "1000-500",
+            "id": "derived-ecmwf-thickness-layer",
+            "model": "ECMWF_HR",
+            "name": "Derived 1000-500hPa Thickness (ECMWF)",
+            "path": "/api/derived/ECMWF_HR/THICKNESS",
+            "type": "contour",
+            "render": {
+              "colormap": "THICKNESS",
+              "lineColor": "#58a6ff",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "id": "derived-ecmwf-t850-500",
+        "name": "Derived T850-500 Lapse Rate (ECMWF)",
+        "layers": [
+          {
+            "element": "TMP",
+            "level": "850-500",
+            "id": "derived-ecmwf-t850-500-layer",
+            "model": "ECMWF_HR",
+            "name": "Derived T850-500 Lapse Rate (ECMWF)",
+            "path": "/api/derived/ECMWF_HR/TMP/850-500",
+            "type": "contour",
+            "render": {
+              "colormap": "TMP",
+              "lineColor": "#e3b341",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-diag-sounding-composite",
+        "name": "Sounding Derived Multi-Level Analysis",
+        "layers": [
+          {
+            "element": "K-INDEX",
+            "id": "derived-sounding-k-index-comp",
+            "model": "UPPER_AIR",
+            "name": "Sounding Derived K-Index",
+            "path": "/api/derived/UPPER_AIR/PLOT/K-INDEX",
+            "type": "contour",
+            "render": {
+              "colormap": "K_INDEX",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.65,
+              "showFill": true,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          },
+          {
+            "element": "TMP",
+            "level": "850-500",
+            "id": "derived-sounding-t850-500-comp",
+            "model": "UPPER_AIR",
+            "name": "Sounding Derived T850-500 Difference",
+            "path": "/api/derived/UPPER_AIR/PLOT/TMP/850-500",
+            "type": "contour",
+            "render": {
+              "colormap": "TMP",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-diag-sounding-k-index",
+        "name": "Sounding Derived K-Index",
+        "layers": [
+          {
+            "element": "K-INDEX",
+            "id": "derived-diag-sounding-k-index-layer",
+            "model": "UPPER_AIR",
+            "name": "Sounding Derived K-Index",
+            "path": "/api/derived/UPPER_AIR/PLOT/K-INDEX",
+            "type": "contour",
+            "render": {
+              "colormap": "K_INDEX",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.65,
+              "showFill": true,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-diag-sounding-showalter",
+        "name": "Sounding Derived Showalter Index",
+        "layers": [
+          {
+            "element": "SHOWALTER",
+            "id": "derived-diag-sounding-showalter-layer",
+            "model": "UPPER_AIR",
+            "name": "Sounding Derived Showalter Index",
+            "path": "/api/derived/UPPER_AIR/PLOT/SHOWALTER",
+            "type": "contour",
+            "render": {
+              "colormap": "SHOWALTER",
+              "lineColor": "#e3b341",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-diag-sounding-lifted",
+        "name": "Sounding Derived Lifted Index",
+        "layers": [
+          {
+            "element": "LIFTED",
+            "id": "derived-diag-sounding-lifted-layer",
+            "model": "UPPER_AIR",
+            "name": "Sounding Derived Lifted Index",
+            "path": "/api/derived/UPPER_AIR/PLOT/LIFTED",
+            "type": "contour",
+            "render": {
+              "colormap": "LIFTED",
+              "lineColor": "#e3b341",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-diag-sounding-sweat",
+        "name": "Sounding Derived SWEAT Index",
+        "layers": [
+          {
+            "element": "SWEAT",
+            "id": "derived-diag-sounding-sweat-layer",
+            "model": "UPPER_AIR",
+            "name": "Sounding Derived SWEAT Index",
+            "path": "/api/derived/UPPER_AIR/PLOT/SWEAT",
+            "type": "contour",
+            "render": {
+              "colormap": "SWEAT",
+              "lineColor": "#da3633",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-diag-sounding-tt",
+        "name": "Sounding Derived Total Totals TT",
+        "layers": [
+          {
+            "element": "TT",
+            "id": "derived-diag-sounding-tt-layer",
+            "model": "UPPER_AIR",
+            "name": "Sounding Derived Total Totals TT",
+            "path": "/api/derived/UPPER_AIR/PLOT/TT",
+            "type": "contour",
+            "render": {
+              "colormap": "TT",
+              "lineColor": "#d29922",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-diag-sounding-shear",
+        "name": "Sounding Derived Vertical Wind Shear",
+        "layers": [
+          {
+            "element": "SHEAR",
+            "level": "850-500",
+            "id": "derived-diag-sounding-shear-layer",
+            "model": "UPPER_AIR",
+            "name": "Sounding Derived Vertical Wind Shear",
+            "path": "/api/derived/UPPER_AIR/PLOT/SHEAR",
+            "type": "contour",
+            "render": {
+              "colormap": "SHEAR",
+              "lineColor": "#58a6ff",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-diag-sounding-thickness",
+        "name": "Sounding Derived 1000-500hPa Thickness",
+        "layers": [
+          {
+            "element": "THICKNESS",
+            "level": "1000-500",
+            "id": "derived-diag-sounding-thickness-layer",
+            "model": "UPPER_AIR",
+            "name": "Sounding Derived 1000-500hPa Thickness",
+            "path": "/api/derived/UPPER_AIR/PLOT/THICKNESS",
+            "type": "contour",
+            "render": {
+              "colormap": "THICKNESS",
+              "lineColor": "#58a6ff",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-diag-sounding-t850-500",
+        "name": "Sounding Derived T850-500 Difference",
+        "layers": [
+          {
+            "element": "TMP",
+            "level": "850-500",
+            "id": "derived-diag-sounding-t850-500-layer",
+            "model": "UPPER_AIR",
+            "name": "Sounding Derived T850-500 Difference",
+            "path": "/api/derived/UPPER_AIR/PLOT/TMP/850-500",
+            "type": "contour",
+            "render": {
+              "colormap": "TMP",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      }
   ]
 }

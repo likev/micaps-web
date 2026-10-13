@@ -263,9 +263,12 @@ export async function recalcAndRerenderLayer(map, layer, winObj) {
       layer.forecastCycle = winObj.forecastCycle;
       layer.file = `${winObj.forecastCycle}.${String(period).padStart(3, "0")}`;
     }
-    const updatedPath = (levelChanged || !layer.path)
-      ? (targetLevel ? `${layer.model || "ECMWF_HR"}/${layer.element}/${targetLevel}` : `${layer.model || "ECMWF_HR"}/${layer.element}`)
-      : layer.path;
+    const isDerivedPath = layer.path && layer.path.includes("/api/derived/");
+    const updatedPath = isDerivedPath
+      ? layer.path
+      : ((levelChanged || !layer.path)
+        ? (targetLevel ? `${layer.model || "ECMWF_HR"}/${layer.element}/${targetLevel}` : `${layer.model || "ECMWF_HR"}/${layer.element}`)
+        : layer.path);
     const updatedName = (levelChanged && layer.name && /\d+\s*hPa/.test(layer.name))
       ? layer.name.replace(/\d+\s*hPa/, `${targetLevel} hPa`)
       : layer.name;
@@ -299,9 +302,12 @@ export async function recalcAndRerenderLayer(map, layer, winObj) {
       layer.forecastCycle = winObj.forecastCycle;
       layer.file = `${winObj.forecastCycle}.${String(period).padStart(3, "0")}`;
     }
-    const updatedPath = (levelChanged || !layer.path)
-      ? (targetLevel ? `${layer.model || "ECMWF_HR"}/${layer.element || "WIND"}/${targetLevel}` : `${layer.model || "ECMWF_HR"}/${layer.element || "WIND"}`)
-      : layer.path;
+    const isDerivedWindPath = layer.path && layer.path.includes("/api/derived/");
+    const updatedPath = isDerivedWindPath
+      ? layer.path
+      : ((levelChanged || !layer.path)
+        ? (targetLevel ? `${layer.model || "ECMWF_HR"}/${layer.element || "WIND"}/${targetLevel}` : `${layer.model || "ECMWF_HR"}/${layer.element || "WIND"}`)
+        : layer.path);
     const updatedName = (levelChanged && layer.name && /\d+\s*hPa/.test(layer.name))
       ? layer.name.replace(/\d+\s*hPa/, `${targetLevel} hPa`)
       : layer.name;

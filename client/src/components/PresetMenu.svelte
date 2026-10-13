@@ -315,10 +315,12 @@
                 >
                   <span class="preset-check">{preset.id === activePresetId ? "✓" : ""}</span>
                   <span class="preset-name">{preset.name}</span>
-                  {#if preset.hasLevel !== false && (preset.defaultLevel || preset.hasLevel)}
+                  {#if preset.badge}
+                    <span class="preset-badge">{preset.badge}</span>
+                  {:else if preset.hasLevel !== false && (preset.defaultLevel || preset.hasLevel)}
                     <span class="preset-badge">{preset.defaultLevel || 500} hPa</span>
                   {:else if preset.hasLevel === false}
-                    <span class="preset-badge">Sfc</span>
+                    <span class="preset-badge">{preset.category?.includes("Derived") ? "Diag" : (preset.isObservation && preset.category?.includes("Upper") ? "Obs" : "Sfc")}</span>
                   {/if}
                   <button
                     type="button"

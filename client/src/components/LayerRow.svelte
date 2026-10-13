@@ -390,20 +390,6 @@
               <label><input type="checkbox" checked={Boolean(layer.config?.showBarbs)} onchange={(e) => handleConfigChange("showBarbs", e.target.checked)} /> Wind Barbs</label>
             </div>
           {/if}
-
-          <div class="config-row wind-contour-row">
-            <label for="sel-contour-derived-{layer.id}">Add Derived Layer</label>
-            <select id="sel-contour-derived-{layer.id}" class="sel-contour-element" bind:value={layer._contourElement}>
-              <option value="T850-500">T850-500 Lapse Rate</option>
-              <option value="K-INDEX">K-Index (K-INDEX)</option>
-              <option value="SHOWALTER">Showalter Index (SSI)</option>
-              <option value="LIFTED">Lifted Index (LI)</option>
-              <option value="SWEAT">SWEAT Index (SWEAT)</option>
-              <option value="TT">Total Totals (TT)</option>
-              <option value="SHEAR">Vertical Wind Shear (SHEAR)</option>
-            </select>
-            <button type="button" class="btn-inline" onclick={() => handleAction("addContour", { value: layer._contourElement || "T850-500" })}>＋ Add</button>
-          </div>
         </div>
 
         <div class="config-subtab-pane" class:active={currentSubtab === "interval"} role="tabpanel">
@@ -500,13 +486,6 @@
                   <option value="WIND">Wind Speed (WIND)</option>
                   <option value="VOR">Relative Vorticity (VOR)</option>
                   <option value="DIV">Divergence (DIV)</option>
-                  <option value="T850-500">T850-500 Lapse Rate</option>
-                  <option value="K-INDEX">K-Index (K-INDEX)</option>
-                  <option value="SHOWALTER">Showalter Index (SSI)</option>
-                  <option value="LIFTED">Lifted Index (LI)</option>
-                  <option value="SWEAT">SWEAT Index (SWEAT)</option>
-                  <option value="TT">Total Totals (TT)</option>
-                  <option value="SHEAR">Vertical Wind Shear (SHEAR)</option>
                 {:else}
                   <option value="SLP">Sea Level Pressure (SLP)</option>
                   <option value="TMP">Temperature (TMP)</option>
@@ -563,13 +542,6 @@
             <select id="sel-wind-contour-{layer.id}" class="sel-contour-element" bind:value={layer._contourElement}>
               <option value="VOR">Relative Vorticity (VOR)</option>
               <option value="DIV">Divergence (DIV)</option>
-              <option value="SHEAR">Vertical Wind Shear (SHEAR)</option>
-              <option value="T850-500">T850-500 Lapse Rate</option>
-              <option value="K-INDEX">K-Index (K-INDEX)</option>
-              <option value="SHOWALTER">Showalter Index (SSI)</option>
-              <option value="LIFTED">Lifted Index (LI)</option>
-              <option value="SWEAT">SWEAT Index (SWEAT)</option>
-              <option value="TT">Total Totals (TT)</option>
             </select>
             <button type="button" class="btn-inline" onclick={() => handleAction("addContour", { value: layer._contourElement || "VOR" })}>＋ Add</button>
           </div>
