@@ -461,6 +461,10 @@
     transition: background-color 0.15s ease;
   }
 
+  .tabs-bar #layout-controls {
+    display: none !important;
+  }
+
   .tabs-bar #layout-controls .auto-alloc-container,
   .tabs-bar #layout-controls .layout-label,
   .tabs-bar #layout-controls #btn-layout-select {

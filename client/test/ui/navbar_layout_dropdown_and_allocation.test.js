@@ -55,6 +55,7 @@ describe("NavBar Layout Dropdown & Allocation Menu", () => {
   });
 
   test("TabsBar hides legacy layout select and auto-alloc via CSS", () => {
+    expect(tabsBarSrc).toContain(".tabs-bar #layout-controls");
     expect(tabsBarSrc).toContain(".tabs-bar #layout-controls .auto-alloc-container");
     expect(tabsBarSrc).toContain(".tabs-bar #layout-controls .layout-label");
     expect(tabsBarSrc).toContain(".tabs-bar #layout-controls #btn-layout-select");
