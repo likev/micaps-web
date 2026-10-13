@@ -22,16 +22,16 @@ func TestCatalogHandler_LevelsHandler(t *testing.T) {
 		mustNotLevels []int
 	}{
 		{
-			name:          "SHANGHAI_MR has only boundary levels (no <= 700)",
+			name:          "SHANGHAI_MR has all synoptic levels including 500",
 			path:          "SHANGHAI_MR/RH",
-			expectLevels:  []int{1000, 925, 850},
-			mustNotLevels: []int{700, 500, 200},
+			expectLevels:  []int{1000, 925, 850, 700, 500, 400, 300, 250, 200, 100},
+			mustNotLevels: nil,
 		},
 		{
-			name:          "GRAPES_3KM has only boundary levels (no <= 700)",
+			name:          "GRAPES_3KM has all synoptic levels including 500",
 			path:          "GRAPES_3KM/HGT",
-			expectLevels:  []int{1000, 925, 850},
-			mustNotLevels: []int{700, 500, 200},
+			expectLevels:  []int{1000, 925, 850, 700, 500, 400, 300, 250, 200, 100},
+			mustNotLevels: nil,
 		},
 		{
 			name:          "ECMWF_HR has all synoptic levels including 500 and 700",

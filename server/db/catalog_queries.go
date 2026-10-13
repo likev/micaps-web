@@ -1,6 +1,7 @@
 package db
 
 import (
+	"encoding/binary"
 	"fmt"
 	"sort"
 	"strconv"
@@ -149,32 +150,75 @@ func GetFileList(client *CQLClient, dataPath string, limit int) ([]model.FileEnt
 	return []model.FileEntry{}, nil
 }
 
+// parsePressureLevel parses column1 which may be an Int32Type (4-byte big-endian), Int64Type (8-byte), Int16Type (2-byte), or textual decimal string.
+func parsePressureLevel(col []byte) (int, bool) {
+	if len(col) == 0 {
+		return 0, false
+	}
+	if len(col) == 4 {
+		return int(binary.BigEndian.Uint32(col)), true
+	}
+	if len(col) == 8 {
+		return int(binary.BigEndian.Uint64(col)), true
+	}
+	if len(col) == 2 {
+		return int(binary.BigEndian.Uint16(col)), true
+	}
+	if lvl, err := strconv.Atoi(string(col)); err == nil {
+		return lvl, true
+	}
+	return 0, false
+}
+
 // GetPressureLevels queries the level table for configured vertical pressure levels
 func GetPressureLevels(client *CQLClient, dataPath string) ([]int, error) {
-	dataPath = strings.TrimSuffix(dataPath, "/")
-	query := fmt.Sprintf(`SELECT column1 FROM micapsdataserver.level WHERE "dataPath" = '%s'`, dataPath)
-
-	rows, err := client.Query(query)
-	if err != nil {
-		return nil, err
+	dataPath = strings.Trim(dataPath, "/")
+	if dataPath == "" {
+		return nil, fmt.Errorf("empty dataPath")
 	}
 
-	levels := make([]int, 0, len(rows))
-	for _, row := range rows {
-		if col1 := row.Columns["column1"]; len(col1) > 0 {
-			if lvl, err := strconv.Atoi(string(col1)); err == nil {
-				levels = append(levels, lvl)
+	candidates := []string{dataPath}
+	if !strings.Contains(dataPath, "/") {
+		candidates = append(candidates, dataPath+"/TMP", dataPath+"/HGT", dataPath+"/UGRD")
+	} else {
+		parts := strings.Split(dataPath, "/")
+		if len(parts) >= 2 && parts[1] != "TMP" {
+			candidates = append(candidates, parts[0]+"/TMP", parts[0]+"/HGT")
+		}
+	}
+
+	seen := make(map[int]bool)
+	var levels []int
+	var lastErr error
+
+	for _, cand := range candidates {
+		query := fmt.Sprintf(`SELECT column1 FROM micapsdataserver.level WHERE "dataPath" = '%s'`, cand)
+		rows, err := client.Query(query)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if len(rows) > 0 {
+			for _, row := range rows {
+				if col1 := row.Columns["column1"]; len(col1) > 0 {
+					if lvl, ok := parsePressureLevel(col1); ok && !seen[lvl] {
+						seen[lvl] = true
+						levels = append(levels, lvl)
+					}
+				}
+			}
+			if len(levels) > 0 {
+				break
 			}
 		}
 	}
 
 	// If no custom levels configured in table, provide default meteorological levels
 	if len(levels) == 0 {
-		if strings.Contains(dataPath, "SHANGHAI_MR") || strings.Contains(dataPath, "GRAPES_3KM") {
-			levels = []int{1000, 925, 850}
-		} else {
-			levels = []int{1000, 925, 850, 700, 500, 400, 300, 250, 200, 100}
+		if lastErr != nil && len(candidates) == 1 {
+			return nil, lastErr
 		}
+		levels = []int{1000, 925, 850, 700, 500, 400, 300, 250, 200, 100}
 	}
 
 	sort.Slice(levels, func(i, j int) bool {
