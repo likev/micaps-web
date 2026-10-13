@@ -213,6 +213,28 @@ func GetPressureLevels(client *CQLClient, dataPath string) ([]int, error) {
 		}
 	}
 
+	// If level table yielded no rows, query treeview table for directory entries under candidate paths
+	if len(levels) == 0 {
+		for _, cand := range candidates {
+			qTree := fmt.Sprintf(`SELECT column1, value FROM micapsdataserver.treeview WHERE "dataPath" = '%s'`, cand)
+			rTree, errTree := client.Query(qTree)
+			if errTree == nil && len(rTree) > 0 {
+				for _, row := range rTree {
+					if string(row.Columns["value"]) == "D" {
+						col1 := row.Columns["column1"]
+						if lvl, ok := parsePressureLevel(col1); ok && !seen[lvl] {
+							seen[lvl] = true
+							levels = append(levels, lvl)
+						}
+					}
+				}
+				if len(levels) > 0 {
+					break
+				}
+			}
+		}
+	}
+
 	// If no custom levels configured in table, provide default meteorological levels
 	if len(levels) == 0 {
 		if lastErr != nil && len(candidates) == 1 {

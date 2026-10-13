@@ -111,9 +111,10 @@ export async function loadWeatherField(map, model, element, level, period, custo
     } else {
       try {
         let fileEntries = await fetchTree(dataPath, 100);
-      if (Array.isArray(fileEntries) && fileEntries.length > 0) {
-        // If fileEntries are subdirectories representing levels (e.g. 1000, 925, 850, 500), dive into the level
-        const isLevelDirs = fileEntries.every((e) => /^\d+$/.test(e.name) && (e.size === 0 || !e.name.includes(".")));
+        // If fileEntries are subdirectories representing levels (e.g. 1000, 925, 850, 500, 2M_ABOVE_GROUND, 850-925), dive into the level
+        const isLevelDirs =
+          fileEntries.length > 0 &&
+          fileEntries.every((e) => !e.name.includes(".") && (e.size === 0 || /^\d+$/.test(e.name) || /^[A-Z0-9_\-]+$/i.test(e.name)));
         if (isLevelDirs) {
           const chosenLvl = targetLevel || 500;
           if (!dataPath.endsWith(`/${chosenLvl}`)) {
@@ -128,11 +129,10 @@ export async function loadWeatherField(map, model, element, level, period, custo
             .map((f) => f.name)
             .filter((n) => Boolean(n) && n.includes(".") && !/^\d+$/.test(n));
         }
+      } catch (err) {
+        console.warn(`[weatherLoader] fetchTree failed for ${dataPath}:`, err);
       }
-    } catch (err) {
-      console.warn(`[weatherLoader] fetchTree failed for ${dataPath}:`, err);
     }
-  }
   }
 
   if (availableFiles.length > 0) {
