@@ -148,11 +148,34 @@ export function getEligibleModelsForAllocation(groupOrWin, level = 500, models =
     return models;
   }
 
+  // When groupOrWin.hasLevel === false or layers.every(l => l.hasLevel === false || !l.level), DO NOT filter by vertical pressure level!
+  const hasNoLevel =
+    groupOrWin?.hasLevel === false ||
+    groupOrWin?.activeGroup?.hasLevel === false ||
+    layers.every((l) => l.hasLevel === false) ||
+    level === null ||
+    (
+      (level === undefined || level === null) &&
+      groupOrWin?.level == null &&
+      groupOrWin?.activeGroup?.level == null &&
+      groupOrWin?.defaultLevel == null &&
+      groupOrWin?.activeGroup?.defaultLevel == null &&
+      layers.every((l) => l.hasLevel === false || !l.level)
+    );
+
+  if (hasNoLevel) {
+    return models;
+  }
+
   const effectiveLevel = level !== null && level !== undefined
     ? parseInt(level, 10)
     : (groupOrWin?.level !== null && groupOrWin?.level !== undefined
       ? parseInt(groupOrWin.level, 10)
-      : (groupOrWin?.defaultLevel ? parseInt(groupOrWin.defaultLevel, 10) : 500));
+      : (groupOrWin?.defaultLevel ? parseInt(groupOrWin.defaultLevel, 10) : null));
+
+  if (effectiveLevel === null || isNaN(effectiveLevel)) {
+    return models;
+  }
 
   const fallbackElement = groupOrWin?.element || groupOrWin?.activeGroup?.element;
 
@@ -182,6 +205,24 @@ export async function getEligibleModelsForAllocationAsync(groupOrWin, level = 50
       : null);
 
   if (!layers || layers.length === 0) {
+    return models;
+  }
+
+  const hasNoLevel =
+    groupOrWin?.hasLevel === false ||
+    groupOrWin?.activeGroup?.hasLevel === false ||
+    layers.every((l) => l.hasLevel === false) ||
+    level === null ||
+    (
+      (level === undefined || level === null) &&
+      groupOrWin?.level == null &&
+      groupOrWin?.activeGroup?.level == null &&
+      groupOrWin?.defaultLevel == null &&
+      groupOrWin?.activeGroup?.defaultLevel == null &&
+      layers.every((l) => l.hasLevel === false || !l.level)
+    );
+
+  if (hasNoLevel) {
     return models;
   }
 
@@ -411,9 +452,29 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {  if (
   const win0 = (baseWin && typeof baseWin === "object")
     ? baseWin
     : ((tab.activeWinIdx != null && tab.windows[tab.activeWinIdx]) ? tab.windows[tab.activeWinIdx] : (tab.windows[0] || {}));
-  const baseLevel = win0.level ?? 500;
-  const baseModel = win0.model || (tab.activeWinIdx != null ? tab.windows[tab.activeWinIdx]?.model : null) || tab.windows[0]?.model || "ECMWF_HR";
-  const baseElement = win0.element || "TMP";
+  const win0Layers = (Array.isArray(win0.activeGroup?.layers) && win0.activeGroup.layers.length > 0)
+    ? win0.activeGroup.layers
+    : (Array.isArray(win0.layers) && win0.layers.length > 0
+      ? win0.layers
+      : null);
+  const win0HasNoLevel =
+    win0.hasLevel === false ||
+    win0.activeGroup?.hasLevel === false ||
+    (Array.isArray(win0Layers) && win0Layers.length > 0 && win0Layers.every((l) => l.hasLevel === false || !l.level));
+
+  const baseLevel = win0HasNoLevel ? (win0.level ?? null) : (win0.level ?? 500);
+  const baseModel = win0.model ||
+    win0.activeGroup?.model ||
+    (Array.isArray(win0.activeGroup?.layers) && win0.activeGroup.layers[0]?.model) ||
+    (Array.isArray(win0.layers) && win0.layers[0]?.model) ||
+    (tab.activeWinIdx != null ? tab.windows[tab.activeWinIdx]?.model : null) ||
+    tab.windows[0]?.model ||
+    "ECMWF_HR";
+  const baseElement = win0.element ||
+    win0.activeGroup?.element ||
+    (Array.isArray(win0.activeGroup?.layers) && win0.activeGroup.layers[0]?.element) ||
+    (Array.isArray(win0.layers) && win0.layers[0]?.element) ||
+    "TMP";
   const rainHours = getRainAccumulationHoursForWindow(win0) ??
     getRainAccumulationHours(baseElement) ??
     getRainAccumulationHours(win0.activeGroup?.id) ??
@@ -723,6 +784,10 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
       if (tab.autoAllocation && tab.autoAllocation !== "none") {
         winObj.isAutoAllocated = true;
         if (targetBase) winObj.allocParentId = targetBase.id;
+        if (tab.autoAllocation === "model") {
+          const eligible = getEligibleModelsForAllocation(targetBase, targetBase?.level, DEFAULT_MODELS);
+          winObj.model = eligible[posIdx % eligible.length];
+        }
       }
       createdWins.push(winObj);
     }
@@ -768,6 +833,10 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
       if (tab.autoAllocation && tab.autoAllocation !== "none") {
         winObj.isAutoAllocated = true;
         if (targetBase) winObj.allocParentId = targetBase.id;
+        if (tab.autoAllocation === "model") {
+          const eligible = getEligibleModelsForAllocation(targetBase, targetBase?.level, DEFAULT_MODELS);
+          winObj.model = eligible[posIdx % eligible.length];
+        }
       }
       createdWins.push(winObj);
     }

@@ -327,8 +327,10 @@
     const posIdx = activeTab.windows.length;
     const winObj = createDefaultWindow(posIdx, activeTab.id);
     winObj.uid = uid;
-    winObj.id = `tab-${activeTab.id}-win-${uid}`;
-    winObj.level = (activeTab.autoAllocation === "level") ? (DEFAULT_LEVELS[posIdx] ?? 500) : (activeWin?.level ?? 500);
+    const activeHasNoLevel = activeWin?.hasLevel === false || activeWin?.activeGroup?.hasLevel === false;
+    winObj.level = (activeTab.autoAllocation === "level")
+      ? (DEFAULT_LEVELS[posIdx] ?? 500)
+      : (activeHasNoLevel ? (activeWin?.level ?? null) : (activeWin?.level ?? 500));
     if (activeTab.autoAllocation === "model") {
       const eligible = getEligibleModelsForAllocation(activeWin, winObj.level, DEFAULT_MODELS);
       winObj.model = eligible[posIdx % eligible.length];
@@ -1104,6 +1106,17 @@
           if (baseCycle) tl.currentInitCycle = baseCycle;
         }
 
+        if (win.forecastCycle) {
+          const nwpValidTime = parseTimestamp({ cycle: win.forecastCycle, period: win.period ?? 0 });
+          if (nwpValidTime) {
+            win.wallClockCursor = nwpValidTime;
+            if (tl) tl.wallClockCursor = nwpValidTime;
+            if (win === activeWin && typeof window !== "undefined") {
+              window.__MICAPS_CURSOR__ = nwpValidTime;
+            }
+          }
+        }
+
         if (win === activeWin) {
           app.period = periodForWin;
           if (baseCycle) app.cycle = baseCycle;
@@ -1186,6 +1199,17 @@
           if (Array.isArray(tl.discretePeriods)) {
             const idx = tl.discretePeriods.indexOf(win.period);
             if (idx !== -1) tl.currentPeriodIdx = idx;
+          }
+        }
+
+        if (win.forecastCycle) {
+          const nwpValidTime = parseTimestamp({ cycle: win.forecastCycle, period: win.period ?? 0 });
+          if (nwpValidTime) {
+            win.wallClockCursor = nwpValidTime;
+            if (tl) tl.wallClockCursor = nwpValidTime;
+            if (win === activeWin && typeof window !== "undefined") {
+              window.__MICAPS_CURSOR__ = nwpValidTime;
+            }
           }
         }
 
@@ -1369,6 +1393,16 @@
         }
         if (win === activeWin && payload.period !== undefined) {
           app.period = payload.period;
+        }
+        if (win.forecastCycle) {
+          const nwpValidTime = parseTimestamp({ cycle: win.forecastCycle, period: win.period ?? 0 });
+          if (nwpValidTime) {
+            win.wallClockCursor = nwpValidTime;
+            if (tl) tl.wallClockCursor = nwpValidTime;
+            if (win === activeWin && typeof window !== "undefined") {
+              window.__MICAPS_CURSOR__ = nwpValidTime;
+            }
+          }
         }
         if (map && win.activeGroup) {
           await loadPresetGroup(map, win.activeGroup, win.period, win.level, win, true, loadSeq);

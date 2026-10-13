@@ -14,11 +14,23 @@
   } = $props();
 
   let effectiveCursor = $derived.by(() => {
-    return win?.wallClockCursor ||
-      (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
-      (win?.forecastCycle ? parseTimestamp({ cycle: win.forecastCycle, period: win.period ?? 0 }) : null) ||
+    if (win?.isObservation) {
+      return (
+        win?.wallClockCursor ||
+        (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
+        (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
+        Date.now()
+      );
+    }
+    const nwpValidTime = win?.forecastCycle
+      ? parseTimestamp({ cycle: win.forecastCycle, period: win.period ?? 0 })
+      : null;
+    return (
+      nwpValidTime ||
+      win?.wallClockCursor ||
       (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
-      Date.now();
+      Date.now()
+    );
   });
 
   $effect(() => {

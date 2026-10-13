@@ -232,10 +232,21 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
     }
   }
 
+  if (!group.isObservation && win?.forecastCycle) {
+    const nwpValidTime = parseTimestamp({ cycle: win.forecastCycle, period: curPeriod ?? 0 });
+    if (nwpValidTime) {
+      win.wallClockCursor = nwpValidTime;
+      if (typeof window !== "undefined") {
+        window.__MICAPS_CURSOR__ = nwpValidTime;
+      }
+    }
+  }
+
   console.log(`[PresetGroup] Loading "${group.name}" with levelOverride=${level}, period=+${curPeriod}h, cycle=${win?.forecastCycle}...`);
 
   const cursorTime = win?.wallClockCursor ||
-    (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
+    (!group.isObservation && win?.forecastCycle ? parseTimestamp({ cycle: win.forecastCycle, period: curPeriod ?? 0 }) : null) ||
+    (group.isObservation && win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
     (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
     Date.now();
 

@@ -22,13 +22,25 @@
   let panelTab = $state("layers"); // "layers" or "status"
   let autoHideStale = $state(false);
 
-  let cursorTime = $derived(
-    winObj?.wallClockCursor ||
-    (winObj?.obsTime ? parseTimestamp(winObj.obsTime) : null) ||
-    (winObj?.forecastCycle ? parseTimestamp({ cycle: winObj.forecastCycle, period: winObj.period ?? 0 }) : null) ||
-    (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
-    Date.now()
-  );
+  let cursorTime = $derived.by(() => {
+    if (winObj?.isObservation) {
+      return (
+        winObj?.wallClockCursor ||
+        (winObj?.obsTime ? parseTimestamp(winObj.obsTime) : null) ||
+        (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
+        Date.now()
+      );
+    }
+    const nwpValidTime = winObj?.forecastCycle
+      ? parseTimestamp({ cycle: winObj.forecastCycle, period: winObj.period ?? 0 })
+      : null;
+    return (
+      nwpValidTime ||
+      winObj?.wallClockCursor ||
+      (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
+      Date.now()
+    );
+  });
 
   $effect(() => {
     if (typeof window !== "undefined" && cursorTime) {

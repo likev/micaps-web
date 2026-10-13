@@ -156,6 +156,18 @@ export function applyPresetToWindow(win, group, overrideLevel = null, timelinesM
     win.model = null;
     win.element = null;
     win.obsTime = null;
+    win.wallClockCursor = null;
+    if (groupCopy.forecastCycle) {
+      const nwpValid = parseTimestamp({ cycle: groupCopy.forecastCycle, period: groupCopy.period ?? win.period ?? 0 });
+      if (nwpValid) {
+        win.wallClockCursor = nwpValid;
+        if (typeof window !== "undefined") {
+          window.__MICAPS_CURSOR__ = nwpValid;
+        }
+      }
+    }
+  } else if (previousGroupId !== groupCopy.id) {
+    win.wallClockCursor = null;
   }
   if (groupCopy.hasLevel === false) {
     win.level = null;
@@ -194,6 +206,7 @@ export function applyPresetToWindow(win, group, overrideLevel = null, timelinesM
     } else {
       tl.timelineMode = "review";
     }
+    tl.wallClockCursor = win.wallClockCursor || null;
   }
 
   return win;
