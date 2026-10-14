@@ -10,9 +10,14 @@ import {
   getNumVisible,
   getVisibleWindows,
   getNextWindowUid,
+  setDefaultLayerResolver,
 } from "../../src/lib/stores/tabsCore.js";
 
 describe("Tab-Win Logic & Consistent Split Lifecycle", () => {
+  beforeEach(() => {
+    setDefaultLayerResolver(null);
+  });
+
   describe("Emptiness Detection: isWindowEmpty & hasWeatherLayers", () => {
     it("identifies a freshly created default window as empty", () => {
       const win = createDefaultWindow(0, 1);

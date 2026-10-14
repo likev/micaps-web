@@ -85,6 +85,7 @@ func main() {
 	statH := &handler.StationHandler{Client: cqlClient, MockMode: cfg.MockMode, Derived: derivedH}
 	tlogpH := &handler.TLogPHandler{Client: cqlClient, MockMode: cfg.MockMode}
 	profilerH := &handler.ProfilerHandler{Client: cqlClient, MockMode: cfg.MockMode}
+	imageH := &handler.ImageHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode}
 	staticH := &handler.StaticHandler{Cfg: cfg, FileCache: fc}
 
 	mux := http.NewServeMux()
@@ -107,6 +108,7 @@ func main() {
 	mux.HandleFunc("/api/data/station", statH.StationGeoJSONHandler)
 	mux.HandleFunc("/api/data/tlogp", tlogpH.Handler)
 	mux.HandleFunc("/api/data/windprofiler", profilerH.Handler)
+	mux.HandleFunc("/api/data/image", imageH.Handler)
 
 	// Map and PMTiles route (serves configured PMTiles file, defaulting to map-china.pmtiles)
 	mux.HandleFunc("/map-china.pmtiles", staticH.PMTilesHandler)

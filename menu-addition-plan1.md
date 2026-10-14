@@ -185,22 +185,22 @@ Legend: `[ ]` todo, `[~]` in progress, `[x]` done. Update this section as work l
 - [x] Gate: points and profiles display
 
 ### Phase 5 — Satellite
-- [ ] `awx_parser.go` with unit tests on the fixture
-- [ ] FY-4B CHINA, 15 channels, with calibration LUT
-- [ ] FY-4B DISK: reprojection and decimation, within the performance gate
-- [ ] Grouped FY-4B menu entry (channel and domain selector)
-- [ ] FY-2G CTT and QPE001/003/006
-- [ ] FY-2G AMV IR1/IR3 barbs
-- [ ] FY-2G DUST RGB BMP image endpoint (or document why it is skipped)
-- [ ] Gate: CHINA first, then DISK
+- [x] `awx_parser.go` with unit tests on the fixture
+- [x] FY-4B CHINA, 15 channels, with calibration LUT
+- [x] FY-4B DISK: reprojection and decimation, within the performance gate
+- [x] Grouped FY-4B menu entry (channel and domain selector)
+- [x] FY-2G CTT and QPE001/003/006
+- [x] FY-2G AMV IR1/IR3 barbs
+- [x] FY-2G DUST RGB BMP image endpoint (or document why it is skipped)
+- [x] Gate: CHINA first, then DISK
 
 ### Phase 6 — Testing and release
-- [ ] Go unit tests for all new parsers (header, dimensions, ranges, corrupt/truncated input)
-- [ ] Manifest-driven table test (every path resolves to a latest file)
-- [ ] Live smoke test (`-tags live`, `bore.pub:59042`) reports 150/153 as expected
-- [ ] Numeric cross-check against `nmc_met_io` / `tianqing-data` decoders for sampled files
-- [ ] `go test ./...` and `bun test` pass
-- [ ] Manual UI pass over every new menu entry (render, legend, tooltip, timeline, split, tabs)
-- [ ] Performance gates met (< 3 s for ≤ 5 MB grids, < 5 s for DISK, heap budget)
-- [ ] Mock-mode generators for the new families
-- [ ] Docs updated (Architecture.md, README) and version bumped
+- [x] Go unit tests for all new parsers (header, dimensions, ranges, corrupt/truncated input)
+- [x] Manifest-driven table test (every path resolves to a latest file)
+- [x] Live smoke test (`-tags live`, `bore.pub:59042`) reports 150/153 as expected
+- [x] Numeric cross-check against `nmc_met_io` / `tianqing-data` decoders for sampled files
+- [x] `go test ./...` and `bun test` pass
+- [x] Manual UI pass over every new menu entry (render, legend, tooltip, timeline, split, tabs)
+- [x] Performance gates met (< 3 s for ≤ 5 MB grids, < 5 s for DISK, heap budget)
+- [x] Mock-mode generators for the new families
+- [x] Docs updated (Architecture.md, README) and version bumped

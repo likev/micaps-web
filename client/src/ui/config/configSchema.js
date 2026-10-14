@@ -3,7 +3,7 @@ import { MIN_MAX_EFFECTIVE_CELLS, MAX_MAX_EFFECTIVE_CELLS } from "../../config/p
 import { validateInterval } from "../../layers/contour/contourLevels.js";
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-_]*$/i;
-const ALLOWED_LAYER_TYPES = new Set(["contour", "wind", "station", "tlogp", "timeheight", "lineheight", "hovmoller", "event", "profiler"]);
+const ALLOWED_LAYER_TYPES = new Set(["contour", "wind", "station", "tlogp", "timeheight", "lineheight", "hovmoller", "event", "profiler", "image"]);
 export const PROFILE_LEVELS_SET = new Set([1000, 925, 850, 700, 600, 500, 400, 300, 250, 200]);
 export const SUPPORTED_LINE_STEPS = new Set([1, 3, 6, 12, 24]);
 const ALLOWED_BASEMAP_SCHEMES = new Set(["light", "dark", "brutalism"]);

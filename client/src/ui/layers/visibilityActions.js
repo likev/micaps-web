@@ -490,6 +490,10 @@ export function handleVisibilityAction(map, layerId, value, layer, winObj) {
     import("../../layers/profilerLayer.js").then(({ setProfilerVisibility }) => {
       setProfilerVisibility(map, isVisible, winObj, layer.id);
     });
+  } else if (layer.type === "image") {
+    import("../../layers/imageLayer.js").then(({ setImageLayerVisibility }) => {
+      setImageLayerVisibility(map, layer.id, isVisible);
+    });
   }
 
   // Synchronize legend lifecycle on layer visibility change (contour/wind only)

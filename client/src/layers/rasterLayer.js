@@ -98,6 +98,9 @@ export function renderGridRaster(map, gridData, element = "TMP", colormap = null
     const dlon = h.d_lon ?? h.LongitudeGridSpace ?? 0.25;
     elon = nlon > 1 ? (slon + (nlon - 1) * dlon) : (h.end_lon ?? h.EndLongitude ?? slon);
   }
+  if (elon < slon && elon < 0 && slon > 0 && (elon + 360 - slon) < 360) {
+    elon += 360;
+  }
 
   if (gridData.y && gridData.y.length > 0) {
     slat = gridData.y[0];

@@ -1,7 +1,11 @@
 package mock
 
 import (
+	"bytes"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"math"
 	"strings"
 	"time"
@@ -185,6 +189,50 @@ func GenerateMockStations() *model.GeoJSONFeatureCollection {
 
 // GenerateMockStationsForPath generates realistic observations for a given path/level
 func GenerateMockStationsForPath(dataPath string) *model.GeoJSONFeatureCollection {
+	if strings.Contains(dataPath, "AMV") {
+		now := time.Now().UTC()
+		count := 120
+		features := make([]model.GeoJSONFeature, count)
+		for i := 0; i < count; i++ {
+			lon := 75.0 + float64(i%15)*4.5 + math.Sin(float64(i))*1.5
+			lat := 15.0 + float64(i/15)*4.0 + math.Cos(float64(i))*1.0
+			ws := 12.0 + math.Sin(float64(i)*0.4)*10.0
+			wd := math.Mod(240.0+float64(i)*5.0, 360.0)
+			p := 200.0
+			if i%3 == 1 {
+				p = 300.0
+			} else if i%3 == 2 {
+				p = 500.0
+			}
+			rad := wd * math.Pi / 180.0
+			u := -ws * math.Sin(rad)
+			v := -ws * math.Cos(rad)
+			features[i] = model.GeoJSONFeature{
+				Type: "Feature",
+				Id:   fmt.Sprintf("mock-amv-%d", i),
+				Geometry: model.GeoJSONGeometry{
+					Type:        "Point",
+					Coordinates: []float64{lon, lat},
+				},
+				Properties: map[string]interface{}{
+					"wind_speed":  ws,
+					"wind_dir":    wd,
+					"u":           u,
+					"v":           v,
+					"pressure":    p,
+					"temperature": -45.0 + (500-p)*0.08,
+					"height":      p,
+					"source":      "AMV",
+					"station_id":  i + 1,
+					"time":        now.Format(time.RFC3339),
+				},
+			}
+		}
+		return &model.GeoJSONFeatureCollection{
+			Type:     "FeatureCollection",
+			Features: features,
+		}
+	}
 	type StationDef struct {
 		ID   int32
 		Name string
@@ -500,3 +548,126 @@ func GenerateMockTLogPProfile(stationID string, file string) *model.StationSound
 		Levels:      levels,
 	}
 }
+
+// GenerateMockSatelliteGrid creates a synthetic satellite raster grid for offline development
+func GenerateMockSatelliteGrid(dataPath string, step int) *model.GridResponse {
+	if step <= 0 {
+		step = 2
+	}
+	isDisk := strings.Contains(dataPath, "DISK")
+	var nLon, nLat int
+	var startLon, endLon, startLat, endLat float64
+	if isDisk {
+		startLon, endLon = 70.0, 200.0
+		startLat, endLat = -70.0, 70.0
+		nLon = 3251 / step
+		nLat = 3501 / step
+	} else {
+		startLon, endLon = 70.0, 140.0
+		startLat, endLat = 15.0, 55.0
+		nLon = 3501 / step
+		nLat = 2001 / step
+	}
+	dLon := (endLon - startLon) / float64(nLon-1)
+	dLat := (endLat - startLat) / float64(nLat-1)
+
+	x := make([]float64, nLon)
+	for i := 0; i < nLon; i++ {
+		x[i] = startLon + float64(i)*dLon
+	}
+	y := make([]float64, nLat)
+	for j := 0; j < nLat; j++ {
+		y[j] = startLat + float64(j)*dLat
+	}
+
+	total := nLon * nLat
+	values := make([]float32, total)
+	now := time.Now().UTC().Truncate(15 * time.Minute)
+
+	parts := strings.Split(dataPath, "/")
+	elem := parts[len(parts)-1]
+
+	isIR := !strings.HasPrefix(elem, "C001") && !strings.HasPrefix(elem, "C002") && !strings.HasPrefix(elem, "C003") && !strings.HasPrefix(elem, "C006")
+	baseVal := float32(280.0)
+	if !isIR {
+		baseVal = 25.0 // Reflectance %
+	}
+
+	var minVal, maxVal, sumVal float32 = math.MaxFloat32, -math.MaxFloat32, 0
+	for j := 0; j < nLat; j++ {
+		lat := y[j]
+		for i := 0; i < nLon; i++ {
+			lon := x[i]
+			idx := j*nLon + i
+			var val float32
+			if isIR {
+				val = baseVal - float32(math.Abs(lat-25.0))*0.8 + float32(math.Sin(lon*0.08)*math.Cos(lat*0.1))*15.0
+			} else {
+				val = float32(math.Max(0.0, float64(baseVal+float32(math.Sin(lon*0.1+lat*0.1))*20.0)))
+			}
+			values[idx] = val
+			if val < minVal {
+				minVal = val
+			}
+			if val > maxVal {
+				maxVal = val
+			}
+			sumVal += val
+		}
+	}
+
+	return &model.GridResponse{
+		Header: model.GridHeader{
+			Discriminator:       "AWX",
+			DataType:            4,
+			ModelName:           "FY4B",
+			Element:             elem,
+			Description:         fmt.Sprintf("Mock FY4B %s", elem),
+			Level:               0,
+			Year:                int32(now.Year()),
+			Month:               int32(now.Month()),
+			Day:                 int32(now.Day()),
+			Hour:                int32(now.Hour()),
+			Period:              0,
+			StartLongitude:      float32(x[0]),
+			EndLongitude:        float32(x[nLon-1]),
+			LongitudeGridSpace:  float32(dLon),
+			LongitudeGridNumber: int32(nLon),
+			StartLatitude:       float32(y[0]),
+			EndLatitude:         float32(y[nLat-1]),
+			LatitudeGridSpace:   float32(dLat),
+			LatitudeGridNumber:  int32(nLat),
+			InitTime:            now,
+			ValidTime:           now,
+		},
+		Stats: model.GridStats{
+			Min:  minVal,
+			Max:  maxVal,
+			Mean: sumVal / float32(total),
+		},
+		X:      x,
+		Y:      y,
+		Values: values,
+	}
+}
+
+// GenerateMockImagePNG creates a mock PNG image stream for testing image endpoints
+func GenerateMockImagePNG(step int) []byte {
+	if step <= 0 {
+		step = 2
+	}
+	w := 2200 / step
+	h := 1000 / step
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			dust := uint8(180 + 60*math.Sin(float64(x)*0.04+float64(y)*0.02))
+			sea := uint8(40 + 30*math.Cos(float64(x)*0.02))
+			img.SetRGBA(x, y, color.RGBA{R: dust, G: dust / 2, B: sea, A: 255})
+		}
+	}
+	var buf bytes.Buffer
+	_ = png.Encode(&buf, img)
+	return buf.Bytes()
+}
+

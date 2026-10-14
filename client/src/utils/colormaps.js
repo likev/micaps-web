@@ -329,6 +329,60 @@ export const DEFAULT_COLORMAPS = {
     { val: 2, color: [255, 130, 0, 240] },
     { val: 3, color: [230, 30, 30, 255] },
   ],
+  IR_TEMP: [
+    { val: 180, color: [255, 255, 255, 255] },
+    { val: 195, color: [200, 30, 200, 255] },
+    { val: 210, color: [230, 40, 40, 255] },
+    { val: 220, color: [245, 140, 40, 255] },
+    { val: 230, color: [250, 220, 50, 255] },
+    { val: 240, color: [50, 180, 50, 255] },
+    { val: 250, color: [40, 140, 220, 255] },
+    { val: 260, color: [140, 200, 240, 220] },
+    { val: 275, color: [200, 200, 200, 180] },
+    { val: 290, color: [140, 140, 140, 220] },
+    { val: 305, color: [80, 80, 80, 255] },
+    { val: 320, color: [30, 30, 30, 255] },
+  ],
+  ALBEDO: [
+    { val: 0, color: [0, 0, 0, 255] },
+    { val: 10, color: [35, 35, 35, 255] },
+    { val: 25, color: [75, 75, 75, 255] },
+    { val: 50, color: [140, 140, 140, 255] },
+    { val: 75, color: [200, 200, 200, 255] },
+    { val: 100, color: [255, 255, 255, 255] },
+  ],
+  WV: [
+    { val: 190, color: [255, 255, 255, 255] },
+    { val: 205, color: [160, 30, 180, 255] },
+    { val: 215, color: [40, 90, 220, 255] },
+    { val: 225, color: [40, 180, 220, 255] },
+    { val: 235, color: [50, 190, 90, 255] },
+    { val: 245, color: [240, 210, 40, 255] },
+    { val: 255, color: [220, 110, 30, 255] },
+    { val: 265, color: [120, 50, 20, 255] },
+    { val: 275, color: [60, 20, 10, 255] },
+  ],
+  CTT: [
+    { val: 180, color: [255, 255, 255, 255] },
+    { val: 195, color: [200, 30, 200, 255] },
+    { val: 210, color: [230, 40, 40, 255] },
+    { val: 220, color: [245, 140, 40, 255] },
+    { val: 230, color: [250, 220, 50, 255] },
+    { val: 240, color: [50, 180, 50, 255] },
+    { val: 250, color: [40, 140, 220, 255] },
+    { val: 265, color: [140, 200, 240, 220] },
+    { val: 280, color: [180, 180, 180, 180] },
+    { val: 300, color: [100, 100, 100, 220] },
+    { val: 320, color: [30, 30, 30, 255] },
+  ],
+  DUST: [
+    { val: 0, color: [240, 240, 240, 0] },
+    { val: 10, color: [254, 237, 177, 160] },
+    { val: 25, color: [254, 209, 114, 200] },
+    { val: 50, color: [230, 150, 50, 240] },
+    { val: 75, color: [180, 90, 30, 255] },
+    { val: 100, color: [120, 40, 10, 255] },
+  ],
 };
 
 const FALLBACK_COLORMAP = DEFAULT_COLORMAPS.TMP;
@@ -433,6 +487,11 @@ export function getColormap(reference = null, element = "TMP") {
     if (up.includes("VARIANCE")) return COLORMAPS.VARIANCE || DEFAULT_COLORMAPS.VARIANCE;
     if (up.includes("PRECIPITATION_TYPE") || up.includes("PRECIP_TYPE")) return COLORMAPS.PRECIP_TYPE || DEFAULT_COLORMAPS.PRECIP_TYPE;
     if (up.includes("HAZARD") || up.includes("HAIL") || up.includes("GALE") || up.includes("WINDY") || up.includes("HEAVY_RAIN") || up.includes("FOG") || up.includes("HAZE")) return COLORMAPS.HAZARDS || DEFAULT_COLORMAPS.HAZARDS;
+    if (up.includes("IR_TEMP") || up.includes("IR1") || up.includes("IR2") || up.includes("IR3") || up.includes("IR4") || up.includes("LWIR") || up.includes("WINDOW_IR")) return COLORMAPS.IR_TEMP || DEFAULT_COLORMAPS.IR_TEMP;
+    if (up.includes("ALBEDO") || up.includes("VIS") || up.includes("SWIR")) return COLORMAPS.ALBEDO || DEFAULT_COLORMAPS.ALBEDO;
+    if (up.includes("WV") || up.includes("WATER_VAPOR")) return COLORMAPS.WV || DEFAULT_COLORMAPS.WV;
+    if (up.includes("CTT") || up.includes("CLOUD_TOP_TEMP")) return COLORMAPS.CTT || DEFAULT_COLORMAPS.CTT;
+    if (up.includes("DUST")) return COLORMAPS.DUST || DEFAULT_COLORMAPS.DUST;
     return null;
   };
 
@@ -480,15 +539,22 @@ export function createColorResolver(element = "TMP", colormap = null, zMin = und
                           elUpper === "RADAR" || cmUpper.includes("RADAR") || elUpper === "DBZ" || cmUpper.includes("DBZ") ||
                           elUpper === "PROBABILITY" || cmUpper.includes("PROB") ||
                           elUpper === "PRECIP_TYPE" || cmUpper.includes("PRECIP_TYPE") ||
-                          elUpper === "HAZARDS" || cmUpper.includes("HAZARD");
+                          elUpper === "HAZARDS" || cmUpper.includes("HAZARD") ||
+                          elUpper === "IR_TEMP" || cmUpper.includes("IR_TEMP") ||
+                          elUpper === "ALBEDO" || cmUpper.includes("ALBEDO") ||
+                          elUpper === "WV" || cmUpper.includes("WV") ||
+                          elUpper === "CTT" || cmUpper.includes("CTT") ||
+                          elUpper === "DUST" || cmUpper.includes("DUST");
 
   const isHGT = (elUpper === "HGT" || cmUpper.includes("HGT")) && !isVariation;
   const isSLP = (elUpper === "SLP" || cmUpper.includes("SLP")) && !isVariation;
+  const isAlbedo = elUpper === "ALBEDO" || cmUpper.includes("ALBEDO");
 
   const palMin = palette[0].val;
   const palMax = palette[palette.length - 1].val;
   const palLen = palette.length;
   const hgtScale = isHGT && palMax > 2500;
+  const albedoFractionScale = isAlbedo && palMax >= 50 && zMax !== undefined && zMax <= 1.0;
 
   const canBeRelative = !isFixedPhysical && zMin !== undefined && zMax !== undefined && zMax > zMin;
   const effMin = (canBeRelative && hgtScale && zMax < 2500) ? zMin * 10 : zMin;
@@ -500,6 +566,8 @@ export function createColorResolver(element = "TMP", colormap = null, zMin = und
     let checkVal = val;
     if (hgtScale && val < 2500) {
       checkVal = val * 10;
+    } else if (albedoFractionScale && val <= 1.0 && val >= 0) {
+      checkVal = val * 100;
     }
 
     if (isFixedPhysical) {

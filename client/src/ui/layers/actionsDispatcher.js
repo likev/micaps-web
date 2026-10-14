@@ -17,6 +17,7 @@ import { removeTimeHeightLayer } from "../../layers/timeheight/timeHeightLayer.j
 import { removeLineHeightLayer, removeHovmollerLayer } from "../../layers/lineprofile/lineProfileLayer.js";
 import { removeEventLayer } from "../../layers/eventLayer.js";
 import { removeProfilerLayer } from "../../layers/profilerLayer.js";
+import { removeImageLayer } from "../../layers/imageLayer.js";
 
 export function handleRemoveAction(map, layerId, layer, win) {
   if ((layer.type === "contour" || layer.type === "wind") && layer.element) {
@@ -100,6 +101,8 @@ export function handleRemoveAction(map, layerId, layer, win) {
     removeEventLayer(map, win, layerId);
   } else if (layer.type === "profiler") {
     removeProfilerLayer(map, win, layerId);
+  } else if (layer.type === "image") {
+    removeImageLayer(map, win, layerId || layer?.id);
   }
 
   const isProfileType = layer?.type === "tlogp" || layer?.type === "timeheight" || layer?.type === "lineheight" || layer?.type === "hovmoller";

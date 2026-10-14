@@ -233,6 +233,11 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
       if (map.getLayer(rasterLayerId)) {
         map.setPaintProperty(rasterLayerId, "raster-opacity", value.opacity);
       }
+      if (layer.type === "image") {
+        import("../../layers/imageLayer.js").then(({ setImageLayerOpacity }) => {
+          setImageLayerOpacity(map, layerId, value.opacity);
+        });
+      }
     }
     if (
       value.lineWidth !== undefined ||

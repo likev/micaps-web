@@ -86,6 +86,13 @@ func (h *GridHandler) BinaryHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *GridHandler) fetchGrid(r *http.Request) (*model.GridResponse, error) {
 	dataPath := sanitizeGridPath(r.URL.Query().Get("path"))
+	if lvl := strings.TrimSpace(r.URL.Query().Get("level")); lvl != "" {
+		if (strings.Contains(dataPath, "FY4B/L1/CHINA") || strings.Contains(dataPath, "FY4B/L1/DISK")) && !strings.Contains(dataPath, "/C0") {
+			if num, err := strconv.Atoi(lvl); err == nil && num >= 1 && num <= 15 {
+				dataPath = fmt.Sprintf("%s/C%03d", dataPath, num)
+			}
+		}
+	}
 	file := sanitizeFile(r.URL.Query().Get("file"))
 
 	// Check if this is a derived grid path (e.g. /api/derived/ECMWF_HR/TMP/850-500)
@@ -199,6 +206,16 @@ func decodeGridPayload(payload []byte, r *http.Request) (*model.GridResponse, er
 		return parser.ParseDiamond11Grid(unwrapped)
 	}
 
+	if parser.IsAWX(unwrapped) {
+		step := 0
+		if stepStr := r.URL.Query().Get("step"); stepStr != "" {
+			if s, err := strconv.Atoi(stepStr); err == nil && s > 0 {
+				step = s
+			}
+		}
+		return parser.ParseAWXGrid(unwrapped, step)
+	}
+
 	return parser.ParseGridData(unwrapped)
 }
 
@@ -216,6 +233,16 @@ func SanitizeGridPath(p string) string {
 		lp := strings.ToLower(strings.TrimSpace(part))
 		if lp != "" && lp != "null" && lp != "undefined" {
 			validParts = append(validParts, part)
+		}
+	}
+	if len(validParts) > 0 && (strings.Contains(clean, "FY4B/L1/CHINA") || strings.Contains(clean, "FY4B/L1/DISK")) {
+		last := validParts[len(validParts)-1]
+		if num, err := strconv.Atoi(last); err == nil && num >= 1 && num <= 15 {
+			validParts[len(validParts)-1] = fmt.Sprintf("C%03d", num)
+		} else if strings.HasPrefix(strings.ToUpper(last), "C") {
+			if num, err := strconv.Atoi(last[1:]); err == nil && num >= 1 && num <= 15 {
+				validParts[len(validParts)-1] = fmt.Sprintf("C%03d", num)
+			}
 		}
 	}
 	return strings.Join(validParts, "/")
@@ -295,6 +322,16 @@ func (h *GridHandler) getFallbackGrid(r *http.Request) *model.GridResponse {
 				period = int32(p)
 			}
 		}
+	}
+
+	if strings.HasPrefix(dataPath, "SATELLITE/") {
+		step := 2
+		if stepStr := r.URL.Query().Get("step"); stepStr != "" {
+			if s, err := strconv.Atoi(stepStr); err == nil && s > 0 {
+				step = s
+			}
+		}
+		return mock.GenerateMockSatelliteGrid(dataPath, step)
 	}
 
 	return mock.GenerateMockGrid(element, level, period)

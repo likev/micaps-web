@@ -40,7 +40,7 @@ func SupportedModels() []model.CategoryInfo {
 		{
 			Category: "Observations & Remote Sensing",
 			Tables: []string{
-				"SURFACE", "UPPER_AIR", "SINGLERADAR", "RADARMOSAIC",
+				"SURFACE", "MARINE", "UPPER_AIR", "SINGLERADAR", "RADARMOSAIC",
 				"SATELLITE", "WIND_PROFILER",
 			},
 		},

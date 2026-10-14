@@ -854,8 +854,10 @@ func TestCassandraLiveDerivedCalculations(t *testing.T) {
 		stnUAVar, errUAVar := dH.CalculateDerivedStation(dReqUAVar)
 		if errUAVar != nil {
 			t.Logf("Live UPPER_AIR/PLOT/T-VARIATION-24H/850 note: %v", errUAVar)
-		} else {
+		} else if len(stnUAVar.Features) > 0 {
 			t.Logf("Live UPPER_AIR 850hPa T-VAR-24H: Features=%d Val0=%v", len(stnUAVar.Features), stnUAVar.Features[0].Properties["temperature"])
+		} else {
+			t.Logf("Live UPPER_AIR 850hPa T-VAR-24H: 0 features")
 		}
 	}
 
@@ -865,8 +867,10 @@ func TestCassandraLiveDerivedCalculations(t *testing.T) {
 		stnUAVar48, errUAVar48 := dH.CalculateDerivedStation(dReqUAVar48)
 		if errUAVar48 != nil {
 			t.Logf("Live UPPER_AIR/PLOT/T-VARIATION-48H/850 note: %v", errUAVar48)
-		} else {
+		} else if len(stnUAVar48.Features) > 0 {
 			t.Logf("Live UPPER_AIR 850hPa T-VAR-48H: Features=%d Val0=%v", len(stnUAVar48.Features), stnUAVar48.Features[0].Properties["temperature"])
+		} else {
+			t.Logf("Live UPPER_AIR 850hPa T-VAR-48H: 0 features")
 		}
 	}
 
@@ -882,8 +886,10 @@ func TestCassandraLiveDerivedCalculations(t *testing.T) {
 			stnSfcT, errSfcT := dH.CalculateDerivedStation(dReqSfcT)
 			if errSfcT != nil {
 				t.Logf("Live SURFACE/T-VARIATION-24H note: %v", errSfcT)
-			} else {
+			} else if len(stnSfcT.Features) > 0 {
 				t.Logf("Live SURFACE T-VAR-24H: Features=%d Val0=%v", len(stnSfcT.Features), stnSfcT.Features[0].Properties["temperature"])
+			} else {
+				t.Logf("Live SURFACE T-VAR-24H: 0 features")
 			}
 		}
 
@@ -893,8 +899,10 @@ func TestCassandraLiveDerivedCalculations(t *testing.T) {
 			stnSfcSLP, errSfcSLP := dH.CalculateDerivedStation(dReqSfcSLP)
 			if errSfcSLP != nil {
 				t.Logf("Live SURFACE/SLP-VARIATION-24H note: %v", errSfcSLP)
-			} else {
+			} else if len(stnSfcSLP.Features) > 0 {
 				t.Logf("Live SURFACE SLP-VAR-24H: Features=%d Val0=%v", len(stnSfcSLP.Features), stnSfcSLP.Features[0].Properties["slp"])
+			} else {
+				t.Logf("Live SURFACE SLP-VAR-24H: 0 features")
 			}
 		}
 
@@ -904,8 +912,10 @@ func TestCassandraLiveDerivedCalculations(t *testing.T) {
 			stnSfcT48, errSfcT48 := dH.CalculateDerivedStation(dReqSfcT48)
 			if errSfcT48 != nil {
 				t.Logf("Live SURFACE/T-VARIATION-48H note: %v", errSfcT48)
-			} else {
+			} else if len(stnSfcT48.Features) > 0 {
 				t.Logf("Live SURFACE T-VAR-48H: Features=%d Val0=%v", len(stnSfcT48.Features), stnSfcT48.Features[0].Properties["temperature"])
+			} else {
+				t.Logf("Live SURFACE T-VAR-48H: 0 features")
 			}
 		}
 
@@ -915,8 +925,10 @@ func TestCassandraLiveDerivedCalculations(t *testing.T) {
 			stnSfcSLP48, errSfcSLP48 := dH.CalculateDerivedStation(dReqSfcSLP48)
 			if errSfcSLP48 != nil {
 				t.Logf("Live SURFACE/SLP-VARIATION-48H note: %v", errSfcSLP48)
-			} else {
+			} else if len(stnSfcSLP48.Features) > 0 {
 				t.Logf("Live SURFACE SLP-VAR-48H: Features=%d Val0=%v", len(stnSfcSLP48.Features), stnSfcSLP48.Features[0].Properties["slp"])
+			} else {
+				t.Logf("Live SURFACE SLP-VAR-48H: 0 features")
 			}
 		}
 	}

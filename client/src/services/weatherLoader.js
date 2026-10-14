@@ -398,6 +398,16 @@ export async function loadWeatherField(map, model, element, level, period, custo
       return; // Discard stale in-flight response from fast navigation
     }
     let colormap = customOptions?.colormap || element;
+    if (model === "SATELLITE" || (path && path.includes("FY4B"))) {
+      const chan = Number(targetLevel || (customOptions?.level) || (win?.level));
+      if (chan >= 1 && chan <= 6) {
+        colormap = "ALBEDO";
+      } else if (chan >= 8 && chan <= 10) {
+        colormap = "WV";
+      } else if (chan === 7 || (chan >= 11 && chan <= 15)) {
+        colormap = "IR_TEMP";
+      }
+    }
 
     // Restore a previously-chosen XML palette for this layer
     if (savedPalettePath) {

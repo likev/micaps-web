@@ -57,6 +57,7 @@
     "实况融合 (Land Surface Reanalysis)": "🗺️",
     "集合预报与概率 (Ensemble & Probability)": "🎲",
     "预报员指导 (Forecaster Guidance)": "🧭",
+    "气象卫星遥感 (Satellite Remote Sensing)": "🛰️",
   };
 
   function getCategoryIcon(name) {

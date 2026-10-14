@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -42,8 +43,36 @@ func (h *CatalogHandler) TreeHandler(w http.ResponseWriter, r *http.Request) {
 	if dReq, ok := ParseDerivedPath(dataPath, ""); ok && dReq != nil {
 		dataPath = ResolveUnderlyingCatalogPath(dReq)
 	}
+	dataPath = SanitizeGridPath(dataPath)
+	if lvlStr := strings.TrimSpace(r.URL.Query().Get("level")); lvlStr != "" {
+		if (strings.Contains(dataPath, "FY4B/L1/CHINA") || strings.Contains(dataPath, "FY4B/L1/DISK")) && !strings.Contains(dataPath, "/C0") {
+			if l, err := strconv.Atoi(lvlStr); err == nil && l >= 1 && l <= 15 {
+				dataPath = fmt.Sprintf("%s/C%03d", dataPath, l)
+			}
+		}
+	} else if (strings.HasSuffix(dataPath, "FY4B/L1/CHINA") || strings.HasSuffix(dataPath, "FY4B/L1/DISK")) && !strings.Contains(dataPath, "/C0") {
+		dataPath = fmt.Sprintf("%s/C012", dataPath)
+	}
 
 	if h.MockMode {
+		if strings.HasPrefix(dataPath, "SATELLITE") {
+			ext := ".AWX"
+			if strings.Contains(dataPath, "DUST") {
+				ext = ".BMP"
+			}
+			mockSatFiles := make([]map[string]interface{}, 0, 48)
+			t := time.Date(2026, 8, 29, 20, 0, 0, 0, time.UTC)
+			for i := 0; i < 40; i++ {
+				fname := t.Format("20060102150405") + ext
+				mockSatFiles = append(mockSatFiles, map[string]interface{}{
+					"name": fname,
+					"size": 524288,
+				})
+				t = t.Add(-15 * time.Minute)
+			}
+			json.NewEncoder(w).Encode(mockSatFiles)
+			return
+		}
 		isObs := strings.HasPrefix(dataPath, "SURFACE") || strings.HasPrefix(dataPath, "UPPER_AIR")
 		if isObs {
 			mockObsFiles := make([]map[string]interface{}, 0, 60)
@@ -122,6 +151,16 @@ func (h *CatalogHandler) LevelsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if strings.Contains(dataPath, "FY4B") {
+		json.NewEncoder(w).Encode([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15})
+		return
+	}
+
+	if strings.Contains(dataPath, "AMV") {
+		json.NewEncoder(w).Encode([]int{200, 300, 500, 700, 850})
+		return
+	}
+
 	if h.MockMode {
 		json.NewEncoder(w).Encode([]int{1000, 925, 850, 700, 500, 400, 300, 250, 200, 100})
 		return
@@ -162,10 +201,30 @@ func (h *CatalogHandler) LatestHandler(w http.ResponseWriter, r *http.Request) {
 	if dReq, ok := ParseDerivedPath(dataPath, ""); ok && dReq != nil {
 		dataPath = ResolveUnderlyingCatalogPath(dReq)
 	}
+	dataPath = SanitizeGridPath(dataPath)
+	if lvlStr := strings.TrimSpace(r.URL.Query().Get("level")); lvlStr != "" {
+		if (strings.Contains(dataPath, "FY4B/L1/CHINA") || strings.Contains(dataPath, "FY4B/L1/DISK")) && !strings.Contains(dataPath, "/C0") {
+			if l, err := strconv.Atoi(lvlStr); err == nil && l >= 1 && l <= 15 {
+				dataPath = fmt.Sprintf("%s/C%03d", dataPath, l)
+			}
+		}
+	} else if (strings.HasSuffix(dataPath, "FY4B/L1/CHINA") || strings.HasSuffix(dataPath, "FY4B/L1/DISK")) && !strings.Contains(dataPath, "/C0") {
+		dataPath = fmt.Sprintf("%s/C012", dataPath)
+	}
 
 	suffix := r.URL.Query().Get("suffix")
 	if suffix == "" {
-		suffix = "*.024"
+		if strings.Contains(dataPath, "DUST") {
+			suffix = "*.BMP"
+		} else if strings.HasPrefix(dataPath, "SATELLITE") {
+			suffix = "*.AWX"
+		} else if strings.Contains(dataPath, "SWAN") {
+			suffix = "*.BZ2"
+		} else if strings.Contains(dataPath, "SURFACE") || strings.Contains(dataPath, "CLDAS") || strings.Contains(dataPath, "MARINE") {
+			suffix = "*.000"
+		} else {
+			suffix = "*.024"
+		}
 	}
 
 	if h.MockMode {

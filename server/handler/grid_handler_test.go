@@ -173,3 +173,61 @@ func TestGridHandlerNonMockMode_Error(t *testing.T) {
 	}
 }
 
+func TestGridHandlerMockMode_SatelliteFY4B(t *testing.T) {
+	h := &handler.GridHandler{
+		Client:   nil,
+		MockMode: true,
+	}
+
+	req := httptest.NewRequest("GET", "/api/data/grid?path=SATELLITE/FY4B/L1/CHINA/C006&file=latest", nil)
+	w := httptest.NewRecorder()
+	h.JSONHandler(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", w.Code)
+	}
+
+	var resp model.GridResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode JSON response: %v", err)
+	}
+
+	if resp.Header.Discriminator != "AWX" {
+		t.Errorf("expected Discriminator AWX, got %s", resp.Header.Discriminator)
+	}
+	if resp.Header.Element != "C006" {
+		t.Errorf("expected Element C006, got %s", resp.Header.Element)
+	}
+	if len(resp.Values) == 0 {
+		t.Errorf("expected non-empty values array")
+	}
+}
+
+func TestGridHandlerMockMode_SatelliteDISK(t *testing.T) {
+	h := &handler.GridHandler{
+		Client:   nil,
+		MockMode: true,
+	}
+
+	req := httptest.NewRequest("GET", "/api/data/grid?path=SATELLITE/FY4B/L1/DISK/C012&file=latest&step=4", nil)
+	w := httptest.NewRecorder()
+	h.JSONHandler(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", w.Code)
+	}
+
+	var resp model.GridResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode JSON response: %v", err)
+	}
+
+	if resp.Header.Element != "C012" {
+		t.Errorf("expected Element C012, got %s", resp.Header.Element)
+	}
+	if resp.Stats.Min <= 0 || resp.Stats.Max <= 0 {
+		t.Errorf("expected positive brightness temp in K, got min=%f, max=%f", resp.Stats.Min, resp.Stats.Max)
+	}
+}
+
+

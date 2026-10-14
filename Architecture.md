@@ -1,6 +1,6 @@
-# MICAPS-Web Architecture & Technical Reference
+# MICAPS-Web Architecture & Technical Reference (v1.9.5)
 
-This document provides in-depth technical documentation for the architecture, data pipeline, API specifications, build workflows, and directory structure of **MICAPS-Web**.
+This document provides in-depth technical documentation for the architecture, data pipeline, API specifications, build workflows, and directory structure of **MICAPS-Web** (v1.9.5).
 
 ---
 
@@ -72,6 +72,13 @@ This document provides in-depth technical documentation for the architecture, da
   - [14.1. Client Meteorological Test Suite (Bun Test)](#141-client-meteorological-test-suite-bun-test)
   - [14.2. Server Binary Parser Test Suite (Go Test)](#142-server-binary-parser-test-suite-go-test)
 - [15. Standards & References](#15-standards--references)
+- [16. Satellite Remote Sensing Architecture & AWX Format Specifications](#16-satellite-remote-sensing-architecture--awx-format-specifications)
+  - [16.1. CMA AWX Format Overview & Header Specifications](#161-cma-awx-format-overview--header-specifications)
+  - [16.2. FY-4B Geostationary Remote Sensing (CHINA & DISK Domains)](#162-fy-4b-geostationary-remote-sensing-china--disk-domains)
+  - [16.3. FY-2G Quantitative Products (CTT & QPE Precipitation)](#163-fy-2g-quantitative-products-ctt--qpe-precipitation)
+  - [16.4. FY-2G AMV Discrete Vector Decoding](#164-fy-2g-amv-discrete-vector-decoding)
+  - [16.5. FY-2G DUST RGB BMP Image Pipeline & Native MapLibre Layer](#165-fy-2g-dust-rgb-bmp-image-pipeline--native-maplibre-layer)
+  - [16.6. Presets, Navigation & Client UI Integration](#166-presets-navigation--client-ui-integration)
 
 
 ---
@@ -1876,3 +1883,58 @@ Key Go test coverage:
 - **WMO / NOAA Station Weather Plot Layout**:
   - [CIMSS Satellite Meteorology Module 7](https://cimss.ssec.wisc.edu/satmet/modules/7_weather_forecast/wf-5.html)
   - [NOAA Weather Prediction Center (WPC) Station Plot](https://www.wpc.ncep.noaa.gov/html/stationplot.shtml)
+
+---
+
+## 16. Satellite Remote Sensing Architecture & AWX Format Specifications
+
+### 16.1. CMA AWX Format Overview & Header Specifications
+The CMA AWX format is China Meteorological Administration's standard binary format for satellite imagery and derived meteorological grids. An AWX file consists of:
+1. **Primary Header (Header 1, 40 bytes)**:
+   - `ByteSequence` (bytes 4-5): `0x0000` for Little-Endian (Intel x86) or `0x0001` for Big-Endian (Motorola/SPARC).
+   - `ProductCategory` (bytes 8-9):
+     - `1`: Geostationary Satellite Imagery (FY-4B CHINA & DISK, FY-2G IR/Vis).
+     - `3`: Grid Quantitative Products (FY-2G CTT, QPE001/003/006).
+     - `4`: Discrete Vector Products (FY-2G AMV IR1/IR3).
+   - `RecordLength` (bytes 12-13) and `HeadRecordNumber` (bytes 14-15): Determines data block offset (`HeadRecordNumber * RecordLength`).
+2. **Secondary Header (Header 2)**:
+   - **Category 1 (Geostationary Imagery)**: Width/height, bounding coordinates (west/east/south/north in units of $0.01^\circ$), projection flag (`4` = Equirectangular / Plate Carrée), color table length, and calibration length (typically 2048 bytes).
+   - **Category 3 (Quantitative Grids)**: Width/height, bounding box, `BytePerGrid` (signed int16 or uint8), `Scale`, `Base`.
+   - **Category 4 (Discrete Vectors)**: Record count and length for AMV vectors.
+
+### 16.2. FY-4B Geostationary Remote Sensing (CHINA & DISK Domains)
+- **15 Spectral Channels**:
+  - Visible / Albedo (C001–C006): $0.47\text{--}2.25\ \mu\text{m}$, calibrated via LUT to albedo percentage ($0\text{--}100\%$).
+  - Water Vapor (C008–C010): $6.25\text{--}7.32\ \mu\text{m}$ upper/mid/lower tropospheric moisture, calibrated to brightness temperature in Kelvin ($180\text{--}280\text{ K}$).
+  - Longwave / Window Infrared (C007, C011–C015): $3.75\text{--}13.5\ \mu\text{m}$ clean window & cloud-top IR ($180\text{--}320\text{ K}$).
+- **DISK Domain & Reprojection**:
+  - In Cassandra, DISK files are stored natively as Equirectangular Plate Carrée (`flagOfProjection == 4`), centered at $135^\circ\text{E}$ with bounds $\text{lat}\in[-70^\circ, 70^\circ]$ and $\text{lon}\in[70^\circ, 200^\circ]$ ($200^\circ = -160^\circ$).
+  - Server-side stride decimation (`step=2` or `step=3`) decodes pixels directly with zero memory waste, ensuring response time remains well under the 5-second performance gate for full-disk geostationary imagery.
+
+### 16.3. FY-2G Quantitative Products (CTT & QPE Precipitation)
+- **CTT (Cloud Top Temperature)**:
+  - 2 bytes per cell (`int16`), scale factor = 10, base = 0.
+  - Temperature decoded in Kelvin ($150\text{--}350\text{ K}$) with sentinel values ($-990 \implies -9999.0$ missing).
+- **QPE (Satellite Quantitative Precipitation Estimation)**:
+  - Products QPE001 (1-hour), QPE003 (3-hour), and QPE006 (6-hour) precipitation rates.
+  - Signed 16-bit values scaled by 10 (0.1 to 50.0 mm/h).
+
+### 16.4. FY-2G AMV Discrete Vector Decoding
+- **Atmospheric Motion Vectors (AMV IR1 & IR3)**:
+  - 40-byte fixed vector record format.
+  - Decoded into standard GeoJSON Point FeatureCollection with `wind_speed`, `wind_dir`, `u`, `v`, `pressure`, and `temperature`.
+  - Displayed on the map using metric wind barbs with vertical pressure level filtering (`?level=200/300/500/700/850`).
+
+### 16.5. FY-2G DUST RGB BMP Image Pipeline & Native MapLibre Layer
+- **Endpoint `/api/data/image`**:
+  - Decodes uncompressed 24-bit Windows BMP files directly from Cassandra BLOB storage.
+  - Converts BMP to web-optimized PNG binary streams or JSON metadata with geographical coordinate bounding box ($[45^\circ\text{E}, 5^\circ\text{N}, 155^\circ\text{E}, 55^\circ\text{N}]$).
+  - Client-side `imageLayer.js` utilizes MapLibre GL's native `image` source and `raster` layer for smooth hardware-accelerated GPU rendering, opacity adjustment, and seamless timeline integration.
+
+### 16.6. Presets, Navigation & Client UI Integration
+- **Grouped FY-4B Presets**:
+  - `preset-fy4b_china_grouped` and `preset-fy4b_disk_grouped` offer unified channel navigation (channels 1 through 15) using the workstation's level selector, avoiding menu clutter.
+- **Dedicated Satellite Category**:
+  - "气象卫星遥感 (Satellite Remote Sensing)" with satellite icon `🛰️` in `PresetMenu.svelte`.
+  - Colormaps added for `IR_TEMP`, `ALBEDO`, `WV`, `CTT`, and `DUST`.
+

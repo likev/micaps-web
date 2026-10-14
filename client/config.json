@@ -1083,6 +1083,192 @@
         "val": 3,
         "color": [230, 30, 30, 255]
       }
+    ],
+    "IR_TEMP": [
+      {
+        "val": 180,
+        "color": [255, 255, 255, 255]
+      },
+      {
+        "val": 195,
+        "color": [200, 30, 200, 255]
+      },
+      {
+        "val": 210,
+        "color": [230, 40, 40, 255]
+      },
+      {
+        "val": 220,
+        "color": [245, 140, 40, 255]
+      },
+      {
+        "val": 230,
+        "color": [250, 220, 50, 255]
+      },
+      {
+        "val": 240,
+        "color": [50, 180, 50, 255]
+      },
+      {
+        "val": 250,
+        "color": [40, 140, 220, 255]
+      },
+      {
+        "val": 260,
+        "color": [140, 200, 240, 220]
+      },
+      {
+        "val": 275,
+        "color": [200, 200, 200, 180]
+      },
+      {
+        "val": 290,
+        "color": [140, 140, 140, 220]
+      },
+      {
+        "val": 305,
+        "color": [80, 80, 80, 255]
+      },
+      {
+        "val": 320,
+        "color": [30, 30, 30, 255]
+      }
+    ],
+    "ALBEDO": [
+      {
+        "val": 0,
+        "color": [0, 0, 0, 255]
+      },
+      {
+        "val": 10,
+        "color": [35, 35, 35, 255]
+      },
+      {
+        "val": 25,
+        "color": [75, 75, 75, 255]
+      },
+      {
+        "val": 50,
+        "color": [140, 140, 140, 255]
+      },
+      {
+        "val": 75,
+        "color": [200, 200, 200, 255]
+      },
+      {
+        "val": 100,
+        "color": [255, 255, 255, 255]
+      }
+    ],
+    "WV": [
+      {
+        "val": 190,
+        "color": [255, 255, 255, 255]
+      },
+      {
+        "val": 205,
+        "color": [160, 30, 180, 255]
+      },
+      {
+        "val": 215,
+        "color": [40, 90, 220, 255]
+      },
+      {
+        "val": 225,
+        "color": [40, 180, 220, 255]
+      },
+      {
+        "val": 235,
+        "color": [50, 190, 90, 255]
+      },
+      {
+        "val": 245,
+        "color": [240, 210, 40, 255]
+      },
+      {
+        "val": 255,
+        "color": [220, 110, 30, 255]
+      },
+      {
+        "val": 265,
+        "color": [120, 50, 20, 255]
+      },
+      {
+        "val": 275,
+        "color": [60, 20, 10, 255]
+      }
+    ],
+    "CTT": [
+      {
+        "val": 180,
+        "color": [255, 255, 255, 255]
+      },
+      {
+        "val": 195,
+        "color": [200, 30, 200, 255]
+      },
+      {
+        "val": 210,
+        "color": [230, 40, 40, 255]
+      },
+      {
+        "val": 220,
+        "color": [245, 140, 40, 255]
+      },
+      {
+        "val": 230,
+        "color": [250, 220, 50, 255]
+      },
+      {
+        "val": 240,
+        "color": [50, 180, 50, 255]
+      },
+      {
+        "val": 250,
+        "color": [40, 140, 220, 255]
+      },
+      {
+        "val": 265,
+        "color": [140, 200, 240, 220]
+      },
+      {
+        "val": 280,
+        "color": [180, 180, 180, 180]
+      },
+      {
+        "val": 300,
+        "color": [100, 100, 100, 220]
+      },
+      {
+        "val": 320,
+        "color": [30, 30, 30, 255]
+      }
+    ],
+    "DUST": [
+      {
+        "val": 0,
+        "color": [240, 240, 240, 0]
+      },
+      {
+        "val": 10,
+        "color": [254, 237, 177, 160]
+      },
+      {
+        "val": 25,
+        "color": [254, 209, 114, 200]
+      },
+      {
+        "val": 50,
+        "color": [230, 150, 50, 240]
+      },
+      {
+        "val": 75,
+        "color": [180, 90, 30, 255]
+      },
+      {
+        "val": 100,
+        "color": [120, 40, 10, 255]
+      }
     ]
   },
   "performance": {
@@ -3576,6 +3762,90 @@
             "showLine": true,
             "lineWidth": 1.5,
             "lineColor": "#58a6ff"
+          }
+        }
+      ]
+    },
+    {
+      "category": "气象卫星遥感 (Satellite Remote Sensing)",
+      "hasLevel": true,
+      "defaultLevel": 12,
+      "levels": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "id": "preset-fy4b_china_grouped",
+      "name": "风云四号B星中国区 (FY-4B CHINA 15通道) / FY-4B CHINA Multi-Channel",
+      "isObservation": true,
+      "layers": [
+        {
+          "id": "layer-fy4b_china_grouped",
+          "name": "FY-4B CHINA (15 Channels)",
+          "type": "contour",
+          "model": "SATELLITE",
+          "element": "FY4B/L1/CHINA",
+          "path": "SATELLITE/FY4B/L1/CHINA",
+          "level": 12,
+          "render": {
+            "colormap": "IR_TEMP",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
+        }
+      ]
+    },
+    {
+      "category": "气象卫星遥感 (Satellite Remote Sensing)",
+      "hasLevel": true,
+      "defaultLevel": 12,
+      "levels": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "id": "preset-fy4b_disk_grouped",
+      "name": "风云四号B星全圆盘 (FY-4B DISK 15通道) / FY-4B DISK Multi-Channel",
+      "isObservation": true,
+      "layers": [
+        {
+          "id": "layer-fy4b_disk_grouped",
+          "name": "FY-4B DISK (15 Channels)",
+          "type": "contour",
+          "model": "SATELLITE",
+          "element": "FY4B/L1/DISK",
+          "path": "SATELLITE/FY4B/L1/DISK",
+          "level": 12,
+          "render": {
+            "colormap": "IR_TEMP",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
           }
         }
       ]
@@ -6175,6 +6445,190 @@
             "showLine": true,
             "lineWidth": 1.5,
             "lineColor": "#e3b341"
+          }
+        }
+      ]
+    },
+    {
+      "category": "气象卫星遥感 (Satellite Remote Sensing)",
+      "hasLevel": false,
+      "id": "preset-fy2g_dust",
+      "name": "沙尘真彩监测图 / DUST RGB BMP",
+      "isObservation": true,
+      "layers": [
+        {
+          "id": "layer-fy2g_dust",
+          "name": "沙尘真彩监测图 / DUST RGB BMP",
+          "type": "image",
+          "model": "SATELLITE",
+          "element": "FY2G/L2/DUST",
+          "path": "SATELLITE/FY2G/L2/DUST",
+          "render": {
+            "colormap": "DUST",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          },
+          "bounds": [45, 5, 155, 55]
+        }
+      ]
+    },
+    {
+      "category": "气象卫星遥感 (Satellite Remote Sensing)",
+      "hasLevel": false,
+      "id": "preset-fy2g_ctt",
+      "name": "云顶亮温(CTT) / CTT (Cloud Top Temp)",
+      "isObservation": true,
+      "layers": [
+        {
+          "id": "layer-fy2g_ctt",
+          "name": "云顶亮温(CTT) / CTT (Cloud Top Temp)",
+          "type": "contour",
+          "model": "SATELLITE",
+          "element": "FY2G/L2/CTT",
+          "path": "SATELLITE/FY2G/L2/CTT",
+          "render": {
+            "colormap": "CTT",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
+        }
+      ]
+    },
+    {
+      "category": "气象卫星遥感 (Satellite Remote Sensing)",
+      "hasLevel": true,
+      "id": "preset-fy2g_amv_ir1",
+      "name": "云导风IR1 / AMV IR1 (Wind Barbs)",
+      "isObservation": true,
+      "layers": [
+        {
+          "id": "layer-fy2g_amv_ir1",
+          "name": "云导风IR1 / AMV IR1 (Wind Barbs)",
+          "type": "station",
+          "model": "SATELLITE",
+          "element": "FY2G/L2/AMV/IR1",
+          "path": "SATELLITE/FY2G/L2/AMV/IR1",
+          "render": {
+            "colormap": "WIND",
+            "showWind": true,
+            "showBarbs": true,
+            "showTemp": false,
+            "showPressure": false,
+            "showVisibility": false
+          },
+          "level": 200
+        }
+      ],
+      "defaultLevel": 200,
+      "levels": [
+        200,
+        300,
+        500,
+        700,
+        850
+      ]
+    },
+    {
+      "category": "气象卫星遥感 (Satellite Remote Sensing)",
+      "hasLevel": true,
+      "id": "preset-fy2g_amv_ir3",
+      "name": "云导风IR3 / AMV IR3 (Wind Barbs)",
+      "isObservation": true,
+      "layers": [
+        {
+          "id": "layer-fy2g_amv_ir3",
+          "name": "云导风IR3 / AMV IR3 (Wind Barbs)",
+          "type": "station",
+          "model": "SATELLITE",
+          "element": "FY2G/L2/AMV/IR3",
+          "path": "SATELLITE/FY2G/L2/AMV/IR3",
+          "render": {
+            "colormap": "WIND",
+            "showWind": true,
+            "showBarbs": true,
+            "showTemp": false,
+            "showPressure": false,
+            "showVisibility": false
+          },
+          "level": 200
+        }
+      ],
+      "defaultLevel": 200,
+      "levels": [
+        200,
+        300,
+        500,
+        700,
+        850
+      ]
+    },
+    {
+      "category": "气象卫星遥感 (Satellite Remote Sensing)",
+      "hasLevel": false,
+      "id": "preset-fy2g_qpe001",
+      "name": "1小时卫星降水估测 / QPE001 (1h Sat Rain)",
+      "isObservation": true,
+      "layers": [
+        {
+          "id": "layer-fy2g_qpe001",
+          "name": "1小时卫星降水估测 / QPE001 (1h Sat Rain)",
+          "type": "contour",
+          "model": "SATELLITE",
+          "element": "FY2G/L2/QPE001",
+          "path": "SATELLITE/FY2G/L2/QPE001",
+          "render": {
+            "colormap": "QPE",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
+        }
+      ]
+    },
+    {
+      "category": "气象卫星遥感 (Satellite Remote Sensing)",
+      "hasLevel": false,
+      "id": "preset-fy2g_qpe003",
+      "name": "3小时卫星降水估测 / QPE003 (3h Sat Rain)",
+      "isObservation": true,
+      "layers": [
+        {
+          "id": "layer-fy2g_qpe003",
+          "name": "3小时卫星降水估测 / QPE003 (3h Sat Rain)",
+          "type": "contour",
+          "model": "SATELLITE",
+          "element": "FY2G/L2/QPE003",
+          "path": "SATELLITE/FY2G/L2/QPE003",
+          "render": {
+            "colormap": "QPE",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
+        }
+      ]
+    },
+    {
+      "category": "气象卫星遥感 (Satellite Remote Sensing)",
+      "hasLevel": false,
+      "id": "preset-fy2g_qpe006",
+      "name": "6小时卫星降水估测 / QPE006 (6h Sat Rain)",
+      "isObservation": true,
+      "layers": [
+        {
+          "id": "layer-fy2g_qpe006",
+          "name": "6小时卫星降水估测 / QPE006 (6h Sat Rain)",
+          "type": "contour",
+          "model": "SATELLITE",
+          "element": "FY2G/L2/QPE006",
+          "path": "SATELLITE/FY2G/L2/QPE006",
+          "render": {
+            "colormap": "QPE",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
           }
         }
       ]

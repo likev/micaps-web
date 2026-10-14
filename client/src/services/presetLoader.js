@@ -9,6 +9,7 @@ import { loadTimeHeightLayer, removeTimeHeightLayer, timeHeightController } from
 import { loadLineHeightLayer, removeLineHeightLayer, lineHeightController, loadHovmollerLayer, removeHovmollerLayer, hovmollerController } from "../layers/lineprofile/lineProfileLayer.js";
 import { loadEventLayer, removeEventLayer } from "../layers/eventLayer.js";
 import { loadProfilerLayer, removeProfilerLayer } from "../layers/profilerLayer.js";
+import { loadImageLayer, removeImageLayer } from "../layers/imageLayer.js";
 import { clearLegends } from "../ui/legend.js";
 import { getActiveWindow, updateWindowTitle, refreshPresetControls } from "../ui/tabWindowManager.js";
 import { setNavBarPreset } from "../ui/navBar.js";
@@ -71,6 +72,7 @@ export function clearAllWeatherLayersFromMap(map, win = null, { resetVisibility 
     removeHovmollerLayer(map, win, null, { preservePreset: true });
     removeEventLayer(map, win);
     removeProfilerLayer(map, win);
+    removeImageLayer(map, win);
     clearLegends(win);
   } catch (err) {
     console.warn("[Main] Error cleaning up weather layers:", err);
@@ -660,6 +662,8 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
         await loadEventLayer(map, layer, win);
       } else if (layer.type === "profiler") {
         await loadProfilerLayer(map, layer, win);
+      } else if (layer.type === "image") {
+        await loadImageLayer(map, layer, win);
       }
     })
   );

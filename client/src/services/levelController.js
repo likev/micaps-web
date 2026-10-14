@@ -101,6 +101,18 @@ export async function changeVerticalLevel(map, direction, explicitLevel = null, 
           l.id = `contour-${l.model || "ECMWF_HR"}-${(l.element).toLowerCase()}-${targetLevel}`;
           const elemName = l.element === "VOR" ? "Relative Vorticity" : (l.element === "DIV" ? "Divergence" : "Wind Speed");
           l.name = `${targetLevel} hPa Derived ${elemName}`;
+        } else if (l.model === "SATELLITE" || (l.path && l.path.includes("FY4B"))) {
+          l.level = targetLevel;
+          const chan = Number(targetLevel);
+          let cm = "IR_TEMP";
+          if (chan >= 1 && chan <= 6) {
+            cm = "ALBEDO";
+          } else if (chan >= 8 && chan <= 10) {
+            cm = "WV";
+          }
+          if (!l.render) l.render = {};
+          l.render.colormap = cm;
+          l.colormap = cm;
         }
       }
     }

@@ -1,14 +1,19 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, beforeEach } from "bun:test";
 import { readSrcText } from "../helpers/cssText.js";
 import {
   createDefaultTab,
   createDefaultWindow,
   applyAutoAllocation,
   prepareSplitWindows,
+  setDefaultLayerResolver,
 } from "../../src/lib/stores/tabsCore.js";
 import { generateDynamicForecastCycles } from "../../src/utils/timelineSync.js";
 import { formatForecastInitTime, formatForecastValidTime } from "../../src/utils/formatters.js";
 import { parseTimestamp } from "../../src/utils/timeResolver.js";
+
+beforeEach(() => {
+  setDefaultLayerResolver(null);
+});
 
 describe("NavBar Layout Dropdown & Allocation Menu", () => {
   const navBarSrc = readSrcText("components/NavBar.svelte");

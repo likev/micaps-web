@@ -142,12 +142,82 @@ const NEW_COLORMAPS = {
     { val: 2, color: [255, 130, 0, 240] },
     { val: 3, color: [230, 30, 30, 255] },
   ],
+  IR_TEMP: [
+    { val: 180, color: [255, 255, 255, 255] },
+    { val: 195, color: [200, 30, 200, 255] },
+    { val: 210, color: [230, 40, 40, 255] },
+    { val: 220, color: [245, 140, 40, 255] },
+    { val: 230, color: [250, 220, 50, 255] },
+    { val: 240, color: [50, 180, 50, 255] },
+    { val: 250, color: [40, 140, 220, 255] },
+    { val: 260, color: [140, 200, 240, 220] },
+    { val: 275, color: [200, 200, 200, 180] },
+    { val: 290, color: [140, 140, 140, 220] },
+    { val: 305, color: [80, 80, 80, 255] },
+    { val: 320, color: [30, 30, 30, 255] },
+  ],
+  ALBEDO: [
+    { val: 0, color: [0, 0, 0, 255] },
+    { val: 10, color: [35, 35, 35, 255] },
+    { val: 25, color: [75, 75, 75, 255] },
+    { val: 50, color: [140, 140, 140, 255] },
+    { val: 75, color: [200, 200, 200, 255] },
+    { val: 100, color: [255, 255, 255, 255] },
+  ],
+  WV: [
+    { val: 190, color: [255, 255, 255, 255] },
+    { val: 205, color: [160, 30, 180, 255] },
+    { val: 215, color: [40, 90, 220, 255] },
+    { val: 225, color: [40, 180, 220, 255] },
+    { val: 235, color: [50, 190, 90, 255] },
+    { val: 245, color: [240, 210, 40, 255] },
+    { val: 255, color: [220, 110, 30, 255] },
+    { val: 265, color: [120, 50, 20, 255] },
+    { val: 275, color: [60, 20, 10, 255] },
+  ],
+  CTT: [
+    { val: 180, color: [255, 255, 255, 255] },
+    { val: 195, color: [200, 30, 200, 255] },
+    { val: 210, color: [230, 40, 40, 255] },
+    { val: 220, color: [245, 140, 40, 255] },
+    { val: 230, color: [250, 220, 50, 255] },
+    { val: 240, color: [50, 180, 50, 255] },
+    { val: 250, color: [40, 140, 220, 255] },
+    { val: 265, color: [140, 200, 240, 220] },
+    { val: 280, color: [180, 180, 180, 180] },
+    { val: 300, color: [100, 100, 100, 220] },
+    { val: 320, color: [30, 30, 30, 255] },
+  ],
+  DUST: [
+    { val: 0, color: [240, 240, 240, 0] },
+    { val: 10, color: [254, 237, 177, 160] },
+    { val: 25, color: [254, 209, 114, 200] },
+    { val: 50, color: [230, 150, 50, 240] },
+    { val: 75, color: [180, 90, 30, 255] },
+    { val: 100, color: [120, 40, 10, 255] },
+  ],
 };
 
 config.colormaps = { ...config.colormaps, ...NEW_COLORMAPS };
 
 function getRenderOptions(dataPath) {
   const p = dataPath.toUpperCase();
+  if (p.includes("CTT")) {
+    return { colormap: "CTT", showRaster: true, showFill: false, showLine: false };
+  }
+  if (p.includes("DUST")) {
+    return { colormap: "DUST", showRaster: true, showFill: false, showLine: false };
+  }
+  if (p.includes("CHINA/C001") || p.includes("CHINA/C002") || p.includes("CHINA/C003") || p.includes("CHINA/C004") || p.includes("CHINA/C005") || p.includes("CHINA/C006") ||
+      p.includes("DISK/C001") || p.includes("DISK/C002") || p.includes("DISK/C003") || p.includes("DISK/C004") || p.includes("DISK/C005") || p.includes("DISK/C006")) {
+    return { colormap: "ALBEDO", showRaster: true, showFill: false, showLine: false };
+  }
+  if (p.includes("C008") || p.includes("C009") || p.includes("C010")) {
+    return { colormap: "WV", showRaster: true, showFill: false, showLine: false };
+  }
+  if (p.includes("C007") || p.includes("C011") || p.includes("C012") || p.includes("C013") || p.includes("C014") || p.includes("C015")) {
+    return { colormap: "IR_TEMP", showRaster: true, showFill: false, showLine: false };
+  }
   if (p.includes("MCR") || p.includes("RADAR_COMBINATION_REFLECTIVITY") || p.includes("REF_FST") || p.includes("TDMOSAIC")) {
     return { colormap: "RADAR", showRaster: true, showFill: false, showLine: false };
   }
@@ -201,6 +271,9 @@ function getRenderOptions(dataPath) {
 
 function getCategory(item) {
   const p = item.dataPath;
+  if (p.startsWith("SATELLITE/")) {
+    return "气象卫星遥感 (Satellite Remote Sensing)";
+  }
   if (p.startsWith("SWAN_PRODUCT/") || p.includes("LIGHTNING") || p.includes("UPDRAFT_HELICITY") || (p.includes("DCAPE") && p.startsWith("GRAPES_3KM")) || p.includes("RADAR_COMBINATION_REFLECTIVITY")) {
     return "强对流与短临 (Severe Convective & Nowcasting)";
   }
@@ -255,12 +328,72 @@ newPresets.push({
   ],
 });
 
-// Filter to active Tier 1 and Tier 2 datasets
-const targetItems = manifest.filter((item) => (item.tier === 1 || item.tier === 2));
+// 2. Grouped FY-4B CHINA Preset (15 channels)
+newPresets.push({
+  category: "气象卫星遥感 (Satellite Remote Sensing)",
+  hasLevel: true,
+  defaultLevel: 12,
+  levels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+  id: "preset-fy4b_china_grouped",
+  name: "风云四号B星中国区 (FY-4B CHINA 15通道) / FY-4B CHINA Multi-Channel",
+  isObservation: true,
+  layers: [
+    {
+      id: "layer-fy4b_china_grouped",
+      name: "FY-4B CHINA (15 Channels)",
+      type: "contour",
+      model: "SATELLITE",
+      element: "FY4B/L1/CHINA",
+      path: "SATELLITE/FY4B/L1/CHINA",
+      level: 12,
+      render: {
+        colormap: "IR_TEMP",
+        showRaster: true,
+        showFill: false,
+        showLine: false,
+      },
+    },
+  ],
+});
+
+// 3. Grouped FY-4B DISK Preset (15 channels)
+newPresets.push({
+  category: "气象卫星遥感 (Satellite Remote Sensing)",
+  hasLevel: true,
+  defaultLevel: 12,
+  levels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+  id: "preset-fy4b_disk_grouped",
+  name: "风云四号B星全圆盘 (FY-4B DISK 15通道) / FY-4B DISK Multi-Channel",
+  isObservation: true,
+  layers: [
+    {
+      id: "layer-fy4b_disk_grouped",
+      name: "FY-4B DISK (15 Channels)",
+      type: "contour",
+      model: "SATELLITE",
+      element: "FY4B/L1/DISK",
+      path: "SATELLITE/FY4B/L1/DISK",
+      level: 12,
+      render: {
+        colormap: "IR_TEMP",
+        showRaster: true,
+        showFill: false,
+        showLine: false,
+      },
+    },
+  ],
+});
+
+// Filter to active Tier 1, Tier 2, and Tier 3 datasets
+const targetItems = manifest.filter((item) => (item.tier === 1 || item.tier === 2 || item.tier === 3));
 
 for (const item of targetItems) {
   // Skip individual PVORT entries since they are consolidated in preset-ecmwf_pvort
   if (item.dataPath.startsWith("ECMWF_HR/PVORT/")) {
+    continue;
+  }
+  // Skip individual FY-4B CHINA and DISK entries since they are consolidated in grouped presets
+  if (item.dataPath.startsWith("SATELLITE/FY4B/L1/CHINA/") || item.dataPath.startsWith("SATELLITE/FY4B/L1/DISK/")) {
     continue;
   }
 
@@ -276,10 +409,11 @@ for (const item of targetItems) {
   let hasLevel = false;
   let defaultLevel = undefined;
   let levels = undefined;
-  let isObservation = Boolean(item.format === "station" || item.format === "wind_profiler" || item.format === "lightning" || item.format === "swan_text" || item.table === "CLDAS" || item.table === "SURFACE" || item.table === "MARINE" || item.table === "SWAN_PRODUCT");
+  let isObservation = Boolean(item.format === "station" || item.format === "wind_profiler" || item.format === "lightning" || item.format === "swan_text" || item.format === "awx" || item.format === "bmp" || item.table === "SATELLITE" || item.table === "CLDAS" || item.table === "SURFACE" || item.table === "MARINE" || item.table === "SWAN_PRODUCT");
   let eventType = undefined;
   let product = undefined;
   let stationId = undefined;
+  let bounds = undefined;
 
   let render = getRenderOptions(item.dataPath);
 
@@ -294,6 +428,22 @@ for (const item of targetItems) {
     else if (item.dataPath.includes("HAIL")) eventType = "hail";
     else if (item.dataPath.includes("GALE")) eventType = "gale";
     else eventType = "default";
+  } else if (item.format === "bmp") {
+    layerType = "image";
+    bounds = [45.0, 5.0, 155.0, 55.0];
+  } else if (item.dataPath.includes("AMV")) {
+    layerType = "station";
+    hasLevel = true;
+    defaultLevel = 200;
+    levels = [200, 300, 500, 700, 850];
+    render = {
+      colormap: "WIND",
+      showWind: true,
+      showBarbs: true,
+      showTemp: false,
+      showPressure: false,
+      showVisibility: false,
+    };
   } else if (item.format === "station") {
     layerType = "station";
     render = {
@@ -312,6 +462,9 @@ for (const item of targetItems) {
       showRaster: false,
       keepWind: true,
     };
+  } else if (item.format === "awx") {
+    layerType = "contour";
+    render = getRenderOptions(item.dataPath);
   }
 
   if (item.dataPath.includes("TDMOSAIC")) {
@@ -333,6 +486,7 @@ for (const item of targetItems) {
   if (eventType) layerDef.eventType = eventType;
   if (product) layerDef.product = product;
   if (stationId) layerDef.stationId = stationId;
+  if (bounds) layerDef.bounds = bounds;
   if (hasLevel) layerDef.level = defaultLevel;
 
   const presetDef = {

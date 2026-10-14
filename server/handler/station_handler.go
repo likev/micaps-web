@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"micaps-web/db"
@@ -139,6 +140,15 @@ func (h *StationHandler) fetchStations(r *http.Request) (*model.GeoJSONFeatureCo
 
 	trimmed := bytes.TrimSpace(decompressed)
 	lowerTrimmed := bytes.ToLower(trimmed)
+	if parser.IsAWX(decompressed) {
+		var targetLevel float64
+		if lvlStr := r.URL.Query().Get("level"); lvlStr != "" {
+			if l, err := strconv.ParseFloat(lvlStr, 64); err == nil {
+				targetLevel = l
+			}
+		}
+		return parser.ParseAWXDiscrete(decompressed, targetLevel)
+	}
 	if bytes.HasPrefix(lowerTrimmed, []byte("diamond 35")) {
 		return parser.ParseSwanText(decompressed)
 	}
