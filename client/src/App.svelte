@@ -92,6 +92,11 @@
   import { initGlobalTheme, getGlobalTheme, normalizeTheme } from "./lib/stores/theme.svelte.js";
 
   let activeTab = $derived(tabsState.tabs.find((t) => t.id === tabsState.activeTabId) || tabsState.tabs[0] || null);
+  // Legend is shared across split windows only under auto-allocation
+  // (step/level/model/time: same content). Independent windows keep their own.
+  let perWindowLegend = $derived(
+    Boolean(activeTab && activeTab.layout !== "1x1" && (!activeTab.autoAllocation || activeTab.autoAllocation === "none"))
+  );
   let activeWin = $derived(activeTab && activeTab.windows ? (activeTab.windows[activeTab.activeWinIdx] || activeTab.windows[0]) : null);
   let visibleWindows = $derived(getVisibleWindows(activeTab));
 
@@ -239,6 +244,9 @@
     const targetLevel = win.activeGroup?.hasLevel === false ? null : (win.level ?? 500);
     const cycles = await resolveForecastCycles(model, element, targetLevel, forceRefresh);
     if (win._forecastRefreshSeq !== refreshSeq) return;
+    // Window may have become an observation (e.g. upper-air/surface loaded)
+    // while cycles were resolving: never flip its timeline back to NWP.
+    if (win.isObservation || !win.activeGroup) return;
     if (!cycles.length) return;
 
     const timeline = getOrCreateTimeline(win.id);
@@ -333,6 +341,7 @@
     const posIdx = activeTab.windows.length;
     const winObj = createDefaultWindow(posIdx, activeTab.id);
     winObj.uid = uid;
+    winObj.id = `tab-${activeTab.id}-win-${uid}`;
     const activeLayers = (Array.isArray(activeWin?.activeGroup?.layers) && activeWin.activeGroup.layers.length > 0)
       ? activeWin.activeGroup.layers
       : (Array.isArray(activeWin?.layers) && activeWin.layers.length > 0
@@ -1992,6 +2001,7 @@
             {win}
             isActive={win === activeWin}
             isVisible={visibleWindows.includes(win)}
+            perWindowLegend={perWindowLegend}
             onFocus={handleWindowFocus}
             onToggleMax={toggleTabsAndSplit}
             onMapCreated={(map) => handleMapCreated(win, map)}
@@ -2003,7 +2013,7 @@
 
     <FullscreenButton />
     <LayersPanel winId={activeWin?.id} onLayerAction={handleLayerAction} />
-    <Legend winId={activeWin?.id} />
+    <Legend winId={activeWin?.id} disabled={perWindowLegend} />
     <Tooltip />
     <Toast />
     <ConfigEditor onConfigSaved={handleConfigSaved} />

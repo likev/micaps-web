@@ -1,5 +1,6 @@
 <script>
   import MapViewport from "../map/MapViewport.svelte";
+  import Legend from "./Legend.svelte";
   import { getLayersForWindow } from "../lib/stores/layersCore.js";
   import { resolveAllLayersForStatus, parseTimestamp } from "../utils/timeResolver.js";
 
@@ -7,6 +8,7 @@
     win,
     isActive = false,
     isVisible = true,
+    perWindowLegend = false,
     onFocus = null,
     onToggleMax = null,
     onMapCreated = null,
@@ -117,6 +119,10 @@
       {onMapCreated}
       onMapDestroyed={() => onMapDestroyed && onMapDestroyed(win)}
     />
+
+    {#if perWindowLegend}
+      <Legend winId={win.id} perWindow={true} />
+    {/if}
 
     {#if hardStaleLayers.length > 0}
       <div class="stale-viewport-hatch" aria-hidden="true"></div>

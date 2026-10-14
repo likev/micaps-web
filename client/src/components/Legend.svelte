@@ -4,7 +4,7 @@
   import { buildLegendItems, setSvelteLegendOwner } from "../lib/stores/legendCore.js";
   import { legends, syncLegendState } from "../lib/stores/legend.svelte.js";
 
-  let { winId = "default" } = $props();
+  let { winId = "default", perWindow = false, disabled = false } = $props();
 
   onMount(() => {
     // Claim #legend-panel ownership so legacy direct-DOM writes stand down
@@ -23,8 +23,10 @@
   });
 </script>
 
-{#if !ui.configOpen && items && items.length > 0}
-  <div id="legend-panel" class="legend-panel" role="region" aria-label="Map Legends">
+{#if disabled}
+  <!-- per-window legends are rendered inside each window (unshared split) -->
+{:else if !ui.configOpen && items && items.length > 0}
+  <div id={perWindow ? `legend-panel-${winId}` : "legend-panel"} class="legend-panel" role="region" aria-label="Map Legends">
     {#each items as item (item.key || item.layerId || item.element)}
       <div class="legend-item">
         <div class="legend-header">
@@ -80,7 +82,7 @@
       </div>
     {/each}
   </div>
-{:else}
+{:else if !perWindow}
   <div id="legend-panel" class="legend-panel hidden"></div>
 {/if}
 
