@@ -4,7 +4,7 @@ import { resolvePMTilesUrl, MAP_PROJECTIONS, resolveInitialProjection, setMapPro
 
 describe("Multi-Tier Vector Basemap (World / China / Province / City / County)", () => {
   test("BASEMAP_SCHEMES defines complete 5-tier styles for dark, light, and micaps", () => {
-    const requiredSchemes = ["dark", "light", "micaps"];
+    const requiredSchemes = ["dark", "light", "brutalism"];
     for (const sName of requiredSchemes) {
       const scheme = BASEMAP_SCHEMES[sName];
       expect(scheme).toBeDefined();

@@ -8,7 +8,7 @@ import { setBasemapScheme, resolveInitialBasemapScheme } from "../src/map/mapIns
 
 describe("Unified Map and Plot Theme System", () => {
   test("THEME_TOKENS defines complete map and plot tokens for dark, light, and micaps", () => {
-    const themeIds = ["dark", "light", "micaps"];
+    const themeIds = ["dark", "light", "brutalism"];
 
     for (const id of themeIds) {
       const theme = THEME_TOKENS[id];
@@ -54,7 +54,7 @@ describe("Unified Map and Plot Theme System", () => {
   test("Contrast design: dark themes use dark halos, light theme uses light halo", () => {
     const darkPlot = getPlotTokens("dark");
     const lightPlot = getPlotTokens("light");
-    const micapsPlot = getPlotTokens("micaps");
+    const micapsPlot = getPlotTokens("brutalism");
 
     expect(darkPlot.halo).toContain("0, 0, 0");
     expect(lightPlot.halo).toContain("255, 255, 255");
@@ -160,10 +160,10 @@ describe("Unified Map and Plot Theme System", () => {
     expect(paintProperties["background"]["background-color"]).toBe(THEME_TOKENS.light.map.background);
 
     // Switch to micaps theme
-    applyBasemapScheme(mockMap, "micaps");
-    expect(mockMap.__basemapScheme).toBe("micaps");
-    expect(state.config.__themeId).toBe("micaps");
-    expect(paintProperties["background"]["background-color"]).toBe(THEME_TOKENS.micaps.map.background);
+    applyBasemapScheme(mockMap, "brutalism");
+    expect(mockMap.__basemapScheme).toBe("brutalism");
+    expect(state.config.__themeId).toBe("brutalism");
+    expect(paintProperties["background"]["background-color"]).toBe(THEME_TOKENS.brutalism.map.background);
   });
 
   test("Wind barb and sky cover symbols adapt colors according to theme tokens", async () => {
@@ -316,7 +316,7 @@ describe("Unified Map and Plot Theme System", () => {
     expect(light.dot).toEqual({ fill: "#e67700", stroke: "rgba(255, 255, 255, 0.5)" });
 
     // 3. MICAPS theme (§3.3.2)
-    const micaps = THEME_TOKENS.micaps.plot;
+    const micaps = THEME_TOKENS.brutalism.plot;
     expect(micaps.halo).toBe("rgba(7, 11, 20, 0.92)");
     expect(micaps.haloWidth).toBe(2.5);
     expect(micaps.font).toBe("'SF Mono', ui-monospace, monospace");
@@ -348,8 +348,8 @@ describe("Unified Map and Plot Theme System", () => {
       expect(resolveInitialBasemapScheme()).toBe("dark");
 
       // Setting micaps in storage
-      storage["micaps-basemap-scheme"] = "micaps";
-      expect(resolveInitialBasemapScheme()).toBe("micaps");
+      storage["micaps-basemap-scheme"] = "brutalism";
+      expect(resolveInitialBasemapScheme()).toBe("brutalism");
 
       // Setting light in storage
       storage["micaps-basemap-scheme"] = "light";
@@ -364,11 +364,11 @@ describe("Unified Map and Plot Theme System", () => {
       };
       const state = getState(mockMap);
 
-      setBasemapScheme(mockMap, "micaps");
-      expect(mockMap.__basemapScheme).toBe("micaps");
-      expect(state.config.__themeId).toBe("micaps");
-      expect(storage["micaps-basemap-scheme"]).toBe("micaps");
-      expect(resolveInitialBasemapScheme()).toBe("micaps");
+      setBasemapScheme(mockMap, "brutalism");
+      expect(mockMap.__basemapScheme).toBe("brutalism");
+      expect(state.config.__themeId).toBe("brutalism");
+      expect(storage["micaps-basemap-scheme"]).toBe("brutalism");
+      expect(resolveInitialBasemapScheme()).toBe("brutalism");
 
       setBasemapScheme(mockMap, "dark");
       expect(mockMap.__basemapScheme).toBe("dark");

@@ -9,6 +9,7 @@ describe("Pro Menu Bar Redesign & Button/Tag Aesthetic", () => {
   const presetMenuSrc = readSrcText("components/PresetMenu.svelte");
   const navbarCss = readSrcText("styles/navbar.css");
   const tokensCss = readSrcText("styles/tokens.css");
+  const polishCss = readSrcText("styles/polish.css");
 
   test("NavBar.svelte incorporates pro workstation header styling", () => {
     // Backdrop blur, subtle box shadow, and dark surface gradient
@@ -95,10 +96,10 @@ describe("Pro Menu Bar Redesign & Button/Tag Aesthetic", () => {
     expect(tokensCss).toContain('[data-theme="light"] .preset-active-indicator');
     expect(tokensCss).toContain('[data-theme="light"] .btn-nav-layout.active');
 
-    expect(tokensCss).toContain('[data-theme="micaps"] .btn-nav-layout');
-    expect(tokensCss).toContain('[data-theme="micaps"] .nav-tag-capsule');
-    expect(tokensCss).toContain('[data-theme="micaps"] .preset-active-indicator');
-    expect(tokensCss).toContain('[data-theme="micaps"] .btn-nav-layout.active');
+    expect(polishCss).toContain('[data-theme="brutalism"] #app :is(.btn, .btn-menu, .btn-nav-layout');
+    expect(polishCss).toContain('.nav-tag-capsule');
+    expect(polishCss).toContain('.preset-active-indicator');
+    expect(polishCss).toContain('.btn-nav-layout.active');
   });
 
   test("NavBar.svelte features nav-divider and horizontal overflow containment on quick-pills", () => {
@@ -119,17 +120,16 @@ describe("Pro Menu Bar Redesign & Button/Tag Aesthetic", () => {
     expect(navbarCss).toContain(".nav-select option");
   });
 
-  test("styles/tokens.css provides high-contrast light and micaps theme rules for tags and active pills", () => {
+  test("styles/tokens.css provides high-contrast light and brutalism theme rules for tags and active pills", () => {
     expect(tokensCss).toContain('[data-theme="light"] .quick-pill.active');
     expect(tokensCss).toContain('[data-theme="light"] .preset-active-indicator .active-tag');
     expect(tokensCss).toContain('[data-theme="light"] .preset-badge');
     expect(tokensCss).toContain('[data-theme="light"] .category-count');
     expect(tokensCss).toContain('[data-theme="light"] .menu-shortcut');
 
-    expect(tokensCss).toContain('[data-theme="micaps"] .quick-pill.active');
-    expect(tokensCss).toContain('[data-theme="micaps"] .preset-active-indicator .active-tag');
-    expect(tokensCss).toContain('[data-theme="micaps"] .preset-active-indicator .active-dot');
-    expect(tokensCss).toContain('[data-theme="micaps"] .brand-badge');
+    expect(polishCss).toContain('.quick-pill.active');
+    expect(polishCss).toContain('[data-theme="brutalism"] #app .brand-badge');
+    expect(polishCss).toContain('.menu-shortcut');
   });
 
   test("responsive.css defines responsive rules for quick-pills and active indicator", () => {

@@ -728,7 +728,7 @@
             >
               <option value="dark">🌙 Ink (Dark)</option>
               <option value="light">☀️ Paper (Light)</option>
-              <option value="micaps">🌐 Slate Blue (Navy)</option>
+              <option value="brutalism">⬛ Brutalism (Raw)</option>
             </select>
           </div>
 

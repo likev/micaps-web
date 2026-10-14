@@ -6,7 +6,7 @@ const SLUG_REGEX = /^[a-z0-9][a-z0-9-_]*$/i;
 const ALLOWED_LAYER_TYPES = new Set(["contour", "wind", "station", "tlogp", "timeheight", "lineheight", "hovmoller"]);
 export const PROFILE_LEVELS_SET = new Set([1000, 925, 850, 700, 600, 500, 400, 300, 250, 200]);
 export const SUPPORTED_LINE_STEPS = new Set([1, 3, 6, 12, 24]);
-const ALLOWED_BASEMAP_SCHEMES = new Set(["light", "dark", "micaps"]);
+const ALLOWED_BASEMAP_SCHEMES = new Set(["light", "dark", "brutalism"]);
 const ALLOWED_BASEMAP_PROJECTIONS = new Set(["mercator", "globe", "vertical-perspective"]);
 
 export function isValidSlug(str) {

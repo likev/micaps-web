@@ -35,7 +35,7 @@
     { id: "act-help", title: "Open Keyboard Shortcuts Help", category: "Actions", icon: "⌨️", execute: () => { ui.helpModalOpen = true; } },
     { id: "act-theme-light", title: "Theme: Light (Paper)", category: "Theme", icon: "☀️", execute: () => setGlobalTheme("light") },
     { id: "act-theme-dark", title: "Theme: Dark (Ink)", category: "Theme", icon: "🌙", execute: () => setGlobalTheme("dark") },
-    { id: "act-theme-micaps", title: "Theme: MICAPS Classic Green", category: "Theme", icon: "🟩", execute: () => setGlobalTheme("micaps") },
+    { id: "act-theme-brutalism", title: "Theme: Brutalism", category: "Theme", icon: "🟨", execute: () => setGlobalTheme("brutalism") },
     { id: "act-proj-mercator", title: "Projection: Mercator (2D)", category: "Projection", icon: "🗺️", execute: () => setGlobalProjection("mercator") },
     { id: "act-proj-globe", title: "Projection: Globe (3D)", category: "Projection", icon: "🌐", execute: () => setGlobalProjection("globe") },
     { id: "act-proj-perspective", title: "Projection: Vertical Perspective", category: "Projection", icon: "🪐", execute: () => setGlobalProjection("vertical-perspective") },

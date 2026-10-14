@@ -57,7 +57,7 @@ export function isMatchingStationLayer(a, b) {
 export function resolveDefaultScheme() {
   try {
     const s = localStorage.getItem("micaps-basemap-scheme");
-    if (s === "light" || s === "dark" || s === "micaps") return s;
+    if (s === "light" || s === "dark" || s === "brutalism") return s;
   } catch {}
   try {
     const cfg = typeof window !== "undefined" ? window.__MICAPS_CONFIG__ : null;

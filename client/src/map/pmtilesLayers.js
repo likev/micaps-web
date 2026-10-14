@@ -5,7 +5,7 @@ import { updateVisibleMarkersForMap } from "../layers/station/stationCanvas.js";
 export const BASEMAP_SCHEMES = {
   dark: THEME_TOKENS.dark.map,
   light: THEME_TOKENS.light.map,
-  micaps: THEME_TOKENS.micaps.map,
+  brutalism: THEME_TOKENS.brutalism.map,
 };
 
 export function getBasemapScheme(name) {

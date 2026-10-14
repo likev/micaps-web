@@ -128,7 +128,7 @@ export async function loadPresetGroups() {
   // persist basemap scheme and projection for next map creation (maptile only, no UI chrome change)
   try {
     const scheme = config?.basemap?.scheme;
-    if (scheme === "light" || scheme === "dark" || scheme === "micaps") {
+    if (scheme === "light" || scheme === "dark" || scheme === "brutalism") {
       try { if (typeof localStorage !== "undefined") localStorage.setItem("micaps-basemap-scheme", scheme); } catch {}
     }
     const proj = config?.basemap?.projection;
@@ -169,7 +169,7 @@ export async function savePresetConfig(configObj = CURRENT_CONFIG) {
     if (typeof window !== "undefined") window.__MICAPS_CONFIG__ = configObj;
     if (typeof globalThis !== "undefined") globalThis.__MICAPS_CONFIG__ = configObj;
     const scheme = configObj?.basemap?.scheme;
-    if (scheme === "light" || scheme === "dark" || scheme === "micaps") {
+    if (scheme === "light" || scheme === "dark" || scheme === "brutalism") {
       try { if (typeof localStorage !== "undefined") localStorage.setItem("micaps-basemap-scheme", scheme); } catch {}
     }
     const proj = configObj?.basemap?.projection;
@@ -191,7 +191,7 @@ export function autoSaveLayerConfig(layer) {
     if (!CURRENT_CONFIG.basemap) CURRENT_CONFIG.basemap = {};
     if (layer.config) {
       Object.assign(CURRENT_CONFIG.basemap, layer.config);
-      if (layer.config.scheme && (layer.config.scheme === "light" || layer.config.scheme === "dark" || layer.config.scheme === "micaps")) {
+      if (layer.config.scheme && (layer.config.scheme === "light" || layer.config.scheme === "dark" || layer.config.scheme === "brutalism")) {
         try { if (typeof localStorage !== "undefined") localStorage.setItem("micaps-basemap-scheme", layer.config.scheme); } catch {}
       }
       if (layer.config.projection && (layer.config.projection === "mercator" || layer.config.projection === "globe" || layer.config.projection === "vertical-perspective")) {

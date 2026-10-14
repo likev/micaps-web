@@ -7,12 +7,12 @@ import { CURRENT_CONFIG } from "../../config/presets.js";
 import { getState } from "../../layers/station/stationState.js";
 import { drawStationCanvas } from "../../layers/station/stationCanvas.js";
 
-export const ALLOWED_THEMES = ["dark", "light", "micaps"];
+export const ALLOWED_THEMES = ["dark", "light", "brutalism"];
 
 export const THEME_LABELS = {
   dark: "Dark (Ink)",
   light: "Light (Paper)",
-  micaps: "MICAPS Classic Green",
+  brutalism: "Brutalism (Raw)",
 };
 
 export const PROJECTIONS = [

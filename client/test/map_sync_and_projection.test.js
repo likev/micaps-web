@@ -250,7 +250,7 @@ describe("Map Config Projection Persistence", () => {
       type: "pmtiles",
       config: {
         projection: "vertical-perspective",
-        scheme: "micaps",
+        scheme: "brutalism",
         showGraticule: true,
       },
     };
@@ -258,10 +258,10 @@ describe("Map Config Projection Persistence", () => {
     autoSaveLayerConfig(pmtilesLayer);
 
     expect(CURRENT_CONFIG.basemap.projection).toBe("vertical-perspective");
-    expect(CURRENT_CONFIG.basemap.scheme).toBe("micaps");
+    expect(CURRENT_CONFIG.basemap.scheme).toBe("brutalism");
     if (typeof localStorage !== "undefined") {
       expect(localStorage.getItem("micaps-map-projection")).toBe("vertical-perspective");
-      expect(localStorage.getItem("micaps-basemap-scheme")).toBe("micaps");
+      expect(localStorage.getItem("micaps-basemap-scheme")).toBe("brutalism");
     }
   });
 

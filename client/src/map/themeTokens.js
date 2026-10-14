@@ -87,12 +87,12 @@ export const THEME_TOKENS = {
       dot: { fill: "#e67700", stroke: "rgba(255, 255, 255, 0.5)" },
     },
   },
-  micaps: {
-    id: "micaps",
-    name: "Slate Blue",
+  brutalism: {
+    id: "brutalism",
+    name: "Brutalism",
     map: {
-      id: "micaps",
-      name: "Slate Blue",
+      id: "brutalism",
+      name: "Brutalism",
       background: "#070b14",
       fills: {
         world: "#0a1020",

@@ -103,17 +103,17 @@
             <span class="radio-card-title">Paper</span>
             <span class="radio-card-sub">Light</span>
           </label>
-          <label class="radio-card" class:selected={scheme === "micaps"} title="MICAPS Classic Green">
+          <label class="radio-card" class:selected={scheme === "brutalism"} title="Brutalism">
             <input
               type="radio"
               name="basemap-scheme"
-              value="micaps"
-              checked={scheme === "micaps"}
-              onchange={() => setScheme("micaps")}
+              value="brutalism"
+              checked={scheme === "brutalism"}
+              onchange={() => setScheme("brutalism")}
             />
-            <span class="radio-card-icon">🟩</span>
-            <span class="radio-card-title">MICAPS</span>
-            <span class="radio-card-sub">Classic Green</span>
+            <span class="radio-card-icon">🟨</span>
+            <span class="radio-card-title">Brutal</span>
+            <span class="radio-card-sub">Raw</span>
           </label>
         </div>
       </div>

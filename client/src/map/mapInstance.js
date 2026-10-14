@@ -77,7 +77,7 @@ export function resolveInitialProjection() {
 export function resolveInitialBasemapScheme() {
   try {
     const stored = typeof localStorage !== "undefined" ? localStorage.getItem("micaps-basemap-scheme") : null;
-    if (stored && (stored === "dark" || stored === "light" || stored === "micaps")) return stored;
+    if (stored && (stored === "dark" || stored === "light" || stored === "brutalism")) return stored;
   } catch {}
   try {
     // also check CURRENT_CONFIG if already loaded (dynamic import to avoid circular dep)

@@ -73,33 +73,35 @@ afterAll(() => {
 
 describe("Item H & Global UI Theme Scheme", () => {
   const tokensCss = readSrcText("styles/tokens.css");
+  const polishCss = readSrcText("styles/polish.css");
   const navBarSrc = readSrcText("components/NavBar.svelte");
   const settingsSrc = readSrcText("components/config/SettingsForm.svelte");
 
-  test("tokens.css defines tokens for dark, light, and micaps Classic Green themes", () => {
+  test("tokens.css defines dark and light tokens; polish.css defines the Brutalism theme", () => {
     expect(tokensCss).toContain('[data-theme="dark"]');
     expect(tokensCss).toContain('[data-theme="light"]');
-    expect(tokensCss).toContain('[data-theme="micaps"]');
+    expect(polishCss).toContain('[data-theme="brutalism"]');
     expect(tokensCss).toContain('--bg-primary');
     expect(tokensCss).toContain('--bg-secondary');
     expect(tokensCss).toContain('--border-color');
     expect(tokensCss).toContain('--text-primary');
 
-    // MICAPS classic green palette
-    expect(tokensCss).toContain("#05140d");
-    expect(tokensCss).toContain("#0a2016");
+    // Brutalism palette: cream paper, black rules, yellow highlight
+    expect(polishCss).toContain("#f2efe6");
+    expect(polishCss).toContain("#ffe14d");
+    expect(tokensCss).not.toContain('data-theme="micaps"');
   });
 
   test("setGlobalTheme updates activeTheme, DOM attributes, localStorage, and CURRENT_CONFIG", () => {
-    expect(ALLOWED_THEMES).toEqual(["dark", "light", "micaps"]);
+    expect(ALLOWED_THEMES).toEqual(["dark", "light", "brutalism"]);
 
-    setGlobalTheme("micaps");
-    expect(getGlobalTheme()).toBe("micaps");
-    expect(document.documentElement.getAttribute("data-theme")).toBe("micaps");
-    expect(document.documentElement.getAttribute("data-scheme")).toBe("micaps");
-    expect(localStorage.getItem("micaps-ui-theme")).toBe("micaps");
-    expect(localStorage.getItem("micaps-basemap-scheme")).toBe("micaps");
-    expect(CURRENT_CONFIG.theme).toBe("micaps");
+    setGlobalTheme("brutalism");
+    expect(getGlobalTheme()).toBe("brutalism");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("brutalism");
+    expect(document.documentElement.getAttribute("data-scheme")).toBe("brutalism");
+    expect(localStorage.getItem("micaps-ui-theme")).toBe("brutalism");
+    expect(localStorage.getItem("micaps-basemap-scheme")).toBe("brutalism");
+    expect(CURRENT_CONFIG.theme).toBe("brutalism");
 
     setGlobalTheme("light");
     expect(getGlobalTheme()).toBe("light");
@@ -112,12 +114,12 @@ describe("Item H & Global UI Theme Scheme", () => {
   test("NavBar and SettingsForm provide Theme Scheme and Projection switches", () => {
     expect(navBarSrc).toContain('id="menu-item-theme-light"');
     expect(navBarSrc).toContain('id="menu-item-theme-dark"');
-    expect(navBarSrc).toContain('id="menu-item-theme-micaps"');
+    expect(navBarSrc).toContain('id="menu-item-theme-brutalism"');
     expect(navBarSrc).toContain('setGlobalTheme("dark")');
     expect(navBarSrc).toContain('setGlobalTheme("light")');
-    expect(navBarSrc).toContain('setGlobalTheme("micaps")');
+    expect(navBarSrc).toContain('setGlobalTheme("brutalism")');
     expect(navBarSrc).toContain('setGlobalProjection');
-    expect(settingsSrc).toContain('MICAPS Classic Green');
+    expect(settingsSrc).toContain('Brutalism');
   });
 
   test("Projection switching persists to localStorage and CURRENT_CONFIG", () => {
@@ -140,8 +142,8 @@ describe("Item H & Global UI Theme Scheme", () => {
     };
     mapInstances.set("win-test-theme", mockMap);
 
-    setGlobalTheme("micaps");
-    expect(mockMap.__basemapScheme).toBe("micaps");
+    setGlobalTheme("brutalism");
+    expect(mockMap.__basemapScheme).toBe("brutalism");
 
     setGlobalTheme("light");
     expect(mockMap.__basemapScheme).toBe("light");
@@ -391,6 +393,7 @@ describe("Tasks 1-6 Alignment & Theme Hardening", () => {
   const presetMenuSrc = readSrcText("components/PresetMenu.svelte");
   const statusBarSrc = readSrcText("components/StatusBar.svelte");
   const tokensCss = readSrcText("styles/tokens.css");
+  const polishCss = readSrcText("styles/polish.css");
 
   test("Item 2: nav-left is placed after nav-brand and has overflow: visible", () => {
     expect(navBarSrc).toContain('class="nav-left"');
@@ -424,10 +427,10 @@ describe("Tasks 1-6 Alignment & Theme Hardening", () => {
     expect(tokensCss).toMatch(/\[data-theme="light"\][^{]*\.timeline-stepper/);
     expect(tokensCss).toMatch(/\[data-theme="light"\][^{]*\.layout-controls/);
 
-    expect(tokensCss).toMatch(/\[data-theme="micaps"\][^{]*tabpanel/);
-    expect(tokensCss).toMatch(/\[data-theme="micaps"\][^{]*\.preset-menu-container/);
-    expect(tokensCss).toMatch(/\[data-theme="micaps"\][^{]*\.timeline-stepper/);
-    expect(tokensCss).toMatch(/\[data-theme="micaps"\][^{]*\.layout-controls/);
+    expect(polishCss).toMatch(/\[data-theme="brutalism"\][^{]*tabpanel/);
+    expect(polishCss).toMatch(/\[data-theme="brutalism"\][^{]*\.preset-menu-container/);
+    expect(polishCss).toMatch(/\[data-theme="brutalism"\][^{]*\.timeline-stepper/);
+    expect(polishCss).toMatch(/\[data-theme="brutalism"\][^{]*\.layout-controls/);
 
     expect(tokensCss).toMatch(/\[data-theme="dark"\][^{]*tabpanel/);
     expect(tokensCss).toMatch(/\[data-theme="dark"\][^{]*\.preset-menu-container/);

@@ -699,15 +699,15 @@
 
           <button
             type="button"
-            id="menu-item-theme-micaps"
+            id="menu-item-theme-brutalism"
             class="nav-menu-item"
-            class:selected={currentTheme === "micaps"}
+            class:selected={currentTheme === "brutalism"}
             role="menuitem"
-            onclick={() => { setGlobalTheme("micaps"); isMenuOpen = false; }}
+            onclick={() => { setGlobalTheme("brutalism"); isMenuOpen = false; }}
           >
-            <span class="menu-item-icon">🟩</span>
-            <span class="menu-item-label">MICAPS Classic Green</span>
-            {#if currentTheme === "micaps"}<span class="menu-check">✓</span>{/if}
+            <span class="menu-item-icon">🟨</span>
+            <span class="menu-item-label">Brutalism</span>
+            {#if currentTheme === "brutalism"}<span class="menu-check">✓</span>{/if}
           </button>
 
           <div class="menu-divider" role="separator"></div>
