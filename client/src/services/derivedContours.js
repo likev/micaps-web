@@ -313,10 +313,21 @@ export async function renderSurfaceDerivedContoursForStation(map, stations, acti
               setColormaps({ ...COLORMAPS, [paletteKey]: stops });
               cfg.colormap = paletteKey;
             }
-          } catch {}
+            } catch {}
+          }
+        let targetStations = stations;
+        if (cLayer.path && cLayer.path.includes("/api/derived/")) {
+          try {
+            const derivedStn = await fetchStationObservations(cLayer.path, cfg.file || win?.obsTime || "");
+            if (derivedStn && Array.isArray(derivedStn.features) && derivedStn.features.length >= 3) {
+              targetStations = derivedStn;
+            }
+          } catch (e) {
+            console.warn(`[derivedContours] Failed to fetch derived surface stations for ${cLayer.path}:`, e);
+          }
         }
 
-        analyzeAndRenderSurfaceContours(map, stations, elem, cfg, win);
+        analyzeAndRenderSurfaceContours(map, targetStations, elem, cfg, win);
         const renderedLayer = getLayersForWindow(win).find((l) => l.id === targetId);
         if (renderedLayer && (renderedLayer.config?.showRaster || cLayer.render?.showRaster) && isVisible) {
           await triggerRasterOverlay(map, renderedLayer, win);
@@ -392,8 +403,19 @@ export async function renderSurfaceDerivedContoursForStation(map, stations, acti
               }
             } catch {}
           }
+          let targetStations = stations;
+          if (cLayer.path && cLayer.path.includes("/api/derived/")) {
+            try {
+              const derivedStn = await fetchStationObservations(cLayer.path, win?.obsTime || "");
+              if (derivedStn && Array.isArray(derivedStn.features) && derivedStn.features.length >= 3) {
+                targetStations = derivedStn;
+              }
+            } catch (e) {
+              console.warn(`[derivedContours] Failed to fetch derived surface stations for ${cLayer.path}:`, e);
+            }
+          }
 
-          analyzeAndRenderSurfaceContours(map, stations, elem, cfg, win);
+          analyzeAndRenderSurfaceContours(map, targetStations, elem, cfg, win);
           const renderedLayer = getLayersForWindow(win).find((l) => l.id === targetId);
           if (renderedLayer && (renderedLayer.config?.showRaster || cLayer.config?.showRaster) && isVisible) {
             await triggerRasterOverlay(map, renderedLayer, win);

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"micaps-web/db"
 	"micaps-web/filecache"
@@ -52,6 +53,11 @@ func (h *DerivedHandler) DirectHandler(w http.ResponseWriter, r *http.Request) {
 			latest, err := db.GetLatestCycle(h.Client, underlying, "")
 			if err == nil && latest != "" {
 				dReq.File = latest
+			} else {
+				files, errList := db.GetFileList(h.Client, underlying, 1)
+				if errList == nil && len(files) > 0 {
+					dReq.File = files[0].Name
+				}
 			}
 		}
 		if dReq.File == "" || dReq.File == "latest" {
@@ -111,6 +117,7 @@ func (h *DerivedHandler) DirectHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *DerivedHandler) fetchGridLevel(modelName, element, level, file string) (*model.GridResponse, error) {
+	modelName = NormalizeModelName(modelName)
 	if h.MockMode || h.Client == nil {
 		lvlF := float32(850)
 		if l, err := strconv.ParseFloat(level, 32); err == nil {
@@ -128,6 +135,10 @@ func (h *DerivedHandler) fetchGridLevel(modelName, element, level, file string) 
 	fullPath := modelName + "/" + element + "/" + level
 	table := modelName
 	subDataPath := element + "/" + level
+	if level == "" || level == "0" {
+		fullPath = modelName + "/" + element
+		subDataPath = element
+	}
 
 	if h.Cache != nil {
 		if cachedBlob, _, ok := h.Cache.Get(table, subDataPath, file); ok {
@@ -139,6 +150,28 @@ func (h *DerivedHandler) fetchGridLevel(modelName, element, level, file string) 
 	}
 
 	rawBlob, err := db.GetBlob(h.Client, fullPath, file)
+	if err != nil {
+		if level == "" || level == "0" {
+			altPath := modelName + "/" + element + "/0"
+			if fullPath == altPath {
+				altPath = modelName + "/" + element
+			}
+			if altBlob, altErr := db.GetBlob(h.Client, altPath, file); altErr == nil {
+				rawBlob = altBlob
+				err = nil
+				fullPath = altPath
+				subDataPath = strings.TrimPrefix(altPath, modelName+"/")
+			}
+		} else {
+			altPath := modelName + "/" + element
+			if altBlob, altErr := db.GetBlob(h.Client, altPath, file); altErr == nil {
+				rawBlob = altBlob
+				err = nil
+				fullPath = altPath
+				subDataPath = element
+			}
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("fetchGridLevel (%s, %s): %w", fullPath, file, err)
 	}
@@ -155,8 +188,25 @@ func (h *DerivedHandler) fetchGridLevel(modelName, element, level, file string) 
 	return parser.ParseGridData(decompressed)
 }
 
-func (h *DerivedHandler) fetchStationLevel(subPath, level, file string) (*model.GeoJSONFeatureCollection, error) {
-	fullPath := "UPPER_AIR/" + subPath + "/" + level
+func (h *DerivedHandler) fetchStationData(modelName, subPath, level, file string) (*model.GeoJSONFeatureCollection, error) {
+	var fullPath string
+	if strings.EqualFold(modelName, "SURFACE") {
+		sub := subPath
+		if sub == "" {
+			sub = "PLOT_GLOBAL_3H"
+		}
+		fullPath = "SURFACE/" + sub
+	} else {
+		sub := subPath
+		if sub == "" {
+			sub = "PLOT"
+		}
+		lvl := level
+		if lvl == "" {
+			lvl = "850"
+		}
+		fullPath = "UPPER_AIR/" + sub + "/" + lvl
+	}
 
 	if h.MockMode || h.Client == nil {
 		return mock.GenerateMockStationsForPath(fullPath), nil
@@ -166,8 +216,11 @@ func (h *DerivedHandler) fetchStationLevel(subPath, level, file string) (*model.
 	if err != nil && !strings.HasSuffix(file, ".000") && len(file) == 14 {
 		rawBlob, err = db.GetBlob(h.Client, fullPath, file+".000")
 	}
+	if err != nil && strings.HasSuffix(file, ".000") {
+		rawBlob, err = db.GetBlob(h.Client, fullPath, strings.TrimSuffix(file, ".000"))
+	}
 	if err != nil {
-		return nil, fmt.Errorf("fetchStationLevel (%s, %s): %w", fullPath, file, err)
+		return nil, fmt.Errorf("fetchStationData (%s, %s): %w", fullPath, file, err)
 	}
 
 	decompressed, err := parser.DecompressGzip(rawBlob)
@@ -176,6 +229,344 @@ func (h *DerivedHandler) fetchStationLevel(subPath, level, file string) (*model.
 	}
 
 	return parser.ParseStationData(decompressed)
+}
+
+func (h *DerivedHandler) fetchStationLevel(subPath, level, file string) (*model.GeoJSONFeatureCollection, error) {
+	return h.fetchStationData("UPPER_AIR", subPath, level, file)
+}
+
+func (h *DerivedHandler) fetchGridLevelWithFallback(modelName, element, level, file string) (*model.GridResponse, error) {
+	grid, err := h.fetchGridLevel(modelName, element, level, file)
+	if err == nil && grid != nil && len(grid.Values) > 0 {
+		return grid, nil
+	}
+	if element == "TMP_2M" {
+		if g2, err2 := h.fetchGridLevel(modelName, "TMP", "1000", file); err2 == nil && len(g2.Values) > 0 {
+			return g2, nil
+		}
+		if g3, err3 := h.fetchGridLevel(modelName, "TMP", "850", file); err3 == nil && len(g3.Values) > 0 {
+			return g3, nil
+		}
+	} else if element == "PRMSL" {
+		if g2, err2 := h.fetchGridLevel(modelName, "MSL", "0", file); err2 == nil && len(g2.Values) > 0 {
+			return g2, nil
+		}
+		if g3, err3 := h.fetchGridLevel(modelName, "SLP", "0", file); err3 == nil && len(g3.Values) > 0 {
+			return g3, nil
+		}
+	}
+	return grid, err
+}
+
+func (h *DerivedHandler) resolvePriorStationFile(modelName, underlyingPath, currFile string, deltaHours int) (string, error) {
+	cleanFile := currFile
+	if strings.Contains(cleanFile, "/") {
+		parts := strings.Split(cleanFile, "/")
+		cleanFile = parts[len(parts)-1]
+	}
+
+	var currTime time.Time
+	var err error
+	hasDot000 := strings.HasSuffix(cleanFile, ".000")
+	timeStr := strings.TrimSuffix(cleanFile, ".000")
+
+	if len(timeStr) >= 14 {
+		currTime, err = time.Parse("20060102150405", timeStr[:14])
+	} else if len(timeStr) >= 10 {
+		currTime, err = time.Parse("2006010215", timeStr[:10])
+	} else {
+		err = fmt.Errorf("invalid station observation timestamp format: %s", cleanFile)
+	}
+
+	if err != nil {
+		if h.MockMode || h.Client == nil {
+			currTime = time.Now().UTC()
+		} else {
+			return "", fmt.Errorf("parse observation file time %s: %w", cleanFile, err)
+		}
+	}
+
+	targetTime := currTime.Add(-time.Duration(deltaHours) * time.Hour)
+	var exactFile string
+	if hasDot000 || len(cleanFile) > 14 {
+		exactFile = targetTime.Format("20060102150405") + ".000"
+	} else {
+		exactFile = targetTime.Format("20060102150405")
+	}
+
+	if h.MockMode || h.Client == nil {
+		return exactFile, nil
+	}
+
+	// 1. Try exact file
+	if _, errBlob := db.GetBlob(h.Client, underlyingPath, exactFile); errBlob == nil {
+		return exactFile, nil
+	}
+	if hasDot000 {
+		altExact := targetTime.Format("20060102150405")
+		if _, errBlob := db.GetBlob(h.Client, underlyingPath, altExact); errBlob == nil {
+			return altExact, nil
+		}
+	} else {
+		altExact := targetTime.Format("20060102150405") + ".000"
+		if _, errBlob := db.GetBlob(h.Client, underlyingPath, altExact); errBlob == nil {
+			return altExact, nil
+		}
+	}
+
+	// 2. Query available files to find closest file within tolerance
+	files, errList := db.GetFileList(h.Client, underlyingPath, 100)
+	if errList == nil && len(files) > 0 {
+		var closestFile string
+		minDiff := time.Duration(6) * time.Hour
+		for _, f := range files {
+			fClean := strings.TrimSuffix(f.Name, ".000")
+			var fTime time.Time
+			var fErr error
+			if len(fClean) >= 14 {
+				fTime, fErr = time.Parse("20060102150405", fClean[:14])
+			} else if len(fClean) >= 10 {
+				fTime, fErr = time.Parse("2006010215", fClean[:10])
+			}
+			if fErr == nil {
+				diff := fTime.Sub(targetTime)
+				if diff < 0 {
+					diff = -diff
+				}
+				if diff < minDiff {
+					minDiff = diff
+					closestFile = f.Name
+				}
+			}
+		}
+		if closestFile != "" {
+			return closestFile, nil
+		}
+	}
+
+	return "", fmt.Errorf("no prior station observation file found near %s (delta=%dh)", targetTime.Format("20060102150405"), deltaHours)
+}
+
+func (h *DerivedHandler) resolvePriorGridFile(modelName, element, level, currFile string, deltaHours int) (string, error) {
+	modelName = NormalizeModelName(modelName)
+	cleanFile := currFile
+	if strings.Contains(cleanFile, "/") {
+		parts := strings.Split(cleanFile, "/")
+		cleanFile = parts[len(parts)-1]
+	}
+
+	parts := strings.Split(cleanFile, ".")
+	if len(parts) < 2 {
+		return "", fmt.Errorf("invalid NWP file format (expected cycle.period): %s", cleanFile)
+	}
+
+	cycleStr := parts[0]
+	leadStr := parts[1]
+	lead, errLead := strconv.Atoi(leadStr)
+	if errLead != nil {
+		return "", fmt.Errorf("invalid NWP lead period in file %s: %w", cleanFile, errLead)
+	}
+
+	if lead >= deltaHours {
+		priorLead := lead - deltaHours
+		var candidate string
+		if len(leadStr) >= 3 {
+			candidate = fmt.Sprintf("%s.%03d", cycleStr, priorLead)
+		} else {
+			candidate = fmt.Sprintf("%s.%d", cycleStr, priorLead)
+		}
+
+		if h.MockMode || h.Client == nil {
+			return candidate, nil
+		}
+
+		fullPath := modelName + "/" + element + "/" + level
+		if level == "" || level == "0" {
+			fullPath = modelName + "/" + element
+		}
+		if _, err := db.GetBlob(h.Client, fullPath, candidate); err == nil {
+			return candidate, nil
+		}
+		if level == "0" || level == "" {
+			altPath := modelName + "/" + element + "/0"
+			if fullPath == altPath {
+				altPath = modelName + "/" + element
+			}
+			if _, err := db.GetBlob(h.Client, altPath, candidate); err == nil {
+				return candidate, nil
+			}
+		}
+		altCandidate := fmt.Sprintf("%s.%03d", cycleStr, priorLead)
+		if _, err := db.GetBlob(h.Client, fullPath, altCandidate); err == nil {
+			return altCandidate, nil
+		}
+		if level == "0" || level == "" {
+			altPath := modelName + "/" + element + "/0"
+			if fullPath == altPath {
+				altPath = modelName + "/" + element
+			}
+			if _, err := db.GetBlob(h.Client, altPath, altCandidate); err == nil {
+				return altCandidate, nil
+			}
+		}
+		if element == "PRMSL" {
+			for _, altElem := range []string{"MSL", "SLP"} {
+				p := modelName + "/" + altElem
+				if _, err := db.GetBlob(h.Client, p, candidate); err == nil {
+					return candidate, nil
+				}
+				if _, err := db.GetBlob(h.Client, p+"/0", candidate); err == nil {
+					return candidate, nil
+				}
+				if _, err := db.GetBlob(h.Client, p, altCandidate); err == nil {
+					return altCandidate, nil
+				}
+			}
+		}
+	}
+
+	var cycleTime time.Time
+	var errCycle error
+	if len(cycleStr) == 8 {
+		y, _ := strconv.Atoi(cycleStr[0:2])
+		m, _ := strconv.Atoi(cycleStr[2:4])
+		d, _ := strconv.Atoi(cycleStr[4:6])
+		hh, _ := strconv.Atoi(cycleStr[6:8])
+		cycleTime = time.Date(2000+y, time.Month(m), d, hh, 0, 0, 0, time.UTC)
+	} else if len(cycleStr) >= 10 {
+		y, _ := strconv.Atoi(cycleStr[0:4])
+		m, _ := strconv.Atoi(cycleStr[4:6])
+		d, _ := strconv.Atoi(cycleStr[6:8])
+		hh, _ := strconv.Atoi(cycleStr[8:10])
+		cycleTime = time.Date(y, time.Month(m), d, hh, 0, 0, 0, time.UTC)
+	} else {
+		errCycle = fmt.Errorf("unknown NWP cycle format: %s", cycleStr)
+	}
+
+	if errCycle != nil || h.MockMode || h.Client == nil {
+		if lead >= deltaHours {
+			return fmt.Sprintf("%s.%03d", cycleStr, lead-deltaHours), nil
+		}
+		if !cycleTime.IsZero() {
+			priorCycleTime := cycleTime.Add(-time.Duration(deltaHours) * time.Hour)
+			if len(cycleStr) == 8 {
+				return fmt.Sprintf("%s.%03d", priorCycleTime.Format("06010215"), lead), nil
+			}
+			return fmt.Sprintf("%s.%03d", priorCycleTime.Format("2006010215"), lead), nil
+		}
+		priorLead := lead - deltaHours
+		if priorLead < 0 {
+			priorLead = 0
+		}
+		return fmt.Sprintf("%s.%03d", cycleStr, priorLead), nil
+	}
+
+	targetValidTime := cycleTime.Add(time.Duration(lead)*time.Hour - time.Duration(deltaHours)*time.Hour)
+
+	fullPath := modelName + "/" + element + "/" + level
+	if level == "" || level == "0" {
+		fullPath = modelName + "/" + element
+	}
+
+	// 1. Direct prior cycle check (cycleTime - deltaHours, same lead)
+	if !cycleTime.IsZero() {
+		priorCycleTime := cycleTime.Add(-time.Duration(deltaHours) * time.Hour)
+		var priorCycleStr string
+		if len(cycleStr) == 8 {
+			priorCycleStr = priorCycleTime.Format("06010215")
+		} else {
+			priorCycleStr = priorCycleTime.Format("2006010215")
+		}
+		candidatePriorCycle := fmt.Sprintf("%s.%03d", priorCycleStr, lead)
+		if _, err := db.GetBlob(h.Client, fullPath, candidatePriorCycle); err == nil {
+			return candidatePriorCycle, nil
+		}
+		candidatePriorCycleShort := fmt.Sprintf("%s.%d", priorCycleStr, lead)
+		if _, err := db.GetBlob(h.Client, fullPath, candidatePriorCycleShort); err == nil {
+			return candidatePriorCycleShort, nil
+		}
+		if level == "0" || level == "" {
+			altPath := modelName + "/" + element + "/0"
+			if fullPath == altPath {
+				altPath = modelName + "/" + element
+			}
+			if _, err := db.GetBlob(h.Client, altPath, candidatePriorCycle); err == nil {
+				return candidatePriorCycle, nil
+			}
+		}
+		if element == "PRMSL" {
+			for _, altElem := range []string{"MSL", "SLP"} {
+				p := modelName + "/" + altElem
+				if _, err := db.GetBlob(h.Client, p, candidatePriorCycle); err == nil {
+					return candidatePriorCycle, nil
+				}
+				if _, err := db.GetBlob(h.Client, p, candidatePriorCycleShort); err == nil {
+					return candidatePriorCycleShort, nil
+				}
+			}
+		}
+	}
+
+	// 2. Search available files near target valid time within tolerance
+	files, errList := db.GetFileList(h.Client, fullPath, 100)
+	if (errList != nil || len(files) == 0) && (level == "0" || level == "") {
+		altPath := modelName + "/" + element + "/0"
+		if fullPath == altPath {
+			altPath = modelName + "/" + element
+		}
+		files, errList = db.GetFileList(h.Client, altPath, 100)
+	}
+	if (errList != nil || len(files) == 0) && element == "PRMSL" {
+		files, errList = db.GetFileList(h.Client, modelName+"/MSL", 100)
+		if errList != nil || len(files) == 0 {
+			files, errList = db.GetFileList(h.Client, modelName+"/SLP", 100)
+		}
+	}
+	if errList == nil && len(files) > 0 {
+		var closestFile string
+		minDiff := time.Duration(6) * time.Hour
+		for _, f := range files {
+			fParts := strings.Split(f.Name, ".")
+			if len(fParts) < 2 {
+				continue
+			}
+			fCycleStr := fParts[0]
+			fLead, fLeadErr := strconv.Atoi(fParts[1])
+			if fLeadErr != nil {
+				continue
+			}
+			var fCycleTime time.Time
+			if len(fCycleStr) == 8 {
+				y, _ := strconv.Atoi(fCycleStr[0:2])
+				m, _ := strconv.Atoi(fCycleStr[2:4])
+				d, _ := strconv.Atoi(fCycleStr[4:6])
+				hh, _ := strconv.Atoi(fCycleStr[6:8])
+				fCycleTime = time.Date(2000+y, time.Month(m), d, hh, 0, 0, 0, time.UTC)
+			} else if len(fCycleStr) >= 10 {
+				y, _ := strconv.Atoi(fCycleStr[0:4])
+				m, _ := strconv.Atoi(fCycleStr[4:6])
+				d, _ := strconv.Atoi(fCycleStr[6:8])
+				hh, _ := strconv.Atoi(fCycleStr[8:10])
+				fCycleTime = time.Date(y, time.Month(m), d, hh, 0, 0, 0, time.UTC)
+			} else {
+				continue
+			}
+			fValidTime := fCycleTime.Add(time.Duration(fLead) * time.Hour)
+			diff := fValidTime.Sub(targetValidTime)
+			if diff < 0 {
+				diff = -diff
+			}
+			if diff < minDiff {
+				minDiff = diff
+				closestFile = f.Name
+			}
+		}
+		if closestFile != "" {
+			return closestFile, nil
+		}
+	}
+
+	return "", fmt.Errorf("no prior NWP grid file found near target valid time %s (delta=%dh)", targetValidTime.Format("2006-01-02 15:04"), deltaHours)
 }
 
 func (h *DerivedHandler) fetchDewpointGrid(modelName, level, file string, tempGrid *model.GridResponse) []float64 {
@@ -205,6 +596,10 @@ func (h *DerivedHandler) fetchDewpointGrid(modelName, level, file string, tempGr
 
 // CalculateDerivedGrid executes real-time server-side derivation for NWP grids
 func (h *DerivedHandler) CalculateDerivedGrid(req *DerivedRequest) (*model.GridResponse, error) {
+	if req.IsTimeDerived {
+		return h.calculateTimeDerivedGrid(req)
+	}
+
 	file := req.File
 	if file == "" {
 		return nil, fmt.Errorf("file parameter required for derived grid")
@@ -701,8 +1096,12 @@ func (h *DerivedHandler) CalculateDerivedGrid(req *DerivedRequest) (*model.GridR
 	}
 }
 
-// CalculateDerivedStation executes real-time server-side derivation for UPPER_AIR sounding stations
+// CalculateDerivedStation executes real-time server-side derivation for UPPER_AIR sounding stations or SURFACE stations
 func (h *DerivedHandler) CalculateDerivedStation(req *DerivedRequest) (*model.GeoJSONFeatureCollection, error) {
+	if req.IsTimeDerived {
+		return h.calculateTimeDerivedStation(req)
+	}
+
 	file := req.File
 	if file == "" {
 		return nil, fmt.Errorf("file parameter required for derived station layer")
@@ -1303,3 +1702,316 @@ func copyProps(props map[string]interface{}) map[string]interface{} {
 	}
 	return m
 }
+
+func (h *DerivedHandler) calculateTimeDerivedGrid(req *DerivedRequest) (*model.GridResponse, error) {
+	file := req.File
+	underlying := ResolveUnderlyingCatalogPath(req)
+	if file == "" || file == "latest" {
+		if h.Client != nil && !h.MockMode {
+			latest, err := db.GetLatestCycle(h.Client, underlying, "")
+			if err == nil && latest != "" {
+				file = latest
+			} else {
+				files, errList := db.GetFileList(h.Client, underlying, 1)
+				if errList == nil && len(files) > 0 {
+					file = files[0].Name
+				}
+			}
+		}
+		if file == "" || file == "latest" {
+			file = "26101408.024"
+		}
+	}
+
+	hours := req.TimeDeltaHours
+	if hours <= 0 {
+		hours = 24
+	}
+
+	isSLP := req.DerivedType == "SLP-VARIATION-24H" || req.DerivedType == "SLP-VARIATION-48H" || req.Element == "PRMSL" || req.Element == "SLP"
+
+	elem := req.Element
+	lvl := req.Level1
+	if isSLP {
+		elem = "PRMSL"
+		lvl = "0"
+	} else {
+		if lvl != "" && lvl != "0" && !strings.EqualFold(lvl, "SURFACE") {
+			elem = "TMP"
+		} else {
+			elem = "TMP_2M"
+			lvl = "0"
+		}
+	}
+
+	priorFile, errPrior := h.resolvePriorGridFile(req.Model, elem, lvl, file, hours)
+	if errPrior != nil {
+		return nil, fmt.Errorf("resolve prior grid file (delta=%dh): %w", hours, errPrior)
+	}
+
+	gridCurr, errCurr := h.fetchGridLevelWithFallback(req.Model, elem, lvl, file)
+	if errCurr != nil {
+		return nil, fmt.Errorf("fetch current grid (%s/%s/%s, %s): %w", req.Model, elem, lvl, file, errCurr)
+	}
+
+	gridPrior, errPriorFetch := h.fetchGridLevelWithFallback(req.Model, elem, lvl, priorFile)
+	if errPriorFetch != nil {
+		return nil, fmt.Errorf("fetch prior grid (%s/%s/%s, %s): %w", req.Model, elem, lvl, priorFile, errPriorFetch)
+	}
+
+	nPoints := len(gridCurr.Values)
+	if len(gridPrior.Values) != nPoints {
+		return nil, fmt.Errorf("grid dimension mismatch: current (%d) vs prior (%d)", nPoints, len(gridPrior.Values))
+	}
+
+	resValues := make([]float32, nPoints)
+	var minVal float32 = math.MaxFloat32
+	var maxVal float32 = -math.MaxFloat32
+	var sumVal float32 = 0
+	validCount := 0
+
+	// In mock mode without live CQL, synthesize realistic variations
+	if (h.MockMode || h.Client == nil) && (file == priorFile || gridCurr.Stats.Min == gridPrior.Stats.Min) {
+		factor := float32(hours) / 24.0
+		for i := 0; i < nPoints; i++ {
+			x := float32(gridCurr.X[i%len(gridCurr.X)])
+			y := float32(gridCurr.Y[i/len(gridCurr.X)])
+			var val float32
+			if isSLP {
+				val = float32(math.Sin(float64(x)*0.08)*math.Cos(float64(y)*0.08)*8.0) * factor
+			} else {
+				val = float32(math.Sin(float64(x)*0.06)*math.Cos(float64(y)*0.06)*10.0) * factor
+			}
+			resValues[i] = val
+			if val < minVal {
+				minVal = val
+			}
+			if val > maxVal {
+				maxVal = val
+			}
+			sumVal += val
+			validCount++
+		}
+	} else {
+		for i := 0; i < nPoints; i++ {
+			v1 := gridCurr.Values[i]
+			v2 := gridPrior.Values[i]
+			if v1 <= -9000 || v2 <= -9000 || math.IsNaN(float64(v1)) || math.IsNaN(float64(v2)) {
+				resValues[i] = -9999
+				continue
+			}
+			diff := v1 - v2
+			resValues[i] = diff
+			if diff < minVal {
+				minVal = diff
+			}
+			if diff > maxVal {
+				maxVal = diff
+			}
+			sumVal += diff
+			validCount++
+		}
+	}
+
+	resp := &model.GridResponse{
+		Header: gridCurr.Header,
+		X:      gridCurr.X,
+		Y:      gridCurr.Y,
+		Values: resValues,
+	}
+	resp.Header.Element = req.DerivedType
+	paramDesc := "Temperature"
+	if isSLP {
+		paramDesc = "Sea Level Pressure"
+	}
+	resp.Header.Description = fmt.Sprintf("%d-Hour %s Variation (%s)", hours, paramDesc, req.Model)
+	resp.Header.IsolineStartValue = -20
+	resp.Header.IsolineEndValue = 20
+	resp.Header.IsolineSpace = 2
+
+	if validCount > 0 {
+		resp.Stats = model.GridStats{
+			Min:  minVal,
+			Max:  maxVal,
+			Mean: sumVal / float32(validCount),
+		}
+	}
+
+	return resp, nil
+}
+
+func (h *DerivedHandler) calculateTimeDerivedStation(req *DerivedRequest) (*model.GeoJSONFeatureCollection, error) {
+	file := req.File
+	underlying := ResolveUnderlyingCatalogPath(req)
+	if file == "" || file == "latest" {
+		if h.Client != nil && !h.MockMode {
+			latest, err := db.GetLatestCycle(h.Client, underlying, "")
+			if err == nil && latest != "" {
+				file = latest
+			} else {
+				files, errList := db.GetFileList(h.Client, underlying, 1)
+				if errList == nil && len(files) > 0 {
+					file = files[0].Name
+				}
+			}
+		}
+		if file == "" || file == "latest" {
+			file = "20261014080000.000"
+		}
+	}
+
+	hours := req.TimeDeltaHours
+	if hours <= 0 {
+		hours = 24
+	}
+
+	priorFile, errPrior := h.resolvePriorStationFile(req.Model, underlying, file, hours)
+	if errPrior != nil {
+		return nil, fmt.Errorf("resolve prior station file (delta=%dh): %w", hours, errPrior)
+	}
+
+	stnCurr, errCurr := h.fetchStationData(req.Model, req.SubPath, req.Level1, file)
+	if errCurr != nil {
+		return nil, fmt.Errorf("fetch current station data (%s, %s): %w", underlying, file, errCurr)
+	}
+
+	stnPrior, errPriorFetch := h.fetchStationData(req.Model, req.SubPath, req.Level1, priorFile)
+	if errPriorFetch != nil {
+		return nil, fmt.Errorf("fetch prior station data (%s, %s): %w", underlying, priorFile, errPriorFetch)
+	}
+
+	isSLP := req.DerivedType == "SLP-VARIATION-24H" || req.DerivedType == "SLP-VARIATION-48H" || req.Element == "SLP"
+
+	if h.MockMode || h.Client == nil {
+		features := make([]model.GeoJSONFeature, 0, len(stnCurr.Features))
+		for _, f := range stnCurr.Features {
+			id := extractStationID(f)
+			props := make(map[string]interface{}, len(f.Properties)+8)
+			for k, v := range f.Properties {
+				props[k] = v
+			}
+
+			sign := 1.0
+			if id%2 == 0 {
+				sign = -1.0
+			}
+			factor := float64(hours) / 24.0
+
+			if isSLP {
+				deltaP := float32(math.Round((sign*float64(id%9)*0.8*factor)*10) / 10)
+				props["slp"] = deltaP
+				props["slp_variation"] = deltaP
+				props[fmt.Sprintf("slp_var_%dh", hours)] = deltaP
+				props["slp_var"] = deltaP
+				props["val"] = deltaP
+				props["value"] = deltaP
+				props["time_delta_h"] = hours
+			} else {
+				deltaT := float32(math.Round((sign*float64(id%7)*1.2*factor)*10) / 10)
+				props["temperature"] = deltaT
+				props["t_variation"] = deltaT
+				props[fmt.Sprintf("t_var_%dh", hours)] = deltaT
+				props["t_var"] = deltaT
+				props["val"] = deltaT
+				props["value"] = deltaT
+				props["time_delta_h"] = hours
+			}
+
+			fNew := f
+			fNew.Properties = props
+			features = append(features, fNew)
+		}
+		return &model.GeoJSONFeatureCollection{Type: "FeatureCollection", Features: features}, nil
+	}
+
+	priorMap := make(map[int32]model.GeoJSONFeature, len(stnPrior.Features))
+	for _, f := range stnPrior.Features {
+		id := extractStationID(f)
+		if id > 0 {
+			priorMap[id] = f
+		}
+	}
+
+	features := make([]model.GeoJSONFeature, 0, len(stnCurr.Features))
+	for _, f := range stnCurr.Features {
+		id := extractStationID(f)
+		if id <= 0 {
+			continue
+		}
+
+		fPrior, ok := priorMap[id]
+		if !ok {
+			continue
+		}
+
+		props := make(map[string]interface{}, len(f.Properties)+8)
+		for k, v := range f.Properties {
+			props[k] = v
+		}
+
+		if isSLP {
+			slpCurr, ok1 := extractFloat(f.Properties["slp"])
+			if !ok1 {
+				slpCurr, ok1 = extractFloat(f.Properties["press_slp"])
+			}
+			if !ok1 {
+				slpCurr, ok1 = extractFloat(f.Properties["press_stn"])
+			}
+			slpPrior, ok2 := extractFloat(fPrior.Properties["slp"])
+			if !ok2 {
+				slpPrior, ok2 = extractFloat(fPrior.Properties["press_slp"])
+			}
+			if !ok2 {
+				slpPrior, ok2 = extractFloat(fPrior.Properties["press_stn"])
+			}
+			if !ok1 || !ok2 || slpCurr <= 0 || slpPrior <= 0 || slpCurr < 800 || slpPrior < 800 || slpCurr > 1100 || slpPrior > 1100 {
+				continue
+			}
+			diff := float32(math.Round((slpCurr-slpPrior)*10) / 10)
+			props["slp"] = diff
+			props["slp_variation"] = diff
+			props[fmt.Sprintf("slp_var_%dh", hours)] = diff
+			props["slp_var"] = diff
+			props["val"] = diff
+			props["value"] = diff
+			props["slp_curr"] = float32(slpCurr)
+			props["slp_prev"] = float32(slpPrior)
+			props["time_delta_h"] = hours
+		} else {
+			tCurr, ok1 := extractFloat(f.Properties["temperature"])
+			if !ok1 {
+				tCurr, ok1 = extractFloat(f.Properties["temp"])
+			}
+			if !ok1 {
+				tCurr, ok1 = extractFloat(f.Properties["tmp"])
+			}
+			tPrior, ok2 := extractFloat(fPrior.Properties["temperature"])
+			if !ok2 {
+				tPrior, ok2 = extractFloat(fPrior.Properties["temp"])
+			}
+			if !ok2 {
+				tPrior, ok2 = extractFloat(fPrior.Properties["tmp"])
+			}
+			if !ok1 || !ok2 || tCurr <= -9000 || tPrior <= -9000 || tCurr < -90 || tPrior < -90 || tCurr > 70 || tPrior > 70 {
+				continue
+			}
+			diff := float32(math.Round((tCurr-tPrior)*10) / 10)
+			props["temperature"] = diff
+			props["t_variation"] = diff
+			props[fmt.Sprintf("t_var_%dh", hours)] = diff
+			props["t_var"] = diff
+			props["val"] = diff
+			props["value"] = diff
+			props["t_curr"] = float32(tCurr)
+			props["t_prev"] = float32(tPrior)
+			props["time_delta_h"] = hours
+		}
+
+		fNew := f
+		fNew.Properties = props
+		features = append(features, fNew)
+	}
+
+	return &model.GeoJSONFeatureCollection{Type: "FeatureCollection", Features: features}, nil
+}
+

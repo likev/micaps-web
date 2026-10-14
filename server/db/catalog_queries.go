@@ -67,6 +67,20 @@ func candidateDataPaths(dataPath string) []string {
 		add("TLOGP")
 	}
 
+	if strings.HasPrefix(dataPath, "CMA_GFS/") {
+		add("GRAPES_GFS/" + strings.TrimPrefix(dataPath, "CMA_GFS/"))
+	}
+	if strings.HasPrefix(dataPath, "CMA-GFS/") {
+		add("GRAPES_GFS/" + strings.TrimPrefix(dataPath, "CMA-GFS/"))
+	}
+	if strings.HasPrefix(dataPath, "CMAGFS/") {
+		add("GRAPES_GFS/" + strings.TrimPrefix(dataPath, "CMAGFS/"))
+	}
+	if strings.HasPrefix(dataPath, "GFS/") {
+		add("GRAPES_GFS/" + strings.TrimPrefix(dataPath, "GFS/"))
+		add("NCEP_GFS/" + strings.TrimPrefix(dataPath, "GFS/"))
+	}
+
 	parts := strings.Split(dataPath, "/")
 	if len(parts) == 3 {
 		add(parts[1] + "/" + parts[2])
@@ -177,13 +191,25 @@ func GetPressureLevels(client *CQLClient, dataPath string) ([]int, error) {
 		return nil, fmt.Errorf("empty dataPath")
 	}
 
-	candidates := []string{dataPath}
+	rawCandidates := []string{dataPath}
 	if !strings.Contains(dataPath, "/") {
-		candidates = append(candidates, dataPath+"/TMP", dataPath+"/HGT", dataPath+"/UGRD")
+		rawCandidates = append(rawCandidates, dataPath+"/TMP", dataPath+"/HGT", dataPath+"/UGRD")
 	} else {
 		parts := strings.Split(dataPath, "/")
-		if len(parts) >= 2 && parts[1] != "TMP" {
-			candidates = append(candidates, parts[0]+"/TMP", parts[0]+"/HGT")
+		rawCandidates = append(rawCandidates, parts[0]+"/TMP", parts[0]+"/HGT")
+		if len(parts) >= 3 {
+			rawCandidates = append(rawCandidates, parts[0]+"/"+parts[1])
+		}
+	}
+
+	seenCand := make(map[string]bool)
+	var candidates []string
+	for _, rc := range rawCandidates {
+		for _, cp := range candidateDataPaths(rc) {
+			if !seenCand[cp] {
+				seenCand[cp] = true
+				candidates = append(candidates, cp)
+			}
 		}
 	}
 

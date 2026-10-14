@@ -424,6 +424,114 @@ export const SOUNDING_CONTOUR_CONFIGS = {
     showLine: true,
     showRaster: false,
   },
+  T_VARIATION_24H: {
+    name: "24h Temperature Variation",
+    element: "T_VARIATION_24H",
+    unit: "°C",
+    defaultColor: "#f85149",
+    colormap: "T_VAR",
+    extract: (p) => {
+      const candidates = [p.t_var_24h, p.t_var, p.temperature, p.temp, p.tmp, p.val, p.value];
+      for (const val of candidates) {
+        if (typeof val === "number" && !isNaN(val) && val > -9000 && val >= -60 && val <= 60) {
+          return val;
+        }
+      }
+      return null;
+    },
+    getLevels: (level, minV, maxV) => {
+      const std = [-16, -12, -8, -6, -4, -2, 0, 2, 4, 6, 8, 12, 16];
+      if (typeof minV === "number" && typeof maxV === "number" && (maxV < -16 || minV > 16)) {
+        return Array.from(griddata.autoLevels(minV, maxV, 8));
+      }
+      return std;
+    },
+    getBoldValues: () => [0],
+    showFill: false,
+    showLine: true,
+    showRaster: false,
+  },
+  T_VARIATION_48H: {
+    name: "48h Temperature Variation",
+    element: "T_VARIATION_48H",
+    unit: "°C",
+    defaultColor: "#f85149",
+    colormap: "T_VAR",
+    extract: (p) => {
+      const candidates = [p.t_var_48h, p.t_var, p.temperature, p.temp, p.tmp, p.val, p.value];
+      for (const val of candidates) {
+        if (typeof val === "number" && !isNaN(val) && val > -9000 && val >= -60 && val <= 60) {
+          return val;
+        }
+      }
+      return null;
+    },
+    getLevels: (level, minV, maxV) => {
+      const std = [-20, -16, -12, -8, -4, -2, 0, 2, 4, 8, 12, 16, 20];
+      if (typeof minV === "number" && typeof maxV === "number" && (maxV < -20 || minV > 20)) {
+        return Array.from(griddata.autoLevels(minV, maxV, 8));
+      }
+      return std;
+    },
+    getBoldValues: () => [0],
+    showFill: false,
+    showLine: true,
+    showRaster: false,
+  },
+  SLP_VARIATION_24H: {
+    name: "24h SLP Variation",
+    element: "SLP_VARIATION_24H",
+    unit: "hPa",
+    defaultColor: "#58a6ff",
+    colormap: "SLP_VAR",
+    extract: (p) => {
+      const candidates = [p.slp_var_24h, p.slp_var, p.slp, p.press_slp, p.val, p.value];
+      for (const val of candidates) {
+        if (typeof val === "number" && !isNaN(val) && val > -9000 && val >= -100 && val <= 100) {
+          return val;
+        }
+      }
+      return null;
+    },
+    getLevels: (level, minV, maxV) => {
+      const std = [-16, -12, -8, -6, -4, -2, 0, 2, 4, 6, 8, 12, 16];
+      if (typeof minV === "number" && typeof maxV === "number" && (maxV < -16 || minV > 16)) {
+        return Array.from(griddata.autoLevels(minV, maxV, 8));
+      }
+      return std;
+    },
+    getBoldValues: () => [0],
+    showFill: false,
+    showLine: true,
+    showRaster: false,
+  },
+  SLP_VARIATION_48H: {
+    name: "48h SLP Variation",
+    element: "SLP_VARIATION_48H",
+    unit: "hPa",
+    defaultColor: "#58a6ff",
+    colormap: "SLP_VAR",
+    extract: (p) => {
+      const candidates = [p.slp_var_48h, p.slp_var, p.slp, p.press_slp, p.val, p.value];
+      for (const val of candidates) {
+        if (typeof val === "number" && !isNaN(val) && val > -9000 && val >= -100 && val <= 100) {
+          return val;
+        }
+      }
+      return null;
+    },
+    getLevels: (level, minV, maxV) => {
+      const std = [-20, -16, -12, -8, -4, -2, 0, 2, 4, 8, 12, 16, 20];
+      if (typeof minV === "number" && typeof maxV === "number" && (maxV < -20 || minV > 20)) {
+        return Array.from(griddata.autoLevels(minV, maxV, 8));
+      }
+      return std;
+    },
+    getBoldValues: () => [0],
+    showFill: false,
+    showLine: true,
+    showRaster: false,
+  },
 };
 
 // Aliases for derived stability indices and multi-level differences
@@ -431,23 +539,48 @@ SOUNDING_CONTOUR_CONFIGS["K-INDEX"] = SOUNDING_CONTOUR_CONFIGS.K_INDEX;
 SOUNDING_CONTOUR_CONFIGS["T850-500"] = SOUNDING_CONTOUR_CONFIGS.TMP_DIFF;
 SOUNDING_CONTOUR_CONFIGS["TMP850-500"] = SOUNDING_CONTOUR_CONFIGS.TMP_DIFF;
 SOUNDING_CONTOUR_CONFIGS["DIFF"] = SOUNDING_CONTOUR_CONFIGS.TMP_DIFF;
+SOUNDING_CONTOUR_CONFIGS["T-VARIATION-24H"] = SOUNDING_CONTOUR_CONFIGS.T_VARIATION_24H;
+SOUNDING_CONTOUR_CONFIGS["T-VARIATION-48H"] = SOUNDING_CONTOUR_CONFIGS.T_VARIATION_48H;
+SOUNDING_CONTOUR_CONFIGS["SLP-VARIATION-24H"] = SOUNDING_CONTOUR_CONFIGS.SLP_VARIATION_24H;
+SOUNDING_CONTOUR_CONFIGS["SLP-VARIATION-48H"] = SOUNDING_CONTOUR_CONFIGS.SLP_VARIATION_48H;
+SOUNDING_CONTOUR_CONFIGS["T_VAR_24H"] = SOUNDING_CONTOUR_CONFIGS.T_VARIATION_24H;
+SOUNDING_CONTOUR_CONFIGS["T_VAR_48H"] = SOUNDING_CONTOUR_CONFIGS.T_VARIATION_48H;
+SOUNDING_CONTOUR_CONFIGS["SLP_VAR_24H"] = SOUNDING_CONTOUR_CONFIGS.SLP_VARIATION_24H;
+SOUNDING_CONTOUR_CONFIGS["SLP_VAR_48H"] = SOUNDING_CONTOUR_CONFIGS.SLP_VARIATION_48H;
 
 export function normalizeSoundingElementKey(elem) {
-  const norm = (elem || "").toUpperCase();
-  if (norm === "HGT" || norm === "HEIGHT" || norm === "GH" || norm === "GEO" || norm === "H") return "HGT";
-  if (norm === "TD" || norm === "DPT" || norm === "DEWPOINT" || norm === "DEW_POINT") return "TD";
-  if (norm === "WIND" || norm === "WS" || norm === "WINDSPEED" || norm === "WIND_SPEED" || norm === "FF") return "WIND";
-  if (norm === "DTD" || norm === "T-TD" || norm === "TTD" || norm === "DEPRESSION" || norm === "DPTDPR") return "DTD";
-  if (norm === "VOR" || norm === "VORT" || norm === "VORTICITY" || norm === "RVOR" || norm === "REL_VOR") return "VOR";
-  if (norm === "DIV" || norm === "DIVERGENCE") return "DIV";
-  if (norm === "K" || norm === "K_INDEX" || norm === "K-INDEX" || norm === "KINDEX") return "K_INDEX";
-  if (norm === "SHOWALTER" || norm === "SHOWALTER_INDEX" || norm === "SSI" || norm === "SI") return "SHOWALTER";
-  if (norm === "LIFTED" || norm === "LIFTED_INDEX" || norm === "LI") return "LIFTED";
-  if (norm === "SWEAT" || norm === "SWEAT_INDEX" || norm === "SEVERE_WEATHER_THREAT") return "SWEAT";
-  if (norm === "TT" || norm === "TOTAL_TOTALS" || norm === "TOTAL_TOTALS_INDEX" || norm === "TOTALTOTALS") return "TT";
-  if (norm === "SHEAR" || norm === "WIND_SHEAR" || norm === "VERTICAL_SHEAR") return "SHEAR";
-  if (norm === "THICKNESS" || norm === "HGT_DIFF") return "THICKNESS";
-  if (norm === "TMP_DIFF" || norm === "T_DIFF" || norm === "T850-500" || norm === "TMP850-500" || norm === "850-500") return "TMP_DIFF";
-  if (norm === "TMP" || norm === "TEMPERATURE" || norm === "TEMP" || norm === "T") return "TMP";
+  const upper = (elem || "").toUpperCase().trim();
+  const hyphen = upper.replace(/_/g, "-");
+
+  if (
+    hyphen.includes("SLP-VAR") ||
+    hyphen.includes("PRS-VAR") ||
+    hyphen.includes("PRESS-VAR") ||
+    hyphen.includes("PRESSURE-VAR") ||
+    hyphen.includes("PRMSL-VAR") ||
+    ((hyphen.includes("SLP") || hyphen.includes("PRS") || hyphen.includes("PRMSL")) && (hyphen.includes("VAR") || hyphen.includes("24") || hyphen.includes("48")))
+  ) {
+    if (hyphen.includes("48")) return "SLP_VARIATION_48H";
+    return "SLP_VARIATION_24H";
+  }
+  if (hyphen.includes("T-VAR") || hyphen.includes("TEM-VAR") || hyphen.includes("TEMP-VAR") || hyphen.startsWith("VAR-") || hyphen.includes("VARIATION")) {
+    if (hyphen.includes("48")) return "T_VARIATION_48H";
+    return "T_VARIATION_24H";
+  }
+  if (upper === "HGT" || upper === "HEIGHT" || upper === "GH" || upper === "GEO" || upper === "H") return "HGT";
+  if (upper === "TD" || upper === "DPT" || upper === "DEWPOINT" || upper === "DEW_POINT" || hyphen === "DEW-POINT") return "TD";
+  if (upper === "WIND" || upper === "WS" || upper === "WINDSPEED" || upper === "WIND_SPEED" || hyphen === "WIND-SPEED" || upper === "FF") return "WIND";
+  if (upper === "DTD" || upper === "T-TD" || upper === "TTD" || upper === "DEPRESSION" || upper === "DPTDPR") return "DTD";
+  if (upper === "VOR" || upper === "VORT" || upper === "VORTICITY" || upper === "RVOR" || upper === "REL_VOR" || hyphen === "REL-VOR") return "VOR";
+  if (upper === "DIV" || upper === "DIVERGENCE") return "DIV";
+  if (upper === "K" || upper === "K_INDEX" || upper === "K-INDEX" || upper === "KINDEX") return "K_INDEX";
+  if (upper === "SHOWALTER" || upper === "SHOWALTER_INDEX" || hyphen === "SHOWALTER-INDEX" || upper === "SSI" || upper === "SI") return "SHOWALTER";
+  if (upper === "LIFTED" || upper === "LIFTED_INDEX" || hyphen === "LIFTED-INDEX" || upper === "LI") return "LIFTED";
+  if (upper === "SWEAT" || upper === "SWEAT_INDEX" || hyphen === "SWEAT-INDEX" || upper === "SEVERE_WEATHER_THREAT") return "SWEAT";
+  if (upper === "TT" || upper === "TOTAL_TOTALS" || hyphen === "TOTAL-TOTALS" || upper === "TOTAL_TOTALS_INDEX" || hyphen === "TOTAL-TOTALS-INDEX" || upper === "TOTALTOTALS") return "TT";
+  if (upper === "SHEAR" || upper === "WIND_SHEAR" || hyphen === "WIND-SHEAR" || upper === "VERTICAL_SHEAR" || hyphen === "VERTICAL-SHEAR") return "SHEAR";
+  if (upper === "THICKNESS" || upper === "HGT_DIFF" || hyphen === "HGT-DIFF") return "THICKNESS";
+  if (upper === "TMP_DIFF" || hyphen === "TMP-DIFF" || upper === "T_DIFF" || hyphen === "T-DIFF" || upper === "T850-500" || upper === "TMP850-500" || upper === "850-500") return "TMP_DIFF";
+  if (upper === "TMP" || upper === "TEMPERATURE" || upper === "TEMP" || upper === "T") return "TMP";
   return "HGT";
 }

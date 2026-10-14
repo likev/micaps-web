@@ -257,8 +257,9 @@ export async function loadWeatherField(map, model, element, level, period, custo
   const exCfg = existingLayer?.config || snap?.config || {};
 
   const isHeight = element === "HGT";
-  const isTemp = element === "TMP";
-  const defaultLineColor = isHeight ? "#58a6ff" : (isTemp ? "#f85149" : (isVOR ? "#c678dd" : (isDIV ? "#56d4dd" : "#58a6ff")));
+  const isTemp = element === "TMP" || element.includes("T-VAR") || element.includes("T_VAR");
+  const isSLP = element.includes("SLP") || element.includes("PRMSL");
+  const defaultLineColor = isHeight ? "#58a6ff" : (isTemp ? "#f85149" : (isVOR ? "#c678dd" : (isDIV ? "#56d4dd" : (isSLP ? "#58a6ff" : "#58a6ff"))));
   const lineColor = resolveLineColor({
     customOptions: isTimeStep ? customOptions : null,
     existingLayer,

@@ -726,10 +726,39 @@
           const groupCopy = JSON.parse(JSON.stringify(w.activeGroup));
           if (Array.isArray(groupCopy.layers)) {
             for (const l of groupCopy.layers) {
-              if (l.type === "contour" || l.type === "wind" || l.type === "raster") {
+              const isObs = Boolean(
+                l?.isObservation ||
+                l?.model === "SURFACE" ||
+                l?.model === "UPPER_AIR" ||
+                l?.path?.includes("/api/derived/SURFACE") ||
+                l?.path?.includes("/api/derived/UPPER_AIR")
+              );
+              if (!isObs && (l.type === "contour" || l.type === "wind" || l.type === "raster")) {
+                const prevM = l.model;
                 l.model = w.model;
                 if (typeof l.path === "string" && l.path.includes("/")) {
                   l.path = replaceModelInPath(l.path, w.model);
+                }
+                if (typeof l.id === "string" && prevM) {
+                  const baseM = prevM.replace(/_.*$/, "");
+                  l.id = l.id.replaceAll(prevM, w.model).replaceAll(prevM.toLowerCase(), w.model.toLowerCase());
+                  if (baseM && baseM !== prevM) {
+                    l.id = l.id.replaceAll(baseM, w.model).replaceAll(baseM.toLowerCase(), w.model.toLowerCase());
+                  }
+                }
+                if (typeof l.derivedFrom === "string" && prevM) {
+                  const baseM = prevM.replace(/_.*$/, "");
+                  l.derivedFrom = l.derivedFrom.replaceAll(prevM, w.model).replaceAll(prevM.toLowerCase(), w.model.toLowerCase());
+                  if (baseM && baseM !== prevM) {
+                    l.derivedFrom = l.derivedFrom.replaceAll(baseM, w.model).replaceAll(baseM.toLowerCase(), w.model.toLowerCase());
+                  }
+                }
+                if (typeof l.name === "string" && prevM) {
+                  const baseM = prevM.replace(/_.*$/, "");
+                  l.name = l.name.replaceAll(prevM, w.model);
+                  if (baseM && baseM !== prevM) {
+                    l.name = l.name.replaceAll(baseM, w.model);
+                  }
                 }
               }
             }
@@ -740,6 +769,57 @@
               console.error("[AutoAlloc] model failed:", e)
             );
           }
+        } else if (Array.isArray(w.layers) && w.layers.length > 0) {
+          clearAllWeatherLayersFromMap(map, w);
+          for (const l of [...w.layers]) {
+            const isObs = Boolean(
+              l?.isObservation ||
+              l?.model === "SURFACE" ||
+              l?.model === "UPPER_AIR" ||
+              l?.path?.includes("/api/derived/SURFACE") ||
+              l?.path?.includes("/api/derived/UPPER_AIR")
+            );
+            if (!isObs && (l.type === "contour" || l.type === "wind" || l.type === "raster")) {
+              const prevM = l.model;
+              l.model = w.model;
+              if (typeof l.path === "string" && l.path.includes("/")) {
+                l.path = replaceModelInPath(l.path, w.model);
+              }
+              if (typeof l.id === "string" && prevM) {
+                const baseM = prevM.replace(/_.*$/, "");
+                l.id = l.id.replaceAll(prevM, w.model).replaceAll(prevM.toLowerCase(), w.model.toLowerCase());
+                if (baseM && baseM !== prevM) {
+                  l.id = l.id.replaceAll(baseM, w.model).replaceAll(baseM.toLowerCase(), w.model.toLowerCase());
+                }
+              }
+              if (typeof l.derivedFrom === "string" && prevM) {
+                const baseM = prevM.replace(/_.*$/, "");
+                l.derivedFrom = l.derivedFrom.replaceAll(prevM, w.model).replaceAll(prevM.toLowerCase(), w.model.toLowerCase());
+                if (baseM && baseM !== prevM) {
+                  l.derivedFrom = l.derivedFrom.replaceAll(baseM, w.model).replaceAll(baseM.toLowerCase(), w.model.toLowerCase());
+                }
+              }
+              if (typeof l.name === "string" && prevM) {
+                const baseM = prevM.replace(/_.*$/, "");
+                l.name = l.name.replaceAll(prevM, w.model);
+                if (baseM && baseM !== prevM) {
+                  l.name = l.name.replaceAll(baseM, w.model);
+                }
+              }
+              const render = l.render || l.config || {};
+              await loadWeatherField(map, w.model, l.element, l.level, l.period ?? w.period, {
+                ...render,
+                id: l.id,
+                name: l.name,
+                path: l.path,
+                colormap: l.colormap,
+                visible: l.visible !== false,
+              }, w, false, loadSeq);
+            }
+          }
+        } else if (w.element) {
+          clearAllWeatherLayersFromMap(map, w);
+          await loadWeatherField(map, w.model, w.element, w.level, w.period, null, w, false, loadSeq);
         }
       } else if (mode === "step") {
         const tl = getOrCreateTimeline(w.id);
@@ -1685,8 +1765,12 @@
   async function handleModelSelect(newModel, targetWin = activeWin) {
     const win = targetWin;
     if (!win || !newModel) return;
+    const oldModel = win.model;
     win.model = newModel;
     if (win === activeWin) app.model = newModel;
+    if (oldModel && oldModel !== newModel) {
+      win.forecastCycle = null;
+    }
 
     try {
       if (timeHeightController.isActive(win)) {
@@ -1716,16 +1800,132 @@
       const groupCopy = JSON.parse(JSON.stringify(win.activeGroup));
       if (Array.isArray(groupCopy.layers)) {
         for (const l of groupCopy.layers) {
-          if (l.type === "contour" || l.type === "wind" || l.type === "raster") {
+          const isObs = Boolean(
+            l?.isObservation ||
+            l?.model === "SURFACE" ||
+            l?.model === "UPPER_AIR" ||
+            l?.path?.includes("/api/derived/SURFACE") ||
+            l?.path?.includes("/api/derived/UPPER_AIR")
+          );
+          if (!isObs && (l.type === "contour" || l.type === "wind" || l.type === "raster")) {
+            const prevM = l.model;
             l.model = newModel;
             if (typeof l.path === "string" && l.path.includes("/")) {
               l.path = replaceModelInPath(l.path, newModel);
+            }
+            if (typeof l.id === "string" && prevM) {
+              const baseM = prevM.replace(/_.*$/, "");
+              l.id = l.id.replaceAll(prevM, newModel).replaceAll(prevM.toLowerCase(), newModel.toLowerCase());
+              if (baseM && baseM !== prevM) {
+                l.id = l.id.replaceAll(baseM, newModel).replaceAll(baseM.toLowerCase(), newModel.toLowerCase());
+              }
+            }
+            if (typeof l.derivedFrom === "string" && prevM) {
+              const baseM = prevM.replace(/_.*$/, "");
+              l.derivedFrom = l.derivedFrom.replaceAll(prevM, newModel).replaceAll(prevM.toLowerCase(), newModel.toLowerCase());
+              if (baseM && baseM !== prevM) {
+                l.derivedFrom = l.derivedFrom.replaceAll(baseM, newModel).replaceAll(baseM.toLowerCase(), newModel.toLowerCase());
+              }
+            }
+            if (typeof l.name === "string" && prevM) {
+              const baseM = prevM.replace(/_.*$/, "");
+              l.name = l.name.replaceAll(prevM, newModel);
+              if (baseM && baseM !== prevM) {
+                l.name = l.name.replaceAll(baseM, newModel);
+              }
             }
           }
         }
       }
       win.activeGroup = groupCopy;
+      if (Array.isArray(win.layers)) {
+        for (const l of win.layers) {
+          const isObs = Boolean(
+            l?.isObservation ||
+            l?.model === "SURFACE" ||
+            l?.model === "UPPER_AIR" ||
+            l?.path?.includes("/api/derived/SURFACE") ||
+            l?.path?.includes("/api/derived/UPPER_AIR")
+          );
+          if (!isObs && (l.type === "contour" || l.type === "wind" || l.type === "raster")) {
+            const prevM = l.model;
+            l.model = newModel;
+            if (typeof l.path === "string" && l.path.includes("/")) {
+              l.path = replaceModelInPath(l.path, newModel);
+            }
+            if (typeof l.id === "string" && prevM) {
+              const baseM = prevM.replace(/_.*$/, "");
+              l.id = l.id.replaceAll(prevM, newModel).replaceAll(prevM.toLowerCase(), newModel.toLowerCase());
+              if (baseM && baseM !== prevM) {
+                l.id = l.id.replaceAll(baseM, newModel).replaceAll(baseM.toLowerCase(), newModel.toLowerCase());
+              }
+            }
+            if (typeof l.derivedFrom === "string" && prevM) {
+              const baseM = prevM.replace(/_.*$/, "");
+              l.derivedFrom = l.derivedFrom.replaceAll(prevM, newModel).replaceAll(prevM.toLowerCase(), newModel.toLowerCase());
+              if (baseM && baseM !== prevM) {
+                l.derivedFrom = l.derivedFrom.replaceAll(baseM, newModel).replaceAll(baseM.toLowerCase(), newModel.toLowerCase());
+              }
+            }
+            if (typeof l.name === "string" && prevM) {
+              const baseM = prevM.replace(/_.*$/, "");
+              l.name = l.name.replaceAll(prevM, newModel);
+              if (baseM && baseM !== prevM) {
+                l.name = l.name.replaceAll(baseM, newModel);
+              }
+            }
+          }
+        }
+      }
       await loadPresetGroup(map, groupCopy, win.period, win.level, win, false, loadSeq);
+    } else if (Array.isArray(win.layers) && win.layers.length > 0) {
+      clearAllWeatherLayersFromMap(map, win);
+      for (const l of [...win.layers]) {
+        const isObs = Boolean(
+          l?.isObservation ||
+          l?.model === "SURFACE" ||
+          l?.model === "UPPER_AIR" ||
+          l?.path?.includes("/api/derived/SURFACE") ||
+          l?.path?.includes("/api/derived/UPPER_AIR")
+        );
+        if (!isObs && (l.type === "contour" || l.type === "wind" || l.type === "raster")) {
+          const prevM = l.model;
+          l.model = newModel;
+          if (typeof l.path === "string" && l.path.includes("/")) {
+            l.path = replaceModelInPath(l.path, newModel);
+          }
+          if (typeof l.id === "string" && prevM) {
+            const baseM = prevM.replace(/_.*$/, "");
+            l.id = l.id.replaceAll(prevM, newModel).replaceAll(prevM.toLowerCase(), newModel.toLowerCase());
+            if (baseM && baseM !== prevM) {
+              l.id = l.id.replaceAll(baseM, newModel).replaceAll(baseM.toLowerCase(), newModel.toLowerCase());
+            }
+          }
+          if (typeof l.derivedFrom === "string" && prevM) {
+            const baseM = prevM.replace(/_.*$/, "");
+            l.derivedFrom = l.derivedFrom.replaceAll(prevM, newModel).replaceAll(prevM.toLowerCase(), newModel.toLowerCase());
+            if (baseM && baseM !== prevM) {
+              l.derivedFrom = l.derivedFrom.replaceAll(baseM, newModel).replaceAll(baseM.toLowerCase(), newModel.toLowerCase());
+            }
+          }
+          if (typeof l.name === "string" && prevM) {
+            const baseM = prevM.replace(/_.*$/, "");
+            l.name = l.name.replaceAll(prevM, newModel);
+            if (baseM && baseM !== prevM) {
+              l.name = l.name.replaceAll(baseM, newModel);
+            }
+          }
+          const render = l.render || l.config || {};
+          await loadWeatherField(map, newModel, l.element, l.level, l.period ?? win.period, {
+            ...render,
+            id: l.id,
+            name: l.name,
+            path: l.path,
+            colormap: l.colormap,
+            visible: l.visible !== false,
+          }, win, false, loadSeq);
+        }
+      }
     } else if (win.element) {
       clearAllWeatherLayersFromMap(map, win);
       await loadWeatherField(map, newModel, win.element, win.level, win.period, null, win, false, loadSeq);

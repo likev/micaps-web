@@ -7,7 +7,6 @@
 // so show/hide decisions can't drift from panel reality.
 //
 // Plain JS (no runes) so imperative controllers and bun tests can import it.
-// The reactive mirror for Svelte components lives in profiles.svelte.js.
 const profileState = {
   tlogp: null, // singleton: entry object or null
   timeheight: new Map(), // winId -> entry

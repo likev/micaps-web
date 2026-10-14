@@ -406,6 +406,32 @@
       { "color": [230, 220, 50, 255], "val": 5640 },
       { "color": [245, 140, 40, 255], "val": 5760 },
       { "color": [230, 50, 40, 255], "val": 5880 }
+    ],
+    "T_VAR": [
+      { "color": [20, 30, 140, 255], "val": -16 },
+      { "color": [30, 80, 200, 255], "val": -12 },
+      { "color": [50, 140, 230, 255], "val": -8 },
+      { "color": [120, 200, 245, 230], "val": -4 },
+      { "color": [190, 235, 250, 200], "val": -2 },
+      { "color": [245, 245, 245, 0], "val": 0 },
+      { "color": [254, 230, 170, 200], "val": 2 },
+      { "color": [253, 175, 95, 230], "val": 4 },
+      { "color": [235, 95, 55, 255], "val": 8 },
+      { "color": [200, 30, 30, 255], "val": 12 },
+      { "color": [130, 15, 20, 255], "val": 16 }
+    ],
+    "SLP_VAR": [
+      { "color": [110, 30, 140, 255], "val": -16 },
+      { "color": [30, 60, 180, 255], "val": -12 },
+      { "color": [50, 130, 220, 255], "val": -8 },
+      { "color": [130, 195, 245, 230], "val": -4 },
+      { "color": [195, 235, 250, 200], "val": -2 },
+      { "color": [245, 245, 245, 0], "val": 0 },
+      { "color": [254, 230, 170, 200], "val": 2 },
+      { "color": [253, 175, 95, 230], "val": 4 },
+      { "color": [235, 95, 55, 255], "val": 8 },
+      { "color": [190, 35, 35, 255], "val": 12 },
+      { "color": [120, 15, 20, 255], "val": 16 }
     ]
   },
   "performance": {
@@ -901,6 +927,77 @@
         }
       ],
       "name": "200hPa Jet Stream (HGT + WIND)"
+    },
+    {
+      "category": "NWP Synoptic",
+      "hasLevel": false,
+      "id": "composite-ecmwf-slp",
+      "name": "ECMWF Sea Level Pressure (SLP)",
+      "layers": [
+        {
+          "element": "PRMSL",
+          "id": "ecmwf-slp-layer",
+          "model": "ECMWF_HR",
+          "name": "Sea Level Pressure (Isobars)",
+          "path": "ECMWF_HR/PRMSL",
+          "type": "contour",
+          "render": {
+            "boldLineWidth": 4,
+            "boldValues": [
+              1000,
+              1020
+            ],
+            "colormap": "SLP_VAR",
+            "lineColor": "#58a6ff",
+            "lineWidth": 2,
+            "opacity": 0.8,
+            "palettePath": null,
+            "showBarbs": false,
+            "showFill": false,
+            "showLabels": true,
+            "showLine": true,
+            "showRaster": false,
+            "showWind": false,
+            "smooth": true,
+            "smoothIterations": 2
+          }
+        }
+      ]
+    },
+    {
+      "category": "NWP Synoptic",
+      "hasLevel": false,
+      "id": "composite-ecmwf-t2m",
+      "name": "ECMWF 2m Temperature (T2m)",
+      "layers": [
+        {
+          "element": "TMP_2M",
+          "id": "ecmwf-t2m-layer",
+          "model": "ECMWF_HR",
+          "name": "2m Temperature (TMP_2M)",
+          "path": "ECMWF_HR/TMP_2M",
+          "type": "contour",
+          "render": {
+            "boldLineWidth": 4,
+            "boldValues": [
+              0
+            ],
+            "colormap": "TMP",
+            "lineColor": "#f85149",
+            "lineWidth": 2,
+            "opacity": 0.75,
+            "palettePath": null,
+            "showBarbs": false,
+            "showFill": true,
+            "showLabels": true,
+            "showLine": true,
+            "showRaster": false,
+            "showWind": false,
+            "smooth": true,
+            "smoothIterations": 2
+          }
+        }
+      ]
     },
     {
       "divider": true,
@@ -2009,6 +2106,772 @@
             "render": {
               "colormap": "TMP",
               "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Surface Observations",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "obs-surface-t-var-24h",
+        "name": "Surface Station 24h Temperature Variation",
+        "layers": [
+          {
+            "element": "PLOT_GLOBAL_3H",
+            "id": "surface-obs",
+            "model": "SURFACE",
+            "name": "Surface Station Observations",
+            "type": "station"
+          },
+          {
+            "derivedFrom": "surface-obs",
+            "element": "T_VARIATION_24H",
+            "id": "contour-surface-t-var-24h",
+            "model": "SURFACE",
+            "name": "Surface 24h Temperature Variation",
+            "path": "/api/derived/SURFACE/T-VARIATION-24H",
+            "type": "contour",
+            "render": {
+              "colormap": "T_VAR",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Surface Observations",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "obs-surface-t-var-48h",
+        "name": "Surface Station 48h Temperature Variation",
+        "layers": [
+          {
+            "element": "PLOT_GLOBAL_3H",
+            "id": "surface-obs",
+            "model": "SURFACE",
+            "name": "Surface Station Observations",
+            "type": "station"
+          },
+          {
+            "derivedFrom": "surface-obs",
+            "element": "T_VARIATION_48H",
+            "id": "contour-surface-t-var-48h",
+            "model": "SURFACE",
+            "name": "Surface 48h Temperature Variation",
+            "path": "/api/derived/SURFACE/T-VARIATION-48H",
+            "type": "contour",
+            "render": {
+              "colormap": "T_VAR",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Surface Observations",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "obs-surface-slp-var-24h",
+        "name": "Surface Station 24h SLP Variation",
+        "layers": [
+          {
+            "element": "PLOT_GLOBAL_3H",
+            "id": "surface-obs",
+            "model": "SURFACE",
+            "name": "Surface Station Observations",
+            "type": "station"
+          },
+          {
+            "derivedFrom": "surface-obs",
+            "element": "SLP_VARIATION_24H",
+            "id": "contour-surface-slp-var-24h",
+            "model": "SURFACE",
+            "name": "Surface 24h SLP Variation",
+            "path": "/api/derived/SURFACE/SLP-VARIATION-24H",
+            "type": "contour",
+            "render": {
+              "colormap": "SLP_VAR",
+              "lineColor": "#58a6ff",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Surface Observations",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "obs-surface-slp-var-48h",
+        "name": "Surface Station 48h SLP Variation",
+        "layers": [
+          {
+            "element": "PLOT_GLOBAL_3H",
+            "id": "surface-obs",
+            "model": "SURFACE",
+            "name": "Surface Station Observations",
+            "type": "station"
+          },
+          {
+            "derivedFrom": "surface-obs",
+            "element": "SLP_VARIATION_48H",
+            "id": "contour-surface-slp-var-48h",
+            "model": "SURFACE",
+            "name": "Surface 48h SLP Variation",
+            "path": "/api/derived/SURFACE/SLP-VARIATION-48H",
+            "type": "contour",
+            "render": {
+              "colormap": "SLP_VAR",
+              "lineColor": "#58a6ff",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Upper-Air Observations",
+        "defaultLevel": 850,
+        "hasLevel": true,
+        "isObservation": true,
+        "id": "obs-upperair-850-t-var-24h",
+        "name": "850hPa Sounding 24h Temperature Variation",
+        "layers": [
+          {
+            "element": "PLOT",
+            "id": "upperair-obs-850",
+            "level": 850,
+            "model": "UPPER_AIR",
+            "name": "850 hPa Sounding Station Plots",
+            "type": "station"
+          },
+          {
+            "derivedFrom": "upperair-obs-850",
+            "element": "T_VARIATION_24H",
+            "id": "contour-sounding-t-variation-24h-850",
+            "level": 850,
+            "model": "UPPER_AIR",
+            "name": "850hPa 24h Temperature Variation",
+            "path": "/api/derived/UPPER_AIR/PLOT/T-VARIATION-24H/850",
+            "type": "contour",
+            "render": {
+              "colormap": "T_VAR",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Upper-Air Observations",
+        "defaultLevel": 850,
+        "hasLevel": true,
+        "isObservation": true,
+        "id": "obs-upperair-850-t-var-48h",
+        "name": "850hPa Sounding 48h Temperature Variation",
+        "layers": [
+          {
+            "element": "PLOT",
+            "id": "upperair-obs-850",
+            "level": 850,
+            "model": "UPPER_AIR",
+            "name": "850 hPa Sounding Station Plots",
+            "type": "station"
+          },
+          {
+            "derivedFrom": "upperair-obs-850",
+            "element": "T_VARIATION_48H",
+            "id": "contour-sounding-t-variation-48h-850",
+            "level": 850,
+            "model": "UPPER_AIR",
+            "name": "850hPa 48h Temperature Variation",
+            "path": "/api/derived/UPPER_AIR/PLOT/T-VARIATION-48H/850",
+            "type": "contour",
+            "render": {
+              "colormap": "T_VAR",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "id": "derived-ecmwf-sfc-t-var-24h",
+        "name": "ECMWF Surface 24h Temperature Variation",
+        "layers": [
+          {
+            "element": "T-VARIATION-24H",
+            "id": "derived-ecmwf-sfc-t-var-24h-layer",
+            "model": "ECMWF_HR",
+            "name": "ECMWF Surface 24h Temperature Variation",
+            "path": "/api/derived/ECMWF_HR/T-VARIATION-24H",
+            "type": "contour",
+            "render": {
+              "colormap": "T_VAR",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.65,
+              "showFill": true,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "id": "derived-ecmwf-sfc-t-var-48h",
+        "name": "ECMWF Surface 48h Temperature Variation",
+        "layers": [
+          {
+            "element": "T-VARIATION-48H",
+            "id": "derived-ecmwf-sfc-t-var-48h-layer",
+            "model": "ECMWF_HR",
+            "name": "ECMWF Surface 48h Temperature Variation",
+            "path": "/api/derived/ECMWF_HR/T-VARIATION-48H",
+            "type": "contour",
+            "render": {
+              "colormap": "T_VAR",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.65,
+              "showFill": true,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "defaultLevel": 850,
+        "hasLevel": true,
+        "id": "derived-ecmwf-850-t-var-24h",
+        "name": "ECMWF 850hPa 24h Temperature Variation",
+        "layers": [
+          {
+            "element": "T-VARIATION-24H",
+            "level": 850,
+            "id": "derived-ecmwf-850-t-var-24h-layer",
+            "model": "ECMWF_HR",
+            "name": "ECMWF 850hPa 24h Temperature Variation",
+            "path": "/api/derived/ECMWF_HR/T-VARIATION-24H/850",
+            "type": "contour",
+            "render": {
+              "colormap": "T_VAR",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.65,
+              "showFill": true,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "defaultLevel": 850,
+        "hasLevel": true,
+        "id": "derived-ecmwf-850-t-var-48h",
+        "name": "ECMWF 850hPa 48h Temperature Variation",
+        "layers": [
+          {
+            "element": "T-VARIATION-48H",
+            "level": 850,
+            "id": "derived-ecmwf-850-t-var-48h-layer",
+            "model": "ECMWF_HR",
+            "name": "ECMWF 850hPa 48h Temperature Variation",
+            "path": "/api/derived/ECMWF_HR/T-VARIATION-48H/850",
+            "type": "contour",
+            "render": {
+              "colormap": "T_VAR",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.65,
+              "showFill": true,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "id": "derived-ecmwf-slp-var-24h",
+        "name": "ECMWF 24h Sea Level Pressure Variation",
+        "layers": [
+          {
+            "element": "SLP-VARIATION-24H",
+            "id": "derived-ecmwf-slp-var-24h-layer",
+            "model": "ECMWF_HR",
+            "name": "ECMWF 24h Sea Level Pressure Variation",
+            "path": "/api/derived/ECMWF_HR/SLP-VARIATION-24H",
+            "type": "contour",
+            "render": {
+              "colormap": "SLP_VAR",
+              "lineColor": "#58a6ff",
+              "lineWidth": 2,
+              "opacity": 0.65,
+              "showFill": true,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "id": "derived-ecmwf-slp-var-48h",
+        "name": "ECMWF 48h Sea Level Pressure Variation",
+        "layers": [
+          {
+            "element": "SLP-VARIATION-48H",
+            "id": "derived-ecmwf-slp-var-48h-layer",
+            "model": "ECMWF_HR",
+            "name": "ECMWF 48h Sea Level Pressure Variation",
+            "path": "/api/derived/ECMWF_HR/SLP-VARIATION-48H",
+            "type": "contour",
+            "render": {
+              "colormap": "SLP_VAR",
+              "lineColor": "#58a6ff",
+              "lineWidth": 2,
+              "opacity": 0.65,
+              "showFill": true,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-diag-surface-t-var-24h",
+        "name": "Surface Station 24h Temperature Variation",
+        "layers": [
+          {
+            "element": "T_VARIATION_24H",
+            "id": "derived-diag-surface-t-var-24h-layer",
+            "model": "SURFACE",
+            "name": "Surface 24h Temperature Variation",
+            "path": "/api/derived/SURFACE/T-VARIATION-24H",
+            "type": "contour",
+            "render": {
+              "colormap": "T_VAR",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-diag-surface-slp-var-24h",
+        "name": "Surface Station 24h SLP Variation",
+        "layers": [
+          {
+            "element": "SLP_VARIATION_24H",
+            "id": "derived-diag-surface-slp-var-24h-layer",
+            "model": "SURFACE",
+            "name": "Surface 24h SLP Variation",
+            "path": "/api/derived/SURFACE/SLP-VARIATION-24H",
+            "type": "contour",
+            "render": {
+              "colormap": "SLP_VAR",
+              "lineColor": "#58a6ff",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-diag-surface-t-var-48h",
+        "name": "Surface Station 48h Temperature Variation",
+        "layers": [
+          {
+            "element": "T_VARIATION_48H",
+            "id": "derived-diag-surface-t-var-48h-layer",
+            "model": "SURFACE",
+            "name": "Surface 48h Temperature Variation",
+            "path": "/api/derived/SURFACE/T-VARIATION-48H",
+            "type": "contour",
+            "render": {
+              "colormap": "T_VAR",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "derived-diag-surface-slp-var-48h",
+        "name": "Surface Station 48h SLP Variation",
+        "layers": [
+          {
+            "element": "SLP_VARIATION_48H",
+            "id": "derived-diag-surface-slp-var-48h-layer",
+            "model": "SURFACE",
+            "name": "Surface 48h SLP Variation",
+            "path": "/api/derived/SURFACE/SLP-VARIATION-48H",
+            "type": "contour",
+            "render": {
+              "colormap": "SLP_VAR",
+              "lineColor": "#58a6ff",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": true,
+        "level": 850,
+        "isObservation": true,
+        "id": "derived-diag-sounding-850-t-var-24h",
+        "name": "850hPa Sounding 24h Temperature Variation",
+        "layers": [
+          {
+            "element": "T_VARIATION_24H",
+            "level": 850,
+            "id": "derived-diag-sounding-850-t-var-24h-layer",
+            "model": "UPPER_AIR",
+            "name": "850hPa Sounding 24h Temp Variation",
+            "path": "/api/derived/UPPER_AIR/PLOT/T-VARIATION-24H/850",
+            "type": "contour",
+            "render": {
+              "colormap": "T_VAR",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Derived Diagnostics",
+        "hasLevel": true,
+        "level": 850,
+        "isObservation": true,
+        "id": "derived-diag-sounding-850-t-var-48h",
+        "name": "850hPa Sounding 48h Temperature Variation",
+        "layers": [
+          {
+            "element": "T_VARIATION_48H",
+            "level": 850,
+            "id": "derived-diag-sounding-850-t-var-48h-layer",
+            "model": "UPPER_AIR",
+            "name": "850hPa Sounding 48h Temp Variation",
+            "path": "/api/derived/UPPER_AIR/PLOT/T-VARIATION-48H/850",
+            "type": "contour",
+            "render": {
+              "colormap": "T_VAR",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Multi-Time Recipes",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "recipe-surface-variation-24h",
+        "name": "Surface 24h Synoptic Variation (T-var + SLP-var)",
+        "layers": [
+          {
+            "element": "PLOT_GLOBAL_3H",
+            "id": "surface-obs",
+            "model": "SURFACE",
+            "name": "Surface Station Observations",
+            "type": "station"
+          },
+          {
+            "derivedFrom": "surface-obs",
+            "element": "T_VARIATION_24H",
+            "id": "recipe-surface-t-var-24h",
+            "model": "SURFACE",
+            "name": "Surface 24h Temp Variation (Fills)",
+            "path": "/api/derived/SURFACE/T-VARIATION-24H",
+            "type": "contour",
+            "render": {
+              "colormap": "T_VAR",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.6,
+              "showFill": true,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          },
+          {
+            "derivedFrom": "surface-obs",
+            "element": "SLP_VARIATION_24H",
+            "id": "recipe-surface-slp-var-24h",
+            "model": "SURFACE",
+            "name": "Surface 24h SLP Variation (Isobars)",
+            "path": "/api/derived/SURFACE/SLP-VARIATION-24H",
+            "type": "contour",
+            "render": {
+              "colormap": "SLP_VAR",
+              "lineColor": "#58a6ff",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Multi-Time Recipes",
+        "hasLevel": false,
+        "isObservation": true,
+        "id": "recipe-surface-variation-48h",
+        "name": "Surface 48h Synoptic Variation (T-var + SLP-var)",
+        "layers": [
+          {
+            "element": "PLOT_GLOBAL_3H",
+            "id": "surface-obs",
+            "model": "SURFACE",
+            "name": "Surface Station Observations",
+            "type": "station"
+          },
+          {
+            "derivedFrom": "surface-obs",
+            "element": "T_VARIATION_48H",
+            "id": "recipe-surface-t-var-48h",
+            "model": "SURFACE",
+            "name": "Surface 48h Temp Variation (Fills)",
+            "path": "/api/derived/SURFACE/T-VARIATION-48H",
+            "type": "contour",
+            "render": {
+              "colormap": "T_VAR",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.6,
+              "showFill": true,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          },
+          {
+            "derivedFrom": "surface-obs",
+            "element": "SLP_VARIATION_48H",
+            "id": "recipe-surface-slp-var-48h",
+            "model": "SURFACE",
+            "name": "Surface 48h SLP Variation (Isobars)",
+            "path": "/api/derived/SURFACE/SLP-VARIATION-48H",
+            "type": "contour",
+            "render": {
+              "colormap": "SLP_VAR",
+              "lineColor": "#58a6ff",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Multi-Time Recipes",
+        "hasLevel": false,
+        "id": "recipe-nwp-variation-24h",
+        "name": "NWP 24h Synoptic Variation (ECMWF 850 T-var + SLP-var)",
+        "layers": [
+          {
+            "element": "T-VARIATION-24H",
+            "level": 850,
+            "id": "recipe-nwp-t-var-24h-850",
+            "model": "ECMWF_HR",
+            "name": "ECMWF 850hPa 24h Temp Variation (Fills)",
+            "path": "/api/derived/ECMWF_HR/T-VARIATION-24H/850",
+            "type": "contour",
+            "render": {
+              "colormap": "T_VAR",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.6,
+              "showFill": true,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          },
+          {
+            "element": "SLP-VARIATION-24H",
+            "id": "recipe-nwp-slp-var-24h",
+            "model": "ECMWF_HR",
+            "name": "ECMWF 24h SLP Variation (Isobars)",
+            "path": "/api/derived/ECMWF_HR/SLP-VARIATION-24H",
+            "type": "contour",
+            "render": {
+              "colormap": "SLP_VAR",
+              "lineColor": "#58a6ff",
+              "lineWidth": 2,
+              "opacity": 0.75,
+              "showFill": false,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          }
+        ]
+      },
+      {
+        "category": "Multi-Time Recipes",
+        "hasLevel": false,
+        "id": "recipe-nwp-variation-48h",
+        "name": "NWP 48h Synoptic Variation (ECMWF 850 T-var + SLP-var)",
+        "layers": [
+          {
+            "element": "T-VARIATION-48H",
+            "level": 850,
+            "id": "recipe-nwp-t-var-48h-850",
+            "model": "ECMWF_HR",
+            "name": "ECMWF 850hPa 48h Temp Variation (Fills)",
+            "path": "/api/derived/ECMWF_HR/T-VARIATION-48H/850",
+            "type": "contour",
+            "render": {
+              "colormap": "T_VAR",
+              "lineColor": "#f85149",
+              "lineWidth": 2,
+              "opacity": 0.6,
+              "showFill": true,
+              "showLabels": true,
+              "showLine": true,
+              "smooth": true,
+              "smoothIterations": 2
+            }
+          },
+          {
+            "element": "SLP-VARIATION-48H",
+            "id": "recipe-nwp-slp-var-48h",
+            "model": "ECMWF_HR",
+            "name": "ECMWF 48h SLP Variation (Isobars)",
+            "path": "/api/derived/ECMWF_HR/SLP-VARIATION-48H",
+            "type": "contour",
+            "render": {
+              "colormap": "SLP_VAR",
+              "lineColor": "#58a6ff",
               "lineWidth": 2,
               "opacity": 0.75,
               "showFill": false,

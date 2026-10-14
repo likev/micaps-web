@@ -174,6 +174,32 @@ export const DEFAULT_COLORMAPS = {
     { val: 5760, color: [245, 140, 40, 255] },
     { val: 5880, color: [230, 50, 40, 255] },
   ],
+  T_VAR: [
+    { val: -16, color: [20, 30, 140, 255] },
+    { val: -12, color: [30, 80, 200, 255] },
+    { val: -8, color: [50, 140, 230, 255] },
+    { val: -4, color: [120, 200, 245, 230] },
+    { val: -2, color: [190, 235, 250, 200] },
+    { val: 0, color: [245, 245, 245, 0] },
+    { val: 2, color: [254, 230, 170, 200] },
+    { val: 4, color: [253, 175, 95, 230] },
+    { val: 8, color: [235, 95, 55, 255] },
+    { val: 12, color: [200, 30, 30, 255] },
+    { val: 16, color: [130, 15, 20, 255] },
+  ],
+  SLP_VAR: [
+    { val: -16, color: [110, 30, 140, 255] },
+    { val: -12, color: [30, 60, 180, 255] },
+    { val: -8, color: [50, 130, 220, 255] },
+    { val: -4, color: [130, 195, 245, 230] },
+    { val: -2, color: [195, 235, 250, 200] },
+    { val: 0, color: [245, 245, 245, 0] },
+    { val: 2, color: [254, 230, 170, 200] },
+    { val: 4, color: [253, 175, 95, 230] },
+    { val: 8, color: [235, 95, 55, 255] },
+    { val: 12, color: [190, 35, 35, 255] },
+    { val: 16, color: [120, 15, 20, 255] },
+  ],
 };
 
 const FALLBACK_COLORMAP = DEFAULT_COLORMAPS.TMP;
@@ -253,10 +279,22 @@ export function getColormap(reference = null, element = "TMP") {
     if (COLORMAPS[trimmed]) return COLORMAPS[trimmed];
     if (COLORMAPS["/" + trimmed]) return COLORMAPS["/" + trimmed];
     if (isRainElement(reference)) return COLORMAPS.RAIN || DEFAULT_COLORMAPS.RAIN;
+    if (up.includes("SLP_VAR") || up.includes("SLP-VAR") || (up.includes("SLP") && up.includes("VAR"))) {
+      return COLORMAPS.SLP_VAR || DEFAULT_COLORMAPS.SLP_VAR;
+    }
+    if (up.includes("T_VAR") || up.includes("T-VAR") || (up.includes("TMP") && up.includes("VAR")) || (up.startsWith("T") && up.includes("VAR"))) {
+      return COLORMAPS.T_VAR || DEFAULT_COLORMAPS.T_VAR;
+    }
   }
   const elUp = (element || "").toUpperCase();
   if (COLORMAPS[elUp]) return COLORMAPS[elUp];
   if (isRainElement(element)) return COLORMAPS.RAIN || DEFAULT_COLORMAPS.RAIN;
+  if (elUp.includes("SLP_VAR") || elUp.includes("SLP-VAR") || (elUp.includes("SLP") && elUp.includes("VAR"))) {
+    return COLORMAPS.SLP_VAR || DEFAULT_COLORMAPS.SLP_VAR;
+  }
+  if (elUp.includes("T_VAR") || elUp.includes("T-VAR") || (elUp.includes("TMP") && elUp.includes("VAR")) || (elUp.startsWith("T") && elUp.includes("VAR"))) {
+    return COLORMAPS.T_VAR || DEFAULT_COLORMAPS.T_VAR;
+  }
   return COLORMAPS[element] || COLORMAPS.TMP || COLORMAPS.default || FALLBACK_COLORMAP;
 }
 
@@ -282,18 +320,20 @@ export function createColorResolver(element = "TMP", colormap = null, zMin = und
 
   const elUpper = (element || "").toUpperCase();
   const cmUpper = (typeof colormap === "string" ? colormap : "").toUpperCase();
+  const isVariation = elUpper.includes("VAR") || cmUpper.includes("VAR");
   const isRain = isRainElement(element) || isRainElement(colormap) || cmUpper.includes("RAIN");
 
   // Fixed physical scale fields must NEVER be dynamically stretched:
-  // RH (0..100%), WIND (0..45 m/s), TMP (-40..40 C), RAIN (0.1..250 mm), DTD (0..30 C)
-  const isFixedPhysical = elUpper === "RH" || cmUpper.includes("RH") ||
+  // RH (0..100%), WIND (0..45 m/s), TMP (-40..40 C), RAIN (0.1..250 mm), DTD (0..30 C), and Variations
+  const isFixedPhysical = isVariation ||
+                          elUpper === "RH" || cmUpper.includes("RH") ||
                           elUpper === "WIND" || cmUpper.includes("WIND") ||
-                          elUpper === "TMP" || cmUpper.includes("TMP") ||
+                          (!isVariation && (elUpper === "TMP" || cmUpper.includes("TMP"))) ||
                           isRain ||
                           elUpper === "DTD" || cmUpper.includes("DTD");
 
-  const isHGT = elUpper === "HGT" || cmUpper.includes("HGT");
-  const isSLP = elUpper === "SLP" || cmUpper.includes("SLP");
+  const isHGT = (elUpper === "HGT" || cmUpper.includes("HGT")) && !isVariation;
+  const isSLP = (elUpper === "SLP" || cmUpper.includes("SLP")) && !isVariation;
 
   const palMin = palette[0].val;
   const palMax = palette[palette.length - 1].val;

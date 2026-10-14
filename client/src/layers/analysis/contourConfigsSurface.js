@@ -239,18 +239,136 @@ export const SURFACE_CONTOUR_CONFIGS = {
       return DIV_LEVELS;
     },
   },
+  T_VARIATION_24H: {
+    name: "24h Temperature Variation",
+    element: "T_VARIATION_24H",
+    unit: "°C",
+    defaultColor: "#f85149",
+    colormap: "T_VAR",
+    boldValues: [0],
+    extract: (p) => {
+      const keys = ["t_var_24h", "t_var", "temperature", "temp", "val", "value"];
+      for (const k of keys) {
+        const v = p[k];
+        if (typeof v === "number" && !isNaN(v) && v > -90 && v < 90) return v;
+      }
+      return null;
+    },
+    getLevels: (minV, maxV) => {
+      const std = [-16, -12, -8, -6, -4, -2, 0, 2, 4, 6, 8, 12, 16];
+      if (typeof minV === "number" && typeof maxV === "number" && (maxV < -16 || minV > 16)) {
+        return Array.from(griddata.autoLevels(minV, maxV, 8));
+      }
+      return std;
+    },
+  },
+  T_VARIATION_48H: {
+    name: "48h Temperature Variation",
+    element: "T_VARIATION_48H",
+    unit: "°C",
+    defaultColor: "#f85149",
+    colormap: "T_VAR",
+    boldValues: [0],
+    extract: (p) => {
+      const keys = ["t_var_48h", "t_var", "temperature", "temp", "val", "value"];
+      for (const k of keys) {
+        const v = p[k];
+        if (typeof v === "number" && !isNaN(v) && v > -90 && v < 90) return v;
+      }
+      return null;
+    },
+    getLevels: (minV, maxV) => {
+      const std = [-20, -16, -12, -8, -4, -2, 0, 2, 4, 8, 12, 16, 20];
+      if (typeof minV === "number" && typeof maxV === "number" && (maxV < -20 || minV > 20)) {
+        return Array.from(griddata.autoLevels(minV, maxV, 8));
+      }
+      return std;
+    },
+  },
+  SLP_VARIATION_24H: {
+    name: "24h SLP Variation",
+    element: "SLP_VARIATION_24H",
+    unit: "hPa",
+    defaultColor: "#58a6ff",
+    colormap: "SLP_VAR",
+    boldValues: [0],
+    extract: (p) => {
+      const keys = ["slp_var_24h", "slp_var", "slp", "SLP", "press_slp", "val", "value"];
+      for (const k of keys) {
+        const v = p[k];
+        if (typeof v === "number" && !isNaN(v) && v > -100 && v < 100) return v;
+      }
+      return null;
+    },
+    getLevels: (minV, maxV) => {
+      const std = [-16, -12, -8, -6, -4, -2, 0, 2, 4, 6, 8, 12, 16];
+      if (typeof minV === "number" && typeof maxV === "number" && (maxV < -16 || minV > 16)) {
+        return Array.from(griddata.autoLevels(minV, maxV, 8));
+      }
+      return std;
+    },
+  },
+  SLP_VARIATION_48H: {
+    name: "48h SLP Variation",
+    element: "SLP_VARIATION_48H",
+    unit: "hPa",
+    defaultColor: "#58a6ff",
+    colormap: "SLP_VAR",
+    boldValues: [0],
+    extract: (p) => {
+      const keys = ["slp_var_48h", "slp_var", "slp", "SLP", "press_slp", "val", "value"];
+      for (const k of keys) {
+        const v = p[k];
+        if (typeof v === "number" && !isNaN(v) && v > -100 && v < 100) return v;
+      }
+      return null;
+    },
+    getLevels: (minV, maxV) => {
+      const std = [-20, -16, -12, -8, -4, -2, 0, 2, 4, 8, 12, 16, 20];
+      if (typeof minV === "number" && typeof maxV === "number" && (maxV < -20 || minV > 20)) {
+        return Array.from(griddata.autoLevels(minV, maxV, 8));
+      }
+      return std;
+    },
+  },
 };
 
+SURFACE_CONTOUR_CONFIGS["T-VARIATION-24H"] = SURFACE_CONTOUR_CONFIGS.T_VARIATION_24H;
+SURFACE_CONTOUR_CONFIGS["T-VARIATION-48H"] = SURFACE_CONTOUR_CONFIGS.T_VARIATION_48H;
+SURFACE_CONTOUR_CONFIGS["SLP-VARIATION-24H"] = SURFACE_CONTOUR_CONFIGS.SLP_VARIATION_24H;
+SURFACE_CONTOUR_CONFIGS["SLP-VARIATION-48H"] = SURFACE_CONTOUR_CONFIGS.SLP_VARIATION_48H;
+SURFACE_CONTOUR_CONFIGS["T_VAR_24H"] = SURFACE_CONTOUR_CONFIGS.T_VARIATION_24H;
+SURFACE_CONTOUR_CONFIGS["T_VAR_48H"] = SURFACE_CONTOUR_CONFIGS.T_VARIATION_48H;
+SURFACE_CONTOUR_CONFIGS["SLP_VAR_24H"] = SURFACE_CONTOUR_CONFIGS.SLP_VARIATION_24H;
+SURFACE_CONTOUR_CONFIGS["SLP_VAR_48H"] = SURFACE_CONTOUR_CONFIGS.SLP_VARIATION_48H;
+
 export function normalizeSurfaceElementKey(elem) {
-  const norm = (elem || "").toUpperCase();
-  if (norm === "SLP" || norm === "PRESSURE" || norm === "PRS") return "SLP";
-  if (norm === "TMP" || norm === "TT" || norm === "TEMPERATURE" || norm === "TEMP") return "TMP";
-  if (norm === "TD" || norm === "DPT" || norm === "DEWPOINT" || norm === "DEW_POINT") return "TD";
-  if (norm === "VIS" || norm === "VISIBILITY" || norm === "VV") return "VIS";
-  if (norm === "RAIN6" || norm === "RAIN6H" || norm === "RAIN_6H" || norm === "RAIN" || norm === "PRECIPITATION") return "RAIN6";
-  if (norm === "WIND" || norm === "WS" || norm === "WINDSPEED" || norm === "WIND_SPEED" || norm === "FF") return "WIND";
-  if (norm === "DTD" || norm === "T-TD" || norm === "TTD" || norm === "DEPRESSION" || norm === "DPTDPR") return "DTD";
-  if (norm === "VOR" || norm === "VORT" || norm === "VORTICITY" || norm === "RVOR" || norm === "REL_VOR") return "VOR";
-  if (norm === "DIV" || norm === "DIVERGENCE") return "DIV";
+  const upper = (elem || "").toUpperCase().trim();
+  const hyphen = upper.replace(/_/g, "-");
+
+  if (
+    hyphen.includes("SLP-VAR") ||
+    hyphen.includes("PRS-VAR") ||
+    hyphen.includes("PRESS-VAR") ||
+    hyphen.includes("PRESSURE-VAR") ||
+    hyphen.includes("PRMSL-VAR") ||
+    ((hyphen.includes("SLP") || hyphen.includes("PRS") || hyphen.includes("PRMSL")) && (hyphen.includes("VAR") || hyphen.includes("24") || hyphen.includes("48")))
+  ) {
+    if (hyphen.includes("48")) return "SLP_VARIATION_48H";
+    return "SLP_VARIATION_24H";
+  }
+  if (hyphen.includes("T-VAR") || hyphen.includes("TEM-VAR") || hyphen.includes("TEMP-VAR") || hyphen.startsWith("VAR-") || hyphen.includes("VARIATION")) {
+    if (hyphen.includes("48")) return "T_VARIATION_48H";
+    return "T_VARIATION_24H";
+  }
+  if (upper === "SLP" || upper === "PRESSURE" || upper === "PRS") return "SLP";
+  if (upper === "TMP" || upper === "TT" || upper === "TEMPERATURE" || upper === "TEMP") return "TMP";
+  if (upper === "TD" || upper === "DPT" || upper === "DEWPOINT" || upper === "DEW_POINT" || hyphen === "DEW-POINT") return "TD";
+  if (upper === "VIS" || upper === "VISIBILITY" || upper === "VV") return "VIS";
+  if (upper === "RAIN6" || upper === "RAIN6H" || upper === "RAIN_6H" || hyphen === "RAIN-6H" || upper === "RAIN" || upper === "PRECIPITATION") return "RAIN6";
+  if (upper === "WIND" || upper === "WS" || upper === "WINDSPEED" || upper === "WIND_SPEED" || hyphen === "WIND-SPEED" || upper === "FF") return "WIND";
+  if (upper === "DTD" || upper === "T-TD" || upper === "TTD" || upper === "DEPRESSION" || upper === "DPTDPR") return "DTD";
+  if (upper === "VOR" || upper === "VORT" || upper === "VORTICITY" || upper === "RVOR" || upper === "REL_VOR" || hyphen === "REL-VOR") return "VOR";
+  if (upper === "DIV" || upper === "DIVERGENCE") return "DIV";
   return "SLP";
 }

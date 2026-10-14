@@ -157,8 +157,16 @@ describe("Derived Layers in Menu/Submenu and Single Layer Row Cleanup", () => {
     const { replaceModelInPath } = await import("../../src/lib/stores/tabsCore.js");
     expect(replaceModelInPath("/api/derived/ECMWF_HR/K-INDEX", "JAPAN_MR")).toBe("/api/derived/JAPAN_MR/K-INDEX");
     expect(replaceModelInPath("/api/derived/ECMWF_HR/TMP/850-500", "GRAPES_GFS")).toBe("/api/derived/GRAPES_GFS/TMP/850-500");
+    expect(replaceModelInPath("/api/derived/ECMWF_HR/T-VARIATION-24H/850", "JAPAN_MR")).toBe("/api/derived/JAPAN_MR/T-VARIATION-24H/850");
+    expect(replaceModelInPath("/api/derived/ECMWF_HR/T-VARIATION-48H/850", "GRAPES_GFS")).toBe("/api/derived/GRAPES_GFS/T-VARIATION-48H/850");
+    expect(replaceModelInPath("/api/derived/ECMWF_HR/SLP-VARIATION-24H", "CMA_GFS")).toBe("/api/derived/CMA_GFS/SLP-VARIATION-24H");
+    expect(replaceModelInPath("/api/derived/ECMWF_HR/SLP-VARIATION-48H", "GFS")).toBe("/api/derived/GFS/SLP-VARIATION-48H");
     expect(replaceModelInPath("ECMWF_HR/TMP/850", "JAPAN_MR")).toBe("JAPAN_MR/TMP/850");
     expect(replaceModelInPath("UPPER_AIR/PLOT/500", "JAPAN_MR")).toBe("JAPAN_MR/PLOT/500");
+
+    // Observation paths must be preserved and not overwritten by model replacement
+    expect(replaceModelInPath("/api/derived/SURFACE/T-VARIATION-24H", "JAPAN_MR")).toBe("/api/derived/SURFACE/T-VARIATION-24H");
+    expect(replaceModelInPath("/api/derived/UPPER_AIR/PLOT/T-VARIATION-24H/850", "JAPAN_MR")).toBe("/api/derived/UPPER_AIR/PLOT/T-VARIATION-24H/850");
   });
 
   test("App.svelte and visibilityActions preserve virtual /api/derived/ paths during model changes and visibility toggle", () => {

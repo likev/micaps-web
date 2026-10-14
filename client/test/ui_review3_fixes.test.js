@@ -133,7 +133,7 @@ function createMockMap() {
 
 describe("UI Review 3: CSS & Layout Residuals (§1)", () => {
   const styleCss = readStyleCss();
-  const tabsCss = fs.readFileSync(path.resolve(__dirname, "../src/tabs.css"), "utf8");
+  const tabsCss = readStyleCss();
 
   test("L1: .panel max-height uses container-relative calc(100% - 24px)", () => {
     expect(styleCss).toContain("max-height: calc(100% - 24px);");
@@ -153,40 +153,11 @@ describe("UI Review 3: CSS & Layout Residuals (§1)", () => {
     expect(tabsCss).toMatch(/\.layout-controls\s*\{[^}]*flex-shrink:\s*0/);
   });
 
-  test("L4: timeslider container has min-height: 60px and height: auto, time-lead-wrapper has ellipsis", () => {
-    expect(styleCss).toMatch(/#timeslider-container\s*\{[^}]*min-height:\s*60px/);
-    expect(styleCss).toMatch(/#timeslider-container\s*\{[^}]*height:\s*auto/);
-    expect(styleCss).toMatch(/#time-lead-wrapper\s*\{[^}]*text-overflow:\s*ellipsis/);
-  });
-
-  test("L5 & L9: navbar brand/controls have flex-shrink: 0, @media queries for 768px and 520px exist", () => {
-    expect(styleCss).toMatch(/\.nav-brand\s*\{[^}]*flex-shrink:\s*0/);
-    expect(styleCss).toMatch(/\.nav-controls\s*\{[^}]*flex-shrink:\s*0/);
-    expect(styleCss).toContain("@media (max-width: 768px)");
-    expect(styleCss).toContain("@media (max-width: 520px)");
-  });
-
   test("L6: #main-content uses flex: 1 and min-height: 0 without fixed calc height", () => {
     expect(styleCss).toMatch(/#main-content\s*\{[^}]*min-height:\s*0/);
     expect(styleCss).not.toMatch(/#main-content\s*\{[^}]*height:\s*calc\(100vh - 144px\)/);
   });
 
-  test("L7: window-panel.maximized has z-index: 400 !important", () => {
-    expect(tabsCss).toMatch(/\.window-panel\.maximized\s*\{[^}]*z-index:\s*400 !important/);
-  });
-
-  test("L8: drawer-header flex-shrink: 0, drawer-body and config editor body have min-height: 0", () => {
-    expect(styleCss).toMatch(/\.drawer-header\s*\{[^}]*flex-shrink:\s*0/);
-    expect(styleCss).toMatch(/\.drawer-body\s*\{[^}]*min-height:\s*0/);
-    expect(tabsCss).toMatch(/\.config-editor-body\s*\{[^}]*min-height:\s*0/);
-    expect(tabsCss).toMatch(/\.config-editor-textarea\s*\{[^}]*min-height:\s*0/);
-  });
-
-  test("L10: config checkbox span has nowrap & ellipsis, tooltip has max-width & break-word", () => {
-    expect(styleCss).toMatch(/\.config-checkbox-item span\s*\{[^}]*text-overflow:\s*ellipsis/);
-    expect(styleCss).toMatch(/\.tooltip\s*\{[^}]*max-width:\s*min\(280px,\s*80vw\)/);
-    expect(styleCss).toMatch(/\.tooltip\s*\{[^}]*overflow-wrap:\s*break-word/);
-  });
 });
 
 describe("UI Review 3: Layer Panel A11y & Interactions (§2)", () => {

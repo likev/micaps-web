@@ -29,6 +29,10 @@ func GetBlob(client *CQLClient, fullDirectory string, fileName string) ([]byte, 
 		table = "UPPER_AIR"
 		dataPath = "TLOGP"
 	}
+	uTable := strings.ToUpper(table)
+	if uTable == "CMA_GFS" || uTable == "CMA-GFS" || uTable == "CMAGFS" || uTable == "GFS" {
+		table = "GRAPES_GFS"
+	}
 
 	if !validTableRegex.MatchString(table) {
 		return nil, fmt.Errorf("invalid table name: %s", table)

@@ -1,9 +1,0 @@
-/* style.css - Barrel importing split style modules (see styles/). Cascade order preserved. */
-@import "./styles/tokens.css";
-@import "./styles/navbar.css";
-@import "./styles/drawer-forms.css";
-@import "./styles/layers-panel.css";
-@import "./styles/station-filter.css";
-@import "./styles/legend.css";
-@import "./styles/timeline.css";
-@import "./styles/responsive.css";

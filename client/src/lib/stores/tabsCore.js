@@ -30,7 +30,12 @@ const inFlightLevelQueries = new Map();
 export async function queryModelSupportedLevels(model, element = "") {
   if (!model) return null;
   const m = String(model).trim().toUpperCase();
-  const el = element ? String(element).trim().toUpperCase() : "";
+  let el = element ? String(element).trim().toUpperCase() : "";
+  if (el.includes("T-VAR") || el.includes("T_VAR") || el.includes("TMP-VAR") || el.includes("TMP_VAR")) {
+    el = "TMP";
+  } else if (el.includes("SLP") || el.includes("PRMSL")) {
+    el = "PRMSL";
+  }
   const key = el ? `${m}/${el}` : m;
 
   if (modelLevelsRuntimeCache.has(key)) {
@@ -110,10 +115,15 @@ export function setModelLevelsCache(model, element, levels) {
 export function isModelLayerSupported(model, element, level) {
   if (!model || level == null) return true;
   const numLevel = parseInt(level, 10);
-  if (isNaN(numLevel)) return true;
+  if (isNaN(numLevel) || numLevel === 0) return true;
 
   const m = String(model).trim().toUpperCase();
-  const el = element ? String(element).trim().toUpperCase() : "";
+  let el = element ? String(element).trim().toUpperCase() : "";
+  if (el.includes("T-VAR") || el.includes("T_VAR") || el.includes("TMP-VAR") || el.includes("TMP_VAR")) {
+    el = "TMP";
+  } else if (el.includes("SLP") || el.includes("PRMSL")) {
+    return true; // Surface level element always supported on gridded models
+  }
   const key = el ? `${m}/${el}` : m;
 
   // 1. If levels are already cached from a runtime server query, check against them:
@@ -433,6 +443,9 @@ export function shouldSkipWindowReload(w, baseWin, prevBaseState, mode) {
 export function replaceModelInPath(path, newModel) {
   if (typeof path !== "string" || !path.includes("/")) return path;
   if (path.startsWith("/api/derived/")) {
+    if (path.startsWith("/api/derived/SURFACE/") || path.startsWith("/api/derived/UPPER_AIR/")) {
+      return path;
+    }
     return path.replace(/^\/api\/derived\/[^\/]+/, `/api/derived/${newModel}`);
   }
   return path.replace(/^[^\/]+/, newModel);
@@ -531,20 +544,78 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {  if (
       win.obsTime = baseObsTime;
       if (win.activeGroup && Array.isArray(win.activeGroup.layers)) {
         for (const l of win.activeGroup.layers) {
-          if (l && (l.type === "contour" || l.type === "wind" || l.type === "raster" || (l.model && l.model !== "SURFACE" && l.model !== "UPPER_AIR"))) {
+          const isObs = Boolean(
+            l?.isObservation ||
+            l?.model === "SURFACE" ||
+            l?.model === "UPPER_AIR" ||
+            l?.path?.includes("/api/derived/SURFACE") ||
+            l?.path?.includes("/api/derived/UPPER_AIR")
+          );
+          if (!isObs && l && (l.type === "contour" || l.type === "wind" || l.type === "raster" || l.model)) {
+            const oldM = l.model;
             l.model = win.model;
             if (typeof l.path === "string" && l.path.includes("/")) {
               l.path = replaceModelInPath(l.path, win.model);
+            }
+            if (typeof l.id === "string" && oldM) {
+              const baseM = oldM.replace(/_.*$/, "");
+              l.id = l.id.replaceAll(oldM, win.model).replaceAll(oldM.toLowerCase(), win.model.toLowerCase());
+              if (baseM && baseM !== oldM) {
+                l.id = l.id.replaceAll(baseM, win.model).replaceAll(baseM.toLowerCase(), win.model.toLowerCase());
+              }
+            }
+            if (typeof l.derivedFrom === "string" && oldM) {
+              const baseM = oldM.replace(/_.*$/, "");
+              l.derivedFrom = l.derivedFrom.replaceAll(oldM, win.model).replaceAll(oldM.toLowerCase(), win.model.toLowerCase());
+              if (baseM && baseM !== oldM) {
+                l.derivedFrom = l.derivedFrom.replaceAll(baseM, win.model).replaceAll(baseM.toLowerCase(), win.model.toLowerCase());
+              }
+            }
+            if (typeof l.name === "string" && oldM) {
+              const baseM = oldM.replace(/_.*$/, "");
+              l.name = l.name.replaceAll(oldM, win.model);
+              if (baseM && baseM !== oldM) {
+                l.name = l.name.replaceAll(baseM, win.model);
+              }
             }
           }
         }
       }
       if (Array.isArray(win.layers)) {
         for (const l of win.layers) {
-          if (l && (l.type === "contour" || l.type === "wind" || l.type === "raster" || (l.model && l.model !== "SURFACE" && l.model !== "UPPER_AIR"))) {
+          const isObs = Boolean(
+            l?.isObservation ||
+            l?.model === "SURFACE" ||
+            l?.model === "UPPER_AIR" ||
+            l?.path?.includes("/api/derived/SURFACE") ||
+            l?.path?.includes("/api/derived/UPPER_AIR")
+          );
+          if (!isObs && l && (l.type === "contour" || l.type === "wind" || l.type === "raster" || l.model)) {
+            const oldM = l.model;
             l.model = win.model;
             if (typeof l.path === "string" && l.path.includes("/")) {
               l.path = replaceModelInPath(l.path, win.model);
+            }
+            if (typeof l.id === "string" && oldM) {
+              const baseM = oldM.replace(/_.*$/, "");
+              l.id = l.id.replaceAll(oldM, win.model).replaceAll(oldM.toLowerCase(), win.model.toLowerCase());
+              if (baseM && baseM !== oldM) {
+                l.id = l.id.replaceAll(baseM, win.model).replaceAll(baseM.toLowerCase(), win.model.toLowerCase());
+              }
+            }
+            if (typeof l.derivedFrom === "string" && oldM) {
+              const baseM = oldM.replace(/_.*$/, "");
+              l.derivedFrom = l.derivedFrom.replaceAll(oldM, win.model).replaceAll(oldM.toLowerCase(), win.model.toLowerCase());
+              if (baseM && baseM !== oldM) {
+                l.derivedFrom = l.derivedFrom.replaceAll(baseM, win.model).replaceAll(baseM.toLowerCase(), win.model.toLowerCase());
+              }
+            }
+            if (typeof l.name === "string" && oldM) {
+              const baseM = oldM.replace(/_.*$/, "");
+              l.name = l.name.replaceAll(oldM, win.model);
+              if (baseM && baseM !== oldM) {
+                l.name = l.name.replaceAll(baseM, win.model);
+              }
             }
           }
         }

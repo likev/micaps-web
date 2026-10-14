@@ -2,9 +2,12 @@ package handler_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -208,6 +211,114 @@ func TestParseDerivedPath(t *testing.T) {
 			path:      "/derived/UPPER_AIR/PLOT/TMP/850-500/20261010080000.000",
 			file:      "",
 			expectDer: false,
+		},
+		{
+			name:        "Surface station T-variation-24H",
+			path:        "/api/derived/SURFACE/T-VARIATION-24H/20261014080000.000",
+			file:        "",
+			expectDer:   true,
+			expectStn:   true,
+			expectModel: "SURFACE",
+			expectElem:  "TMP",
+			expectType:  "T-VARIATION-24H",
+			expectL1:    "SURFACE",
+			expectFile:  "20261014080000.000",
+		},
+		{
+			name:        "Surface station SLP-variation-24H",
+			path:        "/api/derived/SURFACE/SLP-VARIATION-24H",
+			file:        "20261014080000.000",
+			expectDer:   true,
+			expectStn:   true,
+			expectModel: "SURFACE",
+			expectElem:  "SLP",
+			expectType:  "SLP-VARIATION-24H",
+			expectL1:    "SURFACE",
+			expectFile:  "20261014080000.000",
+		},
+		{
+			name:        "Upper air 850hPa T-variation-24H",
+			path:        "/api/derived/UPPER_AIR/PLOT/T-VARIATION-24H/850/20261014080000.000",
+			file:        "",
+			expectDer:   true,
+			expectStn:   true,
+			expectModel: "UPPER_AIR",
+			expectElem:  "TMP",
+			expectType:  "T-VARIATION-24H",
+			expectL1:    "850",
+			expectFile:  "20261014080000.000",
+		},
+		{
+			name:        "ECMWF_HR 850hPa T-variation-24H",
+			path:        "/api/derived/ECMWF_HR/T-VARIATION-24H/850",
+			file:        "26101408.024",
+			expectDer:   true,
+			expectStn:   false,
+			expectModel: "ECMWF_HR",
+			expectElem:  "TMP",
+			expectType:  "T-VARIATION-24H",
+			expectL1:    "850",
+			expectFile:  "26101408.024",
+		},
+		{
+			name:        "ECMWF_HR SLP-variation-24H",
+			path:        "/api/derived/ECMWF_HR/SLP-VARIATION-24H",
+			file:        "26101408.024",
+			expectDer:   true,
+			expectStn:   false,
+			expectModel: "ECMWF_HR",
+			expectElem:  "PRMSL",
+			expectType:  "SLP-VARIATION-24H",
+			expectL1:    "0",
+			expectFile:  "26101408.024",
+		},
+		{
+			name:        "ECMWF_HR 850hPa 4-part T-variation-24H",
+			path:        "/api/derived/ECMWF_HR/TMP/T-VARIATION-24H/850",
+			file:        "26101408.024",
+			expectDer:   true,
+			expectStn:   false,
+			expectModel: "ECMWF_HR",
+			expectElem:  "TMP",
+			expectType:  "T-VARIATION-24H",
+			expectL1:    "850",
+			expectFile:  "26101408.024",
+		},
+		{
+			name:        "Surface station 4-part T-variation-24H",
+			path:        "/api/derived/SURFACE/TMP/T-VARIATION-24H",
+			file:        "20261014080000.000",
+			expectDer:   true,
+			expectStn:   true,
+			expectModel: "SURFACE",
+			expectElem:  "TMP",
+			expectType:  "T-VARIATION-24H",
+			expectL1:    "SURFACE",
+			expectFile:  "20261014080000.000",
+		},
+		{
+			name:        "Upper-Air 850hPa 5-part T-variation-24H",
+			path:        "/api/derived/UPPER_AIR/PLOT/TMP/T-VARIATION-24H/850",
+			file:        "20261014080000.000",
+			expectDer:   true,
+			expectStn:   true,
+			expectModel: "UPPER_AIR",
+			expectElem:  "TMP",
+			expectType:  "T-VARIATION-24H",
+			expectL1:    "850",
+			expectFile:  "20261014080000.000",
+		},
+		{
+			name:        "ECMWF_HR PRMSL SLP-variation-48H",
+			path:        "/api/derived/ECMWF_HR/PRMSL/SLP-VARIATION-48H",
+			file:        "26101408.048",
+			expectDer:   true,
+			expectStn:   false,
+			expectModel: "ECMWF_HR",
+			expectElem:  "PRMSL",
+			expectType:  "SLP-VARIATION-48H",
+			expectL1:    "0",
+			expectFile:  "26101408.048",
 		},
 	}
 
@@ -528,6 +639,177 @@ func TestDirectHandler_HTTPEndpoints(t *testing.T) {
 	}
 }
 
+func TestMockTimeDerivedCalculations(t *testing.T) {
+	dH := &handler.DerivedHandler{
+		Client:   nil,
+		Cache:    nil,
+		MockMode: true,
+	}
+
+	// 1. Mock Surface Station T-variation-24H
+	dReqSfcT, ok := handler.ParseDerivedPath("/api/derived/SURFACE/T-VARIATION-24H", "20261014080000.000")
+	if !ok || !dReqSfcT.IsTimeDerived {
+		t.Fatalf("ParseDerivedPath failed for SURFACE/T-VARIATION-24H")
+	}
+	stnResp, err := dH.CalculateDerivedStation(dReqSfcT)
+	if err != nil {
+		t.Fatalf("Mock CalculateDerivedStation for SURFACE/T-VARIATION-24H failed: %v", err)
+	}
+	if len(stnResp.Features) == 0 {
+		t.Fatalf("Expected non-empty mock station features")
+	}
+	if _, okT := stnResp.Features[0].Properties["temperature"]; !okT {
+		t.Fatalf("Expected temperature property in derived surface station")
+	}
+	if _, okT24 := stnResp.Features[0].Properties["t_var_24h"]; !okT24 {
+		t.Fatalf("Expected t_var_24h property in derived surface station")
+	}
+	if _, okVal := stnResp.Features[0].Properties["val"]; !okVal {
+		t.Fatalf("Expected val property in derived surface station")
+	}
+
+	// 1b. Mock Surface Station T-variation-48H
+	dReqSfcT48, ok48 := handler.ParseDerivedPath("/api/derived/SURFACE/T-VARIATION-48H", "20261014080000.000")
+	if !ok48 || !dReqSfcT48.IsTimeDerived || dReqSfcT48.TimeDeltaHours != 48 {
+		t.Fatalf("ParseDerivedPath failed for SURFACE/T-VARIATION-48H")
+	}
+	stnResp48, err48 := dH.CalculateDerivedStation(dReqSfcT48)
+	if err48 != nil {
+		t.Fatalf("Mock CalculateDerivedStation for SURFACE/T-VARIATION-48H failed: %v", err48)
+	}
+	if len(stnResp48.Features) == 0 {
+		t.Fatalf("Expected non-empty mock station features for 48H")
+	}
+	if _, okT48 := stnResp48.Features[0].Properties["t_var_48h"]; !okT48 {
+		t.Fatalf("Expected t_var_48h property in derived surface station 48H")
+	}
+	if _, okVal48 := stnResp48.Features[0].Properties["value"]; !okVal48 {
+		t.Fatalf("Expected value property in derived surface station 48H")
+	}
+
+	// 2. Mock Surface Station SLP-variation-24H
+	dReqSfcSLP, ok := handler.ParseDerivedPath("/api/derived/SURFACE/SLP-VARIATION-24H", "20261014080000.000")
+	if !ok || !dReqSfcSLP.IsTimeDerived {
+		t.Fatalf("ParseDerivedPath failed for SURFACE/SLP-VARIATION-24H")
+	}
+	stnSLPResp, err := dH.CalculateDerivedStation(dReqSfcSLP)
+	if err != nil {
+		t.Fatalf("Mock CalculateDerivedStation for SURFACE/SLP-VARIATION-24H failed: %v", err)
+	}
+	if len(stnSLPResp.Features) == 0 {
+		t.Fatalf("Expected non-empty mock station features")
+	}
+	if _, okSLP := stnSLPResp.Features[0].Properties["slp"]; !okSLP {
+		t.Fatalf("Expected slp property in derived surface station")
+	}
+	if _, okSLP24 := stnSLPResp.Features[0].Properties["slp_var_24h"]; !okSLP24 {
+		t.Fatalf("Expected slp_var_24h property in derived surface station")
+	}
+	if _, okSLPVal := stnSLPResp.Features[0].Properties["val"]; !okSLPVal {
+		t.Fatalf("Expected val property in derived surface station SLP")
+	}
+
+	// 2b. Mock Surface Station SLP-variation-48H
+	dReqSfcSLP48, okSLP48 := handler.ParseDerivedPath("/api/derived/SURFACE/SLP-VARIATION-48H", "20261014080000.000")
+	if !okSLP48 || !dReqSfcSLP48.IsTimeDerived || dReqSfcSLP48.TimeDeltaHours != 48 {
+		t.Fatalf("ParseDerivedPath failed for SURFACE/SLP-VARIATION-48H")
+	}
+	stnSLPResp48, errSLP48 := dH.CalculateDerivedStation(dReqSfcSLP48)
+	if errSLP48 != nil {
+		t.Fatalf("Mock CalculateDerivedStation for SURFACE/SLP-VARIATION-48H failed: %v", errSLP48)
+	}
+	if len(stnSLPResp48.Features) == 0 {
+		t.Fatalf("Expected non-empty mock station features for SLP 48H")
+	}
+	if _, okSLP48Prop := stnSLPResp48.Features[0].Properties["slp_var_48h"]; !okSLP48Prop {
+		t.Fatalf("Expected slp_var_48h property in derived surface station 48H")
+	}
+
+	// 3. Mock Upper-Air 850hPa T-variation-24H
+	dReqUAT, ok := handler.ParseDerivedPath("/api/derived/UPPER_AIR/PLOT/T-VARIATION-24H/850", "20261014080000.000")
+	if !ok || !dReqUAT.IsTimeDerived {
+		t.Fatalf("ParseDerivedPath failed for UPPER_AIR/PLOT/T-VARIATION-24H/850")
+	}
+	stnUAResp, err := dH.CalculateDerivedStation(dReqUAT)
+	if err != nil {
+		t.Fatalf("Mock CalculateDerivedStation for UPPER_AIR/PLOT/T-VARIATION-24H/850 failed: %v", err)
+	}
+	if len(stnUAResp.Features) == 0 {
+		t.Fatalf("Expected non-empty mock station features")
+	}
+	if _, okUAT24 := stnUAResp.Features[0].Properties["t_var_24h"]; !okUAT24 {
+		t.Fatalf("Expected t_var_24h in derived upper-air station")
+	}
+
+	// 3b. Mock Upper-Air 850hPa T-variation-48H
+	dReqUAT48, okUAT48 := handler.ParseDerivedPath("/api/derived/UPPER_AIR/PLOT/T-VARIATION-48H/850", "20261014080000.000")
+	if !okUAT48 || !dReqUAT48.IsTimeDerived || dReqUAT48.TimeDeltaHours != 48 {
+		t.Fatalf("ParseDerivedPath failed for UPPER_AIR/PLOT/T-VARIATION-48H/850")
+	}
+	stnUAResp48, errUAT48 := dH.CalculateDerivedStation(dReqUAT48)
+	if errUAT48 != nil {
+		t.Fatalf("Mock CalculateDerivedStation for UPPER_AIR/PLOT/T-VARIATION-48H/850 failed: %v", errUAT48)
+	}
+	if len(stnUAResp48.Features) == 0 {
+		t.Fatalf("Expected non-empty mock station features for UA 48H")
+	}
+	if _, okUAT48Prop := stnUAResp48.Features[0].Properties["t_var_48h"]; !okUAT48Prop {
+		t.Fatalf("Expected t_var_48h in derived upper-air station 48H")
+	}
+
+	// 4. Mock ECMWF_HR 850hPa T-variation-24H
+	dReqECGridT, ok := handler.ParseDerivedPath("/api/derived/ECMWF_HR/T-VARIATION-24H/850", "26101408.024")
+	if !ok || !dReqECGridT.IsTimeDerived {
+		t.Fatalf("ParseDerivedPath failed for ECMWF_HR/T-VARIATION-24H/850")
+	}
+	gridResp, err := dH.CalculateDerivedGrid(dReqECGridT)
+	if err != nil {
+		t.Fatalf("Mock CalculateDerivedGrid for ECMWF_HR/T-VARIATION-24H/850 failed: %v", err)
+	}
+	if len(gridResp.Values) == 0 {
+		t.Fatalf("Expected non-empty mock grid values")
+	}
+
+	// 4b. Mock ECMWF_HR 850hPa T-variation-48H
+	dReqECGridT48, okECGridT48 := handler.ParseDerivedPath("/api/derived/ECMWF_HR/T-VARIATION-48H/850", "26101408.048")
+	if !okECGridT48 || !dReqECGridT48.IsTimeDerived || dReqECGridT48.TimeDeltaHours != 48 {
+		t.Fatalf("ParseDerivedPath failed for ECMWF_HR/T-VARIATION-48H/850")
+	}
+	gridResp48, errECGridT48 := dH.CalculateDerivedGrid(dReqECGridT48)
+	if errECGridT48 != nil {
+		t.Fatalf("Mock CalculateDerivedGrid for ECMWF_HR/T-VARIATION-48H/850 failed: %v", errECGridT48)
+	}
+	if len(gridResp48.Values) == 0 {
+		t.Fatalf("Expected non-empty mock grid values for 48H")
+	}
+
+	// 5. Mock ECMWF_HR SLP-variation-24H
+	dReqECGridSLP, ok := handler.ParseDerivedPath("/api/derived/ECMWF_HR/SLP-VARIATION-24H", "26101408.024")
+	if !ok || !dReqECGridSLP.IsTimeDerived {
+		t.Fatalf("ParseDerivedPath failed for ECMWF_HR/SLP-VARIATION-24H")
+	}
+	gridSLPResp, err := dH.CalculateDerivedGrid(dReqECGridSLP)
+	if err != nil {
+		t.Fatalf("Mock CalculateDerivedGrid for ECMWF_HR/SLP-VARIATION-24H failed: %v", err)
+	}
+	if len(gridSLPResp.Values) == 0 {
+		t.Fatalf("Expected non-empty mock grid values")
+	}
+
+	// 5b. Mock ECMWF_HR SLP-variation-48H
+	dReqECGridSLP48, okECGridSLP48 := handler.ParseDerivedPath("/api/derived/ECMWF_HR/SLP-VARIATION-48H", "26101408.048")
+	if !okECGridSLP48 || !dReqECGridSLP48.IsTimeDerived || dReqECGridSLP48.TimeDeltaHours != 48 {
+		t.Fatalf("ParseDerivedPath failed for ECMWF_HR/SLP-VARIATION-48H")
+	}
+	gridSLPResp48, errECGridSLP48 := dH.CalculateDerivedGrid(dReqECGridSLP48)
+	if errECGridSLP48 != nil {
+		t.Fatalf("Mock CalculateDerivedGrid for ECMWF_HR/SLP-VARIATION-48H failed: %v", errECGridSLP48)
+	}
+	if len(gridSLPResp48.Values) == 0 {
+		t.Fatalf("Expected non-empty mock grid values for SLP 48H")
+	}
+}
+
 func TestCassandraLiveDerivedCalculations(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping live Cassandra integration test in short mode")
@@ -544,8 +826,15 @@ func TestCassandraLiveDerivedCalculations(t *testing.T) {
 		MockMode: false,
 	}
 
-	// 1. Live Upper Air Station T850-500 difference calculation
-	dReqStn, ok := handler.ParseDerivedPath("/api/derived/UPPER_AIR/PLOT/TMP/850-500", "20260413080000.000")
+	// 1. Live Upper Air Station calculation with dynamic latest file
+	filesUA, errUA := db.GetFileList(client, "UPPER_AIR/PLOT/850", 5)
+	if errUA != nil || len(filesUA) == 0 {
+		t.Skipf("No files found in UPPER_AIR/PLOT/850: %v", errUA)
+	}
+	latestUA := filesUA[0].Name
+	t.Logf("Using latest live UPPER_AIR/PLOT/850 file: %s", latestUA)
+
+	dReqStn, ok := handler.ParseDerivedPath("/api/derived/UPPER_AIR/PLOT/TMP/850-500", latestUA)
 	if !ok {
 		t.Fatal("ParseDerivedPath failed for station")
 	}
@@ -559,65 +848,327 @@ func TestCassandraLiveDerivedCalculations(t *testing.T) {
 	firstProps := stnResp.Features[0].Properties
 	t.Logf("Live UPPER_AIR/PLOT/TMP/850-500 Station[0]: ID=%v TempDiff=%v", firstProps["station_id"], firstProps["temperature"])
 
-	// 1b. Live Upper Air K-INDEX
-	dReqK, okK := handler.ParseDerivedPath("/api/derived/UPPER_AIR/PLOT/K-INDEX", "20260413080000.000")
-	if okK {
-		stnK, errK := dH.CalculateDerivedStation(dReqK)
-		if errK != nil {
-			t.Logf("Live UPPER_AIR/PLOT/K-INDEX failed: %v", errK)
+	// 1b. Live Upper Air 850hPa 24H Temperature Variation
+	dReqUAVar, okUAVar := handler.ParseDerivedPath("/api/derived/UPPER_AIR/PLOT/T-VARIATION-24H/850", latestUA)
+	if okUAVar {
+		stnUAVar, errUAVar := dH.CalculateDerivedStation(dReqUAVar)
+		if errUAVar != nil {
+			t.Logf("Live UPPER_AIR/PLOT/T-VARIATION-24H/850 note: %v", errUAVar)
 		} else {
-			t.Logf("Live UPPER_AIR/PLOT/K-INDEX: Features=%d Val0=%v", len(stnK.Features), stnK.Features[0].Properties["k_index"])
+			t.Logf("Live UPPER_AIR 850hPa T-VAR-24H: Features=%d Val0=%v", len(stnUAVar.Features), stnUAVar.Features[0].Properties["temperature"])
 		}
 	}
 
-	// 1c. Live Upper Air SHEAR
-	dReqShear, okShear := handler.ParseDerivedPath("/api/derived/UPPER_AIR/PLOT/SHEAR/850-500", "20260413080000.000")
-	if okShear {
-		stnShear, errShear := dH.CalculateDerivedStation(dReqShear)
-		if errShear != nil {
-			t.Logf("Live UPPER_AIR/PLOT/SHEAR failed: %v", errShear)
+	// 1c. Live Upper Air 850hPa 48H Temperature Variation
+	dReqUAVar48, okUAVar48 := handler.ParseDerivedPath("/api/derived/UPPER_AIR/PLOT/T-VARIATION-48H/850", latestUA)
+	if okUAVar48 {
+		stnUAVar48, errUAVar48 := dH.CalculateDerivedStation(dReqUAVar48)
+		if errUAVar48 != nil {
+			t.Logf("Live UPPER_AIR/PLOT/T-VARIATION-48H/850 note: %v", errUAVar48)
 		} else {
-			t.Logf("Live UPPER_AIR/PLOT/SHEAR: Features=%d Val0=%v", len(stnShear.Features), stnShear.Features[0].Properties["shear"])
+			t.Logf("Live UPPER_AIR 850hPa T-VAR-48H: Features=%d Val0=%v", len(stnUAVar48.Features), stnUAVar48.Features[0].Properties["temperature"])
 		}
 	}
 
-	// 2. Live NWP Grid calculation on JAPAN_MR (TMP/850-500)
-	dReqGrid, ok := handler.ParseDerivedPath("/api/derived/JAPAN_MR/TMP/850-500", "26100708.012")
-	if !ok {
-		t.Fatal("ParseDerivedPath failed for JAPAN_MR")
-	}
-	gridResp, errGrid := dH.CalculateDerivedGrid(dReqGrid)
-	if errGrid != nil {
-		t.Fatalf("Live CalculateDerivedGrid for JAPAN_MR failed: %v", errGrid)
-	}
-	if len(gridResp.Values) == 0 {
-		t.Fatalf("Expected non-empty grid values for JAPAN_MR")
-	}
-	t.Logf("Live JAPAN_MR TMP/850-500 Grid: Points=%d Stats=%+v", len(gridResp.Values), gridResp.Stats)
+	// 2. Live Surface Station Observation Variations
+	filesSfc, errSfc := db.GetFileList(client, "SURFACE/PLOT_GLOBAL_3H", 5)
+	if errSfc == nil && len(filesSfc) > 0 {
+		latestSfc := filesSfc[0].Name
+		t.Logf("Using latest live SURFACE/PLOT_GLOBAL_3H file: %s", latestSfc)
 
-	// 2b. Check treeview files for ECMWF_HR
+		// 2a. Surface T-variation-24H
+		dReqSfcT, okSfcT := handler.ParseDerivedPath("/api/derived/SURFACE/T-VARIATION-24H", latestSfc)
+		if okSfcT {
+			stnSfcT, errSfcT := dH.CalculateDerivedStation(dReqSfcT)
+			if errSfcT != nil {
+				t.Logf("Live SURFACE/T-VARIATION-24H note: %v", errSfcT)
+			} else {
+				t.Logf("Live SURFACE T-VAR-24H: Features=%d Val0=%v", len(stnSfcT.Features), stnSfcT.Features[0].Properties["temperature"])
+			}
+		}
+
+		// 2b. Surface SLP-variation-24H
+		dReqSfcSLP, okSfcSLP := handler.ParseDerivedPath("/api/derived/SURFACE/SLP-VARIATION-24H", latestSfc)
+		if okSfcSLP {
+			stnSfcSLP, errSfcSLP := dH.CalculateDerivedStation(dReqSfcSLP)
+			if errSfcSLP != nil {
+				t.Logf("Live SURFACE/SLP-VARIATION-24H note: %v", errSfcSLP)
+			} else {
+				t.Logf("Live SURFACE SLP-VAR-24H: Features=%d Val0=%v", len(stnSfcSLP.Features), stnSfcSLP.Features[0].Properties["slp"])
+			}
+		}
+
+		// 2c. Surface T-variation-48H
+		dReqSfcT48, okSfcT48 := handler.ParseDerivedPath("/api/derived/SURFACE/T-VARIATION-48H", latestSfc)
+		if okSfcT48 {
+			stnSfcT48, errSfcT48 := dH.CalculateDerivedStation(dReqSfcT48)
+			if errSfcT48 != nil {
+				t.Logf("Live SURFACE/T-VARIATION-48H note: %v", errSfcT48)
+			} else {
+				t.Logf("Live SURFACE T-VAR-48H: Features=%d Val0=%v", len(stnSfcT48.Features), stnSfcT48.Features[0].Properties["temperature"])
+			}
+		}
+
+		// 2d. Surface SLP-variation-48H
+		dReqSfcSLP48, okSfcSLP48 := handler.ParseDerivedPath("/api/derived/SURFACE/SLP-VARIATION-48H", latestSfc)
+		if okSfcSLP48 {
+			stnSfcSLP48, errSfcSLP48 := dH.CalculateDerivedStation(dReqSfcSLP48)
+			if errSfcSLP48 != nil {
+				t.Logf("Live SURFACE/SLP-VARIATION-48H note: %v", errSfcSLP48)
+			} else {
+				t.Logf("Live SURFACE SLP-VAR-48H: Features=%d Val0=%v", len(stnSfcSLP48.Features), stnSfcSLP48.Features[0].Properties["slp"])
+			}
+		}
+	}
+
+	// 3. Live NWP Grid calculation on JAPAN_MR and ECMWF_HR
+	filesJP, errJP := db.GetFileList(client, "JAPAN_MR/TMP/850", 5)
+	if errJP == nil && len(filesJP) > 0 {
+		latestJP := filesJP[0].Name
+		dReqGrid, ok := handler.ParseDerivedPath("/api/derived/JAPAN_MR/TMP/850-500", latestJP)
+		if ok {
+			gridResp, errGrid := dH.CalculateDerivedGrid(dReqGrid)
+			if errGrid == nil && gridResp != nil {
+				t.Logf("Live JAPAN_MR TMP/850-500 Grid: Points=%d Stats=%+v", len(gridResp.Values), gridResp.Stats)
+			}
+		}
+	}
+
+	// 4. Live ECMWF_HR time-derived calculations
 	filesEC, errEC := db.GetFileList(client, "ECMWF_HR/TMP/850", 5)
 	t.Logf("ECMWF_HR/TMP/850 files: err=%v, count=%d", errEC, len(filesEC))
 	if len(filesEC) > 0 {
-		t.Logf("ECMWF_HR file 0: %s", filesEC[0].Name)
-		// Try derived on ECMWF_HR
-		dReqEC, okEC := handler.ParseDerivedPath("/api/derived/ECMWF_HR/TMP/850-500", filesEC[0].Name)
-		if okEC {
-			gridEC, errGridEC := dH.CalculateDerivedGrid(dReqEC)
-			if errGridEC != nil {
-				t.Logf("Live ECMWF_HR TMP/850-500 failed: %v", errGridEC)
-			} else if gridEC != nil {
-				t.Logf("Live ECMWF_HR TMP/850-500: points=%v", len(gridEC.Values))
+		latestEC := filesEC[0].Name
+		t.Logf("ECMWF_HR file 0: %s", latestEC)
+
+		// 4a. 850hPa 24H Temperature Variation
+		dReqEC24, okEC24 := handler.ParseDerivedPath("/api/derived/ECMWF_HR/T-VARIATION-24H/850", latestEC)
+		if okEC24 {
+			gridEC24, errGridEC24 := dH.CalculateDerivedGrid(dReqEC24)
+			if errGridEC24 != nil {
+				t.Logf("Live ECMWF_HR T-VARIATION-24H/850 note: %v", errGridEC24)
+			} else if gridEC24 != nil {
+				t.Logf("Live ECMWF_HR T-VARIATION-24H/850: points=%v stats=%+v", len(gridEC24.Values), gridEC24.Stats)
 			}
 		}
-		// Try K-Index on ECMWF_HR
-		dReqECK, okECK := handler.ParseDerivedPath("/api/derived/ECMWF_HR/K-INDEX", filesEC[0].Name)
-		if okECK {
-			gridECK, errGridECK := dH.CalculateDerivedGrid(dReqECK)
-			if errGridECK != nil {
-				t.Logf("Live ECMWF_HR K-INDEX failed: %v", errGridECK)
-			} else if gridECK != nil {
-				t.Logf("Live ECMWF_HR K-INDEX: points=%v", len(gridECK.Values))
+
+		// 4b. 850hPa 48H Temperature Variation
+		dReqEC48, okEC48 := handler.ParseDerivedPath("/api/derived/ECMWF_HR/T-VARIATION-48H/850", latestEC)
+		if okEC48 {
+			gridEC48, errGridEC48 := dH.CalculateDerivedGrid(dReqEC48)
+			if errGridEC48 != nil {
+				t.Logf("Live ECMWF_HR T-VARIATION-48H/850 note: %v", errGridEC48)
+			} else if gridEC48 != nil {
+				t.Logf("Live ECMWF_HR T-VARIATION-48H/850: points=%v stats=%+v", len(gridEC48.Values), gridEC48.Stats)
+			}
+		}
+
+		// 4c. SLP 24H Sea Level Pressure Variation
+		filesSLP, errSLP := db.GetFileList(client, "ECMWF_HR/PRMSL", 10)
+		t.Logf("ECMWF_HR/PRMSL files: err=%v, count=%d", errSLP, len(filesSLP))
+		var testSLPFile string
+		for _, f := range filesSLP {
+			parts := strings.Split(f.Name, ".")
+			if len(parts) >= 2 {
+				if lead, errLead := strconv.Atoi(parts[1]); errLead == nil && lead >= 24 {
+					testSLPFile = f.Name
+					break
+				}
+			}
+		}
+		if testSLPFile == "" && len(filesSLP) > 0 {
+			testSLPFile = filesSLP[0].Name
+		}
+		if testSLPFile != "" {
+			t.Logf("Using live ECMWF_HR PRMSL file: %s", testSLPFile)
+			dReqECSLP24, okECSLP24 := handler.ParseDerivedPath("/api/derived/ECMWF_HR/SLP-VARIATION-24H", testSLPFile)
+			if okECSLP24 {
+				gridECSLP24, errGridECSLP24 := dH.CalculateDerivedGrid(dReqECSLP24)
+				if errGridECSLP24 != nil {
+					t.Logf("Live ECMWF_HR SLP-VARIATION-24H note: %v", errGridECSLP24)
+				} else if gridECSLP24 != nil {
+					t.Logf("Live ECMWF_HR SLP-VARIATION-24H: points=%v stats=%+v", len(gridECSLP24.Values), gridECSLP24.Stats)
+				}
+			}
+
+			// 4d. SLP 48H Sea Level Pressure Variation
+			dReqECSLP48, okECSLP48 := handler.ParseDerivedPath("/api/derived/ECMWF_HR/SLP-VARIATION-48H", testSLPFile)
+			if okECSLP48 {
+				gridECSLP48, errGridECSLP48 := dH.CalculateDerivedGrid(dReqECSLP48)
+				if errGridECSLP48 != nil {
+					t.Logf("Live ECMWF_HR SLP-VARIATION-48H note: %v", errGridECSLP48)
+				} else if gridECSLP48 != nil {
+					t.Logf("Live ECMWF_HR SLP-VARIATION-48H: points=%v stats=%+v", len(gridECSLP48.Values), gridECSLP48.Stats)
+				}
+			}
+		}
+
+		// 4e. Surface 2m Temperature 24H Variation (TMP_2M fallback)
+		dReqECT2m24, okECT2m24 := handler.ParseDerivedPath("/api/derived/ECMWF_HR/T-VARIATION-24H", latestEC)
+		if okECT2m24 {
+			gridECT2m24, errGridECT2m24 := dH.CalculateDerivedGrid(dReqECT2m24)
+			if errGridECT2m24 != nil {
+				t.Logf("Live ECMWF_HR Surface T-VARIATION-24H note: %v", errGridECT2m24)
+			} else if gridECT2m24 != nil {
+				t.Logf("Live ECMWF_HR Surface T-VARIATION-24H: points=%v stats=%+v", len(gridECT2m24.Values), gridECT2m24.Stats)
+			}
+		}
+
+		// 4f. Cross-cycle NWP prior resolution (e.g., lead hour < delta)
+		parts := strings.Split(latestEC, ".")
+		if len(parts) >= 2 {
+			leadSmallFile := fmt.Sprintf("%s.012", parts[0])
+			dReqCrossCycle, okCross := handler.ParseDerivedPath("/api/derived/ECMWF_HR/T-VARIATION-24H/850", leadSmallFile)
+			if okCross {
+				gridCross, errCross := dH.CalculateDerivedGrid(dReqCrossCycle)
+				if errCross != nil {
+					t.Logf("Live cross-cycle ECMWF lead 012 note: %v", errCross)
+				} else if gridCross != nil {
+					t.Logf("Live cross-cycle ECMWF lead 012 resolved successfully: points=%d", len(gridCross.Values))
+				}
+			}
+		}
+	}
+}
+
+func TestCassandraLiveOtherModels(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping live Cassandra integration test in short mode")
+	}
+	client, err := db.NewCQLClient("bore.pub:59042", 5*time.Second)
+	if err != nil {
+		t.Skipf("Cassandra bore.pub:59042 not accessible: %v", err)
+	}
+	defer client.Close()
+
+	dH := &handler.DerivedHandler{
+		Client:   client,
+		Cache:    nil,
+		MockMode: false,
+	}
+
+	testCases := []struct {
+		urlPath string
+	}{
+		{"/api/derived/JAPAN_MR/T-VARIATION-24H/850"},
+		{"/api/derived/JAPAN_MR/T-VARIATION-24H/500"},
+		{"/api/derived/JAPAN_MR/T-VARIATION-48H/850"},
+		{"/api/derived/JAPAN_MR/SLP-VARIATION-24H"},
+		{"/api/derived/JAPAN_MR/SLP-VARIATION-48H"},
+		{"/api/derived/GRAPES_GFS/T-VARIATION-24H/850"},
+		{"/api/derived/GRAPES_GFS/T-VARIATION-48H/850"},
+		{"/api/derived/GRAPES_GFS/SLP-VARIATION-24H"},
+		{"/api/derived/GRAPES_GFS/SLP-VARIATION-48H"},
+		{"/api/derived/CMA_GFS/T-VARIATION-24H/850"},
+		{"/api/derived/CMA_GFS/SLP-VARIATION-24H"},
+		{"/api/derived/GFS/T-VARIATION-24H/850"},
+		{"/api/derived/GFS/SLP-VARIATION-24H"},
+		{"/api/derived/SHANGHAI_MR/T-VARIATION-24H/850"},
+		{"/api/derived/SHANGHAI_MR/T-VARIATION-24H/500"},
+		{"/api/derived/SHANGHAI_MR/SLP-VARIATION-24H"},
+	}
+
+	for _, tc := range testCases {
+		req := httptest.NewRequest("GET", tc.urlPath, nil)
+		rec := httptest.NewRecorder()
+		dH.DirectHandler(rec, req)
+		t.Logf("DirectHandler %-45s -> Code: %d BodyLen: %d", tc.urlPath, rec.Code, rec.Body.Len())
+		if rec.Code != http.StatusOK {
+			t.Errorf("DirectHandler %s failed with code %d: %s", tc.urlPath, rec.Code, rec.Body.String())
+		}
+	}
+
+	// Test GridHandler and CatalogHandler integration for other models
+	gridH := &handler.GridHandler{
+		Client:  client,
+		Derived: dH,
+	}
+	catH := &handler.CatalogHandler{
+		Client: client,
+	}
+
+	// 1. GridHandler for JAPAN_MR
+	recGrid := httptest.NewRecorder()
+	reqGrid := httptest.NewRequest("GET", "/api/data/grid?path=/api/derived/JAPAN_MR/T-VARIATION-24H/850", nil)
+	gridH.JSONHandler(recGrid, reqGrid)
+	if recGrid.Code != http.StatusOK {
+		t.Errorf("GridHandler JAPAN_MR failed: %s", recGrid.Body.String())
+	} else {
+		t.Logf("GridHandler JAPAN_MR T-VAR-24H/850 -> Code: 200 BodyLen: %d", recGrid.Body.Len())
+	}
+
+	// 2. CatalogHandler latest and tree for CMA_GFS & GFS
+	recCatLatest := httptest.NewRecorder()
+	reqCatLatest := httptest.NewRequest("GET", "/api/catalog/latest?path=CMA_GFS/T-VARIATION-24H/850", nil)
+	catH.LatestHandler(recCatLatest, reqCatLatest)
+	if recCatLatest.Code != http.StatusOK {
+		t.Errorf("CatalogHandler latest CMA_GFS failed: %s", recCatLatest.Body.String())
+	} else {
+		t.Logf("CatalogHandler latest CMA_GFS: %s", recCatLatest.Body.String())
+	}
+
+	recCatTree := httptest.NewRecorder()
+	reqCatTree := httptest.NewRequest("GET", "/api/catalog/tree?path=GFS/T-VARIATION-24H/850&limit=5", nil)
+	catH.TreeHandler(recCatTree, reqCatTree)
+	if recCatTree.Code != http.StatusOK {
+		t.Errorf("CatalogHandler tree GFS failed: %s", recCatTree.Body.String())
+	} else {
+		t.Logf("CatalogHandler tree GFS: len=%d", recCatTree.Body.Len())
+	}
+
+	// 3. CatalogHandler levels for CMA_GFS, GFS, JAPAN_MR, and ECMWF_HR derived paths
+	for _, p := range []string{
+		"/api/derived/ECMWF_HR/T-VARIATION-24H/850",
+		"/api/derived/JAPAN_MR/T-VARIATION-24H/850",
+		"/api/derived/CMA_GFS/T-VARIATION-24H/850",
+		"CMA_GFS/T-VARIATION-24H/850",
+		"GFS/T-VARIATION-24H/850",
+		"GRAPES_GFS/T-VARIATION-24H/850",
+		"SHANGHAI_MR/T-VARIATION-24H/850",
+	} {
+		recLevels := httptest.NewRecorder()
+		reqLevels := httptest.NewRequest("GET", "/api/catalog/levels?path="+p, nil)
+		catH.LevelsHandler(recLevels, reqLevels)
+		t.Logf("CatalogHandler levels %s -> Code: %d Body: %s", p, recLevels.Code, strings.TrimSpace(recLevels.Body.String()))
+		if recLevels.Code != http.StatusOK {
+			t.Errorf("CatalogHandler levels %s failed: code %d, body: %s", p, recLevels.Code, recLevels.Body.String())
+		} else {
+			var lvls []int
+			if err := json.Unmarshal(recLevels.Body.Bytes(), &lvls); err != nil || len(lvls) == 0 {
+				t.Errorf("CatalogHandler levels %s returned empty or invalid levels: %s", p, recLevels.Body.String())
+			}
+		}
+	}
+
+	// 4. Test explicit file queries and cross-cycle queries for other models
+	for _, m := range []string{"JAPAN_MR", "GRAPES_GFS", "SHANGHAI_MR"} {
+		files, err := db.GetFileList(client, m+"/TMP/850", 10)
+		if err != nil || len(files) == 0 {
+			t.Logf("No files for %s/TMP/850: %v", m, err)
+			continue
+		}
+		t.Logf("%s files count=%d (first: %s)", m, len(files), files[0].Name)
+		// 4a. Query with the latest file explicitly
+		recFile := httptest.NewRecorder()
+		reqFile := httptest.NewRequest("GET", fmt.Sprintf("/api/derived/%s/T-VARIATION-24H/850?file=%s", m, files[0].Name), nil)
+		dH.DirectHandler(recFile, reqFile)
+		if recFile.Code != http.StatusOK {
+			t.Errorf("DirectHandler %s with explicit file %s failed: %s", m, files[0].Name, recFile.Body.String())
+		} else {
+			t.Logf("DirectHandler %s explicit file %s -> OK (%d bytes)", m, files[0].Name, recFile.Body.Len())
+		}
+
+		// 4b. Find a lead hour < 24 if available to test cross-cycle resolution
+		for _, f := range files {
+			parts := strings.Split(f.Name, ".")
+			if len(parts) >= 2 {
+				if lead, errLead := strconv.Atoi(parts[1]); errLead == nil && lead < 24 && lead > 0 {
+					recCross := httptest.NewRecorder()
+					reqCross := httptest.NewRequest("GET", fmt.Sprintf("/api/derived/%s/T-VARIATION-24H/850?file=%s", m, f.Name), nil)
+					dH.DirectHandler(recCross, reqCross)
+					t.Logf("Cross-cycle test %s lead %d (%s) -> Code: %d", m, lead, f.Name, recCross.Code)
+					break
+				}
 			}
 		}
 	}

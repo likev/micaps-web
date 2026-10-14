@@ -1,7 +1,7 @@
 // global_theme_and_features.test.js - Tests for Items B, C, D, F, G, H and Global Themes
 import "../helpers/svelteRunesPolyfill.js";
 import { test, expect, describe, beforeEach, beforeAll, afterAll } from "bun:test";
-import { readSrcText } from "../helpers/cssText.js";
+import { readSrcText, readStyleCss } from "../helpers/cssText.js";
 import {
   getGlobalTheme,
   setGlobalTheme,
@@ -401,7 +401,7 @@ describe("Tasks 1-6 Alignment & Theme Hardening", () => {
     const leftIdx = navBarSrc.indexOf('class="nav-left"');
     expect(leftIdx).toBeGreaterThan(brandIdx);
 
-    const navbarCss = readSrcText("styles/navbar.css");
+    const navbarCss = readStyleCss();
     expect(navbarCss).toMatch(/\.nav-left\s*\{[^}]*overflow:\s*visible/);
   });
 

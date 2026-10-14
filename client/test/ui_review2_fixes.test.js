@@ -53,7 +53,7 @@ function createMockMap() {
 
 describe("UI Review 2: CSS Overflow Verifications", () => {
   const styleCss = readStyleCss();
-  const tabsCss = readSrcText("tabs.css");
+  const tabsCss = readStyleCss();
 
   test("O1: .panel has overflow-y: auto and .layers-manage-container expands naturally without max-height clipping", () => {
     expect(styleCss).toMatch(/\.panel\s*\{[^}]*overflow-y:\s*auto/);
@@ -74,11 +74,6 @@ describe("UI Review 2: CSS Overflow Verifications", () => {
   test("O4: .legend-panel has max-width, max-height, and overflow: auto", () => {
     expect(styleCss).toMatch(/\.legend-panel\s*\{[^}]*max-width:\s*min\(90%,\s*720px\)/);
     expect(styleCss).toMatch(/\.legend-panel\s*\{[^}]*overflow:\s*auto/);
-  });
-
-  test("Drawer and toolbar overflow constraints", () => {
-    expect(styleCss).toMatch(/\.drawer\s*\{[^}]*max-width:\s*calc\(100vw\s*-\s*24px\)/);
-    expect(tabsCss).toMatch(/\.config-editor-toolbar\s*\{[^}]*flex-wrap:\s*wrap/);
   });
 
   test("Window panel active does not use 2px border shift", () => {

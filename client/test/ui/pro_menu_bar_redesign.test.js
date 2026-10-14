@@ -2,12 +2,12 @@
 // Verification of pro menu and button/tag feel in menu bar components and styles
 
 import { describe, test, expect } from "bun:test";
-import { readSrcText } from "../helpers/cssText.js";
+import { readSrcText, readStyleCss } from "../helpers/cssText.js";
 
 describe("Pro Menu Bar Redesign & Button/Tag Aesthetic", () => {
   const navBarSrc = readSrcText("components/NavBar.svelte");
   const presetMenuSrc = readSrcText("components/PresetMenu.svelte");
-  const navbarCss = readSrcText("styles/navbar.css");
+  const navbarCss = readStyleCss();
   const tokensCss = readSrcText("styles/tokens.css");
   const polishCss = readSrcText("styles/polish.css");
 
@@ -133,7 +133,7 @@ describe("Pro Menu Bar Redesign & Button/Tag Aesthetic", () => {
   });
 
   test("responsive.css defines responsive rules for quick-pills and active indicator", () => {
-    const responsiveCss = readSrcText("styles/responsive.css");
+    const responsiveCss = readStyleCss();
     expect(responsiveCss).toContain(".nav-quick-pills");
     expect(responsiveCss).toContain(".preset-active-indicator");
   });

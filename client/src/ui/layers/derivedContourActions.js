@@ -28,7 +28,7 @@ function syncDerivedLayerToWindowPreset(activeGroup, layerEntry) {
   }
 }
 
-const DERIVED_INDEX_KEYS = new Set([
+export const DERIVED_INDEX_KEYS = new Set([
   "K-INDEX",
   "K_INDEX",
   "SHOWALTER",
@@ -38,20 +38,45 @@ const DERIVED_INDEX_KEYS = new Set([
   "SHEAR",
   "THICKNESS",
   "TMP_DIFF",
+  "T-VARIATION-24H",
+  "T_VARIATION_24H",
+  "T-VARIATION-48H",
+  "T_VARIATION_48H",
+  "SLP-VARIATION-24H",
+  "SLP_VARIATION_24H",
+  "SLP-VARIATION-48H",
+  "SLP_VARIATION_48H",
+  "T_VAR_24H",
+  "T-VAR-24H",
+  "T_VAR_48H",
+  "T-VAR-48H",
+  "SLP_VAR_24H",
+  "SLP-VAR-24H",
+  "SLP_VAR_48H",
+  "SLP-VAR-48H",
 ]);
 
 export function isServerDerivedElement(val) {
-  const norm = (val || "").toUpperCase().trim();
-  if (DERIVED_INDEX_KEYS.has(norm)) return true;
+  const norm = (val || "").toUpperCase().trim().replace(/_/g, "-");
+  if (DERIVED_INDEX_KEYS.has(norm) || DERIVED_INDEX_KEYS.has((val || "").toUpperCase().trim())) return true;
   if (/^T?(\d+)[-_](\d+)$/.test(norm)) return true;
+  if (norm.includes("T-VARIATION") || norm.includes("SLP-VARIATION") || norm.includes("T-VAR") || norm.includes("SLP-VAR")) return true;
   return false;
 }
 
 export async function handleDerivedServerContourAction(map, layer, value, winObj) {
   const normVal = (value || "").toUpperCase().trim();
   const rangeMatch = normVal.match(/^T?(\d+)[-_](\d+)$/);
+  const isTimeVar = normVal.includes("T-VAR") || normVal.includes("T_VAR") || normVal.includes("SLP-VAR") || normVal.includes("SLP_VAR");
+
+  const isSurface =
+    layer?.model === "SURFACE" ||
+    (layer?.id && layer.id.includes("surface")) ||
+    (layer?.name && layer.name.includes("Surface")) ||
+    (!layer?.model && winObj?.model === "SURFACE");
 
   const isStation =
+    isSurface ||
     layer?.type === "station" ||
     layer?.model === "UPPER_AIR" ||
     (layer?.id && layer.id.includes("upper")) ||
@@ -60,6 +85,88 @@ export async function handleDerivedServerContourAction(map, layer, value, winObj
 
   const activeGroup = winObj?.activeGroup || appState.get("activeGroup");
 
+  if (isStation && isSurface) {
+    const is48 = normVal.includes("48");
+    const isSLP = normVal.includes("SLP") || normVal.includes("PRS");
+    const elem = isSLP ? (is48 ? "SLP_VARIATION_48H" : "SLP_VARIATION_24H") : (is48 ? "T_VARIATION_48H" : "T_VARIATION_24H");
+    const pathType = isSLP ? (is48 ? "SLP-VARIATION-48H" : "SLP-VARIATION-24H") : (is48 ? "T-VARIATION-48H" : "T-VARIATION-24H");
+    const virtualPath = `/api/derived/SURFACE/${pathType}`;
+    const elemName = isSLP ? (is48 ? "48h SLP Variation" : "24h SLP Variation") : (is48 ? "48h Temp Variation" : "24h Temp Variation");
+    const colormap = isSLP ? "SLP_VAR" : "T_VAR";
+    const liveLayerId = `contour-surface-${elem.toLowerCase().replace(/_/g, "-")}`;
+    const derivedFrom = layer?.id || "surface-obs";
+    const file = layer?.file || winObj?.obsTime || winObj?.file || "";
+
+    const { SURFACE_CONTOUR_CONFIGS, analyzeAndRenderSurfaceContours } = await import(
+      "../../layers/surfaceAnalysis.js"
+    );
+    const { fetchStationObservations } = await import("../../api/catalogApi.js");
+
+    let stnData = null;
+    try {
+      stnData = await fetchStationObservations(virtualPath, file);
+    } catch (err) {
+      console.warn("[derivedContourActions] fetchStationObservations failed:", err);
+    }
+
+    const geojson =
+      stnData && Array.isArray(stnData.features) && stnData.features.length >= 3
+        ? stnData
+        : layer?.stationsGeoJSON || getStationGeoJSON(map) || winObj?.stationsGeoJSON || appState.get("stationData");
+
+    if (!geojson || !Array.isArray(geojson.features) || geojson.features.length < 3) {
+      notifyError(`Insufficient station observations to generate derived ${elemName}.`);
+      return;
+    }
+
+    const cfg = SURFACE_CONTOUR_CONFIGS[elem] || {};
+    const defaultColor = cfg.defaultColor || (isSLP ? "#58a6ff" : "#f85149");
+
+    const res = analyzeAndRenderSurfaceContours(
+      map,
+      geojson,
+      elem,
+      {
+        layerId: liveLayerId,
+        lineColor: defaultColor,
+        derivedFrom,
+        path: virtualPath,
+        colormap,
+        showFill: false,
+        showLine: true,
+        showRaster: false,
+      },
+      winObj
+    );
+
+    const renderedLayer = getLayersForWindow(winObj).find((l) => l.id === liveLayerId);
+    if (renderedLayer) {
+      renderedLayer.path = virtualPath;
+    }
+
+    if (res && activeGroup?.id) {
+      const derivedEntry = {
+        id: liveLayerId,
+        model: "SURFACE",
+        element: elem,
+        name: `Derived ${cfg.name || elemName}`,
+        path: virtualPath,
+        type: "contour",
+        derivedFrom,
+        render: {
+          showFill: false,
+          showLine: true,
+          showRaster: false,
+          lineColor: defaultColor,
+          colormap,
+        },
+      };
+      upsertDerivedLayerToPreset(activeGroup.id, derivedEntry);
+      syncDerivedLayerToWindowPreset(activeGroup, derivedEntry);
+    }
+    return;
+  }
+
   if (isStation) {
     let elem = "K_INDEX";
     let lvl = "850-500";
@@ -67,7 +174,15 @@ export async function handleDerivedServerContourAction(map, layer, value, winObj
     let elemName = "";
     let colormap = "K_INDEX";
 
-    if (rangeMatch) {
+    if (isTimeVar) {
+      const is48 = normVal.includes("48");
+      elem = is48 ? "T_VARIATION_48H" : "T_VARIATION_24H";
+      lvl = layer?.level || winObj?.level || "850";
+      const pathType = is48 ? "T-VARIATION-48H" : "T-VARIATION-24H";
+      virtualPath = `/api/derived/UPPER_AIR/PLOT/${pathType}/${lvl}`;
+      elemName = is48 ? `48h T${lvl} Variation` : `24h T${lvl} Variation`;
+      colormap = "T_VAR";
+    } else if (rangeMatch) {
       elem = "TMP_DIFF";
       lvl = `${rangeMatch[1]}-${rangeMatch[2]}`;
       virtualPath = `/api/derived/UPPER_AIR/PLOT/TMP/${lvl}`;
@@ -165,8 +280,22 @@ export async function handleDerivedServerContourAction(map, layer, value, winObj
   let virtualPath = "";
   let elemName = "";
   let colormap = "TMP";
+  const isSLP = isTimeVar && (normVal.includes("SLP") || normVal.includes("PRS"));
 
-  if (rangeMatch) {
+  if (isTimeVar) {
+    const is48 = normVal.includes("48");
+    const dType = isSLP ? (is48 ? "SLP-VARIATION-48H" : "SLP-VARIATION-24H") : (is48 ? "T-VARIATION-48H" : "T-VARIATION-24H");
+    lvl = isSLP ? "0" : (layer?.level || winObj?.level || "850");
+    const baseElem = isSLP ? "PRMSL" : (lvl === "0" || lvl === 0 ? "TMP_2M" : (layer?.element || "TMP"));
+    if (isSLP || lvl === "0" || lvl === 0) {
+      virtualPath = `/api/derived/${model}/${baseElem}/${dType}`;
+    } else {
+      virtualPath = `/api/derived/${model}/${baseElem}/${dType}/${lvl}`;
+    }
+    elem = dType;
+    elemName = isSLP ? (is48 ? "48h SLP Variation" : "24h SLP Variation") : (is48 ? `48h T${lvl} Variation` : `24h T${lvl} Variation`);
+    colormap = isSLP ? "SLP_VAR" : "T_VAR";
+  } else if (rangeMatch) {
     elem = "TMP";
     lvl = `${rangeMatch[1]}-${rangeMatch[2]}`;
     virtualPath = `/api/derived/${model}/TMP/${lvl}`;
@@ -214,7 +343,7 @@ export async function handleDerivedServerContourAction(map, layer, value, winObj
       derivedFrom,
       render: {
         colormap,
-        lineColor: "#f85149",
+        lineColor: isSLP ? "#58a6ff" : "#f85149",
         lineWidth: 2,
         showFill: Boolean(colormap === "K_INDEX" || colormap === "RH"),
         showLine: true,
