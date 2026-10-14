@@ -225,77 +225,125 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: #0d1117;
+    background: var(--bg-primary, #0d1117);
     display: flex;
     flex-direction: column;
     z-index: 500;
     box-sizing: border-box;
     min-width: 0;
     min-height: 0;
+    animation: config-editor-in 0.15s ease-out;
+  }
+
+  @keyframes config-editor-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .config-editor-panel {
+      animation: none;
+    }
   }
 
   .config-editor-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 16px;
-    background: #161b22;
-    border-bottom: 1px solid #30363d;
+    padding: 10px 16px;
+    background: var(--bg-secondary, #161b22);
+    border-bottom: 1px solid var(--border-color, #30363d);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
     flex-shrink: 0;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 8px 12px;
   }
 
   .config-editor-title-group {
     display: flex;
     align-items: center;
-    gap: 12px;
+    flex-wrap: wrap;
+    gap: 8px 14px;
     min-width: 0;
   }
 
   .config-editor-title {
     font-size: 13px;
     font-weight: 600;
-    color: #e6edf3;
+    letter-spacing: 0.2px;
+    color: var(--text-primary, #e6edf3);
+    white-space: nowrap;
   }
 
   .config-subtab-bar {
     display: flex;
     gap: 2px;
-    background: #0d1117;
-    border: 1px solid #30363d;
-    border-radius: 6px;
+    background: var(--bg-primary, #0d1117);
+    border: 1px solid var(--border-color, #30363d);
+    border-radius: 8px;
     padding: 2px;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .config-subtab-bar::-webkit-scrollbar {
+    display: none;
   }
 
   .config-subtab-btn {
     background: none;
-    border: none;
-    color: #8b949e;
+    border: 1px solid transparent;
+    color: var(--text-secondary, #8b949e);
     font-size: 11px;
-    padding: 3px 10px;
-    border-radius: 4px;
+    padding: 4px 12px;
+    border-radius: 6px;
     cursor: pointer;
-    transition: all 0.15s;
+    white-space: nowrap;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   }
 
   .config-subtab-btn:hover {
-    color: #e6edf3;
+    color: var(--text-primary, #e6edf3);
+    background: var(--bg-hover, rgba(255, 255, 255, 0.05));
+  }
+
+  .config-subtab-btn:focus-visible {
+    outline: 2px solid #58a6ff;
+    outline-offset: 1px;
   }
 
   .config-subtab-btn.active {
-    background: #21262d;
+    background: var(--bg-card, #21262d);
+    border-color: rgba(88, 166, 255, 0.4);
     color: #58a6ff;
     font-weight: 600;
   }
 
   .config-editor-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     font-size: 11px;
     font-family: var(--font-mono, monospace);
-    padding: 2px 8px;
+    padding: 2px 10px;
     border-radius: 12px;
-    background: #21262d;
-    color: #8b949e;
+    background: var(--bg-card, #21262d);
+    border: 1px solid transparent;
+    color: var(--text-secondary, #8b949e);
+  }
+
+  .config-editor-status::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
   }
 
   .config-editor-status.valid {
@@ -319,6 +367,7 @@
   .config-editor-actions {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
   }
 
@@ -336,13 +385,14 @@
     flex-shrink: 0;
     font-size: 11px;
     font-family: var(--font-mono, monospace);
-    color: #8b949e;
+    color: var(--text-secondary, #8b949e);
     min-height: 18px;
     max-height: 60px;
     overflow-y: auto;
     overflow-wrap: break-word;
-    padding: 4px 16px;
-    background: #161b22;
-    border-top: 1px solid #21262d;
+    padding: 5px 16px;
+    background: var(--bg-secondary, #161b22);
+    border-top: 1px solid var(--border-color, #21262d);
+    scrollbar-width: thin;
   }
 </style>
