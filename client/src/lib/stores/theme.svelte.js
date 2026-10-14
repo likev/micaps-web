@@ -21,11 +21,18 @@ export const PROJECTIONS = [
   { id: "vertical-perspective", label: "🔭 Vertical Perspective" },
 ];
 
+export function normalizeTheme(theme) {
+  if (!theme) return "dark";
+  const t = String(theme).toLowerCase().trim();
+  if (t === "black") return "dark";
+  return ALLOWED_THEMES.includes(t) ? t : "dark";
+}
+
 function getStoredTheme() {
   if (typeof localStorage === "undefined") return "dark";
   try {
     const s = localStorage.getItem("micaps-ui-theme") || localStorage.getItem("micaps-basemap-scheme");
-    if (s && ALLOWED_THEMES.includes(s)) return s;
+    if (s) return normalizeTheme(s);
   } catch {}
   return "dark";
 }
@@ -45,28 +52,28 @@ function getMapList() {
 }
 
 export function setGlobalTheme(theme) {
-  if (!ALLOWED_THEMES.includes(theme)) return;
-  activeTheme = theme;
+  const normTheme = normalizeTheme(theme);
+  activeTheme = normTheme;
 
   // 1. Update DOM data-theme attribute
   if (typeof document !== "undefined" && document.documentElement) {
-    document.documentElement.setAttribute("data-theme", theme);
-    document.documentElement.setAttribute("data-scheme", theme);
+    document.documentElement.setAttribute("data-theme", normTheme);
+    document.documentElement.setAttribute("data-scheme", normTheme);
   }
 
   // 2. Persist to localStorage
   if (typeof localStorage !== "undefined") {
     try {
-      localStorage.setItem("micaps-ui-theme", theme);
-      localStorage.setItem("micaps-basemap-scheme", theme);
+      localStorage.setItem("micaps-ui-theme", normTheme);
+      localStorage.setItem("micaps-basemap-scheme", normTheme);
     } catch {}
   }
 
   // 3. Update CURRENT_CONFIG
   if (CURRENT_CONFIG) {
-    CURRENT_CONFIG.theme = theme;
+    CURRENT_CONFIG.theme = normTheme;
     if (!CURRENT_CONFIG.basemap) CURRENT_CONFIG.basemap = {};
-    CURRENT_CONFIG.basemap.scheme = theme;
+    CURRENT_CONFIG.basemap.scheme = normTheme;
   }
 
   // 4. Synchronize all active map instances

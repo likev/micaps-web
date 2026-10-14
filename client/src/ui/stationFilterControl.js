@@ -79,12 +79,12 @@ export function renderStationFilterSection(layer) {
   const upper = isUpperAir(layer);
 
   return `
-    <div class="config-filter-section" style="margin-top: 8px; border-top: 1px solid #30363d; padding-top: 6px;">
+    <div class="config-filter-section" style="margin-top: 8px; border-top: 1px solid var(--border-color, #30363d); padding-top: 6px;">
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-        <span style="font-size: 11px; font-weight: 600; color: #8b949e;">Data Filter Rules</span>
+        <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary, #8b949e);">Data Filter Rules</span>
         <div style="display: flex; align-items: center; gap: 4px;">
-          <span style="font-size: 10px; color: #8b949e;">Match:</span>
-          <select class="sel-filter-global-logic" style="background: #161b22; color: #58a6ff; font-weight: bold; border: 1px solid #388bfd; border-radius: 4px; font-size: 10px; padding: 1px 4px;">
+          <span style="font-size: 10px; color: var(--text-secondary, #8b949e);">Match:</span>
+          <select class="sel-filter-global-logic" style="background: var(--bg-card, #161b22); color: var(--accent-blue, #58a6ff); font-weight: bold; border: 1px solid var(--accent-blue, #388bfd); border-radius: 4px; font-size: 10px; padding: 1px 4px;">
             <option value="VIEW" ${logic === "VIEW" ? "selected" : ""}>ViewOnly (per-element)</option>
             <option value="AND" ${logic === "AND" ? "selected" : ""}>ALL (AND)</option>
             <option value="OR" ${logic === "OR" ? "selected" : ""}>ANY (OR)</option>
@@ -100,10 +100,10 @@ export function renderStationFilterSection(layer) {
 
       <!-- Action Buttons -->
       <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 6px;">
-        <button type="button" class="btn-add-filter-rule" style="padding: 2px 8px; background: #21262d; color: #58a6ff; border: 1px solid #388bfd; border-radius: 3px; font-size: 11px; cursor: pointer;">
+        <button type="button" class="btn-add-filter-rule" style="padding: 2px 8px; background: var(--bg-card, #21262d); color: var(--accent-blue, #58a6ff); border: 1px solid var(--accent-blue, #388bfd); border-radius: 3px; font-size: 11px; cursor: pointer;">
           + Add Rule
         </button>
-        <button type="button" class="btn-clear-filter-rules" style="padding: 2px 8px; background: #21262d; color: #8b949e; border: 1px solid #30363d; border-radius: 3px; font-size: 10px; cursor: pointer;">
+        <button type="button" class="btn-clear-filter-rules" style="padding: 2px 8px; background: var(--bg-card, #21262d); color: var(--text-secondary, #8b949e); border: 1px solid var(--border-color, #30363d); border-radius: 3px; font-size: 10px; cursor: pointer;">
           Clear All
         </button>
       </div>
@@ -113,22 +113,22 @@ export function renderStationFilterSection(layer) {
         ${
           upper
             ? `
-        <button type="button" class="btn-multi-filter-preset" data-preset="hgt_5880" style="padding: 1px 6px; background: #21262d; color: #58a6ff; font-weight: 600; border: 1px solid #388bfd; border-radius: 3px; font-size: 10px; cursor: pointer;">Height≥5880 (Sub-High)</button>
-        <button type="button" class="btn-multi-filter-preset" data-preset="wind_20" style="padding: 1px 6px; background: #21262d; color: #f85149; font-weight: 600; border: 1px solid #da3633; border-radius: 3px; font-size: 10px; cursor: pointer;">Wind≥20m/s (Jet)</button>
-        <button type="button" class="btn-multi-filter-preset" data-preset="tt_m20" style="padding: 1px 6px; background: #21262d; color: #79c0ff; border: 1px solid #30363d; border-radius: 3px; font-size: 10px; cursor: pointer;">TT≤-20°C (Cold)</button>
-        <button type="button" class="btn-multi-filter-preset" data-preset="hgt_5520" style="padding: 1px 6px; background: #21262d; color: #a5d6ff; border: 1px solid #30363d; border-radius: 3px; font-size: 10px; cursor: pointer;">Height≤5520 (Trough)</button>
-        <button type="button" class="btn-multi-filter-preset" data-preset="wind_12" style="padding: 1px 6px; background: #21262d; color: #e3b341; border: 1px solid #30363d; border-radius: 3px; font-size: 10px; cursor: pointer;">Wind≥12m/s</button>
+        <button type="button" class="btn-multi-filter-preset" data-preset="hgt_5880" style="padding: 1px 6px; background: var(--bg-card, #21262d); color: var(--accent-blue, #58a6ff); font-weight: 600; border: 1px solid var(--accent-blue, #388bfd); border-radius: 3px; font-size: 10px; cursor: pointer;">Height≥5880 (Sub-High)</button>
+        <button type="button" class="btn-multi-filter-preset" data-preset="wind_20" style="padding: 1px 6px; background: var(--bg-card, #21262d); color: var(--accent-red, #f85149); font-weight: 600; border: 1px solid var(--accent-red, #da3633); border-radius: 3px; font-size: 10px; cursor: pointer;">Wind≥20m/s (Jet)</button>
+        <button type="button" class="btn-multi-filter-preset" data-preset="tt_m20" style="padding: 1px 6px; background: var(--bg-card, #21262d); color: var(--accent-blue, #79c0ff); border: 1px solid var(--border-color, #30363d); border-radius: 3px; font-size: 10px; cursor: pointer;">TT≤-20°C (Cold)</button>
+        <button type="button" class="btn-multi-filter-preset" data-preset="hgt_5520" style="padding: 1px 6px; background: var(--bg-card, #21262d); color: var(--accent-blue, #a5d6ff); border: 1px solid var(--border-color, #30363d); border-radius: 3px; font-size: 10px; cursor: pointer;">Height≤5520 (Trough)</button>
+        <button type="button" class="btn-multi-filter-preset" data-preset="wind_12" style="padding: 1px 6px; background: var(--bg-card, #21262d); color: var(--accent-orange, #e3b341); border: 1px solid var(--border-color, #30363d); border-radius: 3px; font-size: 10px; cursor: pointer;">Wind≥12m/s</button>
         `
             : `
-        <button type="button" class="btn-multi-filter-preset" data-preset="wind5_rain10_tt10_30" style="padding: 1px 6px; background: #21262d; color: #58a6ff; font-weight: 600; border: 1px solid #388bfd; border-radius: 3px; font-size: 10px; cursor: pointer;">Wind&gt;5 &amp; Rain&gt;10 &amp; TT 10..30</button>
-        <button type="button" class="btn-multi-filter-preset" data-preset="wind5_rain10" style="padding: 1px 6px; background: #21262d; color: #a5d6ff; border: 1px solid #30363d; border-radius: 3px; font-size: 10px; cursor: pointer;">Wind&gt;5 &amp; Rain&gt;10</button>
-        <button type="button" class="btn-multi-filter-preset" data-preset="tt_10_30" style="padding: 1px 6px; background: #21262d; color: #56d364; border: 1px solid #30363d; border-radius: 3px; font-size: 10px; cursor: pointer;">TT 10..30</button>
-        <button type="button" class="btn-multi-filter-preset" data-preset="tt_gt30" style="padding: 1px 6px; background: #21262d; color: #f85149; border: 1px solid #30363d; border-radius: 3px; font-size: 10px; cursor: pointer;">TT&gt;30</button>
-        <button type="button" class="btn-multi-filter-preset" data-preset="tt_lt10" style="padding: 1px 6px; background: #21262d; color: #79c0ff; border: 1px solid #30363d; border-radius: 3px; font-size: 10px; cursor: pointer;">TT&lt;10</button>
-        <button type="button" class="btn-multi-filter-preset" data-preset="wind_gt5" style="padding: 1px 6px; background: #21262d; color: #a5d6ff; border: 1px solid #30363d; border-radius: 3px; font-size: 10px; cursor: pointer;">Wind&gt;5</button>
-        <button type="button" class="btn-multi-filter-preset" data-preset="rain_gt10" style="padding: 1px 6px; background: #21262d; color: #79c0ff; border: 1px solid #30363d; border-radius: 3px; font-size: 10px; cursor: pointer;">Rain&gt;10</button>
-        <button type="button" class="btn-multi-filter-preset" data-preset="rain6_gt10" style="padding: 1px 6px; background: #21262d; color: #38bdf8; border: 1px solid #388bfd; border-radius: 3px; font-size: 10px; cursor: pointer;">Rain6&gt;10</button>
-        <button type="button" class="btn-multi-filter-preset" data-preset="vis_lt1" style="padding: 1px 6px; background: #21262d; color: #ffd33d; border: 1px solid #d29922; border-radius: 3px; font-size: 10px; cursor: pointer;">Vis&lt;1km</button>
+        <button type="button" class="btn-multi-filter-preset" data-preset="wind5_rain10_tt10_30" style="padding: 1px 6px; background: var(--bg-card, #21262d); color: var(--accent-blue, #58a6ff); font-weight: 600; border: 1px solid var(--accent-blue, #388bfd); border-radius: 3px; font-size: 10px; cursor: pointer;">Wind&gt;5 &amp; Rain&gt;10 &amp; TT 10..30</button>
+        <button type="button" class="btn-multi-filter-preset" data-preset="wind5_rain10" style="padding: 1px 6px; background: var(--bg-card, #21262d); color: var(--accent-blue, #a5d6ff); border: 1px solid var(--border-color, #30363d); border-radius: 3px; font-size: 10px; cursor: pointer;">Wind&gt;5 &amp; Rain&gt;10</button>
+        <button type="button" class="btn-multi-filter-preset" data-preset="tt_10_30" style="padding: 1px 6px; background: var(--bg-card, #21262d); color: var(--accent-green, #56d364); border: 1px solid var(--border-color, #30363d); border-radius: 3px; font-size: 10px; cursor: pointer;">TT 10..30</button>
+        <button type="button" class="btn-multi-filter-preset" data-preset="tt_gt30" style="padding: 1px 6px; background: var(--bg-card, #21262d); color: var(--accent-red, #f85149); border: 1px solid var(--border-color, #30363d); border-radius: 3px; font-size: 10px; cursor: pointer;">TT&gt;30</button>
+        <button type="button" class="btn-multi-filter-preset" data-preset="tt_lt10" style="padding: 1px 6px; background: var(--bg-card, #21262d); color: var(--accent-blue, #79c0ff); border: 1px solid var(--border-color, #30363d); border-radius: 3px; font-size: 10px; cursor: pointer;">TT&lt;10</button>
+        <button type="button" class="btn-multi-filter-preset" data-preset="wind_gt5" style="padding: 1px 6px; background: var(--bg-card, #21262d); color: var(--accent-blue, #a5d6ff); border: 1px solid var(--border-color, #30363d); border-radius: 3px; font-size: 10px; cursor: pointer;">Wind&gt;5</button>
+        <button type="button" class="btn-multi-filter-preset" data-preset="rain_gt10" style="padding: 1px 6px; background: var(--bg-card, #21262d); color: var(--accent-blue, #79c0ff); border: 1px solid var(--border-color, #30363d); border-radius: 3px; font-size: 10px; cursor: pointer;">Rain&gt;10</button>
+        <button type="button" class="btn-multi-filter-preset" data-preset="rain6_gt10" style="padding: 1px 6px; background: var(--bg-card, #21262d); color: var(--accent-blue, #38bdf8); border: 1px solid var(--accent-blue, #388bfd); border-radius: 3px; font-size: 10px; cursor: pointer;">Rain6&gt;10</button>
+        <button type="button" class="btn-multi-filter-preset" data-preset="vis_lt1" style="padding: 1px 6px; background: var(--bg-card, #21262d); color: var(--accent-orange, #ffd33d); border: 1px solid var(--accent-orange, #d29922); border-radius: 3px; font-size: 10px; cursor: pointer;">Vis&lt;1km</button>
         `
         }
       </div>

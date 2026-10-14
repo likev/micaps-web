@@ -1,7 +1,7 @@
 {
   "basemap": {
     "projection": "mercator",
-    "scheme": "light",
+    "scheme": "dark",
     "showCities": true,
     "showGraticule": true,
     "showProvinces": true,

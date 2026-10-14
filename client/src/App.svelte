@@ -89,7 +89,7 @@
     getDisabledPeriodsForRain,
   } from "./utils/rain12.js";
   import { updateWindowTitle } from "./ui/tabs/windowTitles.js";
-  import { initGlobalTheme } from "./lib/stores/theme.svelte.js";
+  import { initGlobalTheme, getGlobalTheme, normalizeTheme } from "./lib/stores/theme.svelte.js";
 
   let activeTab = $derived(tabsState.tabs.find((t) => t.id === tabsState.activeTabId) || tabsState.tabs[0] || null);
   let activeWin = $derived(activeTab && activeTab.windows ? (activeTab.windows[activeTab.activeWinIdx] || activeTab.windows[0]) : null);
@@ -200,13 +200,18 @@
           }
         }
       }
-      const cfgScheme = CURRENT_CONFIG?.basemap?.scheme;
-      if (cfgScheme) {
-        for (const [winId, map] of mapInstances.entries()) {
-          if (map && map.__basemapScheme !== cfgScheme) {
+      const activeTheme = getGlobalTheme();
+      const cfgScheme = activeTheme || CURRENT_CONFIG?.basemap?.scheme || "dark";
+      const targetScheme = normalizeTheme(cfgScheme);
+      for (const [winId, map] of mapInstances.entries()) {
+        if (map && map.__basemapScheme !== targetScheme) {
+          try {
+            setBasemapScheme(map, targetScheme);
+          } catch {
             try {
-              applyBasemapScheme(map, cfgScheme);
-              updateGraticuleScheme(map, cfgScheme);
+              applyBasemapScheme(map, targetScheme);
+              updateGraticuleScheme(map, targetScheme);
+              map.__basemapScheme = targetScheme;
             } catch {}
           }
         }

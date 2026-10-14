@@ -6,6 +6,7 @@ export const BASEMAP_SCHEMES = {
   dark: THEME_TOKENS.dark.map,
   light: THEME_TOKENS.light.map,
   brutalism: THEME_TOKENS.brutalism.map,
+  black: THEME_TOKENS.dark.map,
 };
 
 export function getBasemapScheme(name) {

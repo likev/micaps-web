@@ -469,6 +469,10 @@ export async function loadUpperAirComposite(map, level = 500, obsTime = "2026082
     sampleTimes: groupStationLayer?.sampleTimes,
   }, cursorTime);
   const stnConfig = {
+    model: groupStationLayer?.model || "UPPER_AIR",
+    element: groupStationLayer?.element || "PLOT",
+    level: curLevel,
+    isUpperAir: true,
     ...(groupStationLayer?.render || {}),
     ...(groupStationLayer?.config || {}),
     ...(snapStn?.config || {}),
@@ -576,6 +580,9 @@ export async function loadObservationProduct(map, model, element, level, file, w
       sampleTimes: groupStationLayer?.sampleTimes,
     }, cursorTime);
     const stnConfig = {
+      model: groupStationLayer?.model || model || "SURFACE",
+      element: groupStationLayer?.element || element || "PLOT_GLOBAL_3H",
+      isUpperAir: false,
       ...(isRainProduct ? { showRain6: true } : {}),
       ...(groupStationLayer?.render || {}),
       ...(groupStationLayer?.config || {}),

@@ -238,7 +238,7 @@
 <style>
   .config-filter-section {
     margin-top: 8px;
-    border-top: 1px solid rgba(48, 54, 61, 0.6);
+    border-top: 1px solid var(--border-color, rgba(48, 54, 61, 0.6));
     padding-top: 6px;
   }
 
@@ -271,10 +271,10 @@
   }
 
   .sel-filter-global-logic {
-    background: #161b22;
-    color: #58a6ff;
+    background: var(--bg-card, #161b22);
+    color: var(--accent-blue, #58a6ff);
     font-weight: bold;
-    border: 1px solid #388bfd;
+    border: 1px solid var(--accent-blue, #388bfd);
     border-radius: 4px;
     font-size: 10px;
     padding: 1px 4px;
@@ -307,13 +307,20 @@
 
   .sel-filter-field,
   .sel-filter-op {
-    background: #161b22;
+    background: var(--bg-card, #161b22);
     color: var(--text-primary, #e6edf3);
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
     border-radius: 4px;
     font-size: 10px;
     padding: 2px 4px;
     min-width: 0;
+  }
+
+  .sel-filter-field option,
+  .sel-filter-op option,
+  .sel-filter-global-logic option {
+    background: var(--bg-card, #21262d);
+    color: var(--text-primary, #e6edf3);
   }
 
   /* The field select carries the longest option text — let it shrink so the
@@ -333,12 +340,18 @@
   .input-filter-val2 {
     width: 44px;
     flex-shrink: 0;
-    background: #161b22;
+    background: var(--bg-card, #161b22);
     color: var(--text-primary, #e6edf3);
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
     border-radius: 4px;
     font-size: 10px;
     padding: 2px 4px;
+  }
+
+  .input-filter-val::placeholder,
+  .input-filter-val2::placeholder {
+    color: var(--text-secondary, #8b949e);
+    opacity: 0.8;
   }
 
   .btn-remove-rule {
@@ -371,21 +384,22 @@
 
   .btn-filter-preset {
     padding: 2px 6px;
-    background: #21262d;
-    border: 1px solid #388bfd;
+    background: var(--bg-card, #21262d);
+    border: 1px solid var(--accent-blue, #388bfd);
     border-radius: 3px;
-    color: #58a6ff;
+    color: var(--accent-blue, #58a6ff);
     font-size: 10px;
     cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   }
 
   .btn-filter-preset:hover {
-    background: rgba(56, 139, 253, 0.18);
+    background: color-mix(in srgb, var(--accent-blue, #388bfd) 18%, transparent);
   }
 
   .btn-add-rule,
   .btn-clear-rules {
-    background: #21262d;
+    background: var(--bg-card, #21262d);
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
     color: var(--text-primary, #e6edf3);
     border-radius: 4px;
@@ -396,6 +410,6 @@
 
   .btn-add-rule:hover,
   .btn-clear-rules:hover {
-    background: #30363d;
+    background: var(--bg-hover, #30363d);
   }
 </style>

@@ -6,7 +6,8 @@ export function drawWindBarbCanvas(ctx, cx, cy, speed, dir, scale = 1.0, color =
     // Calm surface wind: small circle removed per user request
     return;
   }
-  const windColor = color || (getPlotTokens(themeId)?.wind?.color ?? "#dee2e6");
+  const effectiveTheme = String(themeId).toLowerCase() === "black" ? "dark" : themeId;
+  const windColor = color || (getPlotTokens(effectiveTheme)?.wind?.color ?? "#dee2e6");
 
   const skyRadius = 8 * scale;
   const staffLength = 41 * scale;

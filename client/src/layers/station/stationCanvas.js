@@ -309,6 +309,28 @@ export function drawStationCanvas(map) {
     const lCfg = { ...(state.config || {}), ...(layerEntry.config || {}) };
     const isSoftStale = lCfg.status === "soft-stale" || lCfg.isSoftStale;
     const isHardStale = lCfg.status === "hard-stale" || lCfg.isHardStale;
+    const idLower = String(layerEntry.id || "").toLowerCase();
+    const lModel = String(lCfg.model || layerEntry.model || "").toUpperCase();
+    const lElem = String(lCfg.element || layerEntry.element || "").toUpperCase();
+    const lLevel = lCfg.level ?? layerEntry.level;
+    const isUpperLayer =
+      lCfg.isUpperAir === true ||
+      layerEntry.isUpperAir === true ||
+      lModel === "UPPER_AIR" ||
+      lModel === "SOUNDING" ||
+      lModel === "UPPERAIR" ||
+      idLower.startsWith("upperair-") ||
+      idLower.includes("sounding") ||
+      idLower === "station-upper" ||
+      (lLevel !== undefined && lLevel !== null && Number(lLevel) > 0);
+    const isExplicitSurface =
+      lCfg.isUpperAir === false ||
+      layerEntry.isUpperAir === false ||
+      lCfg.isSurface === true ||
+      lModel === "SURFACE" ||
+      idLower.startsWith("surface-") ||
+      idLower.includes("surface") ||
+      lElem === "PLOT_GLOBAL_3H";
 
     const activeRules = collectActiveRules(lCfg);
     const hasRules = activeRules.length > 0;
@@ -424,7 +446,21 @@ export function drawStationCanvas(map) {
         screenBins.set(binKey, list);
       }
       const hash = hashStation(f.properties?.station_id, lon, lat);
-      list.push({ feature: f, pt, lon, lat, hash, layerId: layerEntry.id });
+      const effectiveUpper = isUpperLayer && !isExplicitSurface;
+      const effectiveModel = lModel || (effectiveUpper ? "UPPER_AIR" : "SURFACE");
+      const effectiveElement = lElem || (effectiveUpper ? "PLOT" : "PLOT_GLOBAL_3H");
+      list.push({
+        feature: f,
+        pt,
+        lon,
+        lat,
+        hash,
+        layerId: layerEntry.id,
+        isUpperAir: effectiveUpper,
+        model: effectiveModel,
+        element: effectiveElement,
+        level: lLevel,
+      });
     }
 
     const selectedStations = [];

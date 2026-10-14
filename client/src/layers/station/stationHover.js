@@ -121,7 +121,15 @@ export function handleStationHover(map, e) {
       map.getCanvas().style.cursor = "pointer";
     }
     if (typeof targetGlobal.__SHOW_TOOLTIP__ === "function") {
-      targetGlobal.__SHOW_TOOLTIP__([hovered.lon, hovered.lat], hovered.feature.properties, { x: px, y: py });
+      const tooltipProps = {
+        ...(hovered.feature?.properties || {}),
+        ...(hovered.layerId ? { layerId: hovered.layerId } : {}),
+        ...(hovered.model ? { model: hovered.model } : {}),
+        ...(hovered.element ? { element: hovered.element } : {}),
+        ...(hovered.level !== undefined && hovered.level !== null ? { level: hovered.level } : {}),
+        ...(hovered.isUpperAir !== undefined ? { isUpperAir: hovered.isUpperAir } : {}),
+      };
+      targetGlobal.__SHOW_TOOLTIP__([hovered.lon, hovered.lat], tooltipProps, { x: px, y: py });
     }
   } else {
     if (map.getCanvas && map.getCanvas()) {

@@ -74,15 +74,34 @@ export function resolveInitialProjection() {
   return "mercator";
 }
 
+export function cleanScheme(raw) {
+  if (!raw) return null;
+  const s = String(raw).toLowerCase().trim();
+  if (s === "black") return "dark";
+  if (s === "dark" || s === "light" || s === "brutalism") return s;
+  return null;
+}
+
 export function resolveInitialBasemapScheme() {
   try {
-    const stored = typeof localStorage !== "undefined" ? localStorage.getItem("micaps-basemap-scheme") : null;
-    if (stored && (stored === "dark" || stored === "light" || stored === "brutalism")) return stored;
+    const s = cleanScheme(typeof localStorage !== "undefined" ? localStorage.getItem("micaps-basemap-scheme") : null);
+    if (s) return s;
+  } catch {}
+  try {
+    const s = cleanScheme(typeof localStorage !== "undefined" ? localStorage.getItem("micaps-ui-theme") : null);
+    if (s) return s;
+  } catch {}
+  try {
+    if (typeof document !== "undefined" && document.documentElement) {
+      const s = cleanScheme(document.documentElement.getAttribute("data-theme") || document.documentElement.getAttribute("data-scheme"));
+      if (s) return s;
+    }
   } catch {}
   try {
     // also check CURRENT_CONFIG if already loaded (dynamic import to avoid circular dep)
     const cfg = typeof window !== "undefined" ? window.__MICAPS_CONFIG__ : null;
-    if (cfg?.basemap?.scheme) return cfg.basemap.scheme;
+    const s = cleanScheme(cfg?.basemap?.scheme || cfg?.theme);
+    if (s) return s;
   } catch {}
   if (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) {
     return "light";
@@ -108,7 +127,8 @@ export function createMapInstance(containerIdOrEl, options = {}) {
   ensurePMTilesProtocol();
 
   const pmtilesUrl = resolvePMTilesUrl(options.pmtilesUrl);
-  const schemeName = options.scheme || options.basemapScheme || resolveInitialBasemapScheme();
+  const rawScheme = options.scheme || options.basemapScheme || resolveInitialBasemapScheme();
+  const schemeName = cleanScheme(rawScheme) || "dark";
   const projectionType = options.projection || resolveInitialProjection();
 
   const mapInstance = new maplibregl.Map({
@@ -159,7 +179,8 @@ export function createMapInstance(containerIdOrEl, options = {}) {
 export function setBasemapScheme(map, schemeName) {
   const m = map || getActiveMap();
   if (!m) return;
-  const scheme = getBasemapScheme(schemeName);
+  const targetName = cleanScheme(schemeName) || "dark";
+  const scheme = getBasemapScheme(targetName);
   const apply = () => {
     applyBasemapScheme(m, scheme.id);
     updateGraticuleScheme(m, scheme.id);

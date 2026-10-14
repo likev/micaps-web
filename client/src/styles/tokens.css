@@ -91,7 +91,6 @@
 [data-theme="light"] .btn-inline,
 [data-theme="light"] .btn-offset-preset,
 [data-theme="light"] .multitrack-toggle-btn,
-[data-theme="light"] .btn-filter-preset,
 [data-theme="light"] .btn-add-rule,
 [data-theme="light"] .btn-clear-rules,
 [data-theme="light"] .status-cursor-probe,
@@ -109,10 +108,78 @@
 [data-theme="light"] .config-editor-modal,
 [data-theme="light"] .config-card,
 [data-theme="light"] .radio-card,
-[data-theme="light"] .help-modal-content {
+[data-theme="light"] .help-modal-content,
+[data-theme="light"] .sel-filter-field,
+[data-theme="light"] .sel-filter-op,
+[data-theme="light"] .input-filter-val,
+[data-theme="light"] .input-filter-val2,
+[data-theme="light"] .sel-filter-field option,
+[data-theme="light"] .sel-filter-op option,
+[data-theme="light"] .tooltip,
+[data-theme="light"] #tooltip {
   background-color: var(--bg-panel) !important;
   border-color: var(--border-color) !important;
   color: var(--text-primary) !important;
+}
+
+[data-theme="light"] .input-filter-val::placeholder,
+[data-theme="light"] .input-filter-val2::placeholder {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="light"] .btn-filter-preset {
+  background-color: var(--bg-panel) !important;
+  border-color: var(--accent-blue) !important;
+  color: var(--accent-blue) !important;
+}
+
+[data-theme="light"] .btn-filter-preset:hover {
+  background-color: color-mix(in srgb, var(--accent-blue) 14%, transparent) !important;
+}
+
+[data-theme="light"] .sel-filter-global-logic {
+  background-color: var(--bg-panel) !important;
+  border-color: var(--accent-blue) !important;
+  color: var(--accent-blue) !important;
+}
+
+[data-theme="light"] .sel-filter-global-logic option {
+  background-color: var(--bg-panel) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="light"] .tooltip,
+[data-theme="light"] #tooltip {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+}
+
+[data-theme="light"] .tooltip .tooltip-title {
+  color: var(--accent-blue) !important;
+}
+
+[data-theme="light"] .tooltip .tooltip-coords,
+[data-theme="light"] .tooltip .tooltip-grid span {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="light"] .tooltip .tooltip-grid strong:not([class*="val-"]) {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="light"] .tooltip .val-tt {
+  color: var(--accent-red) !important;
+}
+
+[data-theme="light"] .tooltip .val-td {
+  color: var(--accent-green) !important;
+}
+
+[data-theme="light"] .tooltip .val-dtd {
+  color: var(--accent-orange) !important;
+}
+
+[data-theme="light"] .tooltip .val-p {
+  color: var(--accent-cyan) !important;
 }
 
 [data-theme="light"] .layout-btn.active,
@@ -386,7 +453,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
   font-size: 11px;
 }
 
-.tooltip { position: absolute; pointer-events: none; background: rgba(10, 14, 22, 0.95); border: 1px solid var(--accent-blue); border-radius: 6px; padding: 8px 12px; font-size: 12px; font-family: var(--font-mono); box-shadow: 0 4px 16px rgba(0,0,0,0.6); z-index: 2000; transition: opacity 0.1s ease; max-width: min(280px, 80vw); overflow-wrap: break-word; }
+.tooltip { position: absolute; pointer-events: none; background: var(--bg-panel, rgba(10, 14, 22, 0.95)); color: var(--text-primary, #e6edf3); border: 1px solid var(--border-color, var(--accent-blue)); border-radius: 6px; padding: 8px 12px; font-size: 12px; font-family: var(--font-mono); box-shadow: 0 4px 16px rgba(0,0,0,0.3); z-index: 2000; transition: opacity 0.1s ease; max-width: min(280px, 80vw); overflow-wrap: break-word; }
 .tooltip.hidden { opacity: 0; pointer-events: none; }
 .station-glyph { transform: translate(-50%, -50%); }
 
@@ -457,5 +524,44 @@ body, html { width: 100%; height: 100%; overflow: hidden; background-color: var(
 .tlogp-resize-handle.tlogp-resize-s:hover {
   background: rgba(88, 166, 255, 0.25);
 }
+
+/* Station Filter Controls - Base Theme Styling */
+.sel-filter-field,
+.sel-filter-op,
+.input-filter-val,
+.input-filter-val2,
+.sel-filter-global-logic {
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+.sel-filter-field option,
+.sel-filter-op option,
+.sel-filter-global-logic option {
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.input-filter-val::placeholder,
+.input-filter-val2::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+.btn-filter-preset {
+  background-color: var(--bg-card);
+  color: var(--accent-blue);
+  border: 1px solid var(--accent-blue);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-filter-preset:hover {
+  background-color: color-mix(in srgb, var(--accent-blue) 18%, transparent);
+}
+
 
 

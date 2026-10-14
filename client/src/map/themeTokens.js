@@ -132,9 +132,12 @@ export const THEME_TOKENS = {
   },
 };
 
+THEME_TOKENS.black = THEME_TOKENS.dark;
+
 export function getThemeTokens(name = "dark") {
   if (!name) return THEME_TOKENS.dark;
-  const key = String(name).toLowerCase();
+  const key = String(name).trim().toLowerCase();
+  if (key === "black") return THEME_TOKENS.dark;
   return THEME_TOKENS[key] || THEME_TOKENS.dark;
 }
 

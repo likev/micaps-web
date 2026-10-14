@@ -395,7 +395,8 @@ html, body {
 [data-theme="brutalism"] #app :is(.btn, .btn-menu, .btn-nav-layout, .preset-menu-trigger, #btn-preset-menu,
   .layout-btn, .layout-select, .step-nav-btn, .btn-add-tab, .btn-toggle-layers, .multitrack-toggle-btn,
   .btn-inline, .btn-offset-preset, .btn-fullscreen-toggle, .nav-select, .step-length-select, .init-time-select,
-  .chip-btn, .quick-pill, .nav-tag-capsule, .preset-active-indicator, .config-subtab-btn, .ctrl-btn, .mode-toggle-btn) {
+  .chip-btn, .quick-pill, .nav-tag-capsule, .preset-active-indicator, .config-subtab-btn, .ctrl-btn, .mode-toggle-btn,
+  .btn-filter-preset, .btn-add-rule, .btn-clear-rules, .sel-filter-field, .sel-filter-op, .input-filter-val, .input-filter-val2) {
   background: #fff !important;
   color: #111 !important;
   border: 2px solid #111 !important;
@@ -405,7 +406,9 @@ html, body {
 }
 [data-theme="brutalism"] #app :is(.btn, .btn-menu, .btn-nav-layout, .preset-menu-trigger, .layout-btn, .layout-select,
   .step-nav-btn, .btn-add-tab, .btn-toggle-layers, .multitrack-toggle-btn, .btn-inline, .btn-fullscreen-toggle,
-  .nav-select, .step-length-select, .init-time-select, .chip-btn, .quick-pill, .config-subtab-btn):hover {
+  .nav-select, .step-length-select, .init-time-select, .chip-btn, .quick-pill, .config-subtab-btn,
+  .btn-filter-preset, .btn-add-rule, .btn-clear-rules):hover {
+
   background: #ffe14d !important;
   color: #111 !important;
   border-color: #111 !important;
