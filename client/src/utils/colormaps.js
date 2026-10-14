@@ -200,6 +200,135 @@ export const DEFAULT_COLORMAPS = {
     { val: 12, color: [190, 35, 35, 255] },
     { val: 16, color: [120, 15, 20, 255] },
   ],
+  CAPE: [
+    { val: 0, color: [240, 240, 240, 0] },
+    { val: 100, color: [180, 220, 250, 120] },
+    { val: 500, color: [100, 200, 230, 180] },
+    { val: 1000, color: [110, 210, 110, 220] },
+    { val: 1500, color: [240, 220, 50, 240] },
+    { val: 2000, color: [245, 140, 40, 255] },
+    { val: 2500, color: [230, 40, 40, 255] },
+    { val: 3000, color: [200, 20, 150, 255] },
+    { val: 4000, color: [130, 0, 180, 255] },
+  ],
+  HELICITY: [
+    { val: 0, color: [240, 240, 240, 0] },
+    { val: 10, color: [180, 230, 245, 140] },
+    { val: 25, color: [100, 200, 230, 190] },
+    { val: 50, color: [120, 220, 100, 220] },
+    { val: 100, color: [240, 220, 50, 240] },
+    { val: 150, color: [245, 140, 40, 255] },
+    { val: 200, color: [230, 40, 40, 255] },
+    { val: 300, color: [180, 20, 160, 255] },
+  ],
+  RADAR: [
+    { val: 0, color: [240, 240, 240, 0] },
+    { val: 10, color: [160, 230, 255, 180] },
+    { val: 15, color: [0, 160, 245, 220] },
+    { val: 20, color: [0, 235, 235, 240] },
+    { val: 25, color: [0, 215, 0, 255] },
+    { val: 30, color: [0, 150, 0, 255] },
+    { val: 35, color: [255, 255, 0, 255] },
+    { val: 40, color: [230, 180, 0, 255] },
+    { val: 45, color: [255, 140, 0, 255] },
+    { val: 50, color: [255, 0, 0, 255] },
+    { val: 55, color: [210, 0, 0, 255] },
+    { val: 60, color: [200, 0, 200, 255] },
+    { val: 65, color: [150, 0, 180, 255] },
+    { val: 70, color: [255, 255, 255, 255] },
+  ],
+  ECHO_TOP: [
+    { val: 0, color: [240, 240, 240, 0] },
+    { val: 2, color: [170, 220, 250, 120] },
+    { val: 4, color: [90, 190, 230, 180] },
+    { val: 6, color: [70, 200, 120, 220] },
+    { val: 8, color: [180, 230, 50, 240] },
+    { val: 10, color: [240, 220, 40, 255] },
+    { val: 12, color: [245, 140, 30, 255] },
+    { val: 14, color: [230, 40, 40, 255] },
+    { val: 16, color: [200, 20, 160, 255] },
+    { val: 18, color: [255, 255, 255, 255] },
+  ],
+  VIL: [
+    { val: 0, color: [240, 240, 240, 0] },
+    { val: 5, color: [160, 220, 250, 140] },
+    { val: 10, color: [80, 180, 230, 200] },
+    { val: 15, color: [70, 200, 110, 220] },
+    { val: 25, color: [240, 220, 40, 255] },
+    { val: 35, color: [245, 140, 30, 255] },
+    { val: 45, color: [230, 40, 40, 255] },
+    { val: 55, color: [190, 20, 160, 255] },
+    { val: 70, color: [120, 0, 160, 255] },
+  ],
+  QPE: [
+    { val: 0.1, color: [166, 242, 143, 200] },
+    { val: 1.0, color: [61, 186, 61, 230] },
+    { val: 5.0, color: [97, 184, 255, 240] },
+    { val: 10.0, color: [0, 120, 255, 255] },
+    { val: 25.0, color: [250, 200, 0, 255] },
+    { val: 50.0, color: [250, 0, 0, 255] },
+    { val: 100.0, color: [180, 0, 160, 255] },
+  ],
+  SNOW: [
+    { val: 0, color: [240, 240, 240, 0] },
+    { val: 1, color: [210, 230, 250, 150] },
+    { val: 5, color: [160, 210, 245, 200] },
+    { val: 10, color: [110, 180, 240, 230] },
+    { val: 20, color: [70, 140, 230, 255] },
+    { val: 30, color: [30, 90, 200, 255] },
+    { val: 50, color: [10, 40, 160, 255] },
+  ],
+  SST: [
+    { val: 0, color: [40, 30, 150, 255] },
+    { val: 5, color: [40, 100, 210, 255] },
+    { val: 10, color: [60, 180, 230, 255] },
+    { val: 15, color: [100, 220, 190, 255] },
+    { val: 20, color: [160, 230, 100, 255] },
+    { val: 25, color: [250, 220, 50, 255] },
+    { val: 28, color: [245, 130, 30, 255] },
+    { val: 32, color: [220, 30, 30, 255] },
+    { val: 36, color: [150, 10, 20, 255] },
+  ],
+  TCWV: [
+    { val: 0, color: [240, 240, 240, 0] },
+    { val: 10, color: [220, 240, 255, 120] },
+    { val: 20, color: [160, 215, 255, 180] },
+    { val: 30, color: [90, 180, 245, 220] },
+    { val: 45, color: [40, 130, 225, 240] },
+    { val: 60, color: [20, 70, 190, 255] },
+    { val: 75, color: [10, 20, 130, 255] },
+  ],
+  PROBABILITY: [
+    { val: 0, color: [240, 240, 240, 0] },
+    { val: 10, color: [210, 235, 255, 140] },
+    { val: 25, color: [140, 200, 245, 180] },
+    { val: 50, color: [245, 225, 60, 220] },
+    { val: 70, color: [245, 140, 40, 240] },
+    { val: 90, color: [225, 40, 40, 255] },
+    { val: 100, color: [160, 10, 140, 255] },
+  ],
+  VARIANCE: [
+    { val: 0, color: [245, 245, 245, 0] },
+    { val: 1, color: [230, 245, 200, 140] },
+    { val: 3, color: [255, 235, 130, 180] },
+    { val: 6, color: [255, 180, 70, 220] },
+    { val: 10, color: [240, 100, 50, 240] },
+    { val: 16, color: [210, 30, 30, 255] },
+    { val: 25, color: [130, 10, 20, 255] },
+  ],
+  PRECIP_TYPE: [
+    { val: 0, color: [240, 240, 240, 0] },
+    { val: 1, color: [60, 180, 75, 255] },
+    { val: 2, color: [70, 150, 240, 255] },
+    { val: 3, color: [245, 160, 30, 255] },
+    { val: 4, color: [220, 30, 180, 255] },
+  ],
+  HAZARDS: [
+    { val: 0, color: [240, 240, 240, 0] },
+    { val: 1, color: [255, 220, 0, 220] },
+    { val: 2, color: [255, 130, 0, 240] },
+    { val: 3, color: [230, 30, 30, 255] },
+  ],
 };
 
 const FALLBACK_COLORMAP = DEFAULT_COLORMAPS.TMP;
@@ -245,7 +374,9 @@ export function setColormaps(colormaps) {
 export function isRainElement(name) {
   if (!name || typeof name !== "string") return false;
   const up = name.toUpperCase();
+  if (up.includes("PRECIPITATION_TYPE") || up.includes("PRECIP_TYPE")) return false;
   const base = up.includes("/") ? up.split("/").pop() : up;
+  if (base.includes("PRECIPITATION_TYPE") || base.includes("PRECIP_TYPE")) return false;
   return (
     base.startsWith("RAIN") ||
     base === "APCP" ||
@@ -271,30 +402,45 @@ export {
 
 export function getColormap(reference = null, element = "TMP") {
   if (Array.isArray(reference)) return reference;
-  if (typeof reference === "string") {
-    if (COLORMAPS[reference]) return COLORMAPS[reference];
-    const up = reference.toUpperCase();
+
+  const matchElement = (name) => {
+    if (!name || typeof name !== "string") return null;
+    const up = name.toUpperCase();
+    if (COLORMAPS[name]) return COLORMAPS[name];
     if (COLORMAPS[up]) return COLORMAPS[up];
-    const trimmed = reference.replace(/^\//, "");
+    const trimmed = name.replace(/^\//, "");
     if (COLORMAPS[trimmed]) return COLORMAPS[trimmed];
     if (COLORMAPS["/" + trimmed]) return COLORMAPS["/" + trimmed];
-    if (isRainElement(reference)) return COLORMAPS.RAIN || DEFAULT_COLORMAPS.RAIN;
+    if (up.includes("PROB")) return COLORMAPS.PROBABILITY || DEFAULT_COLORMAPS.PROBABILITY;
+    if (up.includes("PRECIPITATION_TYPE") || up.includes("PRECIP_TYPE")) return COLORMAPS.PRECIP_TYPE || DEFAULT_COLORMAPS.PRECIP_TYPE;
+    if (isRainElement(name)) return COLORMAPS.RAIN || DEFAULT_COLORMAPS.RAIN;
     if (up.includes("SLP_VAR") || up.includes("SLP-VAR") || (up.includes("SLP") && up.includes("VAR"))) {
       return COLORMAPS.SLP_VAR || DEFAULT_COLORMAPS.SLP_VAR;
     }
     if (up.includes("T_VAR") || up.includes("T-VAR") || (up.includes("TMP") && up.includes("VAR")) || (up.startsWith("T") && up.includes("VAR"))) {
       return COLORMAPS.T_VAR || DEFAULT_COLORMAPS.T_VAR;
     }
-  }
-  const elUp = (element || "").toUpperCase();
-  if (COLORMAPS[elUp]) return COLORMAPS[elUp];
-  if (isRainElement(element)) return COLORMAPS.RAIN || DEFAULT_COLORMAPS.RAIN;
-  if (elUp.includes("SLP_VAR") || elUp.includes("SLP-VAR") || (elUp.includes("SLP") && elUp.includes("VAR"))) {
-    return COLORMAPS.SLP_VAR || DEFAULT_COLORMAPS.SLP_VAR;
-  }
-  if (elUp.includes("T_VAR") || elUp.includes("T-VAR") || (elUp.includes("TMP") && elUp.includes("VAR")) || (elUp.startsWith("T") && elUp.includes("VAR"))) {
-    return COLORMAPS.T_VAR || DEFAULT_COLORMAPS.T_VAR;
-  }
+    if (up.includes("CAPE") || up.includes("DCAPE") || up.includes("CIN")) return COLORMAPS.CAPE || DEFAULT_COLORMAPS.CAPE;
+    if (up.includes("HELICITY") || up.includes("UPDRAFT_HELICITY") || up.endsWith("_UH")) return COLORMAPS.HELICITY || DEFAULT_COLORMAPS.HELICITY;
+    if (up.includes("DBZ") || up.includes("MCR") || up.includes("RADAR") || up.includes("REFLECTIVITY") || up.includes("REF_FST")) return COLORMAPS.RADAR || DEFAULT_COLORMAPS.RADAR;
+    if (up.includes("MTOP") || up.includes("ECHO_TOP")) return COLORMAPS.ECHO_TOP || DEFAULT_COLORMAPS.ECHO_TOP;
+    if (up.includes("MVIL") || up.includes("VIL")) return COLORMAPS.VIL || DEFAULT_COLORMAPS.VIL;
+    if (up.includes("QPE") || up.includes("QPF")) return COLORMAPS.QPE || DEFAULT_COLORMAPS.QPE;
+    if (up.includes("SNOW") || up.includes("SNOD") || up.includes("ASNOW")) return COLORMAPS.SNOW || DEFAULT_COLORMAPS.SNOW;
+    if (up.includes("SST")) return COLORMAPS.SST || DEFAULT_COLORMAPS.SST;
+    if (up.includes("TCWV")) return COLORMAPS.TCWV || DEFAULT_COLORMAPS.TCWV;
+    if (up.includes("PROB")) return COLORMAPS.PROBABILITY || DEFAULT_COLORMAPS.PROBABILITY;
+    if (up.includes("VARIANCE")) return COLORMAPS.VARIANCE || DEFAULT_COLORMAPS.VARIANCE;
+    if (up.includes("PRECIPITATION_TYPE") || up.includes("PRECIP_TYPE")) return COLORMAPS.PRECIP_TYPE || DEFAULT_COLORMAPS.PRECIP_TYPE;
+    if (up.includes("HAZARD") || up.includes("HAIL") || up.includes("GALE") || up.includes("WINDY") || up.includes("HEAVY_RAIN") || up.includes("FOG") || up.includes("HAZE")) return COLORMAPS.HAZARDS || DEFAULT_COLORMAPS.HAZARDS;
+    return null;
+  };
+
+  const refMatch = matchElement(reference);
+  if (refMatch) return refMatch;
+  const elMatch = matchElement(element);
+  if (elMatch) return elMatch;
+
   return COLORMAPS[element] || COLORMAPS.TMP || COLORMAPS.default || FALLBACK_COLORMAP;
 }
 
@@ -330,7 +476,11 @@ export function createColorResolver(element = "TMP", colormap = null, zMin = und
                           elUpper === "WIND" || cmUpper.includes("WIND") ||
                           (!isVariation && (elUpper === "TMP" || cmUpper.includes("TMP"))) ||
                           isRain ||
-                          elUpper === "DTD" || cmUpper.includes("DTD");
+                          elUpper === "DTD" || cmUpper.includes("DTD") ||
+                          elUpper === "RADAR" || cmUpper.includes("RADAR") || elUpper === "DBZ" || cmUpper.includes("DBZ") ||
+                          elUpper === "PROBABILITY" || cmUpper.includes("PROB") ||
+                          elUpper === "PRECIP_TYPE" || cmUpper.includes("PRECIP_TYPE") ||
+                          elUpper === "HAZARDS" || cmUpper.includes("HAZARD");
 
   const isHGT = (elUpper === "HGT" || cmUpper.includes("HGT")) && !isVariation;
   const isSLP = (elUpper === "SLP" || cmUpper.includes("SLP")) && !isVariation;

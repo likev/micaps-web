@@ -112,6 +112,16 @@ func (h *CatalogHandler) LevelsHandler(w http.ResponseWriter, r *http.Request) {
 		dataPath = ResolveUnderlyingCatalogPath(dReq)
 	}
 
+	if strings.Contains(dataPath, "TDMOSAIC") {
+		json.NewEncoder(w).Encode([]int{500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 7000, 8000, 9000, 10000, 12000, 14000, 15500, 17000, 19000})
+		return
+	}
+
+	if strings.Contains(dataPath, "PVORT") {
+		json.NewEncoder(w).Encode([]int{10, 20, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 1000})
+		return
+	}
+
 	if h.MockMode {
 		json.NewEncoder(w).Encode([]int{1000, 925, 850, 700, 500, 400, 300, 250, 200, 100})
 		return

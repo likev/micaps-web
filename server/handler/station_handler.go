@@ -137,7 +137,25 @@ func (h *StationHandler) fetchStations(r *http.Request) (*model.GeoJSONFeatureCo
 		return nil, err
 	}
 
-	if bytes.HasPrefix(bytes.TrimSpace(decompressed), []byte("diamond 5")) || strings.Contains(dataPath, "TLOGP") {
+	trimmed := bytes.TrimSpace(decompressed)
+	lowerTrimmed := bytes.ToLower(trimmed)
+	if bytes.HasPrefix(lowerTrimmed, []byte("diamond 35")) {
+		return parser.ParseSwanText(decompressed)
+	}
+	if bytes.HasPrefix(lowerTrimmed, []byte("diamond ")) {
+		if !bytes.HasPrefix(lowerTrimmed, []byte("diamond 131")) &&
+			!bytes.HasPrefix(lowerTrimmed, []byte("diamond 13 ")) &&
+			!bytes.HasPrefix(lowerTrimmed, []byte("diamond 14 ")) &&
+			!bytes.HasPrefix(lowerTrimmed, []byte("diamond 4 ")) &&
+			!bytes.HasPrefix(lowerTrimmed, []byte("diamond 11 ")) &&
+			!bytes.HasPrefix(lowerTrimmed, []byte("diamond 11\t")) &&
+			!bytes.HasPrefix(lowerTrimmed, []byte("diamond 11\r")) &&
+			!bytes.HasPrefix(lowerTrimmed, []byte("diamond 11\n")) {
+			return parser.ParseDiamondTextStation(decompressed)
+		}
+	}
+
+	if bytes.HasPrefix(trimmed, []byte("diamond 5")) || strings.Contains(dataPath, "TLOGP") {
 		fc, err := parser.ExtractStationsGeoJSON(decompressed)
 		if err == nil && fc != nil && len(fc.Features) > 0 {
 			return fc, nil

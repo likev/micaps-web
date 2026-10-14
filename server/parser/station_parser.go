@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"strings"
 
 	"micaps-web/model"
 )
@@ -21,7 +22,13 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 	elementNumber := int(binary.LittleEndian.Uint16(decompressed[ind : ind+2]))
 	ind += 2
 
-	if stationNumber <= 0 || stationNumber > 500000 {
+	if stationNumber == 0 {
+		return &model.GeoJSONFeatureCollection{
+			Type:     "FeatureCollection",
+			Features: []model.GeoJSONFeature{},
+		}, nil
+	}
+	if stationNumber < 0 || stationNumber > 500000 {
 		return nil, fmt.Errorf("invalid station count: %d", stationNumber)
 	}
 
@@ -55,6 +62,7 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 
 	for s := 0; s < stationNumber && ind < len(decompressed); s++ {
 		var stationID int32
+		var stringID string
 		var lon, lat float32
 		var numb int16
 
@@ -76,14 +84,15 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 			if ind+idLen+10 > len(decompressed) {
 				break
 			}
-			ind += idLen // Skip string ID for now
+			stringID = strings.TrimSpace(string(decompressed[ind : ind+idLen]))
+			ind += idLen
 			lon = math.Float32frombits(binary.LittleEndian.Uint32(decompressed[ind : ind+4]))
 			lat = math.Float32frombits(binary.LittleEndian.Uint32(decompressed[ind+4 : ind+8]))
 			numb = int16(binary.LittleEndian.Uint16(decompressed[ind+8 : ind+10]))
 			ind += 10
 		}
 
-		var temp, dewPoint, slp, stnPress, height, elevation, pDiff3h, vis, rain1h, rain3h, rain6h, rain12h, rain24h float32 = -9999, -9999, -9999, -9999, -9999, -9999, 0, 10, 0, 0, 0, 0, 0
+		var temp, dewPoint, slp, stnPress, height, elevation, pDiff3h, pDiff24h, snowDepth, vis, rain1h, rain3h, rain6h, rain12h, rain24h float32 = -9999, -9999, -9999, -9999, -9999, -9999, 0, 0, -9999, 10, 0, 0, 0, 0, 0
 		var windSpeed, windDir float32 = -9999, -9999
 		var dewDepression float32 = -9999
 		var cloudCover, weatherCode, pTendency int16 = 0, 0, 0
@@ -157,9 +166,15 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 					slp = stnPress
 				}
 			case 403, 6: // 3-hour pressure change
-				pDiff3h = valFloat
+				pDiff3h = normalizePressureChange(valFloat)
+			case 405: // 24-hour pressure change
+				pDiff24h = normalizePressureChange(valFloat)
 			case 404, 7: // Pressure tendency
 				pTendency = int16(valInt)
+			case 2203, 1002: // Snow depth (cm)
+				if valFloat >= 0 && valFloat < 9000 {
+					snowDepth = valFloat
+				}
 			case 1401, 20, 701, 702, 1402: // Cloud cover (0-8)
 				cloudCover = int16(valInt)
 			case 1601, 12, 901, 902: // Present weather code
@@ -208,27 +223,34 @@ func ParseStationData(decompressed []byte) (*model.GeoJSONFeatureCollection, err
 			continue
 		}
 
+		stnIDVal := interface{}(stationID)
+		if idType != 0 && stringID != "" {
+			stnIDVal = stringID
+		}
+
 		props := map[string]interface{}{
-			"station_id":    stationID,
-			"temperature":   round1(temp),
-			"dewpoint":      round1(dewPoint),
-			"height":        round1(height),
-			"elevation":     round1(elevation),
-			"slp":           round1(slp),
-			"press_stn":     round1(stnPress),
-			"slp_encoded":   encodeSLP(slp),
-			"press_diff_3h": round1(pDiff3h),
-			"press_tend":    pTendency,
-			"cloud_cover":   cloudCover,
-			"weather_code":  weatherCode,
-			"wind_speed":    round1(windSpeed),
-			"wind_dir":      round1(windDir),
-			"visibility":    round1(vis),
-			"rain_1h":       round1(rain1h),
-			"rain_3h":       round1(rain3h),
-			"rain_6h":       round1(rain6h),
-			"rain_12h":      round1(rain12h),
-			"rain_24h":      round1(rain24h),
+			"station_id":     stnIDVal,
+			"temperature":    round1(temp),
+			"dewpoint":       round1(dewPoint),
+			"height":         round1(height),
+			"elevation":      round1(elevation),
+			"slp":            round1(slp),
+			"press_stn":      round1(stnPress),
+			"slp_encoded":    encodeSLP(slp),
+			"press_diff_3h":  round1(pDiff3h),
+			"press_diff_24h": round1(pDiff24h),
+			"snow_depth":     round1(snowDepth),
+			"press_tend":     pTendency,
+			"cloud_cover":    cloudCover,
+			"weather_code":   weatherCode,
+			"wind_speed":     round1(windSpeed),
+			"wind_dir":       round1(windDir),
+			"visibility":     round1(vis),
+			"rain_1h":        round1(rain1h),
+			"rain_3h":        round1(rain3h),
+			"rain_6h":        round1(rain6h),
+			"rain_12h":       round1(rain12h),
+			"rain_24h":       round1(rain24h),
 		}
 
 		features = append(features, model.GeoJSONFeature{
@@ -346,6 +368,16 @@ func normalizeWindSpeed(val float32) float32 {
 	// Physical limit check for synoptic wind speed (WMO max non-tornadic ~113 m/s; ceiling 150 m/s)
 	if val > 150 {
 		return -9999
+	}
+	return val
+}
+
+func normalizePressureChange(val float32) float32 {
+	if val < -9000 || val > 9000 || val == 9999.0 || val == 999.0 || val == -999.0 {
+		return 0
+	}
+	if val > 20 || val < -20 {
+		return val / 10.0
 	}
 	return val
 }

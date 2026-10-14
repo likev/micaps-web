@@ -17,6 +17,7 @@ func SupportedModels() []model.CategoryInfo {
 			Category: "Global NWP Models",
 			Tables: []string{
 				"ECMWF_HR", "ECMWF_MR", "ECMWF_LR", "ECMWF_ENSEMBLE",
+				"ECMWF_ENSEMBLE_PRODUCT",
 				"NCEP_GFS", "NCEP_GFS_HR", "NCEP_ENSEMBLE",
 				"GERMAN_HR", "JAPAN_HR", "CANADA_ENSEMBLE",
 			},
@@ -32,8 +33,8 @@ func SupportedModels() []model.CategoryInfo {
 		{
 			Category: "National Gridded Guidance",
 			Tables: []string{
-				"NWFD_SCMOC", "NWFD_SMERGE", "NWFD_SNWFD", "NWFD_SPCC",
-				"CLDAS", "CODAS", "SWAN_PRODUCT",
+				"NWFD_SCMOC", "NWFD_SCMOC_1H", "NWFD_SMERGE", "NWFD_SNWFD", "NWFD_SPCC",
+				"CLDAS", "CODAS", "SWAN_PRODUCT", "FORECAST_PRODUCT",
 			},
 		},
 		{
@@ -82,8 +83,10 @@ func candidateDataPaths(dataPath string) []string {
 	}
 
 	parts := strings.Split(dataPath, "/")
+	if len(parts) >= 2 {
+		add(strings.Join(parts[1:], "/"))
+	}
 	if len(parts) == 3 {
-		add(parts[1] + "/" + parts[2])
 		add(parts[0] + "/" + parts[1])
 		add(parts[1])
 	} else if len(parts) == 2 {
@@ -113,6 +116,15 @@ func GetLatestCycle(client *CQLClient, dataPath string, suffix string) (string, 
 		rFallback, fErr := client.Query(qFallback)
 		if fErr == nil && len(rFallback) > 0 && rFallback[0].Columns["value"] != nil {
 			return string(rFallback[0].Columns["value"]), nil
+		}
+	}
+
+	// Fallback to treeview if latestdatatime has no record
+	for _, cPath := range candidates {
+		qTree := fmt.Sprintf(`SELECT column1 FROM micapsdataserver.treeview WHERE "dataPath" = '%s' ORDER BY column1 DESC LIMIT 1`, cPath)
+		rTree, tErr := client.Query(qTree)
+		if tErr == nil && len(rTree) > 0 && rTree[0].Columns["column1"] != nil {
+			return string(rTree[0].Columns["column1"]), nil
 		}
 	}
 

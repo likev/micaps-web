@@ -434,7 +434,93 @@ Both JSON coordinate vectors (`resp.X`, `resp.Y`) and binary stream headers (`En
 
 ---
 
+### 6.4. Diamond 131 Radar Mosaic Specification (SWAN 3D Radar Products)
+
+The national 3D radar mosaic products (`SWAN_PRODUCT/LOCAL/NCRAD/...`) in Cassandra are wrapped in outer GZIP compression (`1f 8b`) and inner BZIP2 compression (`BZh`). Once unwrapped, the payload begins with the fixed **1024-byte little-endian binary header**:
+
+| Field Offset | Field Name | Type | Description |
+| :--- | :--- | :--- | :--- |
+| `0..12` | `ZonName[12]` | `char[12]` | Magic string: `"diamond 131\0"` |
+| `12..50` | `DataName[38]` | `char[38]` | GB2312 or UTF-8 element description |
+| `50..58` | `Flag[8]` | `char[8]` | `"SWAN\0\0\0\0"` indicates modern 1024-byte layout |
+| `58..66` | `Version[8]` | `char[8]` | Version string, e.g. `"2.1\0\0\0\0\0"` |
+| `66..78` | `year, month, day, hour, minute, interval` | `uint16[6]` | Timestamp and update cadence in minutes |
+| `78..84` | `XNumGrids, YNumGrids, ZNumGrids` | `uint16[3]` | Grid dimensions ($N_{\text{lon}}, N_{\text{lat}}, N_{\text{lev}}$) |
+| `84..88` | `RadarCount` | `int32` | Number of radars included in the mosaic |
+| `88..112` | `StartLon, StartLat, CenterLon, CenterLat, XReso, YReso` | `float32[6]` | Top-left start coordinates, center, and resolutions |
+| `112..272`| `ZhighGrids[40]` | `float32[40]` | Altitude levels in km (up to 40 levels) |
+| `272..852`| Station metadata | | Station names, coordinates, and mosaic flags |
+| `852..854`| `m_iDataType` | `int16` | Data type: 0: u1, 1: u1, 2: u2, 3: i2 |
+| `854..856`| `m_iLevelDimension` | `int16` | Vector components per level (1: scalar, 2: vector) |
+| `856..1024`| `Reserved[168]` | `byte[168]` | Reserved padding to 1024 bytes |
+
+#### Data Block & Physical Value Conversion
+- **Coordinate half-cell convention**:
+  $$\text{lon}_i = \text{StartLon} + i \cdot \text{XReso} - \frac{\text{XReso}}{2},\quad \text{lat}_j = \text{StartLat} - j \cdot \text{YReso} - \frac{\text{YReso}}{2}$$
+- **Latitude reversal**: The rows are stored from top-left (North) with latitude decreasing. The parser reverses rows along the latitude axis to conform with standard south-to-north ascending index representation.
+- **Physical Scaling**:
+  - `u1` (Composite Reflectivity MCR, CAPPI): $\text{dBZ} = \frac{v - 66}{2}$. Raw $0$ or negative values are mapped to missing / transparent nulls.
+  - `u2` / `i2` (Echo Top MTOP, VIL MVIL, QPE): $\text{value} = v \times 0.1$ ($\text{km}$, $\text{kg/m}^2$, $\text{mm}$).
+  - Vector products (`COTRECWIND` with `m_iLevelDimension == 2`): Consecutive blocks per level store $U$ and $V$ wind components.
+
+---
+
+### 6.5. SWAN Severe Storm Nowcasting Point Products (Diamond 35 Text)
+
+Products under `SWAN_PRODUCT/LOCAL/SEVERE_STORM/NOWCASTING/` (`TVS`, `HAIL`, `GALE`) are outer GZIP-compressed text files conforming to **Diamond 35**:
+```text
+Diamond 35 龙卷识别和预报产品
+TAB 2026-10-14 15:48:00 0 9999
+6 时间 站号 移动速度(m/s) 移动方向 u(m/s) v(m/s)
+```
+The server parses records into GeoJSON features containing coordinates, movement speed/direction vector, and severity indicators for display on symbol/event layers.
+
+---
+
+### 6.6. Tropospheric Wind Profiler Data Format
+
+Wind profiler observation tables (`WIND_PROFILER/ROBS` and `WIND_PROFILER/RAD`) partition by station identifier under `WIND_PROFILER/<PRODUCT>/<STATION_ID>`. Blobs are GZIP-compressed UTF-8 JSON payloads:
+```json
+{
+  "stationId": "54511",
+  "observationTime": "20261014235400",
+  "longitude": "116.47",
+  "latitude": "39.8067",
+  "altitude": "31.5",
+  "type": "LC",
+  "data": [
+    {
+      "samplingHeight": "150",
+      "horizontalWindDirection": "108.4",
+      "horizontalWindSpeed": "4.2",
+      "verticalWindSpeed": "0.1",
+      "horizontalDirectionReliability": "100",
+      "horizontalSpeedReliability": "100"
+    }
+  ]
+}
+```
+The server serves station locations via `/api/data/windprofiler` and individual vertical profiles for time-height barb visualization.
+
+---
+
+### 6.7. Lightning Detection Format (SURFACE/LIGHTNING)
+
+Lightning products (`SURFACE/LIGHTNING_10MIN` and `_1H`) store stroke records with MDFS binary envelope (`mdfs` signature). Stroke events contain timestamp, latitude, longitude, peak current (kA), and polarity (positive/negative discharge). Decoded strokes are delivered as point event collections.
+
+---
+
+### 6.8. Geostationary Satellite Remote Sensing (AWX Format)
+
+Satellite products in `SATELLITE/FY4B/L1/` and `SATELLITE/FY2G/L2/` use the CMA AWX binary format with primary and secondary headers:
+1. **Primary Header (40 bytes)**: File signature (`EIEN015C.AWX`), byte order, header byte length, product ID, compression indicator.
+2. **Secondary Header**: Satellite identifier (FY4B, FY2G), observation time, projection type (Equirectangular / Plate Carrée for CHINA, Geostationary NOM for DISK), bounding coordinates, pixel resolution.
+3. **Data Grid & Calibration LUT**: Digital numbers (DN) mapped to brightness temperature ($T_b$) or albedo via calibration lookup tables.
+
+---
+
 ## 7. Meteorological Observation Quality Control (QC) & Objective Analysis Pipeline
+
 
 Raw meteorological observation streams transmitted via MDFS / Cassandra (Diamond 1 surface and Diamond 2 upper-air soundings) often contain telecommunication corruptions, PILOT balloon omissions, element mixups, and flag values that must be sanitized before presentation or spatial interpolation. MICAPS-Web implements a dual-stage quality control architecture spanning the Go backend decoder and the frontend client analysis engine.
 

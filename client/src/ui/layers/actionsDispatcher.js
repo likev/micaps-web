@@ -15,6 +15,8 @@ import { handleAddContourAction } from "./derivedContourActions.js";
 import { removeTLogPLayer } from "../../layers/tlogp/tlogpLayer.js";
 import { removeTimeHeightLayer } from "../../layers/timeheight/timeHeightLayer.js";
 import { removeLineHeightLayer, removeHovmollerLayer } from "../../layers/lineprofile/lineProfileLayer.js";
+import { removeEventLayer } from "../../layers/eventLayer.js";
+import { removeProfilerLayer } from "../../layers/profilerLayer.js";
 
 export function handleRemoveAction(map, layerId, layer, win) {
   if ((layer.type === "contour" || layer.type === "wind") && layer.element) {
@@ -94,6 +96,10 @@ export function handleRemoveAction(map, layerId, layer, win) {
     removeLineHeightLayer(map, win, layerId);
   } else if (layer.type === "hovmoller") {
     removeHovmollerLayer(map, win, layerId);
+  } else if (layer.type === "event") {
+    removeEventLayer(map, win, layerId);
+  } else if (layer.type === "profiler") {
+    removeProfilerLayer(map, win, layerId);
   }
 
   const isProfileType = layer?.type === "tlogp" || layer?.type === "timeheight" || layer?.type === "lineheight" || layer?.type === "hovmoller";

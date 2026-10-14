@@ -7,6 +7,8 @@ import { removeRasterLayer } from "../layers/rasterLayer.js";
 import { loadTLogPLayer, removeTLogPLayer, tlogpController } from "../layers/tlogp/tlogpLayer.js";
 import { loadTimeHeightLayer, removeTimeHeightLayer, timeHeightController } from "../layers/timeheight/timeHeightLayer.js";
 import { loadLineHeightLayer, removeLineHeightLayer, lineHeightController, loadHovmollerLayer, removeHovmollerLayer, hovmollerController } from "../layers/lineprofile/lineProfileLayer.js";
+import { loadEventLayer, removeEventLayer } from "../layers/eventLayer.js";
+import { loadProfilerLayer, removeProfilerLayer } from "../layers/profilerLayer.js";
 import { clearLegends } from "../ui/legend.js";
 import { getActiveWindow, updateWindowTitle, refreshPresetControls } from "../ui/tabWindowManager.js";
 import { setNavBarPreset } from "../ui/navBar.js";
@@ -67,6 +69,8 @@ export function clearAllWeatherLayersFromMap(map, win = null, { resetVisibility 
     removeTimeHeightLayer(map, win, null, { preservePreset: true });
     removeLineHeightLayer(map, win, null, { preservePreset: true });
     removeHovmollerLayer(map, win, null, { preservePreset: true });
+    removeEventLayer(map, win);
+    removeProfilerLayer(map, win);
     clearLegends(win);
   } catch (err) {
     console.warn("[Main] Error cleaning up weather layers:", err);
@@ -652,6 +656,10 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
         } else {
           await loadHovmollerLayer(map, layer, win);
         }
+      } else if (layer.type === "event") {
+        await loadEventLayer(map, layer, win);
+      } else if (layer.type === "profiler") {
+        await loadProfilerLayer(map, layer, win);
       }
     })
   );

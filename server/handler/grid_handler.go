@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -137,10 +138,7 @@ func (h *GridHandler) fetchGrid(r *http.Request) (*model.GridResponse, error) {
 	// Check file cache
 	if h.Cache != nil {
 		if cachedBlob, _, ok := h.Cache.Get(table, subDataPath, file); ok {
-			decompressed, err := parser.DecompressGzip(cachedBlob)
-			if err == nil {
-				return parser.ParseGridData(decompressed)
-			}
+			return decodeGridPayload(cachedBlob, r)
 		}
 	}
 
@@ -173,12 +171,35 @@ func (h *GridHandler) fetchGrid(r *http.Request) (*model.GridResponse, error) {
 		rawBlob = blob
 	}
 
-	decompressed, err := parser.DecompressGzip(rawBlob)
+	return decodeGridPayload(rawBlob, r)
+}
+
+func decodeGridPayload(payload []byte, r *http.Request) (*model.GridResponse, error) {
+	unwrapped, err := parser.UnwrapPayload(payload)
 	if err != nil {
 		return nil, err
 	}
 
-	return parser.ParseGridData(decompressed)
+	trimmed := bytes.TrimSpace(unwrapped)
+	lowerTrimmed := bytes.ToLower(trimmed)
+	if bytes.HasPrefix(lowerTrimmed, []byte("diamond 131")) {
+		var targetLevel float64
+		if lvlStr := r.URL.Query().Get("level"); lvlStr != "" {
+			if l, err := strconv.ParseFloat(lvlStr, 64); err == nil {
+				targetLevel = l
+			}
+		}
+		return parser.ParseDiamond131(unwrapped, targetLevel)
+	}
+
+	if bytes.HasPrefix(lowerTrimmed, []byte("diamond 11 ")) ||
+		bytes.HasPrefix(lowerTrimmed, []byte("diamond 11\t")) ||
+		bytes.HasPrefix(lowerTrimmed, []byte("diamond 11\r")) ||
+		bytes.HasPrefix(lowerTrimmed, []byte("diamond 11\n")) {
+		return parser.ParseDiamond11Grid(unwrapped)
+	}
+
+	return parser.ParseGridData(unwrapped)
 }
 
 func SanitizeGridPath(p string) string {

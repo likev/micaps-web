@@ -387,7 +387,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
         outputSmoothIterations: smoothIterations,
       });
     } else {
-      gridData = await fetchGridData(path, file);
+      gridData = await fetchGridData(path, file, targetLevel);
       if (isWind) {
         const cacheKey = hasLevel ? `${model}/WIND/${level}/${file}` : `${model}/WIND/${file}`;
         if (win) setCachedWindGrid(win, cacheKey, gridData);
@@ -569,7 +569,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
       if (gridData && (gridData.values || (gridData.u && gridData.v))) {
         renderGridRaster(map, gridData, element, colormap, rasterOpts);
       } else {
-        const binBuffer = await fetchGridBinaryStream(path, file);
+        const binBuffer = await fetchGridBinaryStream(path, file, targetLevel);
         renderBinaryRaster(map, binBuffer, element, colormap, rasterOpts);
       }
     }

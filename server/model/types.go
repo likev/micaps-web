@@ -74,6 +74,7 @@ type StationRecord struct {
 // GeoJSONFeature represents a standard GeoJSON Point Feature
 type GeoJSONFeature struct {
 	Type       string                 `json:"type"`
+	Id         interface{}            `json:"id,omitempty"`
 	Geometry   GeoJSONGeometry        `json:"geometry"`
 	Properties map[string]interface{} `json:"properties"`
 }
@@ -123,3 +124,54 @@ type StationSounding struct {
 	NumLevels   int             `json:"numLevels"`
 	Levels      []SoundingLevel `json:"levels"`
 }
+
+// Dataset represents dataset metadata in manifest and catalog
+type Dataset struct {
+	ID       string `json:"id"`
+	NameEn   string `json:"name_en"`
+	NameZh   string `json:"name_zh"`
+	Table    string `json:"table"`
+	DataPath string `json:"dataPath"`
+	Tier     int    `json:"tier"`
+	Format   string `json:"format"`
+	Levels   []int  `json:"levels"`
+	Cadence  string `json:"cadence"`
+	Suffix   string `json:"suffix"`
+}
+
+// EventFeature represents a severe weather or nowcasting event feature
+type EventFeature struct {
+	Type       string                 `json:"type"`
+	Geometry   GeoJSONGeometry        `json:"geometry"`
+	Properties map[string]interface{} `json:"properties"`
+}
+
+// ProfilerLevel represents a single height level in a wind profiler sounding
+type ProfilerLevel struct {
+	Height    float64 `json:"height"`     // meters
+	WindSpeed float64 `json:"wind_speed"` // m/s
+	WindDir   float64 `json:"wind_dir"`   // degrees
+	U         float64 `json:"u"`          // m/s
+	V         float64 `json:"v"`          // m/s
+	W         float64 `json:"w"`          // vertical velocity m/s
+	Quality   int     `json:"quality"`    // confidence percentage (0-100)
+}
+
+// ProfilerProfile represents vertical profile observations for a wind profiler station
+type ProfilerProfile struct {
+	StationID string          `json:"station_id"`
+	ObsTime   string          `json:"obs_time"`
+	Lon       float64         `json:"lon"`
+	Lat       float64         `json:"lat"`
+	Altitude  float64         `json:"altitude"`
+	Type      string          `json:"type"`
+	Levels    []ProfilerLevel `json:"levels"`
+}
+
+// ImageResponse represents geo-registered image raster metadata
+type ImageResponse struct {
+	URL    string    `json:"url"`
+	Bounds []float64 `json:"bounds"` // [minLon, minLat, maxLon, maxLat]
+	Format string    `json:"format"`
+}
+

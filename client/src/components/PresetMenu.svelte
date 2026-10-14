@@ -50,6 +50,13 @@
     "NWP Time-Distance Profile": "🗺️",
     "Multi-Time Recipes": "⏱️",
     "Derived Diagnostics": "⚡",
+    "强对流与短临 (Severe Convective & Nowcasting)": "⚡",
+    "智能网格预报 (National Gridded Guidance)": "🌐",
+    "高密地面与海洋观测 (High-Density Observations)": "📡",
+    "数值预报高影响要素 (High-Impact NWP Fields)": "🌪️",
+    "实况融合 (Land Surface Reanalysis)": "🗺️",
+    "集合预报与概率 (Ensemble & Probability)": "🎲",
+    "预报员指导 (Forecaster Guidance)": "🧭",
   };
 
   function getCategoryIcon(name) {

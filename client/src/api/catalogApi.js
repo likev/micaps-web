@@ -22,12 +22,20 @@ export async function fetchLatest(path, suffix = "*.024", options = {}) {
   return await fetchJson("/api/catalog/latest", { path, suffix }, options);
 }
 
-export async function fetchGridData(path, file) {
-  return await fetchJson("/api/data/grid", { path, file });
+export async function fetchGridData(path, file, level = null) {
+  const params = { path, file };
+  if (level !== null && level !== undefined && level !== "") {
+    params.level = level;
+  }
+  return await fetchJson("/api/data/grid", params);
 }
 
-export async function fetchGridBinaryStream(path, file) {
-  return await fetchBinary("/api/data/grid/binary", { path, file });
+export async function fetchGridBinaryStream(path, file, level = null) {
+  const params = { path, file };
+  if (level !== null && level !== undefined && level !== "") {
+    params.level = level;
+  }
+  return await fetchBinary("/api/data/grid/binary", params);
 }
 
 export async function fetchStationObservations(path = "SURFACE/PLOT_10MIN", file = "") {
