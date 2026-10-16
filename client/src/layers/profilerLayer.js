@@ -121,7 +121,10 @@ class ProfilerPanelController {
 
   render() {
     if (!this.container || !this.profileData) return;
-    const { station, product, file, levels } = this.profileData;
+    const station = this.profileData.station || this.profileData.station_id || "Unknown";
+    const product = this.profileData.product || this.profileData.type || "";
+    const file = this.profileData.file || this.profileData.obs_time || "";
+    const levels = this.profileData.levels || [];
 
     const titleEl = this._findEl("#profiler-title", "profiler-title");
     if (titleEl) titleEl.textContent = `Wind Profiler (${station} ${product})`;
@@ -180,22 +183,25 @@ class ProfilerPanelController {
     // Draw wind barbs for each level
     const cx = padLeft + (w - padLeft - padRight) / 2;
     for (const lvl of levels) {
-      if (!lvl || lvl.height > maxHgt || lvl.speed === undefined || lvl.dir === undefined) continue;
+      if (!lvl || lvl.height > maxHgt) continue;
+      const speed = lvl.speed !== undefined ? lvl.speed : lvl.wind_speed;
+      const dir = lvl.dir !== undefined ? lvl.dir : lvl.wind_dir;
+      if (speed === undefined || speed === null || speed < 0 || dir === undefined || dir === null) continue;
       const y = padTop + plotH * (1 - lvl.height / maxHgt);
 
       // Color based on speed: cyan < 10m/s, green 10-20m/s, yellow 20-30m/s, red > 30m/s
       let barbColor = "#58a6ff";
-      if (lvl.speed >= 30) barbColor = "#f85149";
-      else if (lvl.speed >= 20) barbColor = "#e3b341";
-      else if (lvl.speed >= 10) barbColor = "#3fb950";
+      if (speed >= 30) barbColor = "#f85149";
+      else if (speed >= 20) barbColor = "#e3b341";
+      else if (speed >= 10) barbColor = "#3fb950";
 
-      drawWindBarbCanvas(ctx, cx, y, lvl.speed, lvl.dir, 0.75, barbColor);
+      drawWindBarbCanvas(ctx, cx, y, speed, dir, 0.75, barbColor);
 
       // Label wind speed text on the right
       ctx.fillStyle = "#8b949e";
       ctx.font = "9px monospace";
       ctx.textAlign = "left";
-      ctx.fillText(`${lvl.speed.toFixed(0)}m/s`, w - padRight + 2, y + 3);
+      ctx.fillText(`${speed.toFixed(0)}m/s`, w - padRight + 2, y + 3);
     }
   }
 

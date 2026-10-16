@@ -1,4 +1,5 @@
 // formatters.js - Data, coordinate, and meteorological unit formatting helpers
+import { parseTimestamp } from "./timeResolver.js";
 
 export function formatDateTime(isoString) {
   if (!isoString) return "--";
@@ -77,6 +78,17 @@ export function formatContourLabel(val, element = "", isDam = false) {
 
 export function formatObsTimestamp(fileStr = "") {
   if (!fileStr) return "--";
+  const ts = parseTimestamp(fileStr);
+  if (typeof ts === "number" && !isNaN(ts)) {
+    const parsed = new Date(ts);
+    const pad = (n) => String(n).padStart(2, "0");
+    const y = parsed.getUTCFullYear();
+    const m = pad(parsed.getUTCMonth() + 1);
+    const d = pad(parsed.getUTCDate());
+    const h = pad(parsed.getUTCHours());
+    const min = pad(parsed.getUTCMinutes());
+    return `${y}-${m}-${d} ${h}:${min} (UTC+8)`;
+  }
   const clean = fileStr.includes("/") ? fileStr.split("/").pop() : fileStr;
   if (clean.length < 10) return clean || "--";
   const y = clean.slice(0, 4);
@@ -86,6 +98,24 @@ export function formatObsTimestamp(fileStr = "") {
   const min = clean.length >= 12 ? clean.slice(10, 12) : "00";
 
   return `${y}-${m}-${d} ${h}:${min} (UTC+8)`;
+}
+
+export function formatObsChipLabel(fileStr = "") {
+  if (!fileStr) return "--";
+  const ts = parseTimestamp(fileStr);
+  if (typeof ts === "number" && !isNaN(ts)) {
+    const parsed = new Date(ts);
+    const pad = (n) => String(n).padStart(2, "0");
+    const m = pad(parsed.getUTCMonth() + 1);
+    const d = pad(parsed.getUTCDate());
+    const h = pad(parsed.getUTCHours());
+    const min = pad(parsed.getUTCMinutes());
+    return `${m}/${d} ${h}:${min}`;
+  }
+  const clean = fileStr.includes("/") ? fileStr.split("/").pop() : fileStr;
+  return clean.length >= 10
+    ? `${clean.slice(4, 6)}/${clean.slice(6, 8)} ${clean.slice(8, 10)}:${clean.slice(10, 12) || "00"}`
+    : clean;
 }
 
 export function formatForecastInitTime(cycleStr = "") {

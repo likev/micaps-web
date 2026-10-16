@@ -209,7 +209,7 @@ export function parseTimestamp(input) {
   }
 
   // ISO string
-  if (str.includes("T") || str.includes("-")) {
+  if (/\d{4}-\d{2}-\d{2}[T\s]\d{2}/.test(str)) {
     const parsed = Date.parse(str);
     if (!isNaN(parsed)) return parsed;
   }
@@ -272,6 +272,46 @@ export function parseTimestamp(input) {
     const baseTs = Date.UTC(y, m, d, h, 0, 0);
     const leadHours = (ext && /^\d+$/.test(ext)) ? parseInt(ext, 10) : 0;
     return baseTs + leadHours * 3600 * 1000;
+  }
+
+  // Embedded 14-digit timestamp in radar/satellite filenames
+  // e.g. Z_OTHE_RADAMCR_20261016040600.BIN.BZ2, C012_20261016114500_FY4B.AWX, Z_IUM_CRF_20261016030000.F120.BIN.BZ2
+  const embed14 = basename.match(/(?:^|[_.-])((?:19|20)\d{12})(?:[_.-]|$)/);
+  if (embed14) {
+    const rawDigits = embed14[1];
+    const y = parseInt(rawDigits.slice(0, 4), 10);
+    const m = parseInt(rawDigits.slice(4, 6), 10) - 1;
+    const d = parseInt(rawDigits.slice(6, 8), 10);
+    const h = parseInt(rawDigits.slice(8, 10), 10);
+    const min = parseInt(rawDigits.slice(10, 12), 10);
+    const sec = parseInt(rawDigits.slice(12, 14), 10);
+    let ts = Date.UTC(y, m, d, h, min, sec);
+
+    // FY-4B filenames use Beijing Time (UTC+8); convert to UTC
+    if (basename.includes("FY4B") || basename.includes("FY-4B")) {
+      ts -= 8 * 3600 * 1000;
+    }
+
+    // SWAN extrapolation lead time: .F006 .. .F360 (minutes)
+    const fLeadMatch = basename.match(/\.F(\d{3})\./i);
+    if (fLeadMatch) {
+      const leadMin = parseInt(fLeadMatch[1], 10);
+      ts += leadMin * 60 * 1000;
+    }
+    return ts;
+  }
+
+  // Embedded 8+4 digit underscore timestamp (e.g. CTT_MLT_OTG_20261016_1000_FY2G.AWX, FY2G_DST_DUSTID_20261016_0200.BMP)
+  const embed8_4 = basename.match(/(?:^|[_.-])((?:19|20)\d{6})_(\d{4})(?:[_.-]|$)/);
+  if (embed8_4) {
+    const dStr = embed8_4[1];
+    const tStr = embed8_4[2];
+    const y = parseInt(dStr.slice(0, 4), 10);
+    const m = parseInt(dStr.slice(4, 6), 10) - 1;
+    const d = parseInt(dStr.slice(6, 8), 10);
+    const h = parseInt(tStr.slice(0, 2), 10);
+    const min = parseInt(tStr.slice(2, 4), 10);
+    return Date.UTC(y, m, d, h, min, 0);
   }
 
   // Fallback Date.parse

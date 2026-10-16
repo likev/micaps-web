@@ -164,6 +164,20 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
       } else if (l?.derivedFrom && (l.element === "VOR" || l.element === "DIV" || l.element === "WIND")) {
         l.level = level;
         l.id = `contour-${l.model || "ECMWF_HR"}-${String(l.element).toLowerCase()}-${level}`;
+      } else if (l?.model === "SATELLITE" || (l?.path && l.path.includes("FY4B"))) {
+        l.level = level;
+        const chan = Number(level);
+        let cm = "IR_TEMP";
+        if (chan >= 1 && chan <= 6) {
+          cm = "ALBEDO";
+        } else if (chan >= 8 && chan <= 10) {
+          cm = "WV";
+        }
+        if (!l.render) l.render = {};
+        l.render.colormap = cm;
+        l.colormap = cm;
+      } else if (group.hasLevel) {
+        l.level = level;
       }
     }
   }
@@ -475,6 +489,13 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
         layer.resolved = layerResolved;
         const render = layer.render || {};
         const layerPeriod = (layer.period !== undefined && layer.period !== null) ? layer.period : curPeriod;
+        const isObs = Boolean(
+          group.isObservation ||
+          layer.isObservation ||
+          layer.model === "SWAN_PRODUCT" ||
+          layer.model === "SATELLITE" ||
+          (layer.path && (layer.path.includes("SWAN") || layer.path.includes("SATELLITE") || layer.path.includes("FY4") || layer.path.includes("FY2")))
+        );
         await loadWeatherField(map, layer.model, layer.element, targetLevel, layerPeriod, {
           ...render,
           id: layer.id,
@@ -482,6 +503,9 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
           path: layer.path,
           period: layerPeriod,
           keepWind: true,
+          isWind: layer.type === "wind",
+          isObservation: isObs,
+          obsFile: win?.obsTime || win?.obsFile,
           visible: layer.visible !== false,
           colormap: resolveColormap(group, render, targetLevel),
           policy: layer.policy || layer.config?.policy || render.policy,
@@ -659,10 +683,22 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
           await loadHovmollerLayer(map, layer, win);
         }
       } else if (layer.type === "event") {
+        if (layer.path && (!win?._obsTimeline || freshObsLoad)) {
+          const file = await syncObservationTimeline(layer.path, freshObsLoad ? null : (win?.obsTime || layer.file), winTitle, win, { forceLatest: freshObsLoad });
+          if (win && file) win.obsTime = file;
+        }
         await loadEventLayer(map, layer, win);
       } else if (layer.type === "profiler") {
+        if (layer.path && (!win?._obsTimeline || freshObsLoad)) {
+          const file = await syncObservationTimeline(layer.path, freshObsLoad ? null : (win?.obsTime || layer.file), winTitle, win, { forceLatest: freshObsLoad });
+          if (win && file) win.obsTime = file;
+        }
         await loadProfilerLayer(map, layer, win);
       } else if (layer.type === "image") {
+        if (layer.path && (!win?._obsTimeline || freshObsLoad)) {
+          const file = await syncObservationTimeline(layer.path, freshObsLoad ? null : (win?.obsTime || layer.file), winTitle, win, { forceLatest: freshObsLoad });
+          if (win && file) win.obsTime = file;
+        }
         await loadImageLayer(map, layer, win);
       }
     })

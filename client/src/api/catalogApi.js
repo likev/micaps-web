@@ -10,8 +10,22 @@ export async function fetchModels() {
   return await fetchJson("/api/catalog/models");
 }
 
-export async function fetchTree(path, limit = 100, options = {}) {
-  return await fetchJson("/api/catalog/tree", { path, limit }, options);
+export async function fetchTree(path, limit = 100, optionsOrLevel = {}, levelArg = null) {
+  let options = {};
+  let level = levelArg;
+  if (typeof optionsOrLevel === "number" || typeof optionsOrLevel === "string") {
+    level = optionsOrLevel;
+  } else if (optionsOrLevel && typeof optionsOrLevel === "object") {
+    options = optionsOrLevel;
+    if (options.level !== undefined) {
+      level = options.level;
+    }
+  }
+  const params = { path, limit };
+  if (level !== null && level !== undefined && level !== "") {
+    params.level = level;
+  }
+  return await fetchJson("/api/catalog/tree", params, options);
 }
 
 export async function fetchLevels(path) {
@@ -38,7 +52,7 @@ export async function fetchGridBinaryStream(path, file, level = null) {
   return await fetchBinary("/api/data/grid/binary", params);
 }
 
-export async function fetchStationObservations(path = "SURFACE/PLOT_10MIN", file = "") {
+export async function fetchStationObservations(path = "SURFACE/PLOT_10MIN", file = "", level = null) {
   let normalizedFile = file;
   if (typeof file === "string") {
     normalizedFile = file.trim();
@@ -48,5 +62,9 @@ export async function fetchStationObservations(path = "SURFACE/PLOT_10MIN", file
       normalizedFile = `${normalizedFile}.000`;
     }
   }
-  return await fetchJson("/api/data/station", { path, file: normalizedFile });
+  const params = { path, file: normalizedFile };
+  if (level !== null && level !== undefined && level !== "") {
+    params.level = level;
+  }
+  return await fetchJson("/api/data/station", params);
 }

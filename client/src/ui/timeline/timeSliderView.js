@@ -2,6 +2,7 @@ import { appState } from "../../store/appState.js";
 import {
   formatLeadTime,
   formatObsTimestamp,
+  formatObsChipLabel,
   formatForecastInitTime,
   formatForecastValidTime,
 } from "../../utils/formatters.js";
@@ -93,11 +94,7 @@ export function renderChips() {
       btn.setAttribute("role", "tab");
       btn.setAttribute("aria-selected", idx === timelineState.currentObsIdx ? "true" : "false");
       btn.setAttribute("aria-label", formatObsTimestamp(file));
-      const timeLabel =
-        file.length >= 10
-          ? `${file.slice(4, 6)}/${file.slice(6, 8)} ${file.slice(8, 10)}:${file.slice(10, 12) || "00"}`
-          : file;
-      btn.textContent = timeLabel;
+      btn.textContent = formatObsChipLabel(file);
       btn.title = formatObsTimestamp(file);
       btn.addEventListener("click", () => {
         pausePlayback();

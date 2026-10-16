@@ -328,13 +328,8 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
 
           const isWindLayer = liveLayer.type === "wind" || liveLayer.element === "WIND";
           const effectiveElem = (liveLayer.element || (isWindLayer ? "WIND" : "TMP")).toUpperCase();
-
-          if (liveLayer.visible !== false && liveLayer.config?.showRaster && liveGridData) {
-            renderGridRaster(map, liveGridData, effectiveElem, targetColormap, {
-              layerId: liveLayer.id,
-              opacity: liveLayer.config?.opacity ?? 0.85,
-            });
-          }
+          // Raster image layers in MapLibre are anchored to geographic coordinates
+          // and automatically projected by WebGL; avoid expensive CPU re-rasterization on pan/zoom.
 
           const hasShad = liveLayer.visible !== false && (Boolean(liveLayer.config?.showFill) || Boolean(liveLayer.config?.showRaster));
           if (hasShad) {

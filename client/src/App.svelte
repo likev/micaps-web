@@ -224,6 +224,46 @@
     } catch (e) {
       console.error("[App] loadPresetGroups error:", e);
     }
+    if (typeof window !== "undefined") {
+      window.__loadPresetById = async (id, level = null) => {
+        const p = (presetGroups || []).find((g) => g.id === id);
+        if (!p) throw new Error("Preset not found: " + id);
+        await handleLoadData(p, level);
+      };
+      window.__getWorkstationState = () => {
+        const tl = activeWin ? getOrCreateTimeline(activeWin.id) : null;
+        return {
+          activeWin: activeWin ? {
+            id: activeWin.id,
+            isObservation: activeWin.isObservation,
+            level: activeWin.level,
+            obsTime: activeWin.obsTime,
+            obsTimeline: activeWin._obsTimeline,
+            layers: (activeWin.layers || []).map((l) => ({
+              id: l.id,
+              name: l.name,
+              type: l.type,
+              model: l.model,
+              element: l.element,
+              path: l.path,
+              file: l.file,
+              isHardStale: l.isHardStale,
+              status: l.status,
+              hasGridData: Boolean(l.gridData),
+              hasValues: Boolean(l.gridData?.values?.length),
+              hasWindUV: Boolean(l.gridData?.u?.length && l.gridData?.v?.length),
+              hasStationData: Boolean(l.stationData?.length),
+            })),
+          } : null,
+          timeline: tl ? {
+            currentMode: tl.currentMode,
+            obsFiles: tl.obsFiles,
+            currentObsIdx: tl.currentObsIdx,
+            currentInitCycle: tl.currentInitCycle,
+          } : null,
+        };
+      };
+    }
   });
 
   function getForecastLayer(win) {
@@ -1094,7 +1134,7 @@
     }
 
     try {
-      const targetLevel = groupCopy.hasLevel === false ? null : overrideLevel;
+      const targetLevel = groupCopy.hasLevel === false ? null : (overrideLevel ?? win.level ?? groupCopy.defaultLevel);
       await loadPresetGroup(map, groupCopy, win.period, targetLevel, win, false, loadSeq);
     } catch (err) {
       console.error("[App] Load Data failed:", err);

@@ -105,6 +105,14 @@ func (c *CQLClient) Query(queryStr string) ([]Row, error) {
 
 	rows, err := c.execute(queryStr)
 	if err != nil {
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			log.Printf("[CQL] Query timed out (%v), not retrying: %s", err, queryStr)
+			if c.conn != nil {
+				c.conn.Close()
+				c.conn = nil
+			}
+			return nil, err
+		}
 		log.Printf("[CQL] Query failed, attempting reconnect: %v", err)
 		if rErr := c.reconnect(); rErr == nil {
 			return c.execute(queryStr)

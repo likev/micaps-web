@@ -8,7 +8,7 @@ import { renderWindStreamlines, stopWindAnimation, renderGridWindBarbs, removeGr
 import { fetchGridData, fetchGridBinaryStream, fetchTree } from "../api/catalogApi.js";
 import { updateLegend, removeLegend } from "../ui/legend.js";
 import { appState } from "../store/appState.js";
-import { resolveLatestForecastCycle } from "../utils/timelineSync.js";
+import { resolveLatestForecastCycle, syncObservationTimeline } from "../utils/timelineSync.js";
 import { schedulePrefetch } from "./prefetchService.js";
 import { armContourReRender } from "./contourReRender.js";
 import * as contourReRenderModule from "./contourReRender.js";
@@ -51,9 +51,16 @@ export async function loadWeatherField(map, model, element, level, period, custo
   const isDIV = element === "DIV";
   const isDerivedWind = element === "WIND" && (customOptions?.type === "contour" || (customOptions?.id && customOptions.id.startsWith("contour-")) || customOptions?.derivedFrom);
   const isVortDiv = isVOR || isDIV || isDerivedWind;
+  const isObservationProduct = Boolean(
+    customOptions?.isObservation ||
+    win?.isObservation ||
+    model === "SWAN_PRODUCT" ||
+    model === "SATELLITE" ||
+    (customOptions?.path && (customOptions.path.includes("SWAN") || customOptions.path.includes("SATELLITE") || customOptions.path.includes("FY4") || customOptions.path.includes("FY2")))
+  );
 
   let cycle = win?.forecastCycle;
-  if (!cycle) {
+  if (!cycle && !isObservationProduct) {
     cycle = await resolveLatestForecastCycle(model, isVortDiv ? "WIND" : element, level);
     if (win) {
       win.forecastCycle = cycle;
@@ -88,7 +95,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
   const defaultPath = hasLevel ? `${model}/${element}/${targetLevel}` : `${model}/${element}`;
   let path = customOptions?.path || defaultPath;
   let dataPath = isVortDiv ? (hasLevel ? `${model}/WIND/${targetLevel}` : `${model}/WIND`) : path;
-  const isWind = (element === "WIND" && !isDerivedWind) || customOptions?.isWind;
+  const isWind = ((element === "WIND" || element.endsWith("/WIND") || element.endsWith("COTRECWIND")) && !isDerivedWind) || Boolean(customOptions?.isWind);
   const layerId = customOptions?.id || (isWind ? `wind-${element}` : (isVortDiv ? (hasLevel ? `contour-${model}-${element.toLowerCase()}-${targetLevel}` : `contour-${model}-${element.toLowerCase()}`) : `contour-${element}`));
   const defaultName = isWind
     ? (hasLevel ? `${targetLevel} hPa Wind Field (${model})` : `Wind Field (${model})`)
@@ -110,7 +117,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
       availableFiles = customOptions.sampleTimes;
     } else {
       try {
-        let fileEntries = await fetchTree(dataPath, 100);
+        let fileEntries = await fetchTree(dataPath, 100, targetLevel);
         // If fileEntries are subdirectories representing levels (e.g. 1000, 925, 850, 500, 2M_ABOVE_GROUND, 850-925), dive into the level
         const isLevelDirs =
           fileEntries.length > 0 &&
@@ -122,7 +129,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
           }
           path = dataPath;
           targetLevel = chosenLvl;
-          fileEntries = await fetchTree(dataPath, 100);
+          fileEntries = await fetchTree(dataPath, 100, targetLevel);
         }
         if (Array.isArray(fileEntries)) {
           availableFiles = fileEntries
@@ -136,7 +143,24 @@ export async function loadWeatherField(map, model, element, level, period, custo
   }
 
   if (availableFiles.length > 0) {
-    availableFiles.sort((a, b) => a.localeCompare(b));
+    availableFiles.sort((a, b) => {
+      const ta = parseTimestamp(a);
+      const tb = parseTimestamp(b);
+      if (ta !== null && tb !== null && ta !== tb) return ta - tb;
+      return a.localeCompare(b);
+    });
+  }
+
+  if (isObservationProduct && dataPath && (!win?._obsTimeline || !isTimeStep)) {
+    try {
+      const syncFile = await syncObservationTimeline(dataPath, customOptions?.obsFile || win?.obsTime, win?.title || name, win, { forceLatest: !isTimeStep, level: targetLevel });
+      if (win && syncFile) {
+        win.obsTime = syncFile;
+        win.obsFile = syncFile;
+      }
+    } catch (e) {
+      console.warn("[weatherLoader] syncObservationTimeline failed:", e);
+    }
   }
 
   const cycleFiles = (cycle && availableFiles.length > 0) ? availableFiles.filter((f) => f.startsWith(`${cycle}.`)) : [];
@@ -157,7 +181,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
     effectivePeriod = Number(effectivePeriod);
   }
 
-  const isObsMode = Boolean(win?.isObservation || (!win?.forecastCycle && win?.obsTime));
+  const isObsMode = isObservationProduct || Boolean(win?.isObservation || (!win?.forecastCycle && win?.obsTime));
   const isLive = win?.timelineMode === "live";
   const policy = (customOptions?.policy || customOptions?.config?.policy || (isObsMode ? "hold" : "nearest")).toLowerCase();
   const hasPolicy = Boolean(customOptions?.policy || customOptions?.config?.policy);
@@ -167,7 +191,26 @@ export async function loadWeatherField(map, model, element, level, period, custo
   let file = null;
   let resolved = null;
 
-  if (candidateFiles.length > 0 && (hasPolicy || hasOffset || isObsMode)) {
+  if (isObsMode && candidateFiles.length > 0) {
+    const targetFile = customOptions?.obsFile || win?.obsTime || win?.obsFile;
+    if (targetFile && candidateFiles.includes(targetFile)) {
+      file = targetFile;
+    } else {
+      file = candidateFiles[candidateFiles.length - 1];
+    }
+    if (win && file) {
+      win.obsTime = file;
+      win.obsFile = file;
+    }
+    const fileTs = parseTimestamp(file) || Date.now();
+    resolved = {
+      status: "exact",
+      isHardStale: false,
+      sampleFile: file,
+      targetTime: fileTs,
+      sampleTime: fileTs,
+    };
+  } else if (candidateFiles.length > 0 && (hasPolicy || hasOffset || isObsMode)) {
     const layerMetaForResolve = {
       id: layerId,
       model,
@@ -212,7 +255,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
             }
           }
         }
-        file = bestFile || candidateFiles[0];
+        file = bestFile || candidateFiles[candidateFiles.length - 1] || candidateFiles[0];
       } else {
         let closestFile = candidateFiles[0];
         let minDiff = Infinity;
@@ -433,16 +476,12 @@ export async function loadWeatherField(map, model, element, level, period, custo
         win.colormap = colormap;
       }
     }
-    if (win && isWind) {
-      win.windGridData = gridData;
-    }
-
-    if (!isWind) {
+    if (!isWind && (showFill || showLine)) {
       renderContourLayers(map, gridData, element, {
         layerId,
         levels,
         showFill: isVisible && showFill,
-        showRaster: isVisible && showRaster,
+        showRaster: false,
         showLine: isVisible && showLine,
         showLabels: isVisible && showLabels,
         lineColor,
@@ -518,7 +557,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
       },
     }, win);
 
-    if (!isWind || showRaster) {
+    if ((showFill || showLine) && !isWind) {
       const layerObj = getLayerById(layerId, win) || {
         id: layerId,
         name,

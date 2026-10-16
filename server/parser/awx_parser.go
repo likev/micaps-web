@@ -260,9 +260,16 @@ func parseAWXCategory1(data []byte, h1 *AWXHeader1, order binary.ByteOrder, step
 		return nil, fmt.Errorf("truncated AWX image payload: needed %d bytes from %d, got %d", totalPixels, dataOffset, len(data))
 	}
 
-	// Automatic decimation for large satellite products (meeting < 3s first paint & < 5s DISK gates)
+	// Automatic decimation for large satellite products (capping dimensions to <= 1800 to prevent 160MB JSON)
 	if step <= 0 {
-		if totalPixels > 4000000 {
+		maxDim := w
+		if h > maxDim {
+			maxDim = h
+		}
+		targetMax := 1800
+		if maxDim > targetMax {
+			step = (maxDim + targetMax - 1) / targetMax
+		} else if totalPixels > 4000000 {
 			step = 3
 		} else if totalPixels > 1000000 {
 			step = 2
@@ -318,6 +325,10 @@ func parseAWXCategory1(data []byte, h1 *AWXHeader1, order binary.ByteOrder, step
 				awxCol = w - 1
 			}
 			dn := rawPixels[rowOffset+awxCol]
+			if dn == 0 || (h2.OverlapVal > 0 && h2.OverlapVal <= 255 && dn == uint8(h2.OverlapVal)) {
+				outValues[outR*outW+outC] = -9999.0
+				continue
+			}
 			var v float32
 			if hasCalibration {
 				v = lut[dn]
@@ -326,14 +337,16 @@ func parseAWXCategory1(data []byte, h1 *AWXHeader1, order binary.ByteOrder, step
 			}
 
 			outValues[outR*outW+outC] = v
-			if v < minVal {
-				minVal = v
+			if v > -9990.0 {
+				if v < minVal {
+					minVal = v
+				}
+				if v > maxVal {
+					maxVal = v
+				}
+				sum += float64(v)
+				count++
 			}
-			if v > maxVal {
-				maxVal = v
-			}
-			sum += float64(v)
-			count++
 		}
 	}
 
@@ -493,6 +506,8 @@ func parseAWXCategory3(data []byte, h1 *AWXHeader1, order binary.ByteOrder, step
 
 	rawGrid := data[dataOffset : dataOffset+totalBytesNeeded]
 
+	elemName := getAWXElementName(h2.Element)
+
 	for outR := 0; outR < outH; outR++ {
 		origGridRow := outR * step // 0 is South, outH-1 is North
 		awxRow := (h - 1) - origGridRow
@@ -511,15 +526,24 @@ func parseAWXCategory3(data []byte, h1 *AWXHeader1, order binary.ByteOrder, step
 			if bytesPerCell == 2 {
 				idx := rowByteOffset + awxCol*2
 				rawVal := int16(order.Uint16(rawGrid[idx : idx+2]))
-				if rawVal == -990 || rawVal <= -900 || rawVal == -9999 {
+				if rawVal == -990 || rawVal <= -900 || rawVal == -9999 || rawVal < 0 {
+					val = -9999.0
+				} else if h2.HasQuality != 0 && h2.QualityUp > h2.QualityDown && (rawVal < h2.QualityDown || rawVal > h2.QualityUp) {
+					val = -9999.0
+				} else if (h2.HasLand != 0 && rawVal == h2.LandVal) || (h2.HasCloud != 0 && rawVal == h2.CloudVal) || (h2.HasWater != 0 && rawVal == h2.WaterVal) || (h2.HasIce != 0 && rawVal == h2.IceVal) {
 					val = -9999.0
 				} else {
 					val = (float32(rawVal) + base) / scale
+					if elemName == "CTT" || h2.Element == 11 {
+						if val < 150.0 || val > 340.0 {
+							val = -9999.0
+						}
+					}
 				}
 			} else {
 				idx := rowByteOffset + awxCol
 				rawByte := rawGrid[idx]
-				if rawByte == 255 {
+				if rawByte == 255 || (h2.HasLand != 0 && rawByte == uint8(h2.LandVal)) || (h2.HasCloud != 0 && rawByte == uint8(h2.CloudVal)) {
 					val = -9999.0
 				} else {
 					val = (float32(rawByte) + base) / scale
@@ -547,7 +571,6 @@ func parseAWXCategory3(data []byte, h1 *AWXHeader1, order binary.ByteOrder, step
 		minVal, maxVal = 0, 0
 	}
 
-	elemName := getAWXElementName(h2.Element)
 	obsTime := time.Date(int(h2.StartYear), time.Month(h2.StartMonth), int(h2.StartDay), int(h2.StartHour), int(h2.StartMinute), 0, 0, time.UTC)
 
 	header := model.GridHeader{

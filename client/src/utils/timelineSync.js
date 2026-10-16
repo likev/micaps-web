@@ -2,6 +2,7 @@ import { fetchTree, fetchLatest } from "../api/catalogApi.js";
 import { setTimelineMode, filterObsFilesByStep } from "../ui/timeSlider.js";
 import { getActiveWindow } from "../ui/tabWindowManager.js";
 import { DEFAULT_MOCK_OBS_FILES } from "../config/presets.js";
+import { parseTimestamp } from "./timeResolver.js";
 
 const forecastCyclesCache = {};
 const FORECAST_CYCLES_TTL_MS = 5 * 60 * 1000;
@@ -185,18 +186,26 @@ export async function syncObservationTimeline(path, currentFile = null, winTitle
       setTimelineMode("obs", timelineData);
     }
   };
+  const targetLevel = options?.level ?? win?.level;
+  const treeOpts = { ...(forceLatest ? { bypassCache: true } : {}) };
+  if (targetLevel !== null && targetLevel !== undefined && targetLevel !== "") {
+    treeOpts.level = targetLevel;
+  }
   try {
-    const fileEntries = await fetchTree(path, 100, forceLatest ? { bypassCache: true } : {});
+    const fileEntries = await fetchTree(path, 100, treeOpts);
     if (Array.isArray(fileEntries) && fileEntries.length > 0) {
       let validFiles = fileEntries.filter((f) => f.name && (f.size > 100 || f.size === 0)).map((f) => f.name);
-      const hasObsFormat = validFiles.some((f) => f.length >= 14 && f.endsWith(".000"));
+      const hasObsFormat = validFiles.some((f) => parseTimestamp(f) !== null);
       const isMockFallback = !hasObsFormat;
-      validFiles = hasObsFormat ? validFiles.filter((f) => f.length >= 14 && f.endsWith(".000")) : [...DEFAULT_MOCK_OBS_FILES];
+      validFiles = hasObsFormat ? validFiles.filter((f) => parseTimestamp(f) !== null) : [...DEFAULT_MOCK_OBS_FILES];
       if (validFiles.length > 0) {
-        // The catalog normally returns newest-first, while mock/test providers
-        // may return oldest-first. Sort by the filename timestamp so the
-        // timeline is always chronological and its last chip is truly latest.
-        const chronologicalFiles = [...validFiles].sort((a, b) => a.localeCompare(b));
+        // Sort chronologically by parsed timestamp
+        const chronologicalFiles = [...validFiles].sort((a, b) => {
+          const ta = parseTimestamp(a);
+          const tb = parseTimestamp(b);
+          if (ta !== null && tb !== null && ta !== tb) return ta - tb;
+          return a.localeCompare(b);
+        });
         const rawFiles = isMockFallback && chronologicalFiles.length < 2
           ? [...DEFAULT_MOCK_OBS_FILES]
           : chronologicalFiles.slice(-100);

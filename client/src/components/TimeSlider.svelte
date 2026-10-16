@@ -14,6 +14,7 @@
   import {
     formatLeadTime,
     formatObsTimestamp,
+    formatObsChipLabel,
   } from "../utils/formatters.js";
   import { getPeriodsForStep, filterObsFilesByStep, selectObsChipsWindow, findClosestFile } from "../lib/stores/timelineMath.js";
   import { stepWindowTimeline } from "../lib/services/appWorkflow.js";
@@ -683,7 +684,7 @@
               data-testid="timeline-chip"
               data-file={file}
             >
-              {file.length >= 10 ? `${file.slice(4, 6)}/${file.slice(6, 8)} ${file.slice(8, 10)}:${file.slice(10, 12) || "00"}` : file}
+              {formatObsChipLabel(file)}
               {#if isPtA}<span class="chip-loop-tag tag-a">A</span>{/if}
               {#if isPtB}<span class="chip-loop-tag tag-b">B</span>{/if}
             </button>

@@ -35,6 +35,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.png
+*.jpg
+*.jpeg
+test_*.json
+verified_*.json
 
 # OS & Editor Files
 .DS_Store

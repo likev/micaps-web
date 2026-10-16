@@ -437,7 +437,12 @@ export function isRainElement(name) {
     base === "TP" ||
     base.startsWith("PRECIP") ||
     base.startsWith("SNOW") ||
-    up.includes("RAIN")
+    base.startsWith("QPE") ||
+    base.startsWith("QPF") ||
+    base.startsWith("PRE_") ||
+    up.includes("RAIN") ||
+    up.includes("QPE") ||
+    up.includes("QPF")
   );
 }
 
@@ -467,6 +472,7 @@ export function getColormap(reference = null, element = "TMP") {
     if (COLORMAPS["/" + trimmed]) return COLORMAPS["/" + trimmed];
     if (up.includes("PROB")) return COLORMAPS.PROBABILITY || DEFAULT_COLORMAPS.PROBABILITY;
     if (up.includes("PRECIPITATION_TYPE") || up.includes("PRECIP_TYPE")) return COLORMAPS.PRECIP_TYPE || DEFAULT_COLORMAPS.PRECIP_TYPE;
+    if (up.includes("QPE") || up.includes("QPF")) return COLORMAPS.QPE || DEFAULT_COLORMAPS.QPE;
     if (isRainElement(name)) return COLORMAPS.RAIN || DEFAULT_COLORMAPS.RAIN;
     if (up.includes("SLP_VAR") || up.includes("SLP-VAR") || (up.includes("SLP") && up.includes("VAR"))) {
       return COLORMAPS.SLP_VAR || DEFAULT_COLORMAPS.SLP_VAR;
@@ -537,6 +543,10 @@ export function createColorResolver(element = "TMP", colormap = null, zMin = und
                           isRain ||
                           elUpper === "DTD" || cmUpper.includes("DTD") ||
                           elUpper === "RADAR" || cmUpper.includes("RADAR") || elUpper === "DBZ" || cmUpper.includes("DBZ") ||
+                          elUpper.includes("MCR") || cmUpper.includes("MCR") || elUpper.includes("TDMOSAIC") || cmUpper.includes("TDMOSAIC") ||
+                          elUpper.includes("ECHO_TOP") || cmUpper.includes("ECHO_TOP") || elUpper.includes("MTOP") || cmUpper.includes("MTOP") ||
+                          elUpper.includes("VIL") || cmUpper.includes("VIL") || elUpper.includes("MVIL") || cmUpper.includes("MVIL") ||
+                          elUpper.includes("QPE") || cmUpper.includes("QPE") || elUpper.includes("QPF") || cmUpper.includes("QPF") ||
                           elUpper === "PROBABILITY" || cmUpper.includes("PROB") ||
                           elUpper === "PRECIP_TYPE" || cmUpper.includes("PRECIP_TYPE") ||
                           elUpper === "HAZARDS" || cmUpper.includes("HAZARD") ||

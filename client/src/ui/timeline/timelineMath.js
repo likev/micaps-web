@@ -1,27 +1,21 @@
+import { parseTimestamp } from "../../utils/timeResolver.js";
+
 export const MAX_OBS_CHIPS = 10;
 
 export function findClosestFile(files, target) {
   if (!Array.isArray(files) || files.length === 0) return "";
   if (files.includes(target)) return target;
-  if (!target || typeof target !== "string" || target.length < 10) return files[files.length - 1];
+  if (!target || typeof target !== "string") return files[files.length - 1];
 
-  const tYear = parseInt(target.slice(0, 4), 10);
-  const tMonth = parseInt(target.slice(4, 6), 10) - 1;
-  const tDay = parseInt(target.slice(6, 8), 10);
-  const tHour = parseInt(target.slice(8, 10), 10);
-  const tMin = parseInt(target.slice(10, 12) || "0", 10);
-  const targetMs = Date.UTC(tYear, tMonth, tDay, tHour, tMin);
+  const targetMs = parseTimestamp(target);
+  if (targetMs === null) return files[files.length - 1];
 
   let closest = files[files.length - 1];
   let minDiff = Infinity;
   for (const f of files) {
-    if (typeof f === "string" && f.length >= 10) {
-      const y = parseInt(f.slice(0, 4), 10);
-      const m = parseInt(f.slice(4, 6), 10) - 1;
-      const d = parseInt(f.slice(6, 8), 10);
-      const h = parseInt(f.slice(8, 10), 10);
-      const mn = parseInt(f.slice(10, 12) || "0", 10);
-      const diff = Math.abs(Date.UTC(y, m, d, h, mn) - targetMs);
+    const fMs = parseTimestamp(f);
+    if (fMs !== null) {
+      const diff = Math.abs(fMs - targetMs);
       if (diff < minDiff) {
         minDiff = diff;
         closest = f;
@@ -73,32 +67,47 @@ export function filterObsFilesByStep(files, stepHours, isUpper = false) {
 
   const stepNum = parseInt(stepHours, 10) || (isUpper ? 12 : 3);
 
+  const getFileHour = (f) => {
+    if (typeof f === "string" && f.length >= 10 && /^\d+$/.test(f.slice(0, 10))) {
+      return parseInt(f.slice(8, 10), 10);
+    }
+    const ms = parseTimestamp(f);
+    if (ms !== null) {
+      return new Date(ms).getUTCHours();
+    }
+    return -1;
+  };
+  const getFileMin = (f) => {
+    if (typeof f === "string" && f.length >= 12 && /^\d+$/.test(f.slice(0, 12))) {
+      return parseInt(f.slice(10, 12), 10);
+    }
+    const ms = parseTimestamp(f);
+    if (ms !== null) {
+      return new Date(ms).getUTCMinutes();
+    }
+    return 0;
+  };
+
   if (isUpper) {
     if (stepNum === 12 || stepNum === 24) {
       if (stepNum === 24) {
-        const filtered24 = files.filter((f) => {
-          if (f.length < 10) return false;
-          const hour = parseInt(f.slice(8, 10), 10);
-          return hour === 8;
-        });
+        const filtered24 = files.filter((f) => getFileHour(f) === 8);
         if (filtered24.length > 0) return filtered24;
       }
       // ONLY select 08:00 and 20:00 (UTC+8), filter out 14:00 and 02:00
       const filtered = files.filter((f) => {
-        if (f.length < 10) return false;
-        const hour = parseInt(f.slice(8, 10), 10);
-        return hour === 8 || hour === 20;
+        const h = getFileHour(f);
+        return h === 8 || h === 20;
       });
       return filtered.length > 0 ? filtered : files.filter((f) => {
-        const hour = parseInt(f.slice(8, 10), 10);
-        return hour !== 2 && hour !== 14;
+        const h = getFileHour(f);
+        return h !== 2 && h !== 14;
       });
     } else if (stepNum === 6) {
       // 6h upper-air runs: 02:00, 08:00, 14:00, 20:00 (UTC+8)
       const filtered = files.filter((f) => {
-        if (f.length < 10) return false;
-        const hour = parseInt(f.slice(8, 10), 10);
-        return hour === 2 || hour === 8 || hour === 14 || hour === 20;
+        const h = getFileHour(f);
+        return h === 2 || h === 8 || h === 14 || h === 20;
       });
       return filtered.length > 0 ? filtered : [...files];
     }
@@ -106,33 +115,21 @@ export function filterObsFilesByStep(files, stepHours, isUpper = false) {
 
   // Surface synoptic 24h interval: 08:00 UTC+8 daily
   if (stepNum === 24) {
-    const synoptic24 = files.filter((f) => {
-      if (f.length < 10) return false;
-      const hour = parseInt(f.slice(8, 10), 10);
-      const min = parseInt(f.slice(10, 12) || "0", 10);
-      return hour === 8 && min === 0;
-    });
+    const synoptic24 = files.filter((f) => getFileHour(f) === 8 && getFileMin(f) === 0);
     if (synoptic24.length >= 2) return synoptic24;
   }
 
   // Surface synoptic 12h interval: 08:00 and 20:00 UTC+8
   if (stepNum === 12) {
-    const synoptic12 = files.filter((f) => {
-      if (f.length < 10) return false;
-      const hour = parseInt(f.slice(8, 10), 10);
-      const min = parseInt(f.slice(10, 12) || "0", 10);
-      return (hour === 8 || hour === 20) && min === 0;
-    });
+    const synoptic12 = files.filter((f) => (getFileHour(f) === 8 || getFileHour(f) === 20) && getFileMin(f) === 0);
     if (synoptic12.length >= 2) return synoptic12;
   }
 
   // Surface synoptic 6h interval: 02:00, 08:00, 14:00, 20:00 UTC+8
   if (stepNum === 6) {
     const synoptic6 = files.filter((f) => {
-      if (f.length < 10) return false;
-      const hour = parseInt(f.slice(8, 10), 10);
-      const min = parseInt(f.slice(10, 12) || "0", 10);
-      return (hour === 2 || hour === 8 || hour === 14 || hour === 20) && min === 0;
+      const h = getFileHour(f);
+      return (h === 2 || h === 8 || h === 14 || h === 20) && getFileMin(f) === 0;
     });
     if (synoptic6.length >= 2) return synoptic6;
   }
@@ -142,13 +139,8 @@ export function filterObsFilesByStep(files, stepHours, isUpper = false) {
   const filtered = [];
   let lastTimeMs = 0;
   for (const file of files) {
-    if (file.length >= 10) {
-      const year = parseInt(file.slice(0, 4), 10);
-      const month = parseInt(file.slice(4, 6), 10) - 1;
-      const day = parseInt(file.slice(6, 8), 10);
-      const hour = parseInt(file.slice(8, 10), 10);
-      const min = parseInt(file.slice(10, 12) || "0", 10);
-      const timeMs = Date.UTC(year, month, day, hour, min);
+    const timeMs = parseTimestamp(file);
+    if (timeMs !== null) {
       if (lastTimeMs === 0 || Math.abs(timeMs - lastTimeMs) >= (stepNum * 3600000 - 1800000)) {
         filtered.push(file);
         lastTimeMs = timeMs;

@@ -549,7 +549,7 @@ export async function loadObservationProduct(map, model, element, level, file, w
   }
   const path = customPath || (model === "SURFACE" ? `SURFACE/${element}` : (model === "UPPER_AIR" ? `UPPER_AIR/${element}/${level || 500}` : `${model}/${element}`));
   try {
-    const stations = await fetchStationObservations(path, targetFile);
+    const stations = await fetchStationObservations(path, targetFile, level || win?.level);
     if (win && expectedSeq !== null && expectedSeq !== undefined && win.loadSeq !== expectedSeq) {
       return; // Discard stale in-flight response from fast navigation
     }

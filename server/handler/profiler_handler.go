@@ -121,6 +121,12 @@ func (h *ProfilerHandler) getStationProfile(product, station, file string) (*mod
 	dataPath := fmt.Sprintf("WIND_PROFILER/%s/%s", product, station)
 	if file == "" || file == "latest" {
 		files, err := db.GetFileList(h.Client, dataPath, 1)
+		if (err != nil || len(files) == 0) && product == "RAD" && station != "AH001" {
+			// Fallback to AH001 if requested station has no data for RAD
+			dataPath = "WIND_PROFILER/RAD/AH001"
+			station = "AH001"
+			files, err = db.GetFileList(h.Client, dataPath, 1)
+		}
 		if err != nil || len(files) == 0 {
 			return nil, fmt.Errorf("no files found for profiler station %s: %v", station, err)
 		}

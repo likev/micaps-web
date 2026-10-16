@@ -161,7 +161,7 @@ export function buildLegendItems(winOrId, legendsMap = windowLegends, winResolve
       if (layer.resolved) {
         resolvedTimeZ = layer.resolved.actualTimeZ;
         ageStr = layer.resolved.ageStr;
-        timeBadge = `${resolvedTimeZ} (${ageStr})`;
+        timeBadge = resolvedTimeZ && ageStr ? `${resolvedTimeZ} (${ageStr})` : (resolvedTimeZ || null);
         status = layer.resolved.status;
         statusIcon = layer.resolved.statusIcon;
         statusText = layer.resolved.statusText;
@@ -171,15 +171,15 @@ export function buildLegendItems(winOrId, legendsMap = windowLegends, winResolve
       } else if (liveWin) {
         const cursor = liveWin.obsTime || (liveWin.period !== undefined ? { cycle: liveWin.forecastCycle, period: liveWin.period } : Date.now());
         const res = resolveLayerTime(layer, cursor);
-        resolvedTimeZ = res.actualTimeZ;
-        ageStr = res.ageStr;
-        timeBadge = `${resolvedTimeZ} (${ageStr})`;
-        status = res.status;
-        statusIcon = res.statusIcon;
-        statusText = res.statusText;
-        isStale = res.isStale;
-        isHardStale = res.isHardStale;
-        isDesync = res.isDesync;
+        resolvedTimeZ = res?.actualTimeZ;
+        ageStr = res?.ageStr;
+        timeBadge = resolvedTimeZ && ageStr ? `${resolvedTimeZ} (${ageStr})` : (resolvedTimeZ || null);
+        status = res?.status || status;
+        statusIcon = res?.statusIcon || statusIcon;
+        statusText = res?.statusText || statusText;
+        isStale = Boolean(res?.isStale);
+        isHardStale = Boolean(res?.isHardStale);
+        isDesync = Boolean(res?.isDesync);
       }
     }
 

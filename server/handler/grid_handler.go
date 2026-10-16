@@ -119,6 +119,44 @@ func (h *GridHandler) fetchGrid(r *http.Request) (*model.GridResponse, error) {
 		return dH.CalculateDerivedGrid(dReq)
 	}
 
+	levelStr := strings.TrimSpace(r.URL.Query().Get("level"))
+	if levelStr != "" {
+		if (strings.Contains(dataPath, "FY4B/L1/CHINA") || strings.Contains(dataPath, "FY4B/L1/DISK")) && !strings.Contains(dataPath, "/C0") {
+			if l, err := strconv.Atoi(levelStr); err == nil && l >= 1 && l <= 15 {
+				dataPath = fmt.Sprintf("%s/C%03d", dataPath, l)
+			}
+		}
+	} else if (strings.HasSuffix(dataPath, "FY4B/L1/CHINA") || strings.HasSuffix(dataPath, "FY4B/L1/DISK")) && !strings.Contains(dataPath, "/C0") {
+		dataPath = fmt.Sprintf("%s/C012", dataPath)
+	}
+
+	if h.Client != nil && !h.MockMode && dataPath != "" && (file == "" || file == "latest") {
+		latest, err := db.GetLatestCycle(h.Client, dataPath, "")
+		if err == nil && latest != "" {
+			file = latest
+		} else {
+			files, fErr := db.GetFileList(h.Client, dataPath, 1)
+			if fErr == nil && len(files) > 0 {
+				file = files[0].Name
+			}
+		}
+	}
+
+	// Defensive channel prefix normalization for FY-4B:
+	// If dataPath contains "/C0xx" and file starts with "C0yy_", rewrite prefix to "C0xx_"
+	if strings.Contains(dataPath, "FY4B") && strings.Contains(dataPath, "/C0") {
+		pList := strings.Split(dataPath, "/")
+		targetChannel := pList[len(pList)-1]
+		if strings.HasPrefix(targetChannel, "C0") && len(targetChannel) == 4 {
+			if len(file) > 5 && strings.HasPrefix(file, "C0") && file[4] == '_' {
+				fileChannel := file[0:4]
+				if fileChannel != targetChannel {
+					file = targetChannel + file[4:]
+				}
+			}
+		}
+	}
+
 	if h.Client == nil || dataPath == "" || file == "" {
 		if h.MockMode {
 			return h.getFallbackGrid(r), nil

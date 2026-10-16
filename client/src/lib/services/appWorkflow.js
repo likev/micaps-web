@@ -175,6 +175,8 @@ export function applyPresetToWindow(win, group, overrideLevel = null, timelinesM
     win.level = null;
   } else if (overrideLevel !== null) {
     win.level = overrideLevel;
+  } else if (groupCopy.defaultLevel !== undefined && groupCopy.defaultLevel !== null) {
+    win.level = groupCopy.defaultLevel;
   }
   win.title = groupCopy.name || groupCopy.id;
   win.baseTitle = groupCopy.name || groupCopy.id;

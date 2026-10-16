@@ -299,8 +299,8 @@ func ParseDiamond131(data []byte, targetLevel float64) (*model.GridResponse, err
 			var val float32
 			if bytesPerVal == 1 {
 				raw := levelPayload[srcIdx]
-				if raw == 0 {
-					val = -9999.0 // Missing / clear air sentinel
+				if raw <= 1 || raw == 255 {
+					val = -9999.0 // Missing / clear air sentinel (-32.5 dBZ)
 				} else {
 					// Physical scaling: dBZ = (raw - 66) / 2
 					val = (float32(raw) - 66.0) * 0.5

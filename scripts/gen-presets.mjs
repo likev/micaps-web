@@ -420,7 +420,7 @@ for (const item of targetItems) {
   if (item.format === "wind_profiler") {
     layerType = "profiler";
     product = item.dataPath.includes("RAD") ? "RAD" : "ROBS";
-    stationId = "54511";
+    stationId = product === "RAD" ? "AH001" : "54511";
   } else if (item.format === "swan_text" || item.format === "lightning") {
     layerType = "event";
     if (item.dataPath.includes("LIGHTNING")) eventType = "lightning";

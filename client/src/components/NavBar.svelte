@@ -28,7 +28,7 @@
     onSelectAutoAlloc = null,
   } = $props();
 
-  const levels = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
+  const DEFAULT_LEVELS = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
   let effectivePresetGroups = $derived(presetGroups && presetGroups.length > 0 ? presetGroups : PRESET_GROUPS);
   let currentPresetId = $state(presetId);
 
@@ -80,6 +80,48 @@
   });
 
   let showLevelSelector = $derived(Boolean(hasDataLoaded && dataHasLevel));
+
+  let activeLevels = $derived(
+    Array.isArray(currentGroup?.levels) && currentGroup.levels.length > 0
+      ? currentGroup.levels
+      : DEFAULT_LEVELS
+  );
+
+  let isFY4B = $derived(
+    Boolean(
+      currentGroup?.id?.includes("fy4") ||
+      currentGroup?.name?.includes("FY-4") ||
+      currentGroup?.path?.includes("FY4") ||
+      (currentGroup?.levels?.length === 15 && currentGroup?.levels[0] === 1)
+    )
+  );
+
+  let isMeterHeight = $derived(
+    Boolean(
+      currentGroup?.id?.includes("tdmosaic") ||
+      currentGroup?.name?.includes("TDMOSAIC") ||
+      currentGroup?.path?.includes("TDMOSAIC") ||
+      (Array.isArray(currentGroup?.levels) && currentGroup.levels.some((l) => l > 1050))
+    )
+  );
+
+  let levelLabel = $derived(isFY4B ? "Channel" : (isMeterHeight ? "Height" : "Level"));
+
+  function formatLevelText(lvl) {
+    if (lvl === null || lvl === undefined || lvl === "") return "None";
+    if (isFY4B) {
+      const num = parseInt(lvl, 10);
+      return !isNaN(num) && num >= 1 && num <= 15 ? `C${String(num).padStart(3, "0")}` : `${lvl}`;
+    }
+    if (isMeterHeight) {
+      const num = parseInt(lvl, 10);
+      if (!isNaN(num)) {
+        return num >= 1000 ? `${(num / 1000).toFixed(num % 1000 === 0 ? 0 : 1)} km` : `${num} m`;
+      }
+      return `${lvl} m`;
+    }
+    return `${lvl} hPa`;
+  }
 
   let isNwpData = $derived.by(() => {
     if (!hasDataLoaded) return false;
@@ -564,17 +606,17 @@
 
     {#if showLevelSelector}
       <div class="nav-control-group nav-tag-capsule">
-        <label for="select-nav-level">Level:</label>
+        <label for="select-nav-level">{levelLabel}:</label>
         <select
           id="select-nav-level"
           class="nav-select"
           value={app.level ?? ""}
           onchange={handleLevelChange}
-          title="Select level for focused window"
+          title="Select {levelLabel} for focused window"
         >
           <option value="">None</option>
-          {#each levels as lvl}
-            <option value={lvl}>{lvl} hPa</option>
+          {#each activeLevels as lvl}
+            <option value={lvl}>{formatLevelText(lvl)}</option>
           {/each}
         </select>
       </div>

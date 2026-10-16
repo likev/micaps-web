@@ -23,13 +23,15 @@ export async function changeVerticalLevel(map, direction, explicitLevel = null, 
     return;
   }
 
-  const levels = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
+  const levels = Array.isArray(activeGroup?.levels) && activeGroup.levels.length > 0
+    ? activeGroup.levels
+    : [1000, 925, 850, 700, 500, 400, 300, 200, 100];
   let targetLevel = explicitLevel;
 
   if (targetLevel === null) {
-    const curLevel = win?.level || 500;
+    const curLevel = win?.level !== undefined && win?.level !== null ? win.level : levels[0];
     let idx = levels.indexOf(curLevel);
-    if (idx === -1) idx = 4;
+    if (idx === -1) idx = 0;
 
     let newIdx = idx + direction;
     if (newIdx < 0) newIdx = 0;

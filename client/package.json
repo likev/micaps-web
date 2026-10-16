@@ -1,7 +1,7 @@
 {
   "name": "micaps-client",
   "private": true,
-  "version": "1.9.5",
+  "version": "1.9.6",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,8 @@
     "package": "rm -f ../client.zip && cd .. && zip -r client.zip client/dist/ client/palettes/ client/config.json --exclude \"*.pmtiles*\" && cd client",
     "build:all": "npm run build && npm run package",
     "preview": "vite preview",
-    "test": "bun test"
+    "test": "bun test",
+    "test:e2e:railway": "node ../scripts/runner_railway.cjs"
   },
   "dependencies": {
     "@deck.gl/core": "^9.0.38",
