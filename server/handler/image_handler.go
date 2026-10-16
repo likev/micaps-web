@@ -57,7 +57,12 @@ func (h *ImageHandler) Handler(w http.ResponseWriter, r *http.Request) {
 		step = 2
 	}
 
-	pngBytes, err := h.fetchAndConvertImage(dataPath, file, step)
+	beforeDate, pErr := ParseHistoryDateParam(r)
+	if pErr != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, pErr.Error()), http.StatusBadRequest)
+		return
+	}
+	pngBytes, err := h.fetchAndConvertImage(dataPath, file, step, beforeDate)
 	if err != nil {
 		if h.MockMode {
 			log.Printf("[ImageHandler] Mock fallback for image %s: %v", dataPath, err)
@@ -76,18 +81,18 @@ func (h *ImageHandler) Handler(w http.ResponseWriter, r *http.Request) {
 	w.Write(pngBytes)
 }
 
-func (h *ImageHandler) fetchAndConvertImage(dataPath, file string, step int) ([]byte, error) {
+func (h *ImageHandler) fetchAndConvertImage(dataPath, file string, step int, beforeDate ...string) ([]byte, error) {
 	if dataPath == "" {
 		return nil, fmt.Errorf("missing query parameter 'path'")
 	}
 
 	if file == "" || file == "latest" {
 		if h.Client != nil && !h.MockMode {
-			latest, err := db.GetLatestCycle(h.Client, dataPath, "*.BMP")
+			latest, err := db.GetLatestCycle(h.Client, dataPath, "*.BMP", beforeDate...)
 			if err == nil && latest != "" {
 				file = latest
 			} else {
-				files, fErr := db.GetFileList(h.Client, dataPath, 1)
+				files, fErr := db.GetFileList(h.Client, dataPath, 1, beforeDate...)
 				if fErr == nil && len(files) > 0 {
 					file = files[0].Name
 				}

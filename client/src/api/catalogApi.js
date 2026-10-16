@@ -1,5 +1,6 @@
 // catalogApi.js - Weather dataset catalog and metadata helpers
 import { fetchJson, fetchBinary } from "./apiClient.js";
+import { getActiveHistoryDate } from "../store/appState.js";
 
 export async function fetchStatus(options = {}) {
   const opts = options instanceof AbortSignal ? { signal: options } : options;
@@ -25,6 +26,10 @@ export async function fetchTree(path, limit = 100, optionsOrLevel = {}, levelArg
   if (level !== null && level !== undefined && level !== "") {
     params.level = level;
   }
+  const date = options.date !== undefined ? options.date : getActiveHistoryDate();
+  if (date) {
+    params.date = date;
+  }
   return await fetchJson("/api/catalog/tree", params, options);
 }
 
@@ -33,26 +38,39 @@ export async function fetchLevels(path) {
 }
 
 export async function fetchLatest(path, suffix = "*.024", options = {}) {
-  return await fetchJson("/api/catalog/latest", { path, suffix }, options);
+  const params = { path, suffix };
+  const date = options.date !== undefined ? options.date : getActiveHistoryDate();
+  if (date) {
+    params.date = date;
+  }
+  return await fetchJson("/api/catalog/latest", params, options);
 }
 
-export async function fetchGridData(path, file, level = null) {
+export async function fetchGridData(path, file, level = null, options = {}) {
   const params = { path, file };
   if (level !== null && level !== undefined && level !== "") {
     params.level = level;
   }
-  return await fetchJson("/api/data/grid", params);
+  const date = options?.date !== undefined ? options.date : getActiveHistoryDate();
+  if (date) {
+    params.date = date;
+  }
+  return await fetchJson("/api/data/grid", params, options);
 }
 
-export async function fetchGridBinaryStream(path, file, level = null) {
+export async function fetchGridBinaryStream(path, file, level = null, options = {}) {
   const params = { path, file };
   if (level !== null && level !== undefined && level !== "") {
     params.level = level;
   }
-  return await fetchBinary("/api/data/grid/binary", params);
+  const date = options?.date !== undefined ? options.date : getActiveHistoryDate();
+  if (date) {
+    params.date = date;
+  }
+  return await fetchBinary("/api/data/grid/binary", params, options);
 }
 
-export async function fetchStationObservations(path = "SURFACE/PLOT_10MIN", file = "", level = null) {
+export async function fetchStationObservations(path = "SURFACE/PLOT_10MIN", file = "", level = null, options = {}) {
   let normalizedFile = file;
   if (typeof file === "string") {
     normalizedFile = file.trim();
@@ -66,5 +84,9 @@ export async function fetchStationObservations(path = "SURFACE/PLOT_10MIN", file
   if (level !== null && level !== undefined && level !== "") {
     params.level = level;
   }
-  return await fetchJson("/api/data/station", params);
+  const date = options?.date !== undefined ? options.date : getActiveHistoryDate();
+  if (date) {
+    params.date = date;
+  }
+  return await fetchJson("/api/data/station", params, options);
 }

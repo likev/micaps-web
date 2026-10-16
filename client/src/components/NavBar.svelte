@@ -26,7 +26,58 @@
     onOpenCommandPalette = null,
     onChangeLayout = null,
     onSelectAutoAlloc = null,
+    onHistoryChange = null,
   } = $props();
+
+  function getDefaultHistoryDate() {
+    if (app.historyDate) return app.historyDate;
+    const now = new Date();
+    const y = now.getUTCFullYear();
+    const m = String(now.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(now.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  let selectedHistoryDate = $state(app.historyDate || getDefaultHistoryDate());
+
+  $effect(() => {
+    if (app.historyDate && app.historyDate !== selectedHistoryDate) {
+      selectedHistoryDate = app.historyDate;
+    }
+  });
+
+  function toggleHistoryMode() {
+    const nextEnabled = !app.historyMode;
+    const dateToUse = selectedHistoryDate || getDefaultHistoryDate();
+    selectedHistoryDate = dateToUse;
+    if (onHistoryChange) {
+      onHistoryChange(nextEnabled, nextEnabled ? dateToUse : "");
+    } else {
+      app.historyMode = nextEnabled;
+      app.historyDate = nextEnabled ? dateToUse : "";
+    }
+  }
+
+  function handleHistoryDateInput(e) {
+    const val = e.target.value;
+    if (!val) return;
+    selectedHistoryDate = val;
+    if (onHistoryChange) {
+      onHistoryChange(true, val);
+    } else {
+      app.historyMode = true;
+      app.historyDate = val;
+    }
+  }
+
+  function exitHistoryMode() {
+    if (onHistoryChange) {
+      onHistoryChange(false, "");
+    } else {
+      app.historyMode = false;
+      app.historyDate = "";
+    }
+  }
 
   const DEFAULT_LEVELS = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
   let effectivePresetGroups = $derived(presetGroups && presetGroups.length > 0 ? presetGroups : PRESET_GROUPS);
@@ -641,6 +692,42 @@
   </div>
 
   <div class="nav-controls">
+    <!-- History Mode Control Capsule -->
+    <div id="nav-history-control" class="nav-control-group nav-history-capsule" class:is-history={app.historyMode}>
+      <button
+        type="button"
+        id="btn-history-mode"
+        class="btn btn-history-toggle"
+        class:active={app.historyMode}
+        title={app.historyMode ? "History Mode active. Click to switch to Latest (live)." : "Switch to History Mode"}
+        onclick={toggleHistoryMode}
+      >
+        <span class="history-icon" aria-hidden="true">⏱</span>
+        <span>{app.historyMode ? "History" : "Latest"}</span>
+      </button>
+
+      {#if app.historyMode}
+        <input
+          type="date"
+          id="input-history-date"
+          class="input-history-date"
+          value={selectedHistoryDate}
+          onchange={handleHistoryDateInput}
+          title="Select historical target date (YYYY-MM-DD)"
+        />
+        <button
+          type="button"
+          id="btn-history-exit"
+          class="btn btn-history-exit"
+          title="Exit History Mode and return to Latest"
+          onclick={exitHistoryMode}
+          aria-label="Exit History Mode"
+        >
+          ✕
+        </button>
+      {/if}
+    </div>
+
     <div class="nav-menu-wrapper" bind:this={menuContainerRef} onkeydown={handleMenuKeydown}>
       <button
         type="button"
@@ -1539,5 +1626,84 @@
     color: var(--text-disabled, rgba(255, 255, 255, 0.3));
     cursor: not-allowed;
     opacity: 0.45;
+  }
+
+  /* History Mode Capsule Styles */
+  .nav-history-capsule {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: var(--bg-card, #21262d);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15));
+    transition: all 0.2s ease;
+  }
+
+  .nav-history-capsule.is-history {
+    background: rgba(210, 153, 34, 0.2);
+    border-color: #d29922;
+    color: #e3b341;
+  }
+
+  .btn-history-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: transparent;
+    border: none;
+    color: var(--text-primary, #c9d1d9);
+    cursor: pointer;
+  }
+
+  .nav-history-capsule.is-history .btn-history-toggle {
+    color: #e3b341;
+  }
+
+  .history-icon {
+    font-size: 12px;
+  }
+
+  .input-history-date {
+    font-size: 11px;
+    font-family: inherit;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid #d29922;
+    color: #e3b341;
+    color-scheme: dark;
+    cursor: pointer;
+  }
+
+  .input-history-date:focus {
+    outline: none;
+    border-color: #f0883e;
+    box-shadow: 0 0 0 2px rgba(210, 153, 34, 0.4);
+  }
+
+  .btn-history-exit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(210, 153, 34, 0.4);
+    color: #e3b341;
+    cursor: pointer;
+  }
+
+  .btn-history-exit:hover {
+    background: rgba(210, 153, 34, 0.4);
+    color: #fff;
   }
 </style>

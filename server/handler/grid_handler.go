@@ -39,6 +39,11 @@ func (h *GridHandler) JSONHandler(w http.ResponseWriter, r *http.Request) {
 
 	gridResp, err := h.fetchGrid(r)
 	if err != nil {
+		if strings.Contains(err.Error(), "invalid date format") {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
 		if h.MockMode {
 			log.Printf("[GridHandler] Error fetching grid: %v. Mock fallback.", err)
 			gridResp = h.getFallbackGrid(r)
@@ -68,6 +73,11 @@ func (h *GridHandler) BinaryHandler(w http.ResponseWriter, r *http.Request) {
 
 	gridResp, err := h.fetchGrid(r)
 	if err != nil {
+		if strings.Contains(err.Error(), "invalid date format") {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(err.Error()))
+			return
+		}
 		if h.MockMode {
 			log.Printf("[GridHandler] Error fetching binary grid: %v. Mock fallback.", err)
 			gridResp = h.getFallbackGrid(r)
@@ -95,15 +105,21 @@ func (h *GridHandler) fetchGrid(r *http.Request) (*model.GridResponse, error) {
 	}
 	file := sanitizeFile(r.URL.Query().Get("file"))
 
+	beforeDate, pErr := ParseHistoryDateParam(r)
+	if pErr != nil {
+		return nil, pErr
+	}
+
 	// Check if this is a derived grid path (e.g. /api/derived/ECMWF_HR/TMP/850-500)
 	if dReq, ok := ParseDerivedPath(dataPath, file); ok && dReq != nil && !dReq.IsStation {
+		dReq.DateCutoff = beforeDate
 		if dReq.File == "" {
 			dReq.File = file
 		}
 		if dReq.File == "" || dReq.File == "latest" {
 			underlying := ResolveUnderlyingCatalogPath(dReq)
 			if h.Client != nil && !h.MockMode {
-				latest, err := db.GetLatestCycle(h.Client, underlying, "")
+				latest, err := db.GetLatestCycle(h.Client, underlying, "", beforeDate)
 				if err == nil && latest != "" {
 					dReq.File = latest
 				}
@@ -131,11 +147,11 @@ func (h *GridHandler) fetchGrid(r *http.Request) (*model.GridResponse, error) {
 	}
 
 	if h.Client != nil && !h.MockMode && dataPath != "" && (file == "" || file == "latest") {
-		latest, err := db.GetLatestCycle(h.Client, dataPath, "")
+		latest, err := db.GetLatestCycle(h.Client, dataPath, "", beforeDate)
 		if err == nil && latest != "" {
 			file = latest
 		} else {
-			files, fErr := db.GetFileList(h.Client, dataPath, 1)
+			files, fErr := db.GetFileList(h.Client, dataPath, 1, beforeDate)
 			if fErr == nil && len(files) > 0 {
 				file = files[0].Name
 			}

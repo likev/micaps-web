@@ -52,3 +52,7 @@ class AppState {
 }
 
 export const appState = new AppState();
+
+export function getActiveHistoryDate(state = appState.state) {
+  return (state?.historyMode && state?.historyDate) ? state.historyDate : null;
+}

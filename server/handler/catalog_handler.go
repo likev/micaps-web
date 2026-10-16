@@ -23,12 +23,37 @@ func (h *CatalogHandler) ModelsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(db.SupportedModels())
 }
 
+// ParseHistoryDateParam extracts and validates the ?date= (or ?before=) query parameter.
+// Returns an 8-digit YYYYMMDD string, or empty string if not in history mode.
+func ParseHistoryDateParam(r *http.Request) (string, error) {
+	val := strings.TrimSpace(r.URL.Query().Get("date"))
+	if val == "" {
+		val = strings.TrimSpace(r.URL.Query().Get("before"))
+	}
+	if val == "" {
+		return "", nil
+	}
+	if t, err := time.Parse("2006-01-02", val); err == nil {
+		return t.Format("20060102"), nil
+	}
+	if t, err := time.Parse("20060102", val); err == nil {
+		return t.Format("20060102"), nil
+	}
+	return "", fmt.Errorf("invalid date format: %s (expected YYYY-MM-DD or YYYYMMDD)", val)
+}
+
 // TreeHandler returns files from treeview table
 func (h *CatalogHandler) TreeHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	dataPath := r.URL.Query().Get("path")
 	if dataPath == "" {
 		http.Error(w, `{"error":"path query param required"}`, http.StatusBadRequest)
+		return
+	}
+
+	beforeDate, err := ParseHistoryDateParam(r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
 		return
 	}
 
@@ -55,13 +80,20 @@ func (h *CatalogHandler) TreeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.MockMode {
+		anchorTime := time.Date(2026, 8, 29, 20, 0, 0, 0, time.UTC)
+		if beforeDate != "" {
+			if bt, bErr := time.Parse("20060102", beforeDate); bErr == nil {
+				anchorTime = time.Date(bt.Year(), bt.Month(), bt.Day(), 20, 0, 0, 0, time.UTC)
+			}
+		}
+
 		if strings.HasPrefix(dataPath, "SATELLITE") {
 			ext := ".AWX"
 			if strings.Contains(dataPath, "DUST") {
 				ext = ".BMP"
 			}
 			mockSatFiles := make([]map[string]interface{}, 0, 48)
-			t := time.Date(2026, 8, 29, 20, 0, 0, 0, time.UTC)
+			t := anchorTime
 			for i := 0; i < 40; i++ {
 				fname := t.Format("20060102150405") + ext
 				mockSatFiles = append(mockSatFiles, map[string]interface{}{
@@ -76,7 +108,7 @@ func (h *CatalogHandler) TreeHandler(w http.ResponseWriter, r *http.Request) {
 		isObs := strings.HasPrefix(dataPath, "SURFACE") || strings.HasPrefix(dataPath, "UPPER_AIR")
 		if isObs {
 			mockObsFiles := make([]map[string]interface{}, 0, 60)
-			t := time.Date(2026, 8, 29, 20, 0, 0, 0, time.UTC)
+			t := anchorTime
 			for i := 0; i < 55; i++ {
 				fname := t.Format("20060102150405") + ".000"
 				mockObsFiles = append(mockObsFiles, map[string]interface{}{
@@ -89,12 +121,16 @@ func (h *CatalogHandler) TreeHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		prefix := "260827"
+		if beforeDate != "" {
+			prefix = beforeDate[2:8]
+		}
 		mockFiles := []map[string]interface{}{
-			{"name": "26082708.000", "size": 405764},
-			{"name": "26082708.012", "size": 405764},
-			{"name": "26082708.024", "size": 405764},
-			{"name": "26082708.036", "size": 405764},
-			{"name": "26082708.048", "size": 405764},
+			{"name": prefix + "08.000", "size": 405764},
+			{"name": prefix + "08.012", "size": 405764},
+			{"name": prefix + "08.024", "size": 405764},
+			{"name": prefix + "08.036", "size": 405764},
+			{"name": prefix + "08.048", "size": 405764},
 		}
 		json.NewEncoder(w).Encode(mockFiles)
 		return
@@ -112,7 +148,7 @@ func (h *CatalogHandler) TreeHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	files, err := db.GetFileList(h.Client, dataPath, limit)
+	files, err := db.GetFileList(h.Client, dataPath, limit, beforeDate)
 	if err != nil {
 		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
 		return
@@ -189,6 +225,12 @@ func (h *CatalogHandler) LatestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	beforeDate, err := ParseHistoryDateParam(r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
+		return
+	}
+
 	cleanPath := strings.Trim(strings.ToLower(dataPath), "/")
 	if strings.HasPrefix(cleanPath, "derived/") || cleanPath == "derived" {
 		w.Header().Set("Content-Type", "application/json")
@@ -228,9 +270,33 @@ func (h *CatalogHandler) LatestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.MockMode {
+		latest := "26082708.024"
+		if beforeDate != "" {
+			if strings.HasPrefix(dataPath, "SATELLITE") {
+				ext := ".AWX"
+				if strings.Contains(dataPath, "DUST") {
+					ext = ".BMP"
+				}
+				latest = beforeDate + "200000" + ext
+			} else if strings.HasPrefix(dataPath, "SURFACE") || strings.HasPrefix(dataPath, "UPPER_AIR") {
+				latest = beforeDate + "200000.000"
+			} else {
+				latest = beforeDate[2:8] + "20.024"
+			}
+		} else {
+			if strings.HasPrefix(dataPath, "SATELLITE") {
+				ext := ".AWX"
+				if strings.Contains(dataPath, "DUST") {
+					ext = ".BMP"
+				}
+				latest = "20260829200000" + ext
+			} else if strings.HasPrefix(dataPath, "SURFACE") || strings.HasPrefix(dataPath, "UPPER_AIR") {
+				latest = "20260829200000.000"
+			}
+		}
 		json.NewEncoder(w).Encode(map[string]string{
 			"dataPath": rawPath,
-			"latest":   "26082708.024",
+			"latest":   latest,
 		})
 		return
 	}
@@ -240,7 +306,7 @@ func (h *CatalogHandler) LatestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	latest, err := db.GetLatestCycle(h.Client, dataPath, suffix)
+	latest, err := db.GetLatestCycle(h.Client, dataPath, suffix, beforeDate)
 	if err != nil {
 		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusNotFound)
 		return

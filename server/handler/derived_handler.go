@@ -44,17 +44,26 @@ func (h *DerivedHandler) DirectHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	beforeDate, pErr := ParseHistoryDateParam(r)
+	if pErr != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": pErr.Error()})
+		return
+	}
+	dReq.DateCutoff = beforeDate
+
 	if dReq.File == "" {
 		dReq.File = queryFile
 	}
 	if dReq.File == "" || dReq.File == "latest" {
 		underlying := ResolveUnderlyingCatalogPath(dReq)
 		if h.Client != nil && !h.MockMode {
-			latest, err := db.GetLatestCycle(h.Client, underlying, "")
+			latest, err := db.GetLatestCycle(h.Client, underlying, "", beforeDate)
 			if err == nil && latest != "" {
 				dReq.File = latest
 			} else {
-				files, errList := db.GetFileList(h.Client, underlying, 1)
+				files, errList := db.GetFileList(h.Client, underlying, 1, beforeDate)
 				if errList == nil && len(files) > 0 {
 					dReq.File = files[0].Name
 				}
@@ -315,7 +324,7 @@ func (h *DerivedHandler) resolvePriorStationFile(modelName, underlyingPath, curr
 	}
 
 	// 2. Query available files to find closest file within tolerance
-	files, errList := db.GetFileList(h.Client, underlyingPath, 100)
+	files, errList := db.GetFileList(h.Client, underlyingPath, 100, targetTime.Format("20060102"))
 	if errList == nil && len(files) > 0 {
 		var closestFile string
 		minDiff := time.Duration(6) * time.Hour
@@ -508,18 +517,22 @@ func (h *DerivedHandler) resolvePriorGridFile(modelName, element, level, currFil
 	}
 
 	// 2. Search available files near target valid time within tolerance
-	files, errList := db.GetFileList(h.Client, fullPath, 100)
+	var priorCutoff string
+	if !targetValidTime.IsZero() {
+		priorCutoff = targetValidTime.Format("20060102")
+	}
+	files, errList := db.GetFileList(h.Client, fullPath, 100, priorCutoff)
 	if (errList != nil || len(files) == 0) && (level == "0" || level == "") {
 		altPath := modelName + "/" + element + "/0"
 		if fullPath == altPath {
 			altPath = modelName + "/" + element
 		}
-		files, errList = db.GetFileList(h.Client, altPath, 100)
+		files, errList = db.GetFileList(h.Client, altPath, 100, priorCutoff)
 	}
 	if (errList != nil || len(files) == 0) && element == "PRMSL" {
-		files, errList = db.GetFileList(h.Client, modelName+"/MSL", 100)
+		files, errList = db.GetFileList(h.Client, modelName+"/MSL", 100, priorCutoff)
 		if errList != nil || len(files) == 0 {
-			files, errList = db.GetFileList(h.Client, modelName+"/SLP", 100)
+			files, errList = db.GetFileList(h.Client, modelName+"/SLP", 100, priorCutoff)
 		}
 	}
 	if errList == nil && len(files) > 0 {
@@ -1708,11 +1721,11 @@ func (h *DerivedHandler) calculateTimeDerivedGrid(req *DerivedRequest) (*model.G
 	underlying := ResolveUnderlyingCatalogPath(req)
 	if file == "" || file == "latest" {
 		if h.Client != nil && !h.MockMode {
-			latest, err := db.GetLatestCycle(h.Client, underlying, "")
+			latest, err := db.GetLatestCycle(h.Client, underlying, "", req.DateCutoff)
 			if err == nil && latest != "" {
 				file = latest
 			} else {
-				files, errList := db.GetFileList(h.Client, underlying, 1)
+				files, errList := db.GetFileList(h.Client, underlying, 1, req.DateCutoff)
 				if errList == nil && len(files) > 0 {
 					file = files[0].Name
 				}
@@ -1845,11 +1858,11 @@ func (h *DerivedHandler) calculateTimeDerivedStation(req *DerivedRequest) (*mode
 	underlying := ResolveUnderlyingCatalogPath(req)
 	if file == "" || file == "latest" {
 		if h.Client != nil && !h.MockMode {
-			latest, err := db.GetLatestCycle(h.Client, underlying, "")
+			latest, err := db.GetLatestCycle(h.Client, underlying, "", req.DateCutoff)
 			if err == nil && latest != "" {
 				file = latest
 			} else {
-				files, errList := db.GetFileList(h.Client, underlying, 1)
+				files, errList := db.GetFileList(h.Client, underlying, 1, req.DateCutoff)
 				if errList == nil && len(files) > 0 {
 					file = files[0].Name
 				}

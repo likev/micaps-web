@@ -31,7 +31,7 @@
   import { loadPresetGroup, reloadConfiguration } from "./services/presetLoader.js";
   import { changeVerticalLevel } from "./services/levelController.js";
   import { handleLayerAction as serviceHandleLayerAction } from "./ui/layerActions.js";
-  import { resolveForecastCycles } from "./utils/timelineSync.js";
+  import { resolveForecastCycles, invalidateForecastCyclesCache } from "./utils/timelineSync.js";
   import { resolveLayerTime, parseTimestamp } from "./utils/timeResolver.js";
   import {
     DEFAULT_LEVELS,
@@ -192,6 +192,7 @@
     ensureInitialTab();
     initGlobalTheme();
     forecastRefreshTimer = setInterval(() => {
+      if (app.historyMode) return;
       if (activeWin) refreshForecastTimeline(activeWin, true);
     }, 60 * 1000);
     try {
@@ -1019,6 +1020,79 @@
       return;
     }
     await handleSelectAutoAlloc(mode);
+  }
+
+  async function handleHistoryChange(enabled, dateStr) {
+    app.historyMode = Boolean(enabled);
+    app.historyDate = enabled ? dateStr : "";
+    invalidateForecastCyclesCache();
+
+    if (activeTab?.windows) {
+      for (const win of activeTab.windows) {
+        if (!win) continue;
+        win.forecastCycle = null;
+        win.initCycle = null;
+        win.obsTime = null;
+        win.obsFile = null;
+        win._obsTimeline = null;
+        win._obsTimelinePath = null;
+        win.wallClockCursor = null;
+        if (timeHeightController.isActive(win)) {
+          const st = timeHeightController._getState(win);
+          if (st) {
+            st.cycle = null;
+            st.availableCycles = [];
+            st.matrixCache.clear();
+          }
+        }
+        if (lineHeightController?.isActive && lineHeightController.isActive(win)) {
+          const st = lineHeightController._getState(win);
+          if (st) {
+            st.cycle = null;
+            st.availableCycles = [];
+            st.matrixCache.clear();
+          }
+        }
+        if (hovmollerController?.isActive && hovmollerController.isActive(win)) {
+          const st = hovmollerController._getState(win);
+          if (st) {
+            st.cycle = null;
+            st.availableCycles = [];
+            st.matrixCache.clear();
+          }
+        }
+        if (tlogpController?.isActive && tlogpController.isActive()) {
+          tlogpController.obsFile = null;
+          tlogpController.sounding = null;
+          tlogpController.parcelCache.clear();
+        }
+      }
+    }
+
+    if (activeTab?.autoAllocation && activeTab.autoAllocation !== "none" && activeTab.layout !== "1x1") {
+      const visible = getVisibleWindows(activeTab);
+      const baseWin = visible[0] || activeWin;
+      if (baseWin?.activeGroup) {
+        await handleLoadData(baseWin.activeGroup, baseWin.level, baseWin);
+      }
+    } else {
+      const visible = getVisibleWindows(activeTab);
+      for (const win of visible) {
+        if (win?.activeGroup) {
+          await handleLoadData(win.activeGroup, win.level, win);
+        } else {
+          if (timeHeightController.isActive(win)) {
+            await timeHeightController.loadMatrix(win).catch(console.error);
+          } else if (lineHeightController?.isActive && lineHeightController.isActive(win)) {
+            await lineHeightController.loadMatrix(win).catch(console.error);
+          } else if (hovmollerController?.isActive && hovmollerController.isActive(win)) {
+            await hovmollerController.loadMatrix(win).catch(console.error);
+          } else if (tlogpController?.isActive && tlogpController.isActive()) {
+            await tlogpController.loadSounding(win.map, win).catch(console.error);
+          }
+        }
+      }
+    }
   }
 
   async function handleLoadData(group, overrideLevel = null, targetWin = activeWin) {
@@ -2215,6 +2289,7 @@
     onOpenCommandPalette={() => { ui.commandPaletteOpen = true; }}
     onChangeLayout={handleChangeLayout}
     onSelectAutoAlloc={handleSelectAutoAlloc}
+    onHistoryChange={handleHistoryChange}
   />
 
   <TabsBar

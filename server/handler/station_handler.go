@@ -41,6 +41,15 @@ func (h *StationHandler) StationGeoJSONHandler(w http.ResponseWriter, r *http.Re
 
 	stations, err := h.fetchStations(r)
 	if err != nil {
+		if strings.Contains(err.Error(), "invalid date format") {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"type":     "FeatureCollection",
+				"features": []interface{}{},
+				"error":    err.Error(),
+			})
+			return
+		}
 		if h.MockMode {
 			log.Printf("[StationHandler] Error fetching stations: %v. Mock fallback.", err)
 			stations = mock.GenerateMockStationsForPath(r.URL.Query().Get("path"))
@@ -63,15 +72,21 @@ func (h *StationHandler) fetchStations(r *http.Request) (*model.GeoJSONFeatureCo
 	dataPath := SanitizeGridPath(r.URL.Query().Get("path"))
 	file := SanitizeFile(r.URL.Query().Get("file"))
 
+	beforeDate, pErr := ParseHistoryDateParam(r)
+	if pErr != nil {
+		return nil, pErr
+	}
+
 	// Check if this is a derived station path (e.g. /api/derived/UPPER_AIR/PLOT/TMP/850-500)
 	if dReq, ok := ParseDerivedPath(dataPath, file); ok && dReq != nil && dReq.IsStation {
+		dReq.DateCutoff = beforeDate
 		if dReq.File == "" {
 			dReq.File = file
 		}
 		if dReq.File == "" || dReq.File == "latest" {
 			underlying := ResolveUnderlyingCatalogPath(dReq)
 			if h.Client != nil && !h.MockMode {
-				latest, err := db.GetLatestCycle(h.Client, underlying, "")
+				latest, err := db.GetLatestCycle(h.Client, underlying, "", beforeDate)
 				if err == nil && latest != "" {
 					dReq.File = latest
 				}
@@ -107,11 +122,11 @@ func (h *StationHandler) fetchStations(r *http.Request) (*model.GeoJSONFeatureCo
 	}
 
 	if file == "" || file == "latest" {
-		latest, err := db.GetLatestCycle(h.Client, dataPath, "")
+		latest, err := db.GetLatestCycle(h.Client, dataPath, "", beforeDate)
 		if err == nil && latest != "" {
 			file = latest
 		} else {
-			files, fErr := db.GetFileList(h.Client, dataPath, 1)
+			files, fErr := db.GetFileList(h.Client, dataPath, 1, beforeDate)
 			if fErr == nil && len(files) > 0 {
 				file = files[0].Name
 			}

@@ -46,3 +46,7 @@ export function setAppLayer(layerName, visible) {
   if (app.layers) app.layers[layerName] = visible;
   appState.setLayer(layerName, visible);
 }
+
+export function getActiveHistoryDate() {
+  return (app.historyMode && app.historyDate) ? app.historyDate : null;
+}

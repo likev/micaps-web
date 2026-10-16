@@ -14,7 +14,7 @@ import { armContourReRender } from "./contourReRender.js";
 import * as contourReRenderModule from "./contourReRender.js";
 import { getCachedWindGrid, setCachedWindGrid } from "../utils/windGridCache.js";
 import { showErrorToast } from "../ui/toast.js";
-import { resolveLayerTime, parseTimestamp, parseOffset } from "../utils/timeResolver.js";
+import { resolveLayerTime, parseTimestamp, parseOffset, getReferenceNowMs } from "../utils/timeResolver.js";
 
 /**
  * Resolve a contour's stroke color across a timeline reload.
@@ -68,15 +68,15 @@ export async function loadWeatherField(map, model, element, level, period, custo
     }
   }
 
-  const cursorTime = win?.isObservation
+  let cursorTime = win?.isObservation
     ? (win?.wallClockCursor ||
        (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
        (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
-       Date.now())
+       getReferenceNowMs())
     : (win?.wallClockCursor ||
        (win?.forecastCycle ? parseTimestamp({ cycle: win.forecastCycle, period: period ?? win?.period ?? 0 }) : null) ||
        (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
-       Date.now());
+       getReferenceNowMs());
 
   let targetLevel = level;
   const pathRangeMatch = (customOptions?.path || "").match(/\/(\d+[-_]\d+)(?:\/|$)/);
@@ -161,6 +161,12 @@ export async function loadWeatherField(map, model, element, level, period, custo
     } catch (e) {
       console.warn("[weatherLoader] syncObservationTimeline failed:", e);
     }
+    if (win?.isObservation || isObservationProduct) {
+      cursorTime = win?.wallClockCursor ||
+        (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
+        (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
+        getReferenceNowMs();
+    }
   }
 
   const cycleFiles = (cycle && availableFiles.length > 0) ? availableFiles.filter((f) => f.startsWith(`${cycle}.`)) : [];
@@ -202,7 +208,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
       win.obsTime = file;
       win.obsFile = file;
     }
-    const fileTs = parseTimestamp(file) || Date.now();
+    const fileTs = parseTimestamp(file) || getReferenceNowMs();
     resolved = {
       status: "exact",
       isHardStale: false,

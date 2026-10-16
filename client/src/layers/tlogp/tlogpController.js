@@ -1,5 +1,6 @@
 // tlogpController.js - Thermodynamic state management, station toggling, and UI coordination
 import { fetchJson } from "../../api/apiClient.js";
+import { getActiveHistoryDate } from "../../store/appState.js";
 import { computeParcelAscent } from "./tlogpMath.js";
 import { TLogPPanel } from "./tlogpPanel.js";
 import { autoSaveLayerConfig } from "../../config/presets.js";
@@ -69,11 +70,14 @@ class TLogPController {
   async loadSounding(map = this.activeMap, win = this.activeWin) {
     let file = this.obsFile || win?.obsTime || "latest";
     const stn = this.activeStationId || "58362";
+    const histDate = getActiveHistoryDate();
 
     try {
       let data = null;
       try {
-        data = await fetchJson("/api/data/tlogp", { file, station: stn });
+        const queryParams = { file, station: stn };
+        if (histDate) queryParams.date = histDate;
+        data = await fetchJson("/api/data/tlogp", queryParams);
       } catch (fetchErr) {
         if (file && file !== "latest") {
           console.warn(`[TLogPController] Sounding file ${file} unavailable for ${stn}, trying synoptic/latest fallback...`);
@@ -88,7 +92,9 @@ class TLogPController {
           for (const cand of candidates) {
             if (cand && cand !== file) {
               try {
-                const fbData = await fetchJson("/api/data/tlogp", { file: cand, station: stn });
+                const candParams = { file: cand, station: stn };
+                if (histDate) candParams.date = histDate;
+                const fbData = await fetchJson("/api/data/tlogp", candParams);
                 if (fbData && fbData.levels && fbData.levels.length > 0) {
                   data = fbData;
                   this.obsFile = cand;

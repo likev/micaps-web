@@ -2,7 +2,7 @@
 import { generateDynamicForecastCycles } from "../../utils/timelineSync.js";
 import { DEFAULT_MOCK_OBS_FILES } from "../../config/presets.js";
 import { selectObsChipsWindow, filterObsFilesByStep } from "./timelineMath.js";
-import { parseTimestamp, resolveLayerTime } from "../../utils/timeResolver.js";
+import { parseTimestamp, resolveLayerTime, getReferenceNowMs } from "../../utils/timeResolver.js";
 
 export const DEFAULT_PLAYBACK_MS = 1500;
 
@@ -19,11 +19,13 @@ export function createTimelineState(winId = "default", overrides = {}) {
   let initialCursor = overrides.wallClockCursor;
   if (!initialCursor) {
     if (isObs && obs.length > 0) {
-      initialCursor = parseTimestamp(obs[Math.max(0, obs.length - 1)]) || Date.now();
+      initialCursor = parseTimestamp(obs[Math.max(0, obs.length - 1)]) || getReferenceNowMs();
+    } else if (isObs) {
+      initialCursor = getReferenceNowMs();
     } else {
       const initCycle = overrides.currentInitCycle || (cycles && cycles.length > 0 ? cycles[0] : "26082820");
       const period = overrides.discretePeriods ? overrides.discretePeriods[overrides.currentPeriodIdx ?? 4] : 24;
-      const cycleTs = parseTimestamp(initCycle) || Date.now();
+      const cycleTs = parseTimestamp(initCycle) || getReferenceNowMs();
       initialCursor = cycleTs + (period || 0) * 3600 * 1000;
     }
   }
@@ -263,7 +265,7 @@ export function toggleMultiTrack(tl, forceValue = null) {
 
 export function updateLayerResolutions(tl, layers) {
   if (!tl || !Array.isArray(layers)) return {};
-  const cursor = tl.wallClockCursor || Date.now();
+  const cursor = tl.wallClockCursor || getReferenceNowMs();
   const isLive = tl.timelineMode === "live";
   const map = {};
   for (const layer of layers) {

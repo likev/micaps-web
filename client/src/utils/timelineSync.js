@@ -3,6 +3,7 @@ import { setTimelineMode, filterObsFilesByStep } from "../ui/timeSlider.js";
 import { getActiveWindow } from "../ui/tabWindowManager.js";
 import { DEFAULT_MOCK_OBS_FILES } from "../config/presets.js";
 import { parseTimestamp } from "./timeResolver.js";
+import { getActiveHistoryDate } from "../store/appState.js";
 
 const forecastCyclesCache = {};
 const FORECAST_CYCLES_TTL_MS = 5 * 60 * 1000;
@@ -15,6 +16,24 @@ export function invalidateForecastCyclesCache(key = null) {
       delete forecastCyclesCache[k];
     }
   }
+}
+
+export function generateHistoricalMockObsFiles(histDate) {
+  const parts = String(histDate).split("-").map((v) => parseInt(v, 10));
+  const y = parts[0];
+  const m = parts[1] || 1;
+  const d = parts[2] || 1;
+  const baseTime = Date.UTC(y, m - 1, d, 20, 0, 0);
+  const files = [];
+  for (let i = 0; i < 55; i++) {
+    const dt = new Date(baseTime - (54 - i) * 3 * 3600 * 1000);
+    const yy = dt.getUTCFullYear();
+    const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(dt.getUTCDate()).padStart(2, "0");
+    const hh = String(dt.getUTCHours()).padStart(2, "0");
+    files.push(`${yy}${mm}${day}${hh}0000.000`);
+  }
+  return files;
 }
 
 export function generateDynamicForecastCycles(base = null, count = 10) {
@@ -38,12 +57,22 @@ export function generateDynamicForecastCycles(base = null, count = 10) {
     const dayOffset = bjtHour < 8 ? 1 : 0;
     baseDate = new Date(Date.UTC(bjt.getUTCFullYear(), bjt.getUTCMonth(), bjt.getUTCDate() - dayOffset, initHour));
   } else {
-    const now = new Date();
-    const bjt = new Date(now.getTime() + 8 * 3600 * 1000);
-    const bjtHour = bjt.getUTCHours();
-    initHour = bjtHour >= 20 ? 20 : (bjtHour >= 8 ? 8 : 20);
-    const dayOffset = bjtHour < 8 ? 1 : 0;
-    baseDate = new Date(Date.UTC(bjt.getUTCFullYear(), bjt.getUTCMonth(), bjt.getUTCDate() - dayOffset, initHour));
+    const histDate = getActiveHistoryDate();
+    if (histDate) {
+      const parts = histDate.split("-").map((v) => parseInt(v, 10));
+      const hy = parts[0];
+      const hm = parts[1] || 1;
+      const hd = parts[2] || 1;
+      initHour = 20;
+      baseDate = new Date(Date.UTC(hy, hm - 1, hd, initHour));
+    } else {
+      const now = new Date();
+      const bjt = new Date(now.getTime() + 8 * 3600 * 1000);
+      const bjtHour = bjt.getUTCHours();
+      initHour = bjtHour >= 20 ? 20 : (bjtHour >= 8 ? 8 : 20);
+      const dayOffset = bjtHour < 8 ? 1 : 0;
+      baseDate = new Date(Date.UTC(bjt.getUTCFullYear(), bjt.getUTCMonth(), bjt.getUTCDate() - dayOffset, initHour));
+    }
   }
 
   const cycles = [];
@@ -88,16 +117,75 @@ export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP",
   const path = hasLevel ? `${model}/${elem}/${level}` : `${model}/${elem}`;
   const shortPath = `${model}/${elem}`;
 
+  const histDate = getActiveHistoryDate();
+  const cacheKey = `${path}@${histDate || "latest"}`;
+
   if (!forceRefresh) {
-    // Keep cache entries scoped to the complete data path. A model-wide alias
-    // can return the cycle list for a different element/level and, more
-    // importantly, keeps the timeline stale after a new model run appears.
-    const cached = forecastCyclesCache[path];
+    const cached = forecastCyclesCache[cacheKey];
     if (cached && Array.isArray(cached.data) && cached.data.length && (Date.now() - cached.ts) < FORECAST_CYCLES_TTL_MS) {
       return cached.data;
     }
   }
 
+  if (histDate) {
+    const histPrefix = histDate.replace(/-/g, "").slice(2, 8);
+    // Priority 1: Bounded treeview catalog query with limit=100
+    try {
+      const fileEntries = await fetchTree(path, 100, forceRefresh ? { bypassCache: true } : {});
+      let cycles = extractCyclesFromFiles(fileEntries);
+      cycles = cycles.filter((c) => c.slice(0, 6) <= histPrefix);
+      if (cycles.length > 0) {
+        if (cycles.length === 1) {
+          cycles = generateDynamicForecastCycles(cycles[0], 10);
+        }
+        forecastCyclesCache[cacheKey] = { data: cycles, ts: Date.now() };
+        return cycles;
+      }
+    } catch (err) {
+      console.warn(`[Forecast] History fetchTree failed for ${path}:`, err);
+    }
+
+    if (shortPath !== path) {
+      try {
+        const fileEntries = await fetchTree(shortPath, 100, forceRefresh ? { bypassCache: true } : {});
+        let cycles = extractCyclesFromFiles(fileEntries);
+        cycles = cycles.filter((c) => c.slice(0, 6) <= histPrefix);
+        if (cycles.length > 0) {
+          if (cycles.length === 1) {
+            cycles = generateDynamicForecastCycles(cycles[0], 10);
+          }
+          forecastCyclesCache[cacheKey] = { data: cycles, ts: Date.now() };
+          return cycles;
+        }
+      } catch (err) {
+        console.warn(`[Forecast] History fetchTree failed for ${shortPath}:`, err);
+      }
+    }
+
+    // Priority 2: fetchLatest
+    try {
+      const requestOptions = forceRefresh ? { bypassCache: true } : {};
+      const latestRes = await fetchLatest(path, "*.024", requestOptions);
+      const latestStr = typeof latestRes === "string" ? latestRes : (latestRes?.latest || latestRes?.value || latestRes?.file);
+      if (latestStr) {
+        let cycles = generateDynamicForecastCycles(latestStr, 10);
+        cycles = cycles.filter((c) => c.slice(0, 6) <= histPrefix);
+        if (cycles.length > 0) {
+          forecastCyclesCache[cacheKey] = { data: cycles, ts: Date.now() };
+          return cycles;
+        }
+      }
+    } catch (_) {}
+
+    // Priority 3: Fallback anchored at historyDate
+    const [hy, hm, hd] = histDate.split("-").map((v) => parseInt(v, 10));
+    const histFallbackDate = new Date(Date.UTC(hy, (hm || 1) - 1, hd || 1, 20));
+    const dynamicFallback = generateDynamicForecastCycles(histFallbackDate, 10);
+    forecastCyclesCache[cacheKey] = { data: dynamicFallback, ts: Date.now() };
+    return dynamicFallback;
+  }
+
+  // Live mode priorities
   // 1. First priority: O(1) point lookup in latestdatatime index table
   try {
     const requestOptions = forceRefresh ? { bypassCache: true } : {};
@@ -106,7 +194,7 @@ export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP",
     if (latestStr) {
       const cycles = generateDynamicForecastCycles(latestStr, 10);
       if (cycles.length > 0) {
-        forecastCyclesCache[path] = { data: cycles, ts: Date.now() };
+        forecastCyclesCache[cacheKey] = { data: cycles, ts: Date.now() };
         return cycles;
       }
     }
@@ -118,7 +206,7 @@ export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP",
       if (latestStr) {
         const cycles = generateDynamicForecastCycles(latestStr, 10);
         if (cycles.length > 0) {
-          forecastCyclesCache[path] = { data: cycles, ts: Date.now() };
+          forecastCyclesCache[cacheKey] = { data: cycles, ts: Date.now() };
           return cycles;
         }
       }
@@ -130,7 +218,7 @@ export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP",
     const fileEntries = await fetchTree(path, 100, forceRefresh ? { bypassCache: true } : {});
     const cycles = extractCyclesFromFiles(fileEntries);
     if (cycles.length > 0) {
-      forecastCyclesCache[path] = { data: cycles, ts: Date.now() };
+      forecastCyclesCache[cacheKey] = { data: cycles, ts: Date.now() };
       return cycles;
     }
   } catch (err) {
@@ -143,7 +231,7 @@ export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP",
       const fileEntries = await fetchTree(shortPath, 100, forceRefresh ? { bypassCache: true } : {});
       const cycles = extractCyclesFromFiles(fileEntries);
       if (cycles.length > 0) {
-        forecastCyclesCache[path] = { data: cycles, ts: Date.now() };
+        forecastCyclesCache[cacheKey] = { data: cycles, ts: Date.now() };
         return cycles;
       }
     } catch (err) {
@@ -153,7 +241,7 @@ export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP",
 
   // 4. Dynamic fallback based on real-time clock
   const dynamicFallback = generateDynamicForecastCycles(null, 10);
-  forecastCyclesCache[path] = { data: dynamicFallback, ts: Date.now() };
+  forecastCyclesCache[cacheKey] = { data: dynamicFallback, ts: Date.now() };
   return dynamicFallback;
 }
 
@@ -191,13 +279,15 @@ export async function syncObservationTimeline(path, currentFile = null, winTitle
   if (targetLevel !== null && targetLevel !== undefined && targetLevel !== "") {
     treeOpts.level = targetLevel;
   }
+  const histDate = getActiveHistoryDate();
+  const mockObsFiles = histDate ? generateHistoricalMockObsFiles(histDate) : DEFAULT_MOCK_OBS_FILES;
   try {
     const fileEntries = await fetchTree(path, 100, treeOpts);
     if (Array.isArray(fileEntries) && fileEntries.length > 0) {
       let validFiles = fileEntries.filter((f) => f.name && (f.size > 100 || f.size === 0)).map((f) => f.name);
       const hasObsFormat = validFiles.some((f) => parseTimestamp(f) !== null);
       const isMockFallback = !hasObsFormat;
-      validFiles = hasObsFormat ? validFiles.filter((f) => parseTimestamp(f) !== null) : [...DEFAULT_MOCK_OBS_FILES];
+      validFiles = hasObsFormat ? validFiles.filter((f) => parseTimestamp(f) !== null) : [...mockObsFiles];
       if (validFiles.length > 0) {
         // Sort chronologically by parsed timestamp
         const chronologicalFiles = [...validFiles].sort((a, b) => {
@@ -207,7 +297,7 @@ export async function syncObservationTimeline(path, currentFile = null, winTitle
           return a.localeCompare(b);
         });
         const rawFiles = isMockFallback && chronologicalFiles.length < 2
-          ? [...DEFAULT_MOCK_OBS_FILES]
+          ? [...mockObsFiles]
           : chronologicalFiles.slice(-100);
 
         const filteredFiles = filterObsFilesByStep(rawFiles, stepLength, isUpper);
@@ -225,7 +315,7 @@ export async function syncObservationTimeline(path, currentFile = null, winTitle
   } catch (err) {
     console.warn("[Main] Failed to query observation file tree for timeline:", err);
   }
-  const rawFallback = [...DEFAULT_MOCK_OBS_FILES];
+  const rawFallback = [...mockObsFiles];
   const filteredFallback = filterObsFilesByStep(rawFallback, stepLength, isUpper);
   let fallbackFile = !forceLatest && currentFile && filteredFallback.includes(currentFile)
     ? currentFile

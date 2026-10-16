@@ -1,6 +1,7 @@
 // imageLayer.js - Geo-registered raster imagery layer renderer (e.g. FY-2G DUST RGB BMP)
 import { addOrUpdateLayer, removeLayer, syncLayerControlForWindow } from "../ui/layers/layerStore.js";
 import { getActiveWindow } from "../ui/tabs/tabsStore.js";
+import { getActiveHistoryDate } from "../store/appState.js";
 
 export function getImageDOMIds(layerId) {
   const safeId = (layerId || "image-layer").replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -35,7 +36,11 @@ export async function loadImageLayer(map, layer, win = null) {
   const coordinates = boundsToCoordinates(bounds);
   const opacity = typeof layer.opacity === "number" ? layer.opacity : 0.85;
 
-  const url = `/api/data/image?path=${encodeURIComponent(layer.path || "SATELLITE/FY2G/L2/DUST")}&file=${encodeURIComponent(file)}&format=png`;
+  const histDate = getActiveHistoryDate();
+  let url = `/api/data/image?path=${encodeURIComponent(layer.path || "SATELLITE/FY2G/L2/DUST")}&file=${encodeURIComponent(file)}&format=png`;
+  if (histDate) {
+    url += `&date=${encodeURIComponent(histDate)}`;
+  }
 
   try {
     const effectiveOpacity = layer.visible === false ? 0 : opacity;

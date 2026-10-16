@@ -13,7 +13,7 @@
   import { getWindowById } from "../lib/stores/tabs.svelte.js";
   import LayerRow from "./LayerRow.svelte";
   import StatusPanel from "./StatusPanel.svelte";
-  import { resolveLayerTime, parseTimestamp } from "../utils/timeResolver.js";
+  import { resolveLayerTime, parseTimestamp, getReferenceNowMs } from "../utils/timeResolver.js";
 
   let { winId = null, onLayerAction = null } = $props();
 
@@ -28,7 +28,7 @@
         winObj?.wallClockCursor ||
         (winObj?.obsTime ? parseTimestamp(winObj.obsTime) : null) ||
         (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
-        Date.now()
+        getReferenceNowMs()
       );
     }
     const nwpValidTime = winObj?.forecastCycle
@@ -38,7 +38,7 @@
       nwpValidTime ||
       winObj?.wallClockCursor ||
       (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
-      Date.now()
+      getReferenceNowMs()
     );
   });
 

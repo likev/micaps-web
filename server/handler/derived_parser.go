@@ -19,6 +19,7 @@ type DerivedRequest struct {
 	Level1         string // e.g. "850", "SURFACE", "0"
 	Level2         string // e.g. "500"
 	File           string // e.g. "26100920.012" or "20261010080000.000"
+	DateCutoff     string // e.g. "20260910"
 	RawPath        string
 }
 

@@ -20,7 +20,7 @@
   import { stepWindowTimeline } from "../lib/services/appWorkflow.js";
   import { getWindowById } from "../lib/stores/tabs.svelte.js";
   import { getLayersForWindow } from "../lib/stores/layersCore.js";
-  import { parseTimestamp } from "../utils/timeResolver.js";
+  import { parseTimestamp, getReferenceNowMs } from "../utils/timeResolver.js";
   import MultiTrackTimeline from "./timeline/MultiTrackTimeline.svelte";
   import {
     isRain12Element,
@@ -256,7 +256,7 @@
       }
     } else {
       if (periods.length > 0 && currentCycle) {
-        const cycleTs = parseTimestamp(currentCycle) || Date.now();
+        const cycleTs = parseTimestamp(currentCycle) || getReferenceNowMs();
         const diffHours = (targetMs - cycleTs) / (3600 * 1000);
         let closestIdx = 0;
         let minDiff = Infinity;

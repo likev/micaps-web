@@ -2,7 +2,7 @@
   import { isWindRelated, isUpperAirStationLayer, getStationDatasetType } from "../ui/layers/layerDefaults.js";
   import { buildLevelsFromInterval } from "../layers/contour/contourLevels.js";
   import { getPaletteCategory, listPaletteFiles } from "../utils/paletteLoader.js";
-  import { parseOffset, formatOffset, resolveLayerTime } from "../utils/timeResolver.js";
+  import { parseOffset, formatOffset, resolveLayerTime, parseTimestamp, getReferenceNowMs } from "../utils/timeResolver.js";
   import StationFilter from "./StationFilter.svelte";
 
   let {
@@ -78,7 +78,7 @@
       (layer.forecastCycle ? parseTimestamp({ cycle: layer.forecastCycle, period: layer.period ?? 0 }) : null) ||
       (layer.cycle ? parseTimestamp({ cycle: layer.cycle, period: layer.period ?? 0 }) : null) ||
       (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
-      Date.now();
+      getReferenceNowMs();
     return resolveLayerTime(layer, cursor);
   });
 

@@ -1,5 +1,5 @@
 <script>
-  import { resolveAllLayersForStatus, formatOffset, isBasemapLayer } from "../utils/timeResolver.js";
+  import { resolveAllLayersForStatus, formatOffset, isBasemapLayer, getReferenceNowMs } from "../utils/timeResolver.js";
 
   let {
     layers = [],
@@ -12,7 +12,7 @@
   let weatherLayers = $derived(layers.filter((l) => !isBasemapLayer(l)));
 
   let resolvedLayers = $derived.by(() => {
-    const cur = cursorTime || (typeof window !== "undefined" && window.__MICAPS_CURSOR__) || Date.now();
+    const cur = cursorTime || (typeof window !== "undefined" && window.__MICAPS_CURSOR__) || getReferenceNowMs();
     return resolveAllLayersForStatus(weatherLayers, cur);
   });
 

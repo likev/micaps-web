@@ -13,7 +13,7 @@ import { updateLegend, removeLegend } from "../ui/legend.js";
 import { schedulePrefetch } from "./prefetchService.js";
 import { showErrorToast } from "../ui/toast.js";
 import { appState } from "../store/appState.js";
-import { resolveLayerTime, parseTimestamp } from "../utils/timeResolver.js";
+import { resolveLayerTime, parseTimestamp, getReferenceNowMs } from "../utils/timeResolver.js";
 
 export async function renderSoundingDerivedContoursForStation(map, stations, curLevel, activeGroup, win, stationLayerId) {
   if (!curLevel || activeGroup?.id === "composite-tlogp" || activeGroup?.hasLevel === false) return;
@@ -69,7 +69,7 @@ export async function renderSoundingDerivedContoursForStation(map, stations, cur
         const cursorTime = win?.wallClockCursor ||
           (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
           (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
-          Date.now();
+          getReferenceNowMs();
         const stationLayer = getLayerById(stationLayerId, win);
         const rawSamples = cLayer.sampleTimes || stationLayer?.sampleTimes || win?._obsTimeline?.files;
         const sampleTimes = Array.isArray(rawSamples) ? [...rawSamples].sort((a, b) => a.localeCompare(b)) : rawSamples;
@@ -287,7 +287,7 @@ export async function renderSurfaceDerivedContoursForStation(map, stations, acti
         const cursorTime = win?.wallClockCursor ||
           (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
           (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
-          Date.now();
+          getReferenceNowMs();
         const stationLayer = getLayerById(stationLayerId, win);
         const rawSamples = cLayer.sampleTimes || stationLayer?.sampleTimes || win?._obsTimeline?.files;
         const sampleTimes = Array.isArray(rawSamples) ? [...rawSamples].sort((a, b) => a.localeCompare(b)) : rawSamples;
@@ -497,7 +497,7 @@ export async function loadUpperAirComposite(map, level = 500, obsTime = "2026082
   const cursorTime = win?.wallClockCursor ||
     (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
     (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
-    Date.now();
+    getReferenceNowMs();
   const stnResolved = resolveLayerTime(groupStationLayer || {
     id: layerId,
     type: "station",
@@ -607,7 +607,7 @@ export async function loadObservationProduct(map, model, element, level, file, w
     const cursorTime = win?.wallClockCursor ||
       (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
       (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
-      Date.now();
+      getReferenceNowMs();
     const stnResolved = resolveLayerTime(groupStationLayer || {
       id: layerId,
       type: "station",

@@ -5,6 +5,27 @@
 // - Tolerance windows & staleness classification (current, soft-stale, hard-stale, desync)
 // - Age & Zulu time formatters
 
+import { getActiveHistoryDate } from "../store/appState.js";
+
+/**
+ * Returns current continuous reference wall-clock time in milliseconds.
+ * In live mode, returns Date.now().
+ * In History Mode, anchors to the selected historical date at 23:59:59 UTC.
+ */
+export function getReferenceNowMs() {
+  const histDate = getActiveHistoryDate();
+  if (histDate) {
+    const parts = String(histDate).split("-").map((v) => parseInt(v, 10));
+    const y = parts[0];
+    const m = parts[1] || 1;
+    const d = parts[2] || 1;
+    if (!isNaN(y)) {
+      return Date.UTC(y, m - 1, d, 23, 59, 59);
+    }
+  }
+  return Date.now();
+}
+
 /**
  * Default element tolerance in minutes
  */

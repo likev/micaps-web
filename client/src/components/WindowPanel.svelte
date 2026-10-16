@@ -2,7 +2,7 @@
   import MapViewport from "../map/MapViewport.svelte";
   import Legend from "./Legend.svelte";
   import { getLayersForWindow } from "../lib/stores/layersCore.js";
-  import { resolveAllLayersForStatus, parseTimestamp } from "../utils/timeResolver.js";
+  import { resolveAllLayersForStatus, parseTimestamp, getReferenceNowMs } from "../utils/timeResolver.js";
 
   let {
     win,
@@ -21,7 +21,7 @@
         win?.wallClockCursor ||
         (win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
         (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
-        Date.now()
+        getReferenceNowMs()
       );
     }
     const nwpValidTime = win?.forecastCycle
@@ -31,7 +31,7 @@
       nwpValidTime ||
       win?.wallClockCursor ||
       (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
-      Date.now()
+      getReferenceNowMs()
     );
   });
 

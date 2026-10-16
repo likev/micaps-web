@@ -1,6 +1,7 @@
 // profilerLayer.js - Tropospheric wind profiler station network and vertical profile panel
 import { addOrUpdateLayer, removeLayer, syncLayerControlForWindow } from "../ui/layers/layerStore.js";
 import { getActiveWindow } from "../ui/tabs/tabsStore.js";
+import { getActiveHistoryDate } from "../store/appState.js";
 import { drawWindBarbCanvas } from "./station/stationSymbols.js";
 
 const DEFAULT_STATION = "58362";
@@ -101,9 +102,13 @@ class ProfilerPanelController {
   }
 
   async fetchAndRender(stationId, product, file) {
+    const histDate = getActiveHistoryDate();
     let url = `/api/data/windprofiler?station=${encodeURIComponent(stationId)}&product=${encodeURIComponent(product || "ROBS")}`;
     if (file) {
       url += `&file=${encodeURIComponent(file)}`;
+    }
+    if (histDate) {
+      url += `&date=${encodeURIComponent(histDate)}`;
     }
 
     try {

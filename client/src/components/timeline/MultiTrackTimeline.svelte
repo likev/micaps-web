@@ -8,7 +8,9 @@
     resolveLayerTime,
     generateCadenceSampleEntries,
     isBasemapLayer,
+    getReferenceNowMs,
   } from "../../utils/timeResolver.js";
+  import { app } from "../../lib/stores/app.svelte.js";
 
   let {
     winId = "default",
@@ -38,7 +40,7 @@
     timeline?.wallClockCursor ||
     (timeline?.obsFiles?.length ? parseTimestamp(timeline.obsFiles[timeline.currentObsIdx]) : null) ||
     (timeline?.currentInitCycle || timeline?.forecastCycle ? parseTimestamp({ cycle: timeline.currentInitCycle || timeline.forecastCycle, period: timeline.discretePeriods?.[timeline.currentPeriodIdx] ?? 24 }) : null) ||
-    Date.now()
+    getReferenceNowMs()
   );
 
   let isDraggingPlayhead = false;
@@ -113,9 +115,17 @@
     }
   });
 
+  // When in history mode, force review mode and do not run live mode ticker
+  $effect(() => {
+    if (app.historyMode && mode === "live") {
+      mode = "review";
+      if (timeline) timeline.timelineMode = "review";
+    }
+  });
+
   // Live mode ticker: advances cursor every 10s (§2.6)
   $effect(() => {
-    if (mode !== "live") return;
+    if (mode !== "live" || app.historyMode) return;
     cursorMs = Date.now();
     windowCenterMs = cursorMs;
     const timer = setInterval(() => {
@@ -295,7 +305,7 @@
   });
 
   let obsCutoffMs = $derived.by(() => {
-    if (mode === "live") return Date.now();
+    if (mode === "live") return getReferenceNowMs();
     if (!mixesObsAndForecast) return null;
     if (timeline?.forecastCycle || timeline?.currentInitCycle || timeline?.initCycle) {
       const cycleTs = parseTimestamp(timeline.forecastCycle || timeline.currentInitCycle || timeline.initCycle);
@@ -452,6 +462,7 @@
   }
 
   function handleModeToggle() {
+    if (app.historyMode) return;
     const next = mode === "live" ? "review" : "live";
     mode = next;
     if (timeline) timeline.timelineMode = next;
@@ -609,11 +620,15 @@
       <button
         type="button"
         class="mode-toggle-btn"
-        class:is-live={mode === "live"}
+        class:is-live={mode === "live" && !app.historyMode}
+        class:is-history={app.historyMode}
         onclick={handleModeToggle}
-        title={mode === "live" ? "Switch to Review Mode (scrubbable)" : "Switch to Live Mode (pinned to now)"}
+        disabled={app.historyMode}
+        title={app.historyMode ? "Locked to Review Mode in History Mode" : (mode === "live" ? "Switch to Review Mode (scrubbable)" : "Switch to Live Mode (pinned to now)")}
       >
-        {#if mode === "live"}
+        {#if app.historyMode}
+          <span class="review-icon">⏱</span> HISTORY REVIEW
+        {:else if mode === "live"}
           <span class="live-dot">●</span> LIVE (NOWCAST)
         {:else}
           <span class="review-icon">⏱</span> REVIEW MODE
@@ -954,6 +969,13 @@
     background: rgba(63, 185, 80, 0.2);
     border-color: rgba(63, 185, 80, 0.5);
     color: #3fb950;
+  }
+
+  .mode-toggle-btn.is-history {
+    background: rgba(210, 153, 34, 0.2);
+    border-color: rgba(210, 153, 34, 0.5);
+    color: #e3b341;
+    cursor: not-allowed;
   }
 
   .live-dot {

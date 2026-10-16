@@ -35,5 +35,13 @@ export function createInitialAppState() {
 
     status: "connecting",
     isMock: false,
+
+    historyMode: false,
+    historyDate: "", // "YYYY-MM-DD", e.g. "2026-09-10"
   };
+}
+
+export function getActiveHistoryDate(state) {
+  if (!state) return null;
+  return (state.historyMode && state.historyDate) ? state.historyDate : null;
 }

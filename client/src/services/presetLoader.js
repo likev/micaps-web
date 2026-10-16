@@ -21,7 +21,7 @@ import { loadWeatherField } from "./weatherLoader.js";
 import { loadObservationProduct } from "./derivedContours.js";
 import { schedulePrefetch } from "./prefetchService.js";
 import { loadPresetGroups, PRESET_GROUPS } from "../config/presets.js";
-import { resolveLayerTime, parseTimestamp } from "../utils/timeResolver.js";
+import { resolveLayerTime, parseTimestamp, getReferenceNowMs } from "../utils/timeResolver.js";
 import { fetchTree, fetchStationObservations } from "../api/catalogApi.js";
 import { analyzeAndRenderSoundingElementContour } from "../layers/soundingAnalysis.js";
 import { triggerRasterOverlay } from "../ui/layerActions.js";
@@ -268,7 +268,7 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
     (!group.isObservation && win?.forecastCycle ? parseTimestamp({ cycle: win.forecastCycle, period: curPeriod ?? 0 }) : null) ||
     (group.isObservation && win?.obsTime ? parseTimestamp(win.obsTime) : null) ||
     (typeof window !== "undefined" && window.__MICAPS_CURSOR__) ||
-    Date.now();
+    getReferenceNowMs();
 
   const results = await Promise.allSettled(
     group.layers.map(async (layer) => {

@@ -121,6 +121,11 @@
   <!-- Center section: timeline-info -->
   <div class="status-bar-center">
     <div class="timeline-info" aria-label="Timeline Status">
+      {#if app.historyMode && app.historyDate}
+        <span id="status-history-badge" class="history-badge" title="History Mode Cutoff: {app.historyDate} 24:00">
+          HISTORY · {app.historyDate}
+        </span>
+      {/if}
       <span class="mode-badge" class:obs-badge={isObs}>
         {isObs ? "OBSERVATION" : "NWP FORECAST"}
       </span>
@@ -325,6 +330,17 @@
     font-size: 11px;
     font-family: var(--font-mono, monospace);
     min-width: 0;
+  }
+
+  .history-badge {
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: rgba(210, 153, 34, 0.2);
+    border: 1px solid #d29922;
+    color: #e3b341;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
   }
 
   .mode-badge {

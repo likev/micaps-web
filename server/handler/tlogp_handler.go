@@ -31,13 +31,18 @@ func (h *TLogPHandler) Handler(w http.ResponseWriter, r *http.Request) {
 
 	file := SanitizeFile(r.URL.Query().Get("file"))
 	station := strings.TrimSpace(strings.ReplaceAll(r.URL.Query().Get("station"), "\x00", ""))
+	beforeDate, err := ParseHistoryDateParam(r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
+		return
+	}
 
 	if h.MockMode {
 		h.handleMock(w, station, file)
 		return
 	}
 
-	decompressed, resolvedFile, err := h.getDecompressedData(file)
+	decompressed, resolvedFile, err := h.getDecompressedData(file, beforeDate)
 	if err != nil {
 		if h.MockMode {
 			h.handleMock(w, station, file)
@@ -89,16 +94,16 @@ func (h *TLogPHandler) handleMock(w http.ResponseWriter, station, file string) {
 	}
 }
 
-func (h *TLogPHandler) getDecompressedData(file string) ([]byte, string, error) {
+func (h *TLogPHandler) getDecompressedData(file string, beforeDate ...string) ([]byte, string, error) {
 	if h.Client == nil {
 		return nil, "", fmt.Errorf("CQL client is not connected")
 	}
 
 	if file == "" || file == "latest" {
-		latest, err := db.GetLatestCycle(h.Client, "UPPER_AIR/TLOGP", "")
+		latest, err := db.GetLatestCycle(h.Client, "UPPER_AIR/TLOGP", "", beforeDate...)
 		if err != nil {
 			// Fall back to first treeview entry
-			files, fErr := db.GetFileList(h.Client, "UPPER_AIR/TLOGP", 1)
+			files, fErr := db.GetFileList(h.Client, "UPPER_AIR/TLOGP", 1, beforeDate...)
 			if fErr == nil && len(files) > 0 {
 				latest = files[0].Name
 			} else {
