@@ -320,7 +320,7 @@
 }
 
 [data-theme="light"] .preset-dropdown {
-  overflow: visible !important;
+  overflow: visible;
 }
 
 [data-theme="dark"] tabpanel,
@@ -335,7 +335,7 @@
 }
 
 [data-theme="dark"] .preset-dropdown {
-  overflow: visible !important;
+  overflow: visible;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }

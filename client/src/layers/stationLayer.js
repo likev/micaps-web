@@ -14,6 +14,8 @@ export {
   extractPressureOrHeight,
   hashStation,
   getFieldValue,
+  extractSnowDepth,
+  extractPressureChange,
 } from "./station/stationExtract.js";
 
 export {

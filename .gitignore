@@ -40,6 +40,7 @@ yarn-error.log*
 *.jpeg
 test_*.json
 verified_*.json
+artifacts/
 
 # OS & Editor Files
 .DS_Store

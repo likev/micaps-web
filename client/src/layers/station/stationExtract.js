@@ -14,6 +14,9 @@ export const FIELD_KEYS = {
   RAIN_24H: ["rain_24h", "RAIN_24H", "rain24h", "PRE_24h", "RAIN_24h"],
   RAIN_GEN: ["rain", "RAIN"],
   HEIGHT: ["height", "HGT", "hgt", "Height", "GH"],
+  SNOW_DEPTH: ["snow_depth", "snow_depth_24h", "snowDepth", "snow", "SNOW", "sno", "SD", "sd", "snod", "depth", "val", "value"],
+  PRESS_DIFF_3H: ["press_diff_3h", "pDiff3h", "pDiff", "press_diff", "PRS_Change_3h", "p3", "press_change_3h", "pressure_diff_3h", "val", "value"],
+  PRESS_DIFF_24H: ["press_diff_24h", "pDiff24h", "pDiff24", "press_diff_24", "PRS_Change_24h", "p24", "press_change_24h", "pressure_diff_24h", "val", "value"],
 };
 
 export function extractRawNumber(props, keys, minValid = -Infinity, maxValid = Infinity) {
@@ -160,7 +163,40 @@ export function getFieldValue(p, field) {
     case "HGT": {
       return extractRawNumber(p, FIELD_KEYS.HEIGHT, -500, 45000);
     }
+    case "SnowDepth":
+    case "snow_depth":
+    case "SNOW_DEPTH": {
+      return extractRawNumber(p, FIELD_KEYS.SNOW_DEPTH, 0, 10000);
+    }
+    case "PressDiff3h":
+    case "press_diff_3h":
+    case "PRES_CHANGE_3H":
+    case "PRESS_DIFF_3H": {
+      return extractRawNumber(p, FIELD_KEYS.PRESS_DIFF_3H, -500, 500);
+    }
+    case "PressDiff24h":
+    case "press_diff_24h":
+    case "PRES_CHANGE_24H":
+    case "PRESS_DIFF_24H": {
+      return extractRawNumber(p, FIELD_KEYS.PRESS_DIFF_24H, -500, 500);
+    }
     default:
       return null;
   }
+}
+
+export function extractSnowDepth(props) {
+  return extractRawNumber(props, FIELD_KEYS.SNOW_DEPTH, 0, 10000);
+}
+
+export function extractPressureChange(props, hours = null) {
+  if (hours === 24) {
+    return extractRawNumber(props, FIELD_KEYS.PRESS_DIFF_24H, -500, 500);
+  }
+  if (hours === 3) {
+    return extractRawNumber(props, FIELD_KEYS.PRESS_DIFF_3H, -500, 500);
+  }
+  const p3 = extractRawNumber(props, FIELD_KEYS.PRESS_DIFF_3H, -500, 500);
+  if (p3 !== null) return p3;
+  return extractRawNumber(props, FIELD_KEYS.PRESS_DIFF_24H, -500, 500);
 }

@@ -343,3 +343,110 @@ describe("Option A: navBar.js helper methods", () => {
     }
   });
 });
+
+describe("Preset Menu Viewport Constraint & Submenu Positioning", () => {
+  const presetMenuSrc = readSrcText("components/PresetMenu.svelte");
+  const polishCss = readSrcText("styles/polish.css");
+
+  test("PresetMenu.svelte defines overflow-y: auto and max-height on preset-dropdown", () => {
+    expect(presetMenuSrc).toContain(".preset-dropdown {");
+    expect(presetMenuSrc).toContain("overflow-y: auto !important;");
+    expect(presetMenuSrc).toContain("max-height: calc(100vh - var(--navbar-height, 48px) - 16px);");
+  });
+
+  test("PresetMenu.svelte defines overflow-y: auto and max-height on preset-submenu", () => {
+    expect(presetMenuSrc).toContain(".preset-submenu {");
+    expect(presetMenuSrc).toContain("overflow-y: auto !important;");
+    expect(presetMenuSrc).toContain("max-height: calc(100vh - var(--navbar-height, 48px) - 24px);");
+  });
+
+  test("PresetMenu.svelte binds onscroll on preset-dropdown and tracks submenu position", () => {
+    expect(presetMenuSrc).toContain("onscroll={handleDropdownScroll}");
+    expect(presetMenuSrc).toContain("updateSubmenuPosition");
+    expect(presetMenuSrc).toContain("submenuTop");
+    expect(presetMenuSrc).toContain("submenuLeft");
+  });
+
+  test("polish.css enforces viewport-constrained overflow-y: auto for preset-dropdown and preset-submenu", () => {
+    expect(polishCss).toContain("#app .preset-dropdown");
+    expect(polishCss).toContain("#app .preset-submenu");
+    expect(polishCss).toMatch(/#app \.preset-dropdown\s*\{[^}]*overflow-y:\s*auto !important/);
+    expect(polishCss).toMatch(/#app \.preset-submenu\s*\{[^}]*overflow-y:\s*auto !important/);
+  });
+
+  test("Submenu positioning algorithm clamps top inside viewport boundaries", () => {
+    // Simulate updateSubmenuPosition calculation logic
+    function calculateSubmenuTop({
+      catScreenTop,
+      containerScreenTop,
+      dropdownScreenTop,
+      submenuHeight,
+      viewportHeight,
+      padding = 12,
+    }) {
+      const maxAllowedSubmenuHeight = Math.max(160, viewportHeight - dropdownScreenTop - padding);
+      const currentSubmenuHeight = Math.min(submenuHeight, maxAllowedSubmenuHeight);
+
+      let desiredScreenTop = catScreenTop;
+      if (desiredScreenTop + currentSubmenuHeight > viewportHeight - padding) {
+        desiredScreenTop = viewportHeight - padding - currentSubmenuHeight;
+      }
+      const minScreenTop = dropdownScreenTop;
+      if (desiredScreenTop < minScreenTop) {
+        desiredScreenTop = minScreenTop;
+      }
+      return Math.round(desiredScreenTop - containerScreenTop);
+    }
+
+    // Normal viewport (800px)
+    const normalTop = calculateSubmenuTop({
+      catScreenTop: 100,
+      containerScreenTop: 10,
+      dropdownScreenTop: 45,
+      submenuHeight: 300,
+      viewportHeight: 800,
+    });
+    expect(normalTop).toBe(90); // 100 - 10
+
+    // Constrained viewport (500px): category item near bottom at 400px
+    const constrainedTop = calculateSubmenuTop({
+      catScreenTop: 400,
+      containerScreenTop: 10,
+      dropdownScreenTop: 45,
+      submenuHeight: 300,
+      viewportHeight: 500,
+    });
+    // desiredScreenTop clamped to 500 - 12 - 300 = 188
+    // relative top: 188 - 10 = 178
+    expect(constrainedTop).toBe(178);
+
+    // Highly constrained viewport (350px): submenu clamps to dropdown top
+    const tinyTop = calculateSubmenuTop({
+      catScreenTop: 200,
+      containerScreenTop: 10,
+      dropdownScreenTop: 45,
+      submenuHeight: 400,
+      viewportHeight: 350,
+    });
+    // currentSubmenuHeight clamped to 350 - 45 - 12 = 293
+    // desiredScreenTop: min(200, 350 - 12 - 293) = 45
+    expect(tinyTop).toBe(35); // 45 - 10 = 35
+  });
+
+  test("PresetMenu.svelte provides bidirectional hover bridge with ::before and ::after", () => {
+    expect(presetMenuSrc).toContain(".preset-submenu::before,");
+    expect(presetMenuSrc).toContain(".preset-submenu::after");
+  });
+
+  test("PresetMenu.svelte pre-positions submenu synchronously before state update", () => {
+    expect(presetMenuSrc).toContain("function handleCategoryMouseEnter(idx) {");
+    expect(presetMenuSrc).toContain("updateSubmenuPosition(idx);");
+    expect(presetMenuSrc).toContain("activeCategoryIdx = idx;");
+  });
+
+  test("PresetMenu.svelte closes submenu if active category scrolls out of dropdown view", () => {
+    expect(presetMenuSrc).toContain("handleDropdownScroll()");
+    expect(presetMenuSrc).toContain("catRect.bottom < dropdownRect.top || catRect.top > dropdownRect.bottom");
+  });
+});
+

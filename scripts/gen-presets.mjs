@@ -7,9 +7,16 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 const MANIFEST_PATH = resolve(ROOT, "server/testdata/dataset_manifest.json");
 const CONFIG_PATH = resolve(ROOT, "client/config.json");
+const COLORMAPS_PATH = resolve(ROOT, "client/colormaps.json");
 
 const manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
 const config = JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
+let colormaps = {};
+try {
+  colormaps = JSON.parse(readFileSync(COLORMAPS_PATH, "utf8"));
+} catch (e) {
+  colormaps = {};
+}
 
 // 1. Add new meteorological colormaps
 const NEW_COLORMAPS = {
@@ -198,7 +205,12 @@ const NEW_COLORMAPS = {
   ],
 };
 
-config.colormaps = { ...config.colormaps, ...NEW_COLORMAPS };
+colormaps = { ...colormaps, ...NEW_COLORMAPS };
+if (config.colormaps) {
+  for (const k of Object.keys(NEW_COLORMAPS)) {
+    delete config.colormaps[k];
+  }
+}
 
 function getRenderOptions(dataPath) {
   const p = dataPath.toUpperCase();
@@ -446,13 +458,54 @@ for (const item of targetItems) {
     };
   } else if (item.format === "station") {
     layerType = "station";
-    render = {
-      showTemp: true,
-      showDewpoint: true,
-      showPressure: true,
-      showWind: true,
-      showVisibility: true,
-    };
+    if (item.dataPath.includes("SNOW_DEPTH")) {
+      render = {
+        showSnowDepth: true,
+        showTemp: false,
+        showDewpoint: false,
+        showPressure: false,
+        showWind: false,
+        showVisibility: false,
+      };
+    } else if (item.dataPath.includes("PRES_CHANGE_3H")) {
+      render = {
+        showPressDiff3h: true,
+        showPressureChange: true,
+        showTendency: true,
+        showTemp: false,
+        showDewpoint: false,
+        showPressure: false,
+        showWind: false,
+        showVisibility: false,
+      };
+    } else if (item.dataPath.includes("PRES_CHANGE_24H")) {
+      render = {
+        showPressDiff24h: true,
+        showPressureChange: true,
+        showTendency: true,
+        showTemp: false,
+        showDewpoint: false,
+        showPressure: false,
+        showWind: false,
+        showVisibility: false,
+      };
+    } else if (item.dataPath.includes("HORIZONTAL_VISIBILITY") || item.dataPath.includes("VISIBILITY_1MIN")) {
+      render = {
+        showVisibility: true,
+        showTemp: false,
+        showDewpoint: false,
+        showPressure: false,
+        showWind: false,
+      };
+    } else {
+      render = {
+        showTemp: true,
+        showDewpoint: true,
+        showPressure: true,
+        showWind: true,
+        showVisibility: true,
+      };
+    }
   } else if (item.format === "grid_type_11" || item.dataPath.endsWith("WIND") || item.dataPath.includes("COTRECWIND")) {
     layerType = "wind";
     render = {
@@ -519,6 +572,17 @@ const jsonStr = JSON.stringify(config, null, 2).replace(
   /\[\s+(-?\d+(?:\.\d+)?),\s+(-?\d+(?:\.\d+)?),\s+(-?\d+(?:\.\d+)?),\s+(-?\d+(?:\.\d+)?)\s+\]/g,
   "[$1, $2, $3, $4]"
 );
+
+// Compact colormap formatting (one line per stop)
+const colormapsStr = JSON.stringify(colormaps, null, 2)
+  .replace(
+    /\[\s+(-?\d+(?:\.\d+)?),\s+(-?\d+(?:\.\d+)?),\s+(-?\d+(?:\.\d+)?),\s+(-?\d+(?:\.\d+)?)\s+\]/g,
+    "[$1, $2, $3, $4]"
+  )
+  .replace(/\{\s*"val":\s*(-?[\d.]+),\s*"color":\s*(\[[^\]]+\])\s*\}/g, '{ "val": $1, "color": $2 }');
+
+writeFileSync(COLORMAPS_PATH, colormapsStr + "\n", "utf8");
+console.log(`Successfully updated colormaps in ${COLORMAPS_PATH}`);
 
 writeFileSync(CONFIG_PATH, jsonStr + "\n", "utf8");
 console.log(`Successfully generated ${newPresets.length} new presets across 7 categories into ${CONFIG_PATH}`);

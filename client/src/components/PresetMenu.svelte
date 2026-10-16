@@ -38,6 +38,69 @@
 
   let menuContainerRef = $state(null);
   let triggerBtnRef = $state(null);
+  let dropdownRef = $state(null);
+  let submenuRef = $state(null);
+  let submenuTop = $state(0);
+  let submenuLeft = $state(0);
+  let submenuMaxHeight = $state("calc(100vh - var(--navbar-height, 48px) - 24px)");
+
+  function updateSubmenuPosition(targetIdx = activeCategoryIdx) {
+    if (!menuContainerRef || !dropdownRef || targetIdx < 0) return;
+    const catItems = dropdownRef.querySelectorAll(".preset-category-item");
+    const activeCatEl = catItems[targetIdx];
+    if (!activeCatEl) return;
+
+    const containerRect = menuContainerRef.getBoundingClientRect();
+    const dropdownRect = dropdownRef.getBoundingClientRect();
+    const catRect = activeCatEl.getBoundingClientRect();
+
+    const viewportHeight = window.innerHeight || 800;
+    const viewportWidth = window.innerWidth || 1200;
+    const padding = 12;
+
+    const maxAllowedSubmenuHeight = Math.max(160, viewportHeight - dropdownRect.top - padding);
+    submenuMaxHeight = `${maxAllowedSubmenuHeight}px`;
+
+    const submenuElHeight = submenuRef?.offsetHeight || 300;
+    const currentSubmenuHeight = Math.min(submenuElHeight, maxAllowedSubmenuHeight);
+
+    let desiredScreenTop = catRect.top;
+    if (desiredScreenTop + currentSubmenuHeight > viewportHeight - padding) {
+      desiredScreenTop = viewportHeight - padding - currentSubmenuHeight;
+    }
+
+    const minScreenTop = dropdownRect.top;
+    if (desiredScreenTop < minScreenTop) {
+      desiredScreenTop = minScreenTop;
+    }
+
+    submenuTop = Math.round(desiredScreenTop - containerRect.top);
+
+    const submenuWidth = submenuRef?.offsetWidth || 260;
+    if (dropdownRect.right + submenuWidth > viewportWidth - 8 && dropdownRect.left - submenuWidth > 8) {
+      submenuLeft = Math.round(dropdownRect.left - containerRect.left - submenuWidth - 4);
+    } else {
+      submenuLeft = Math.round(dropdownRect.right - containerRect.left + 4);
+    }
+  }
+
+  function handleDropdownScroll() {
+    if (activeCategoryIdx >= 0 && dropdownRef) {
+      const catItems = dropdownRef.querySelectorAll(".preset-category-item");
+      const activeCatEl = catItems[activeCategoryIdx];
+      if (activeCatEl) {
+        const dropdownRect = dropdownRef.getBoundingClientRect();
+        const catRect = activeCatEl.getBoundingClientRect();
+        // If the active category has scrolled completely out of the dropdown view, close submenu
+        if (catRect.bottom < dropdownRect.top || catRect.top > dropdownRect.bottom) {
+          activeCategoryIdx = -1;
+          focusedSubmenuIdx = -1;
+          return;
+        }
+      }
+    }
+    updateSubmenuPosition();
+  }
 
   const CATEGORY_ICONS = {
     "Surface Observations": "🌦️",
@@ -97,9 +160,14 @@
   }
 
   function handleCategoryMouseEnter(idx) {
+    updateSubmenuPosition(idx);
     activeCategoryIdx = idx;
     focusedCategoryIdx = idx;
     focusedSubmenuIdx = -1;
+    tick().then(() => {
+      updateSubmenuPosition(idx);
+      requestAnimationFrame(() => updateSubmenuPosition(idx));
+    });
   }
 
   function handleCategoryClick(idx) {
@@ -107,9 +175,14 @@
       activeCategoryIdx = -1;
       focusedSubmenuIdx = -1;
     } else {
+      updateSubmenuPosition(idx);
       activeCategoryIdx = idx;
       focusedCategoryIdx = idx;
       focusedSubmenuIdx = 0;
+      tick().then(() => {
+        updateSubmenuPosition(idx);
+        requestAnimationFrame(() => updateSubmenuPosition(idx));
+      });
     }
   }
 
@@ -216,15 +289,27 @@
   }
 
   $effect(() => {
+    if (isOpen && activeCategoryIdx >= 0) {
+      tick().then(() => {
+        updateSubmenuPosition();
+        requestAnimationFrame(updateSubmenuPosition);
+      });
+    }
+  });
+
+  $effect(() => {
     if (isOpen && focusedSubmenuIdx >= 0) {
       tick().then(() => {
-        const el = menuContainerRef?.querySelector(".preset-item-btn.focused");
+        const el = submenuRef?.querySelector(".preset-item-btn.focused");
         el?.scrollIntoView?.({ block: "nearest" });
       });
     } else if (isOpen && focusedCategoryIdx >= 0) {
       tick().then(() => {
-        const el = menuContainerRef?.querySelector(".preset-category-item.focused");
+        const catItems = dropdownRef?.querySelectorAll(".preset-category-item");
+        const el = catItems?.[focusedCategoryIdx];
         el?.scrollIntoView?.({ block: "nearest" });
+        updateSubmenuPosition();
+        requestAnimationFrame(updateSubmenuPosition);
       });
     }
   });
@@ -237,9 +322,19 @@
       }
     }
 
+    function handleWindowResize() {
+      if (isOpen && activeCategoryIdx >= 0) {
+        updateSubmenuPosition();
+      }
+    }
+
     document.addEventListener("pointerdown", handleClickOutside);
+    window.addEventListener("resize", handleWindowResize, { passive: true });
+    window.addEventListener("scroll", handleWindowResize, { passive: true });
     return () => {
       document.removeEventListener("pointerdown", handleClickOutside);
+      window.removeEventListener("resize", handleWindowResize);
+      window.removeEventListener("scroll", handleWindowResize);
     };
   });
 </script>
@@ -269,6 +364,8 @@
   {#if isOpen}
     <div
       class="preset-dropdown"
+      bind:this={dropdownRef}
+      onscroll={handleDropdownScroll}
       role="menu"
       aria-label="Preset Categories"
     >
@@ -288,69 +385,72 @@
             onmouseenter={() => handleCategoryMouseEnter(idx)}
             onclick={() => handleCategoryClick(idx)}
           >
-          <div class="category-header">
-            <span class="category-icon">{getCategoryIcon(cat.name)}</span>
-            <span class="category-name">{cat.name}</span>
-            <span class="category-count">{cat.presets.length}</span>
-            <span class="category-arrow">▸</span>
-          </div>
-
-          {#if activeCategoryIdx === idx}
-            <div
-              class="preset-submenu"
-              role="menu"
-              aria-label={cat.name}
-            >
-              {#each cat.presets as preset, pIdx}
-                <div
-                  class="preset-item-btn"
-                  class:active={preset.id === activePresetId}
-                  class:focused={focusedSubmenuIdx === pIdx && activeCategoryIdx === idx}
-                  role="menuitem"
-                  tabindex={focusedSubmenuIdx === pIdx ? 0 : -1}
-                  onmouseenter={() => handleSubmenuMouseEnter(pIdx)}
-                  onclick={(e) => {
-                    e.stopPropagation();
-                    handleSelectPreset(preset);
-                  }}
-                  onkeydown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.stopPropagation();
-                      handleSelectPreset(preset);
-                    }
-                  }}
-                  title={preset.name}
-                >
-                  <span class="preset-check">{preset.id === activePresetId ? "✓" : ""}</span>
-                  <span class="preset-name">{preset.name}</span>
-                  {#if preset.badge}
-                    <span class="preset-badge">{preset.badge}</span>
-                  {:else if preset.hasLevel !== false && (preset.defaultLevel || preset.hasLevel)}
-                    <span class="preset-badge">{preset.defaultLevel || 500} hPa</span>
-                  {:else if preset.hasLevel === false}
-                    <span class="preset-badge">{preset.category?.includes("Derived") ? "Diag" : (preset.isObservation && preset.category?.includes("Upper") ? "Obs" : "Sfc")}</span>
-                  {/if}
-                  <button
-                    type="button"
-                    class="btn-pin-preset"
-                    class:pinned={isPresetPinned(preset.id)}
-                    title={isPresetPinned(preset.id) ? "Unpin preset" : "Pin to quick bar"}
-                    aria-label={isPresetPinned(preset.id) ? "Unpin preset" : "Pin preset"}
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      togglePinPreset(preset.id);
-                    }}
-                  >
-                    {isPresetPinned(preset.id) ? "★" : "☆"}
-                  </button>
-                </div>
-              {/each}
+            <div class="category-header">
+              <span class="category-icon">{getCategoryIcon(cat.name)}</span>
+              <span class="category-name">{cat.name}</span>
+              <span class="category-count">{cat.presets.length}</span>
+              <span class="category-arrow">▸</span>
             </div>
-          {/if}
-        </div>
-      {/each}
+          </div>
+        {/each}
       {/if}
     </div>
+
+    {#if activeCategoryIdx >= 0 && categories[activeCategoryIdx]}
+      {@const cat = categories[activeCategoryIdx]}
+      <div
+        class="preset-submenu"
+        bind:this={submenuRef}
+        role="menu"
+        aria-label={cat.name}
+        style="top: {submenuTop}px; left: {submenuLeft}px; max-height: {submenuMaxHeight};"
+      >
+        {#each cat.presets as preset, pIdx}
+          <div
+            class="preset-item-btn"
+            class:active={preset.id === activePresetId}
+            class:focused={focusedSubmenuIdx === pIdx && activeCategoryIdx >= 0}
+            role="menuitem"
+            tabindex={focusedSubmenuIdx === pIdx ? 0 : -1}
+            onmouseenter={() => handleSubmenuMouseEnter(pIdx)}
+            onclick={(e) => {
+              e.stopPropagation();
+              handleSelectPreset(preset);
+            }}
+            onkeydown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.stopPropagation();
+                handleSelectPreset(preset);
+              }
+            }}
+            title={preset.name}
+          >
+            <span class="preset-check">{preset.id === activePresetId ? "✓" : ""}</span>
+            <span class="preset-name">{preset.name}</span>
+            {#if preset.badge}
+              <span class="preset-badge">{preset.badge}</span>
+            {:else if preset.hasLevel !== false && (preset.defaultLevel || preset.hasLevel)}
+              <span class="preset-badge">{preset.defaultLevel || 500} hPa</span>
+            {:else if preset.hasLevel === false}
+              <span class="preset-badge">{preset.category?.includes("Derived") ? "Diag" : (preset.isObservation && preset.category?.includes("Upper") ? "Obs" : "Sfc")}</span>
+            {/if}
+            <button
+              type="button"
+              class="btn-pin-preset"
+              class:pinned={isPresetPinned(preset.id)}
+              title={isPresetPinned(preset.id) ? "Unpin preset" : "Pin to quick bar"}
+              aria-label={isPresetPinned(preset.id) ? "Unpin preset" : "Pin preset"}
+              onclick={(e) => {
+                e.stopPropagation();
+                togglePinPreset(preset.id);
+              }}
+            >
+              {isPresetPinned(preset.id) ? "★" : "☆"}
+            </button>
+          </div>
+        {/each}
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -369,6 +469,7 @@
     border-radius: 6px;
     transition: background-color 0.15s ease;
     flex-shrink: 0;
+    overflow: visible;
   }
 
   .preset-menu-trigger {
@@ -449,6 +550,7 @@
     top: calc(100% + 5px);
     left: 0;
     min-width: 220px;
+    max-height: calc(100vh - var(--navbar-height, 48px) - 16px);
     background: rgba(18, 24, 34, 0.96);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -457,10 +559,25 @@
     box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65), 0 2px 6px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     padding: 5px;
     z-index: 1100;
-    overflow: visible;
+    overflow-y: auto !important;
+    overflow-x: hidden;
     animation: proMenuFadeIn 0.12s cubic-bezier(0.16, 1, 0.3, 1);
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  }
+
+  .preset-dropdown::-webkit-scrollbar {
+    width: 6px;
+  }
+  .preset-dropdown::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .preset-dropdown::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+  }
+  .preset-dropdown::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.28);
   }
 
   .preset-category-item {
@@ -535,11 +652,10 @@
 
   .preset-submenu {
     position: absolute;
-    left: calc(100% + 4px);
-    top: -5px;
     min-width: 260px;
-    max-height: 400px;
-    overflow-y: auto;
+    max-height: calc(100vh - var(--navbar-height, 48px) - 24px);
+    overflow-y: auto !important;
+    overflow-x: hidden;
     background: rgba(18, 24, 34, 0.96);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -551,6 +667,25 @@
     animation: proMenuFadeIn 0.12s cubic-bezier(0.16, 1, 0.3, 1);
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  }
+
+  .preset-submenu::before,
+  .preset-submenu::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    width: 10px;
+    height: 100%;
+    background: transparent;
+    pointer-events: auto;
+  }
+
+  .preset-submenu::before {
+    left: -10px;
+  }
+
+  .preset-submenu::after {
+    right: -10px;
   }
 
   .preset-submenu::-webkit-scrollbar {

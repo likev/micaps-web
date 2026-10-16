@@ -1,5 +1,5 @@
 <script>
-  import { isWindRelated, isUpperAirStationLayer } from "../ui/layers/layerDefaults.js";
+  import { isWindRelated, isUpperAirStationLayer, getStationDatasetType } from "../ui/layers/layerDefaults.js";
   import { buildLevelsFromInterval } from "../layers/contour/contourLevels.js";
   import { getPaletteCategory, listPaletteFiles } from "../utils/paletteLoader.js";
   import { parseOffset, formatOffset, resolveLayerTime } from "../utils/timeResolver.js";
@@ -64,6 +64,7 @@
 
   let isWind = $derived(isWindRelated(layer));
   let isUpperStation = $derived(isUpperAirStationLayer(layer));
+  let stationType = $derived(getStationDatasetType(layer));
   let isContour = $derived(layer.type === "contour");
   let paletteOptions = $state([]);
   let currentPaletteValue = $derived(
@@ -413,66 +414,153 @@
         </div>
       {:else if layer.type === "station"}
         <div class="config-subtab-pane" class:active={currentSubtab === "elements"} role="tabpanel">
-          <div class="config-row">
-            <label for="chk-show-temp-{layer.id}">
-              <input
-                type="checkbox"
-                id="chk-show-temp-{layer.id}"
-                class="chk-show-temp"
-                class:lbl-temp={true}
-                checked={layer.config?.showTemp !== false}
-                onchange={(e) => handleConfigChange("showTemp", e.target.checked)}
-              />
-              <span class="lbl-temp">Temperature</span>
-            </label>
-            <label for="chk-show-dewpoint-{layer.id}">
-              <input
-                type="checkbox"
-                id="chk-show-dewpoint-{layer.id}"
-                class="chk-show-dewpoint"
-                class:lbl-dew={true}
-                checked={layer.config?.showDewpoint !== false}
-                onchange={(e) => handleConfigChange("showDewpoint", e.target.checked)}
-              />
-              <span class="lbl-dew">Dew Point</span>
-            </label>
-          </div>
+          {#if !stationType || stationType === "standard"}
+            <div class="config-row">
+              <label for="chk-show-temp-{layer.id}">
+                <input
+                  type="checkbox"
+                  id="chk-show-temp-{layer.id}"
+                  class="chk-show-temp"
+                  class:lbl-temp={true}
+                  checked={layer.config?.showTemp !== false}
+                  onchange={(e) => handleConfigChange("showTemp", e.target.checked)}
+                />
+                <span class="lbl-temp">Temperature</span>
+              </label>
+              <label for="chk-show-dewpoint-{layer.id}">
+                <input
+                  type="checkbox"
+                  id="chk-show-dewpoint-{layer.id}"
+                  class="chk-show-dewpoint"
+                  class:lbl-dew={true}
+                  checked={layer.config?.showDewpoint !== false}
+                  onchange={(e) => handleConfigChange("showDewpoint", e.target.checked)}
+                />
+                <span class="lbl-dew">Dew Point</span>
+              </label>
+            </div>
 
-          <div class="config-row">
-            <label for="chk-show-wind-{layer.id}">
-              <input
-                type="checkbox"
-                id="chk-show-wind-{layer.id}"
-                class="chk-show-wind"
-                class:lbl-wind={true}
-                checked={layer.config?.showWind !== false}
-                onchange={(e) => handleConfigChange("showWind", e.target.checked)}
-              />
-              <span class="lbl-wind">Wind Barbs</span>
-            </label>
-            <label for="chk-show-pressure-{layer.id}">
-              <input
-                type="checkbox"
-                id="chk-show-pressure-{layer.id}"
-                class="chk-show-pressure"
-                class:lbl-press={true}
-                checked={isUpperStation ? layer.config?.showPressure !== false : Boolean(layer.config?.showPressure)}
-                onchange={(e) => handleConfigChange("showPressure", e.target.checked)}
-              />
-              <span class="lbl-press">{isUpperStation ? "Height" : "Pressure"}</span>
-            </label>
-          </div>
+            <div class="config-row">
+              <label for="chk-show-wind-{layer.id}">
+                <input
+                  type="checkbox"
+                  id="chk-show-wind-{layer.id}"
+                  class="chk-show-wind"
+                  class:lbl-wind={true}
+                  checked={layer.config?.showWind !== false}
+                  onchange={(e) => handleConfigChange("showWind", e.target.checked)}
+                />
+                <span class="lbl-wind">Wind Barbs</span>
+              </label>
+              <label for="chk-show-pressure-{layer.id}">
+                <input
+                  type="checkbox"
+                  id="chk-show-pressure-{layer.id}"
+                  class="chk-show-pressure"
+                  class:lbl-press={true}
+                  checked={isUpperStation ? layer.config?.showPressure !== false : Boolean(layer.config?.showPressure)}
+                  onchange={(e) => handleConfigChange("showPressure", e.target.checked)}
+                />
+                <span class="lbl-press">{isUpperStation ? "Height" : "Pressure"}</span>
+              </label>
+            </div>
 
-          <div class="config-row config-row-wrap">
-            <label for="chk-show-dtd-{layer.id}"><input type="checkbox" id="chk-show-dtd-{layer.id}" class="chk-show-dtd" class:lbl-dtd={true} checked={Boolean(layer.config?.showDTD)} onchange={(e) => handleConfigChange("showDTD", e.target.checked)} /> <span class="lbl-dtd">T−Td</span></label>
-            {#if !isUpperStation}
-              <label for="chk-show-cloud-{layer.id}"><input type="checkbox" id="chk-show-cloud-{layer.id}" class="chk-show-cloud" class:lbl-cloud={true} checked={Boolean(layer.config?.showCloud)} onchange={(e) => handleConfigChange("showCloud", e.target.checked)} /> <span class="lbl-cloud">Cloud</span></label>
-              <label for="chk-show-weather-{layer.id}"><input type="checkbox" id="chk-show-weather-{layer.id}" class="chk-show-weather" class:lbl-weather={true} checked={Boolean(layer.config?.showWeather)} onchange={(e) => handleConfigChange("showWeather", e.target.checked)} /> <span class="lbl-weather">Weather</span></label>
-              <label for="chk-show-vis-{layer.id}"><input type="checkbox" id="chk-show-vis-{layer.id}" class="chk-show-vis" class:lbl-vis={true} checked={Boolean(layer.config?.showVisibility)} onchange={(e) => handleConfigChange("showVisibility", e.target.checked)} /> <span class="lbl-vis">Visibility</span></label>
-              <label for="chk-show-rain6-{layer.id}"><input type="checkbox" id="chk-show-rain6-{layer.id}" class="chk-show-rain6" class:lbl-rain6={true} checked={Boolean(layer.config?.showRain6)} onchange={(e) => handleConfigChange("showRain6", e.target.checked)} /> <span class="lbl-rain6">Rain 6h</span></label>
-            {/if}
-            <label for="chk-show-streamlines-{layer.id}"><input type="checkbox" id="chk-show-streamlines-{layer.id}" class="chk-show-streamlines" class:lbl-streamlines={true} checked={Boolean(layer.config?.showStreamlines)} onchange={(e) => handleConfigChange("showStreamlines", e.target.checked)} /> <span>Streamlines</span></label>
-          </div>
+            <div class="config-row config-row-wrap">
+              <label for="chk-show-dtd-{layer.id}"><input type="checkbox" id="chk-show-dtd-{layer.id}" class="chk-show-dtd" class:lbl-dtd={true} checked={Boolean(layer.config?.showDTD)} onchange={(e) => handleConfigChange("showDTD", e.target.checked)} /> <span class="lbl-dtd">T−Td</span></label>
+              {#if !isUpperStation}
+                <label for="chk-show-cloud-{layer.id}"><input type="checkbox" id="chk-show-cloud-{layer.id}" class="chk-show-cloud" class:lbl-cloud={true} checked={Boolean(layer.config?.showCloud)} onchange={(e) => handleConfigChange("showCloud", e.target.checked)} /> <span class="lbl-cloud">Cloud</span></label>
+                <label for="chk-show-weather-{layer.id}"><input type="checkbox" id="chk-show-weather-{layer.id}" class="chk-show-weather" class:lbl-weather={true} checked={Boolean(layer.config?.showWeather)} onchange={(e) => handleConfigChange("showWeather", e.target.checked)} /> <span class="lbl-weather">Weather</span></label>
+                <label for="chk-show-vis-{layer.id}"><input type="checkbox" id="chk-show-vis-{layer.id}" class="chk-show-vis" class:lbl-vis={true} checked={Boolean(layer.config?.showVisibility)} onchange={(e) => handleConfigChange("showVisibility", e.target.checked)} /> <span class="lbl-vis">Visibility</span></label>
+                <label for="chk-show-rain6-{layer.id}"><input type="checkbox" id="chk-show-rain6-{layer.id}" class="chk-show-rain6" class:lbl-rain6={true} checked={Boolean(layer.config?.showRain6)} onchange={(e) => handleConfigChange("showRain6", e.target.checked)} /> <span class="lbl-rain6">Rain 6h</span></label>
+              {/if}
+              <label for="chk-show-streamlines-{layer.id}"><input type="checkbox" id="chk-show-streamlines-{layer.id}" class="chk-show-streamlines" class:lbl-streamlines={true} checked={Boolean(layer.config?.showStreamlines)} onchange={(e) => handleConfigChange("showStreamlines", e.target.checked)} /> <span>Streamlines</span></label>
+            </div>
+          {:else if stationType === "snow_depth"}
+            <div class="config-row">
+              <label for="chk-show-snow-depth-{layer.id}">
+                <input
+                  type="checkbox"
+                  id="chk-show-snow-depth-{layer.id}"
+                  class="chk-show-snow-depth"
+                  class:lbl-snow-depth={true}
+                  checked={layer.config?.showSnowDepth !== false}
+                  onchange={(e) => handleConfigChange("showSnowDepth", e.target.checked)}
+                />
+                <span class="lbl-snow-depth">Snow Depth</span>
+              </label>
+            </div>
+          {:else if stationType === "pres_change_3h"}
+            <div class="config-row">
+              <label for="chk-show-press-change-3h-{layer.id}">
+                <input
+                  type="checkbox"
+                  id="chk-show-press-change-3h-{layer.id}"
+                  class="chk-show-press-change chk-show-press-diff-3h"
+                  class:lbl-press={true}
+                  checked={layer.config?.showPressDiff3h !== false && layer.config?.showPressureChange !== false && layer.config?.showTendency !== false}
+                  onchange={(e) => {
+                    handleConfigPatch({ showPressDiff3h: e.target.checked, showPressureChange: e.target.checked, showTendency: e.target.checked });
+                  }}
+                />
+                <span class="lbl-press">3h Pressure Change</span>
+              </label>
+            </div>
+          {:else if stationType === "pres_change_24h"}
+            <div class="config-row">
+              <label for="chk-show-press-change-24h-{layer.id}">
+                <input
+                  type="checkbox"
+                  id="chk-show-press-change-24h-{layer.id}"
+                  class="chk-show-press-change chk-show-press-diff-24h"
+                  class:lbl-press={true}
+                  checked={layer.config?.showPressDiff24h !== false && layer.config?.showPressureChange !== false && layer.config?.showTendency !== false}
+                  onchange={(e) => {
+                    handleConfigPatch({ showPressDiff24h: e.target.checked, showPressureChange: e.target.checked, showTendency: e.target.checked });
+                  }}
+                />
+                <span class="lbl-press">24h Pressure Change</span>
+              </label>
+            </div>
+          {:else if stationType === "visibility"}
+            <div class="config-row">
+              <label for="chk-show-vis-{layer.id}">
+                <input
+                  type="checkbox"
+                  id="chk-show-vis-{layer.id}"
+                  class="chk-show-vis"
+                  class:lbl-vis={true}
+                  checked={layer.config?.showVisibility !== false}
+                  onchange={(e) => handleConfigChange("showVisibility", e.target.checked)}
+                />
+                <span class="lbl-vis">Visibility</span>
+              </label>
+            </div>
+          {:else if stationType === "amv"}
+            <div class="config-row">
+              <label for="chk-show-wind-{layer.id}">
+                <input
+                  type="checkbox"
+                  id="chk-show-wind-{layer.id}"
+                  class="chk-show-wind"
+                  class:lbl-wind={true}
+                  checked={layer.config?.showWind !== false}
+                  onchange={(e) => handleConfigChange("showWind", e.target.checked)}
+                />
+                <span class="lbl-wind">Wind Barbs</span>
+              </label>
+              <label for="chk-show-streamlines-{layer.id}">
+                <input
+                  type="checkbox"
+                  id="chk-show-streamlines-{layer.id}"
+                  class="chk-show-streamlines"
+                  class:lbl-streamlines={true}
+                  checked={Boolean(layer.config?.showStreamlines)}
+                  onchange={(e) => handleConfigChange("showStreamlines", e.target.checked)}
+                />
+                <span>Streamlines</span>
+              </label>
+            </div>
+          {/if}
 
           {#if layer.element !== "TLOGP" && !(layer.path && layer.path.includes("TLOGP")) && !(layer.id && layer.id.includes("tlogp"))}
             <div class="config-row wind-contour-row">
@@ -487,18 +575,54 @@
                   <option value="VOR">Relative Vorticity (VOR)</option>
                   <option value="DIV">Divergence (DIV)</option>
                 {:else}
-                  <option value="SLP">Sea Level Pressure (SLP)</option>
-                  <option value="TMP">Temperature (TMP)</option>
-                  <option value="TD">Dew Point (TD)</option>
-                  <option value="DTD">Dew-Pt Depression (DTD)</option>
-                  <option value="VIS">Visibility (VIS)</option>
-                  <option value="RAIN6">6h Precipitation (RAIN6)</option>
-                  <option value="WIND">Wind Speed (WIND)</option>
-                  <option value="VOR">Relative Vorticity (VOR)</option>
-                  <option value="DIV">Divergence (DIV)</option>
+                  {#if stationType === "snow_depth"}
+                    <option value="SNOW_DEPTH">Snow Depth (SNOW_DEPTH)</option>
+                  {:else if stationType === "pres_change_3h"}
+                    <option value="PRES_CHANGE_3H">3h Pressure Change (PRES_CHANGE_3H)</option>
+                  {:else if stationType === "pres_change_24h"}
+                    <option value="PRES_CHANGE_24H">24h Pressure Change (PRES_CHANGE_24H)</option>
+                  {:else if stationType === "visibility"}
+                    <option value="VIS">Visibility (VIS)</option>
+                  {:else if stationType === "amv"}
+                    <option value="WIND">Wind Speed (WIND)</option>
+                    <option value="VOR">Relative Vorticity (VOR)</option>
+                    <option value="DIV">Divergence (DIV)</option>
+                  {:else}
+                    <option value="SLP">Sea Level Pressure (SLP)</option>
+                    <option value="TMP">Temperature (TMP)</option>
+                    <option value="TD">Dew Point (TD)</option>
+                    <option value="DTD">Dew-Pt Depression (DTD)</option>
+                    <option value="VIS">Visibility (VIS)</option>
+                    <option value="RAIN6">6h Precipitation (RAIN6)</option>
+                    <option value="WIND">Wind Speed (WIND)</option>
+                    <option value="VOR">Relative Vorticity (VOR)</option>
+                    <option value="DIV">Divergence (DIV)</option>
+                  {/if}
                 {/if}
               </select>
-              <button type="button" class="btn-inline" onclick={() => handleAction("addContour", { value: layer._contourElement || (isUpperStation ? "HGT" : "SLP") })}>＋ Add</button>
+              <button
+                type="button"
+                class="btn-inline"
+                onclick={() => {
+                  const defaultElement =
+                    stationType === "snow_depth"
+                      ? "SNOW_DEPTH"
+                      : stationType === "pres_change_3h"
+                        ? "PRES_CHANGE_3H"
+                        : stationType === "pres_change_24h"
+                          ? "PRES_CHANGE_24H"
+                          : stationType === "visibility"
+                            ? "VIS"
+                            : stationType === "amv"
+                              ? "WIND"
+                              : isUpperStation
+                                ? "HGT"
+                                : "SLP";
+                  handleAction("addContour", { value: layer._contourElement || defaultElement });
+                }}
+              >
+                ＋ Add
+              </button>
             </div>
           {/if}
         </div>
@@ -1287,6 +1411,14 @@
 
   .lbl-press {
     color: var(--accent-blue, #58a6ff);
+  }
+
+  .lbl-snow-depth {
+    color: var(--accent-cyan, #56d4dd);
+  }
+
+  .lbl-vis {
+    color: var(--accent-yellow, #ffd43b);
   }
 
   .sel-basemap-scheme,

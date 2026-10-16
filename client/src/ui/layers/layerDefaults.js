@@ -15,8 +15,13 @@ export function isWindRelated(layer) {
 
 export function isUpperAirStationLayer(layer) {
   if (!layer) return false;
-  if (layer.model === "UPPER_AIR") return true;
+  const path = (layer.path || "").toLowerCase();
+  const elem = (layer.element || "").toLowerCase();
   const id = (layer.id || "").toLowerCase();
+  if (path.includes("amv") || elem.includes("amv") || id.includes("amv")) {
+    return false;
+  }
+  if (layer.model === "UPPER_AIR") return true;
   const name = (layer.name || "").toLowerCase();
   if (
     id.includes("upper") ||
@@ -30,6 +35,19 @@ export function isUpperAirStationLayer(layer) {
     return true;
   }
   return false;
+}
+
+export function getStationDatasetType(layer) {
+  if (!layer) return "standard";
+  if (layer.type && layer.type !== "station") return null;
+  const str = `${layer.path || ""} ${layer.element || ""} ${layer.id || ""} ${layer.name || ""}`.toUpperCase();
+  if (str.includes("SNOW_DEPTH") || str.includes("SNOD")) return "snow_depth";
+  if (str.includes("PRES_CHANGE_3H")) return "pres_change_3h";
+  if (str.includes("PRES_CHANGE_24H")) return "pres_change_24h";
+  if (str.includes("HORIZONTAL_VISIBILITY") || str.includes("VISIBILITY_1MIN") || str.includes("VIS_1MIN")) return "visibility";
+  if (str.includes("AMV")) return "amv";
+  if (isUpperAirStationLayer(layer)) return "upper_air";
+  return "standard";
 }
 
 export function isGenericSurfaceStationId(id) {

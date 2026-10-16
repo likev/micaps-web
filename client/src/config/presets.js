@@ -3,6 +3,7 @@ import { setColormaps } from "../utils/colormaps.js";
 import { isUpperAirStationLayer } from "../ui/layers/layerDefaults.js";
 
 const CONFIG_URL = new URL("./config.json", (typeof document !== "undefined" && document.baseURI) ? document.baseURI : "http://localhost:8088/");
+const COLORMAPS_URL = new URL("./colormaps.json", (typeof document !== "undefined" && document.baseURI) ? document.baseURI : "http://localhost:8088/");
 
 // Keep this as a live export so existing consumers see a successfully reloaded
 // configuration without needing to be re-imported.
@@ -96,17 +97,49 @@ export function notifyConfigLoaded() {
   });
 }
 
-export async function loadPresetGroups() {
-  let response = await fetch(new URL(CONFIG_URL.href + "?_t=" + Date.now()), { cache: "no-store" });
-  if (!response.ok) {
-    // Fallback to /api/config
-    response = await fetch("/api/config?_t=" + Date.now(), { cache: "no-store" });
+export async function loadColormaps() {
+  try {
+    let response = await fetch(new URL(COLORMAPS_URL.href + "?_t=" + Date.now()), { cache: "no-store" });
+    if (!response.ok) {
+      response = await fetch("/api/colormaps?_t=" + Date.now(), { cache: "no-store" });
+    }
+    if (!response.ok) {
+      response = await fetch("/colormaps.json?_t=" + Date.now(), { cache: "no-store" });
+    }
+    if (response.ok) {
+      const data = await response.json();
+      const colormaps = (data && typeof data === "object" && !Array.isArray(data) && data.colormaps) ? data.colormaps : data;
+      if (colormaps && typeof colormaps === "object" && !Array.isArray(colormaps) && Object.keys(colormaps).length > 0) {
+        setColormaps(colormaps);
+        return colormaps;
+      }
+    }
+  } catch (err) {
+    // Graceful fallback to built-in or config colormaps
   }
-  if (!response.ok) {
-    throw new Error(`Config request failed (${response.status})`);
-  }
+  return null;
+}
 
-  const config = await response.json();
+export async function loadPresetGroups() {
+  const [colormapsRes, configRes] = await Promise.allSettled([
+    loadColormaps(),
+    (async () => {
+      let response = await fetch(new URL(CONFIG_URL.href + "?_t=" + Date.now()), { cache: "no-store" });
+      if (!response.ok) {
+        // Fallback to /api/config
+        response = await fetch("/api/config?_t=" + Date.now(), { cache: "no-store" });
+      }
+      if (!response.ok) {
+        throw new Error(`Config request failed (${response.status})`);
+      }
+      return response.json();
+    })()
+  ]);
+
+  if (configRes.status !== "fulfilled") {
+    throw configRes.reason;
+  }
+  const config = configRes.value;
   CURRENT_CONFIG = config;
   // expose for mapInstance resolveInitialBasemapScheme
   try {
@@ -122,9 +155,18 @@ export async function loadPresetGroups() {
     throw new Error("Config must be an array of groups with id and layers");
   }
 
-  if (!Array.isArray(config) && config.colormaps !== undefined) {
-    setColormaps(config.colormaps);
+  const colormapsLoaded = colormapsRes.status === "fulfilled" ? colormapsRes.value : null;
+  const mergedColormaps = {
+    ...(colormapsLoaded || {}),
+    ...(!Array.isArray(config) && config?.colormaps ? config.colormaps : {}),
+  };
+  if (Object.keys(mergedColormaps).length > 0) {
+    setColormaps(mergedColormaps);
+    if (!Array.isArray(config)) {
+      config.colormaps = mergedColormaps;
+    }
   }
+
   // persist basemap scheme and projection for next map creation (maptile only, no UI chrome change)
   try {
     const scheme = config?.basemap?.scheme;

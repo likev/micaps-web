@@ -1,14 +1,14 @@
 {
   "name": "micaps-client",
   "private": true,
-  "version": "1.9.6",
+  "version": "1.9.7",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "check": "svelte-check --threshold error",
     "lint": "oxlint src",
     "build": "npm run check && vite build",
-    "package": "rm -f ../client.zip && cd .. && zip -r client.zip client/dist/ client/palettes/ client/config.json --exclude \"*.pmtiles*\" && cd client",
+    "package": "rm -f ../client.zip && cd .. && zip -r client.zip client/dist/ client/palettes/ client/config.json client/colormaps.json --exclude \"*.pmtiles*\" && cd client",
     "build:all": "npm run build && npm run package",
     "preview": "vite preview",
     "test": "bun test",

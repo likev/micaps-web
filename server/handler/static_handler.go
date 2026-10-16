@@ -182,6 +182,37 @@ func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+// ColormapsHandler reads client/colormaps.json
+func (h *StaticHandler) ColormapsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	candidates := []string{
+		"client/colormaps.json",
+		"../client/colormaps.json",
+	}
+	if exePath, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exePath)
+		candidates = append(candidates, filepath.Join(exeDir, "client", "colormaps.json"))
+	}
+
+	for _, p := range candidates {
+		if data, err := os.ReadFile(p); err == nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(data)
+			return
+		}
+	}
+
+	http.Error(w, `{"error":"Colormaps file not found"}`, http.StatusNotFound)
+}
+
 // SPAHandler serves frontend static files with SPA fallback
 func (h *StaticHandler) SPAHandler(w http.ResponseWriter, r *http.Request) {
 	// If requesting /config.json, strictly serve from client/config.json
@@ -193,6 +224,26 @@ func (h *StaticHandler) SPAHandler(w http.ResponseWriter, r *http.Request) {
 		if exePath, err := os.Executable(); err == nil {
 			exeDir := filepath.Dir(exePath)
 			candidates = append(candidates, filepath.Join(exeDir, "client", "config.json"))
+		}
+		for _, fp := range candidates {
+			if _, err := os.Stat(fp); err == nil {
+				http.ServeFile(w, r, fp)
+				return
+			}
+		}
+		http.NotFound(w, r)
+		return
+	}
+
+	// If requesting /colormaps.json, strictly serve from client/colormaps.json
+	if r.URL.Path == "/colormaps.json" || r.URL.Path == "colormaps.json" {
+		candidates := []string{
+			"client/colormaps.json",
+			"../client/colormaps.json",
+		}
+		if exePath, err := os.Executable(); err == nil {
+			exeDir := filepath.Dir(exePath)
+			candidates = append(candidates, filepath.Join(exeDir, "client", "colormaps.json"))
 		}
 		for _, fp := range candidates {
 			if _, err := os.Stat(fp); err == nil {

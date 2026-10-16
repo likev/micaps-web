@@ -16,6 +16,14 @@ import {
 import { getPlotTokens } from "../../map/themeTokens.js";
 
 export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0, allowedFields = null) {
+  if (typeof cx === "object" && cx !== null) {
+    allowedFields = typeof scale === "object" ? scale : null;
+    scale = typeof cy === "number" ? cy : 1.0;
+    cfg = cx;
+    cx = p?.x || 0;
+    cy = p?.y || 0;
+  }
+
   const rawT = extractTemp(p, ["temperature", "temp", "TEM", "TT", "T", "TMP", "t", "temp_max", "tem"]);
   const tt = rawT !== null ? Math.round(rawT).toString() : "";
 
@@ -33,10 +41,18 @@ export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0,
 
   const weatherCode = extractRawNumber(p, ["weather_code", "weatherCode", "weather", "Ww", "ww", "WEA"], 0, 99) || 0;
 
-  const pDiffRaw = extractRawNumber(p, ["press_diff_3h", "pDiff3h", "press_diff", "PRS_Change_3h", "p3"], -500, 500);
+  const pDiffRaw = extractRawNumber(p, ["press_diff_3h", "pDiff3h", "pDiff", "press_diff", "PRS_Change_3h", "p3", "press_change_3h"], -500, 500);
   const pDiff = pDiffRaw !== null && Math.abs(pDiffRaw) > 0.05
-    ? `${pDiffRaw > 0 ? "+" : ""}${Math.abs(pDiffRaw) > 30 ? Math.round(pDiffRaw) : Math.round(pDiffRaw * 10)}`
+    ? `${pDiffRaw > 0 ? "+" : ""}${Math.abs(pDiffRaw) > 30 ? Math.round(pDiffRaw) : (Math.abs(pDiffRaw) < 10 && !Number.isInteger(pDiffRaw) ? pDiffRaw.toFixed(1) : Math.round(pDiffRaw * 10))}`
     : "";
+
+  const pDiff24Raw = extractRawNumber(p, ["press_diff_24h", "pDiff24h", "pDiff24", "press_diff_24", "PRS_Change_24h", "p24", "press_change_24h"], -500, 500);
+  const pDiff24 = pDiff24Raw !== null && Math.abs(pDiff24Raw) > 0.05
+    ? `${pDiff24Raw > 0 ? "+" : ""}${Math.abs(pDiff24Raw) > 30 ? Math.round(pDiff24Raw) : (Math.abs(pDiff24Raw) < 10 && !Number.isInteger(pDiff24Raw) ? pDiff24Raw.toFixed(1) : Math.round(pDiff24Raw * 10))}`
+    : "";
+
+  const rawSnow = extractRawNumber(p, ["snow_depth", "snowDepth", "snow", "SNOW", "sno", "SD", "sd", "snod"], 0, 10000);
+  const snowDepth = rawSnow !== null ? Math.round(rawSnow).toString() : "";
 
   const pTendCode = extractRawNumber(p, ["press_tend", "pTend", "PRS_Tendency", "a"], 0, 8);
   const pTend = pTendCode !== null ? getPressureTendencyGlyph(pTendCode) : "";
@@ -48,9 +64,12 @@ export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0,
   const showCloud = Boolean(cfg.showCloud);
   const showWeather = Boolean(cfg.showWeather);
   const showPressure = Boolean(cfg.showPressure);
-  const showTendency = Boolean(cfg.showTendency);
+  const showTendency = cfg.showTendency !== undefined
+    ? Boolean(cfg.showTendency)
+    : Boolean(cfg.showPressureChange || cfg.showPressDiff3h || cfg.showPressDiff24h);
   const showVisibility = Boolean(cfg.showVisibility);
   const showRain6 = Boolean(cfg.showRain6);
+  const showSnowDepth = cfg.showSnowDepth !== undefined ? Boolean(cfg.showSnowDepth) : true;
 
   let dtd = "";
   if (rawT !== null && rawTd !== null && rawTd <= 50 && rawTd <= rawT + 0.5) {
@@ -166,8 +185,21 @@ export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0,
     drawPlotText(rain6, cx + 8 * scale, cy, "rain", "left");
   }
 
-  // 9. ppa (3h Pressure Tendency & Diff) - Bottom-Right
-  if (showTendency && (pDiff || pTend) && isAllowed("Tendency")) {
-    drawPlotText(`${pDiff}${pTend}`, cx + 8 * scale, cy + 12 * scale, "tend", "left");
+  // Snow Depth (Top-Right if no PPP, otherwise Middle-Right)
+  if (showSnowDepth && snowDepth && isAllowed("SnowDepth") && allowField("SnowDepth")) {
+    const snowToken = theme.snow ? "snow" : (theme.rain ? "rain" : "ppp");
+    if (!ppp || !showPressure) {
+      drawPlotText(snowDepth, cx + 8 * scale, cy - 12 * scale, snowToken, "left");
+    } else if (!rain6 || !showRain6) {
+      drawPlotText(snowDepth, cx + 8 * scale, cy, snowToken, "left");
+    } else {
+      drawPlotText(snowDepth, cx + 8 * scale, cy + 12 * scale, snowToken, "left");
+    }
+  }
+
+  // 9. ppa (3h / 24h Pressure Tendency & Diff) - Bottom-Right
+  const effectivePDiff = pDiff || pDiff24;
+  if (showTendency && (effectivePDiff || pTend) && (isAllowed("Tendency") || isAllowed("PressDiff") || isAllowed("PressureChange"))) {
+    drawPlotText(`${effectivePDiff}${pTend}`, cx + 8 * scale, cy + 12 * scale, "tend", "left");
   }
 }

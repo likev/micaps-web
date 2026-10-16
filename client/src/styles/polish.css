@@ -129,6 +129,16 @@ html, body {
   -webkit-backdrop-filter: blur(14px) saturate(140%);
   padding: 6px;
 }
+#app .preset-dropdown {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  max-height: calc(100vh - var(--navbar-height, 48px) - 16px);
+}
+#app .preset-submenu {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  max-height: calc(100vh - var(--navbar-height, 48px) - 24px);
+}
 #app :is(.nav-menu-item, .layout-menu-item, .layout-item-btn, .layout-sub-item-btn) {
   border-radius: var(--radius-md);
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);

@@ -51,13 +51,29 @@
 
   function isUpperAir(l) {
     if (!l) return false;
-    if (l.model === "UPPER_AIR") return true;
+    const path = (l.path || "").toLowerCase();
+    const elem = (l.element || "").toLowerCase();
     const id = (l.id || "").toLowerCase();
+    if (path.includes("amv") || elem.includes("amv") || id.includes("amv")) return false;
+    if (l.model === "UPPER_AIR") return true;
     const name = (l.name || "").toLowerCase();
     return id.includes("upper") || id.includes("sounding") || name.includes("upper") || name.includes("sounding") || name.includes("高空") || name.includes("探空") || (l.type === "station" && typeof l.level === "number" && l.level > 0);
   }
 
-  let upper = $derived(isUpperAir(layer));
+  function getStationType(l) {
+    if (!l) return null;
+    const str = `${l.path || ""} ${l.element || ""} ${l.id || ""} ${l.name || ""}`.toUpperCase();
+    if (str.includes("SNOW_DEPTH") || str.includes("SNOD")) return "snow_depth";
+    if (str.includes("PRES_CHANGE_3H")) return "pres_change_3h";
+    if (str.includes("PRES_CHANGE_24H")) return "pres_change_24h";
+    if (str.includes("HORIZONTAL_VISIBILITY") || str.includes("VISIBILITY_1MIN") || str.includes("VIS_1MIN")) return "visibility";
+    if (str.includes("AMV")) return "amv";
+    if (isUpperAir(l)) return "upper_air";
+    return "standard";
+  }
+
+  let stationType = $derived(getStationType(layer));
+  let upper = $derived(stationType === "upper_air");
 
   function update() {
     layer.config.filterRules = rules.map(({ field, op, val, val2 }) => ({ field, op, val, val2 }));
@@ -160,7 +176,17 @@
           onchange={update}
         >
           <option value="none">No Filter</option>
-          {#if upper}
+          {#if stationType === "snow_depth"}
+            <option value="SnowDepth">Snow Depth (积雪深度)</option>
+          {:else if stationType === "pres_change_3h"}
+            <option value="PressDiff3h">3h Pressure Change (3小时变压)</option>
+          {:else if stationType === "pres_change_24h"}
+            <option value="PressDiff24h">24h Pressure Change (24小时变压)</option>
+          {:else if stationType === "visibility"}
+            <option value="Visibility">Visibility (能见度)</option>
+          {:else if stationType === "amv"}
+            <option value="Wind">Wind Speed (风速)</option>
+          {:else if upper}
             <option value="Height">Height (位势高度)</option>
             <option value="TT">Temperature (温度)</option>
             <option value="Td">Dewpoint (露点)</option>

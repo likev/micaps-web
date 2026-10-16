@@ -11,7 +11,7 @@ export function isViewOnly(cfg) {
   return String(logic ?? "").toUpperCase() === VIEW_LOGIC;
 }
 
-const VIEW_FIELD_ALIASES = {
+export const VIEW_FIELD_ALIASES = {
   TT: "TT",
   TEMP: "TT",
   TMP: "TT",
@@ -39,6 +39,20 @@ const VIEW_FIELD_ALIASES = {
   PRESSURE: "SLP",
   HEIGHT: "Height",
   HGT: "Height",
+  SNOW_DEPTH: "SnowDepth",
+  SNOWDEPTH: "SnowDepth",
+  SNOW: "SnowDepth",
+  SD: "SnowDepth",
+  PRESS_DIFF_3H: "PressDiff",
+  PRESS_DIFF_24H: "PressDiff",
+  PRES_CHANGE_3H: "PressDiff",
+  PRES_CHANGE_24H: "PressDiff",
+  PRESS_DIFF: "PressDiff",
+  PRES_CHANGE: "PressDiff",
+  PRESSDIFF: "PressDiff",
+  PRESSDIFF3H: "PressDiff",
+  PRESSDIFF24H: "PressDiff",
+  TENDENCY: "Tendency",
 };
 
 export function normalizeFilterField(field) {
@@ -141,7 +155,7 @@ export function isFieldVisibleInView(p, cfg, field) {
 // new rule (e.g. vis<1km) has a visible effect instead of gating a hidden
 // element. Fields without a plotted toggle (Cloud/Weather/Tendency) map
 // to null.
-const FIELD_CONFIG_FLAGS = {
+export const FIELD_CONFIG_FLAGS = {
   TT: "showTemp",
   Td: "showDewpoint",
   DTD: "showDTD",
@@ -151,6 +165,8 @@ const FIELD_CONFIG_FLAGS = {
   Visibility: "showVisibility",
   SLP: "showPressure",
   Height: "showPressure",
+  SnowDepth: "showSnowDepth",
+  PressDiff: "showTendency",
 };
 
 export function filterFieldToConfigFlag(field) {

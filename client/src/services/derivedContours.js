@@ -243,6 +243,21 @@ export async function renderSoundingDerivedContoursForStation(map, stations, cur
   if (win?.derivedContourSnapshots) win.derivedContourSnapshots = null;
 }
 
+export function shouldAutoDeriveDefaultSLP(stationLayer) {
+  if (!stationLayer) return true;
+  const str = `${stationLayer?.path || ""} ${stationLayer?.element || ""} ${stationLayer?.id || ""} ${stationLayer?.name || ""}`.toUpperCase();
+  const isSpecializedWithoutSLP =
+    str.includes("SNOW_DEPTH") ||
+    str.includes("SNOD") ||
+    str.includes("PRES_CHANGE_3H") ||
+    str.includes("PRES_CHANGE_24H") ||
+    str.includes("HORIZONTAL_VISIBILITY") ||
+    str.includes("VISIBILITY_1MIN") ||
+    str.includes("VIS_1MIN") ||
+    str.includes("AMV");
+  return !isSpecializedWithoutSLP;
+}
+
 export async function renderSurfaceDerivedContoursForStation(map, stations, activeGroup, win, stationLayerId) {
   const groupDerived = activeGroup?.layers?.filter((l) =>
     l.type === "contour" && l.model === "SURFACE" && Boolean(l.derivedFrom) &&
@@ -441,7 +456,10 @@ export async function renderSurfaceDerivedContoursForStation(map, stations, acti
         }
       }
     } else {
-      analyzeAndRenderSurfaceContours(map, stations, "SLP", {}, win);
+      const stationLayer = getLayerById(stationLayerId, win);
+      if (shouldAutoDeriveDefaultSLP(stationLayer)) {
+        analyzeAndRenderSurfaceContours(map, stations, "SLP", {}, win);
+      }
     }
   }
   if (win?.derivedContourSnapshots) win.derivedContourSnapshots = null;

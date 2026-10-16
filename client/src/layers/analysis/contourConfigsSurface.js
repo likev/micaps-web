@@ -331,6 +331,69 @@ export const SURFACE_CONTOUR_CONFIGS = {
       return std;
     },
   },
+  SNOW_DEPTH: {
+    name: "Snow Depth",
+    element: "SNOW_DEPTH",
+    unit: "cm",
+    defaultColor: "#99e9f2",
+    colormap: "SNOW",
+    boldValues: [5, 10, 20, 50],
+    extract: (p) => {
+      const keys = ["snow_depth", "snowDepth", "snow", "SNOW", "sno", "SD", "sd", "snod"];
+      for (const k of keys) {
+        const v = p[k];
+        if (typeof v === "number" && !isNaN(v) && v >= 0 && v <= 10000) return v;
+      }
+      return null;
+    },
+    getLevels: (minV, maxV) => {
+      const std = [1, 2, 5, 10, 20, 30, 50, 75, 100];
+      const filtered = std.filter((l) => l >= minV && l <= maxV + 5);
+      return filtered.length >= 2 ? filtered : griddata.autoLevels(minV, maxV, 6);
+    },
+  },
+  PRES_CHANGE_3H: {
+    name: "3h Pressure Change",
+    element: "PRES_CHANGE_3H",
+    unit: "hPa",
+    defaultColor: "#a5d8ff",
+    colormap: "SLP_VAR",
+    boldValues: [0],
+    extract: (p) => {
+      const keys = ["press_diff_3h", "pDiff3h", "press_diff", "PRS_Change_3h", "p3", "press_change_3h"];
+      for (const k of keys) {
+        const v = p[k];
+        if (typeof v === "number" && !isNaN(v) && v > -500 && v < 500) return v;
+      }
+      return null;
+    },
+    getLevels: (minV, maxV) => {
+      const std = [-10, -8, -6, -4, -2.5, -1, 0, 1, 2.5, 4, 6, 8, 10];
+      const filtered = std.filter((l) => l >= minV - 1 && l <= maxV + 1);
+      return filtered.length >= 2 ? filtered : griddata.autoLevels(minV, maxV, 6);
+    },
+  },
+  PRES_CHANGE_24H: {
+    name: "24h Pressure Change",
+    element: "PRES_CHANGE_24H",
+    unit: "hPa",
+    defaultColor: "#58a6ff",
+    colormap: "SLP_VAR",
+    boldValues: [0],
+    extract: (p) => {
+      const keys = ["press_diff_24h", "pDiff24h", "press_diff_24", "PRS_Change_24h", "p24", "press_change_24h"];
+      for (const k of keys) {
+        const v = p[k];
+        if (typeof v === "number" && !isNaN(v) && v > -500 && v < 500) return v;
+      }
+      return null;
+    },
+    getLevels: (minV, maxV) => {
+      const std = [-16, -12, -8, -6, -4, -2, 0, 2, 4, 6, 8, 12, 16];
+      const filtered = std.filter((l) => l >= minV - 2 && l <= maxV + 2);
+      return filtered.length >= 2 ? filtered : griddata.autoLevels(minV, maxV, 6);
+    },
+  },
 };
 
 SURFACE_CONTOUR_CONFIGS["T-VARIATION-24H"] = SURFACE_CONTOUR_CONFIGS.T_VARIATION_24H;
@@ -341,10 +404,21 @@ SURFACE_CONTOUR_CONFIGS["T_VAR_24H"] = SURFACE_CONTOUR_CONFIGS.T_VARIATION_24H;
 SURFACE_CONTOUR_CONFIGS["T_VAR_48H"] = SURFACE_CONTOUR_CONFIGS.T_VARIATION_48H;
 SURFACE_CONTOUR_CONFIGS["SLP_VAR_24H"] = SURFACE_CONTOUR_CONFIGS.SLP_VARIATION_24H;
 SURFACE_CONTOUR_CONFIGS["SLP_VAR_48H"] = SURFACE_CONTOUR_CONFIGS.SLP_VARIATION_48H;
+SURFACE_CONTOUR_CONFIGS["SNOW"] = SURFACE_CONTOUR_CONFIGS.SNOW_DEPTH;
+SURFACE_CONTOUR_CONFIGS["SNOW-DEPTH"] = SURFACE_CONTOUR_CONFIGS.SNOW_DEPTH;
+SURFACE_CONTOUR_CONFIGS["SNOD"] = SURFACE_CONTOUR_CONFIGS.SNOW_DEPTH;
+SURFACE_CONTOUR_CONFIGS["PRES_CHANGE_3H"] = SURFACE_CONTOUR_CONFIGS.PRES_CHANGE_3H;
+SURFACE_CONTOUR_CONFIGS["PRES_CHANGE_24H"] = SURFACE_CONTOUR_CONFIGS.PRES_CHANGE_24H;
+SURFACE_CONTOUR_CONFIGS["PRESS_DIFF_3H"] = SURFACE_CONTOUR_CONFIGS.PRES_CHANGE_3H;
+SURFACE_CONTOUR_CONFIGS["PRESS_DIFF_24H"] = SURFACE_CONTOUR_CONFIGS.PRES_CHANGE_24H;
 
 export function normalizeSurfaceElementKey(elem) {
   const upper = (elem || "").toUpperCase().trim();
   const hyphen = upper.replace(/_/g, "-");
+
+  if (upper === "SNOW_DEPTH" || upper === "SNOW" || upper === "SNOD" || hyphen === "SNOW-DEPTH") return "SNOW_DEPTH";
+  if (upper === "PRES_CHANGE_3H" || upper === "PRESS_DIFF_3H" || hyphen === "PRES-CHANGE-3H" || hyphen === "PRESS-DIFF-3H") return "PRES_CHANGE_3H";
+  if (upper === "PRES_CHANGE_24H" || upper === "PRESS_DIFF_24H" || hyphen === "PRES-CHANGE-24H" || hyphen === "PRESS-DIFF-24H") return "PRES_CHANGE_24H";
 
   if (
     hyphen.includes("SLP-VAR") ||
