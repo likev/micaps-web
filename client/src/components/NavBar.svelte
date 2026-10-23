@@ -262,11 +262,10 @@
   function handleLayoutSelect(layoutKey, allocMode = null) {
     isLayoutMenuOpen = false;
     hoveredLayoutSubmenu = null;
-    if (allocMode !== null && onSelectAutoAlloc) {
-      onSelectAutoAlloc(allocMode);
-    }
     if (onChangeLayout) {
       onChangeLayout(layoutKey, allocMode);
+    } else if (allocMode !== null && onSelectAutoAlloc) {
+      onSelectAutoAlloc(allocMode);
     }
   }
 

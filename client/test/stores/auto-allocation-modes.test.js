@@ -18,6 +18,12 @@ import {
   queryModelSupportedLevels,
   getEligibleModelsForAllocationAsync,
   shouldSkipWindowReload,
+  resolveContrastInitiator,
+  computeAllocBadgeText,
+  pinContrastWindow,
+  getContrastGroupInfo,
+  pruneAutoAllocatedWindows,
+  isWindowVisible,
 } from "../../src/lib/stores/tabsCore.js";
 import { getPeriodsForStep } from "../../src/ui/timeline/timelineMath.js";
 import {
@@ -977,5 +983,298 @@ describe("shouldSkipWindowReload fan-out guard", () => {
     expect(shouldSkipWindowReload(other, win, prev, "level")).toBe(false);
     expect(shouldSkipWindowReload(win, win, null, "level")).toBe(false);
     expect(shouldSkipWindowReload(win, win, prev, "none")).toBe(false);
+  });
+});
+
+describe("Split-Contrast Lifecycle: Grouping, Pruning, Pinning, Adoption & Bug Fixes", () => {
+  it("pruneAutoAllocatedWindows deletes ephemeral auto-allocated children on exit to 1x1 while strictly preserving Initiator and Original Non-Focused tabs", () => {
+    const tab = createDefaultTab(1);
+    const initiator = {
+      ...createDefaultWindow(0, 1),
+      id: "tab-1-win-0",
+      level: 500,
+      model: "ECMWF_HR",
+      element: "HGT",
+      period: 24,
+      forecastCycle: "26092608",
+      activeGroup: { id: "ecmwf-500", layers: [{ type: "contour", element: "HGT" }] },
+    };
+    const independentSurface = {
+      ...createDefaultWindow(1, 1),
+      id: "tab-1-win-surface",
+      level: null,
+      model: "SURFACE",
+      element: "PLOT",
+      isObservation: true,
+      activeGroup: { id: "surface-obs", layers: [{ type: "station", model: "SURFACE" }] },
+      isAutoAllocated: false,
+    };
+    const independentRadar = {
+      ...createDefaultWindow(2, 1),
+      id: "tab-1-win-radar",
+      level: null,
+      model: "SWAN",
+      element: "CR",
+      activeGroup: { id: "radar-cr", layers: [{ type: "raster" }] },
+      isAutoAllocated: false,
+    };
+
+    tab.windows = [initiator, independentSurface, independentRadar];
+    tab.activeWinIdx = 0;
+    tab.layout = "2x3";
+    tab.autoAllocation = "model";
+
+    // Split to 2x3 (6 visible windows + 2 independent tabs = 8 windows)
+    prepareSplitWindows(tab, 6, initiator, isWindowEmpty, true);
+    applyAutoAllocation(tab, "model", initiator);
+    expect(tab.windows.length).toBe(8);
+
+    const groupInfo = getContrastGroupInfo(tab);
+    expect(groupInfo).not.toBeNull();
+    expect(groupInfo.initiator.id).toBe("tab-1-win-0");
+    expect(groupInfo.children.length).toBe(5);
+    expect(groupInfo.totalCount).toBe(6);
+
+    // Suppose user focuses child W4 (index 3) and then exits split to 1x1
+    tab.activeWinIdx = 3;
+    const cleanedIds = [];
+    const pruned = pruneAutoAllocatedWindows(tab, {
+      keepCount: 0,
+      onCleanupWindow: (w) => cleanedIds.push(w.id),
+    });
+
+    expect(pruned.length).toBe(5);
+    expect(cleanedIds.length).toBe(5);
+    // Only the Initiator and the 2 Original Non-Focused tabs remain!
+    expect(tab.windows.map((w) => w.id)).toEqual([
+      "tab-1-win-0",
+      "tab-1-win-surface",
+      "tab-1-win-radar",
+    ]);
+    // Focus safely falls back to the Initiator tab
+    expect(tab.activeWinIdx).toBe(0);
+    expect(getContrastGroupInfo(tab)).toBeNull();
+  });
+
+  it("pinContrastWindow graduates an auto-allocated child to a permanent independent tab that survives pruning", () => {
+    const tab = createDefaultTab(1);
+    const initiator = {
+      ...createDefaultWindow(0, 1),
+      id: "win-init",
+      level: 500,
+      model: "ECMWF_HR",
+      period: 24,
+      activeGroup: { id: "ecmwf-500", layers: [{ type: "contour" }] },
+    };
+    const independentTab = {
+      ...createDefaultWindow(1, 1),
+      id: "win-indep",
+      level: 850,
+      model: "GRAPES_GFS",
+      activeGroup: { id: "grapes-850", layers: [{ type: "contour" }] },
+      isAutoAllocated: false,
+    };
+
+    tab.windows = [initiator, independentTab];
+    tab.activeWinIdx = 0;
+    tab.layout = "2x2";
+    tab.autoAllocation = "level";
+
+    prepareSplitWindows(tab, 4, initiator, isWindowEmpty, true);
+    applyAutoAllocation(tab, "level", initiator);
+    expect(tab.windows.length).toBe(5);
+
+    // Pin child W3 (1000 hPa, at index 2)
+    const childToPin = tab.windows[2];
+    expect(childToPin.level).toBe(1000);
+    expect(childToPin.isAutoAllocated).toBe(true);
+
+    pinContrastWindow(tab, childToPin);
+    expect(childToPin.isPinned).toBe(true);
+    expect(childToPin.isAutoAllocated).toBe(false);
+    expect(childToPin.allocParentId).toBeNull();
+
+    // Collapse split back to 1x1
+    pruneAutoAllocatedWindows(tab, { keepCount: 0 });
+    expect(tab.windows.map((w) => w.id)).toEqual([
+      "win-init",
+      childToPin.id,
+      "win-indep",
+    ]);
+    expect(tab.windows[1].level).toBe(1000);
+  });
+
+  it("pruneAutoAllocatedWindows with promoteWin adopts the child's parameters into the Initiator tab and prunes children", () => {
+    const tab = createDefaultTab(1);
+    const initiator = {
+      ...createDefaultWindow(0, 1),
+      id: "win-init",
+      level: 850,
+      model: "ECMWF_HR",
+      element: "TMP",
+      period: 24,
+      forecastCycle: "26092608",
+      activeGroup: { id: "comp-850", layers: [{ type: "contour", element: "TMP", model: "ECMWF_HR" }] },
+    };
+    const independentTab = {
+      ...createDefaultWindow(1, 1),
+      id: "win-indep",
+      model: "SURFACE",
+      activeGroup: { id: "surf", layers: [{ type: "station" }] },
+      isAutoAllocated: false,
+    };
+
+    tab.windows = [initiator, independentTab];
+    tab.activeWinIdx = 0;
+    tab.layout = "2x2";
+    tab.autoAllocation = "model";
+
+    prepareSplitWindows(tab, 4, initiator, isWindowEmpty, true);
+    applyAutoAllocation(tab, "model", initiator);
+
+    // Child at index 1 has GRAPES_GFS
+    const grapesChild = tab.windows[1];
+    expect(grapesChild.model).toBe("GRAPES_GFS");
+
+    pruneAutoAllocatedWindows(tab, {
+      keepCount: 0,
+      promoteWin: grapesChild,
+    });
+
+    expect(tab.windows.map((w) => w.id)).toEqual(["win-init", "win-indep"]);
+    expect(initiator.model).toBe("GRAPES_GFS");
+    expect(initiator.activeGroup.layers[0].model).toBe("GRAPES_GFS");
+    expect(tab.activeWinIdx).toBe(0);
+  });
+
+  it("resolveContrastInitiator prevents circular allocParentId when changing layout or mode while a child window is focused", () => {
+    const tab = createDefaultTab(1);
+    const initiator = {
+      ...createDefaultWindow(0, 1),
+      id: "win-init",
+      level: 500,
+      model: "ECMWF_HR",
+      period: 24,
+      stepLength: 6,
+      activeGroup: { id: "ecmwf-500", layers: [{ type: "contour" }] },
+    };
+    tab.windows = [initiator];
+    tab.activeWinIdx = 0;
+    tab.layout = "2x2";
+    tab.autoAllocation = "step";
+
+    prepareSplitWindows(tab, 4, initiator, isWindowEmpty, true);
+    applyAutoAllocation(tab, "step", initiator);
+
+    // User clicks on child W3 (index 2, +36h) to inspect it
+    const childW3 = tab.windows[2];
+    tab.activeWinIdx = 2;
+    expect(childW3.isAutoAllocated).toBe(true);
+    expect(childW3.allocParentId).toBe("win-init");
+
+    // Now user expands from 2x2 to 2x3 while childW3 is focused
+    tab.layout = "2x3";
+    prepareSplitWindows(tab, 6, childW3, isWindowEmpty, false, 4);
+    applyAutoAllocation(tab, "step", childW3);
+
+    // Initiator must STILL be win-init (isAutoAllocated === false), NOT childW3!
+    expect(initiator.isAutoAllocated).toBe(false);
+    expect(initiator.allocParentId).toBeNull();
+    expect(initiator.period).toBe(24);
+    for (let i = 1; i < 6; i++) {
+      expect(tab.windows[i].isAutoAllocated).toBe(true);
+      expect(tab.windows[i].allocParentId).toBe("win-init");
+    }
+  });
+
+  it("prepareSplitWindows reclaims prior parent's auto-allocated children when splitting a different tab and prunes excess slots on downsize", () => {
+    const tab = createDefaultTab(1);
+    const tab1 = {
+      ...createDefaultWindow(0, 1),
+      id: "win-tab1",
+      level: 500,
+      model: "ECMWF_HR",
+      period: 24,
+      activeGroup: { id: "g-ecmwf", layers: [{ type: "contour" }] },
+    };
+    const tab2 = {
+      ...createDefaultWindow(1, 1),
+      id: "win-tab2",
+      level: 850,
+      model: "GRAPES_GFS",
+      period: 12,
+      activeGroup: { id: "g-grapes", layers: [{ type: "contour" }] },
+      isAutoAllocated: false,
+    };
+
+    tab.windows = [tab1, tab2];
+    tab.activeWinIdx = 0;
+    tab.layout = "2x3";
+    tab.autoAllocation = "level";
+
+    // 1. Split tab1 into 2x3 (6 split windows + tab2 = 7 windows)
+    prepareSplitWindows(tab, 6, tab1, isWindowEmpty, true);
+    applyAutoAllocation(tab, "level", tab1);
+    expect(tab.windows.length).toBe(7);
+
+    // 2. Downsize from 2x3 (6) to 2x2 (4): excess 2 auto-allocated children are pruned!
+    const downsizeCleaned = [];
+    tab.layout = "2x2";
+    prepareSplitWindows(tab, 4, tab1, isWindowEmpty, false, 6, (w) => downsizeCleaned.push(w.id));
+    expect(downsizeCleaned.length).toBe(2);
+    expect(tab.windows.length).toBe(5); // 4 split windows + tab2
+
+    // 3. User switches to tab2 and splits tab2 into 1x2 (2 windows):
+    // tab1's 3 auto-allocated children must be reclaimed/pruned, NOT kept as busyWins!
+    tab.activeWinIdx = tab.windows.indexOf(tab2);
+    tab.layout = "1x2";
+    tab.autoAllocation = "step";
+    prepareSplitWindows(tab, 2, tab2, isWindowEmpty, true);
+    applyAutoAllocation(tab, "step", tab2);
+
+    // Total windows should be 3: [tab2, 1 child for tab2, tab1]!
+    expect(tab.windows.length).toBe(3);
+    expect(tab.windows[0].id).toBe("win-tab2");
+    expect(tab.windows[1].isAutoAllocated).toBe(true);
+    expect(tab.windows[1].allocParentId).toBe("win-tab2");
+    expect(tab.windows[2].id).toBe("win-tab1");
+  });
+
+  it("supports non-destructive isMaximizedPreview in getVisibleWindows and computeAllocBadgeText across modes", () => {
+    const tab = createDefaultTab(1);
+    tab.layout = "2x2";
+    tab.windows = Array.from({ length: 4 }, (_, i) => ({
+      ...createDefaultWindow(i, 1),
+      id: `w-${i}`,
+      level: 500,
+      model: "ECMWF_HR",
+      period: 24,
+      forecastCycle: "26092608",
+    }));
+    applyAutoAllocation(tab, "level", tab.windows[0]);
+    expect(tab.windows.map((w) => w.allocBadgeText)).toEqual([
+      "500hPa",
+      "850hPa",
+      "1000hPa",
+      "200hPa",
+    ]);
+
+    tab.activeWinIdx = 2;
+    expect(getVisibleWindows(tab).length).toBe(4);
+
+    // Enable temporary maximize preview on W3 (index 2)
+    tab.isMaximizedPreview = true;
+    const previewVis = getVisibleWindows(tab);
+    expect(previewVis.length).toBe(1);
+    expect(previewVis[0].id).toBe("w-2");
+    expect(isWindowVisible(tab, tab.windows[2])).toBe(true);
+    expect(isWindowVisible(tab, tab.windows[0])).toBe(false);
+
+    // Restore from preview
+    tab.isMaximizedPreview = false;
+    expect(getVisibleWindows(tab).length).toBe(4);
+    expect(computeAllocBadgeText({ model: "ECMWF_HR" }, "model", 0)).toBe("ECMWF");
+    expect(computeAllocBadgeText({ period: 36 }, "step", 1)).toBe("+036h");
+    expect(computeAllocBadgeText({ forecastCycle: "26092608", period: 24 }, "time", 0)).toBe("26/08 +024h");
   });
 });

@@ -22,6 +22,10 @@
     onToggleSync = null,
     onSelectAutoAlloc = null,
     onToggleAutoAlloc = null,
+    isMaximizedPreview = false,
+    onPinWin = null,
+    onCollapseGroup = null,
+    onRestorePreview = null,
   } = $props();
 
   let draggedIndex = $state(null);
@@ -67,11 +71,48 @@
   });
 
   $effect(() => {
-    if (effectiveAlloc === "none" && autoAllocation && autoAllocation !== "none") {
+    if (layout === "1x1" && effectiveAlloc === "none" && autoAllocation && autoAllocation !== "none") {
       if (onSelectAutoAlloc) onSelectAutoAlloc("none");
       else if (onToggleAutoAlloc) onToggleAutoAlloc("none");
     }
   });
+
+  let hasAutoAllocGroup = $derived(
+    Boolean(tabItems && tabItems.some((w) => w && w.isAutoAllocated && !w.isPinned))
+  );
+  let contrastInitiatorId = $derived.by(() => {
+    if (!hasAutoAllocGroup || !tabItems) return null;
+    const child = tabItems.find((w) => w && w.isAutoAllocated && !w.isPinned && w.allocParentId);
+    if (child?.allocParentId) return child.allocParentId;
+    const firstNonAlloc = tabItems.find((w) => w && (!w.isAutoAllocated || w.isPinned));
+    return firstNonAlloc?.id || null;
+  });
+  let firstGroupIdx = $derived.by(() => {
+    if (!hasAutoAllocGroup || !tabItems) return -1;
+    return tabItems.findIndex(
+      (w) => w && ((w.id && w.id === contrastInitiatorId) || (w.isAutoAllocated && !w.isPinned))
+    );
+  });
+  let lastGroupIdx = $derived.by(() => {
+    if (!hasAutoAllocGroup || !tabItems) return -1;
+    for (let i = tabItems.length - 1; i >= 0; i--) {
+      const w = tabItems[i];
+      if (w && ((w.id && w.id === contrastInitiatorId) || (w.isAutoAllocated && !w.isPinned))) {
+        return i;
+      }
+    }
+    return -1;
+  });
+
+  function pinItem(e, item) {
+    e.stopPropagation();
+    if (onPinWin) onPinWin(item);
+  }
+
+  function collapseGroup(e) {
+    e.stopPropagation();
+    if (onCollapseGroup) onCollapseGroup();
+  }
 
   function selectItem(item, idx) {
     ui.configOpen = false;
@@ -216,15 +257,29 @@
       {#if showIndicator && insertP === idx}
         <div class="drop-indicator" aria-hidden="true"></div>
       {/if}
+      {#if hasAutoAllocGroup && idx === firstGroupIdx}
+        <span
+          class="contrast-group-badge"
+          id="contrast-group-badge"
+          title="Active Split Auto-Contrast Group"
+        >
+          ⊞ {layout !== "1x1" ? layout : "Split"} · {autoAllocation && autoAllocation !== "none" ? autoAllocation.toUpperCase() : String(item.allocMode || "CONTRAST").toUpperCase()}
+        </span>
+      {/if}
       <div
         id={item.pillId || `tab-item-win-${item.uid ?? item.winIdx ?? idx}`}
         class="tab-item"
         class:active={(item.winIdx ?? idx) === activeWinIdx && !ui.configOpen}
         class:dragging={draggedIndex === idx}
+        class:contrast-initiator={hasAutoAllocGroup && item.id === contrastInitiatorId}
+        class:contrast-child={Boolean(item.isAutoAllocated && !item.isPinned)}
+        class:contrast-pinned={Boolean(item.isPinned)}
         role="tab"
         aria-selected={(item.winIdx ?? idx) === activeWinIdx && !ui.configOpen}
         tabindex="0"
-        title="Drag to rearrange"
+        title={item.isAutoAllocated && !item.isPinned
+          ? `Auto-allocated contrast slot (${item.allocBadgeText || item.allocMode || "contrast"}). Click 📌 to keep permanently.`
+          : "Drag to rearrange"}
         draggable="true"
         ondragstart={(e) => handleDragStart(e, idx)}
         ondragover={(e) => handleDragOver(e, idx)}
@@ -233,12 +288,28 @@
         onclick={() => selectItem(item, item.winIdx ?? idx)}
         onkeydown={(e) => e.key === "Enter" && selectItem(item, item.winIdx ?? idx)}
       >
+        {#if hasAutoAllocGroup && item.id === contrastInitiatorId}
+          <span class="tab-initiator-star" title="Split Contrast Initiator Tab" aria-hidden="true">★</span>
+        {/if}
+        {#if item.allocBadgeText && (item.isAutoAllocated || (hasAutoAllocGroup && item.id === contrastInitiatorId))}
+          <span class="tab-alloc-chip">{item.allocBadgeText}</span>
+        {/if}
         <span class="tab-label" id={item.labelId || `tab-label-${item.uid ?? item.winIdx ?? idx}`}>
           {(() => {
             const raw = item.title ? String(item.title).replace(/^W\d+:\s*/, "") : "";
             return raw ? `W${(item.winIdx ?? idx) + 1}: ${raw}` : `Tab ${(item.winIdx ?? idx) + 1}`;
           })()}
         </span>
+        {#if item.isAutoAllocated && !item.isPinned && onPinWin}
+          <button
+            type="button"
+            id={`tab-pin-${item.uid ?? item.winIdx ?? idx}`}
+            class="tab-pin-btn"
+            title="Pin as permanent independent tab (Alt+P)"
+            aria-label="Pin Tab"
+            onclick={(e) => pinItem(e, item)}
+          >📌</button>
+        {/if}
         {#if tabItems.length > 1}
           <button
             type="button"
@@ -250,6 +321,16 @@
           >×</button>
         {/if}
       </div>
+      {#if hasAutoAllocGroup && idx === lastGroupIdx && onCollapseGroup}
+        <button
+          type="button"
+          id="btn-collapse-contrast-group"
+          class="btn-collapse-group"
+          title="Collapse split contrast group and remove auto-allocated tabs (Shift+F4)"
+          aria-label="Collapse Contrast Group"
+          onclick={collapseGroup}
+        >✕ Collapse</button>
+      {/if}
     {/each}
     {#if showIndicator && insertP === tabItems.length}
       <div class="drop-indicator" aria-hidden="true"></div>
@@ -288,6 +369,16 @@
       aria-label="Add new tab"
       onclick={addItem}
     >+</button>
+
+    {#if isMaximizedPreview && layout !== "1x1" && onRestorePreview}
+      <button
+        id="btn-restore-split-preview"
+        type="button"
+        class="btn-restore-preview"
+        title="Return to {layout} split grid (F4)"
+        onclick={() => onRestorePreview && onRestorePreview()}
+      >⊞ Return to {layout} Split</button>
+    {/if}
   </div>
 
   <div class="layout-controls" id="layout-controls">
@@ -563,6 +654,116 @@
 
   .tab-item.dragging {
     opacity: 0.45;
+  }
+
+  .contrast-group-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: var(--font-mono, monospace);
+    background: rgba(56, 139, 253, 0.16);
+    border: 1px solid rgba(88, 166, 255, 0.4);
+    color: #79c0ff;
+    white-space: nowrap;
+    flex-shrink: 0;
+    letter-spacing: 0.3px;
+  }
+
+  .tab-item.contrast-initiator {
+    border-color: rgba(88, 166, 255, 0.45);
+    background: rgba(56, 139, 253, 0.1);
+  }
+
+  .tab-item.contrast-child {
+    border-style: dashed;
+    border-color: rgba(88, 166, 255, 0.32);
+    background: rgba(56, 139, 253, 0.06);
+    padding: 3px 8px;
+    gap: 5px;
+    max-width: 145px;
+  }
+
+  .tab-item.contrast-child .tab-label {
+    font-size: 11px;
+    opacity: 0.85;
+  }
+
+  .tab-initiator-star {
+    color: #f2cc60;
+    font-size: 11px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .tab-alloc-chip {
+    font-size: 10px;
+    font-weight: 700;
+    font-family: var(--font-mono, monospace);
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgba(88, 166, 255, 0.18);
+    color: #79c0ff;
+    flex-shrink: 0;
+  }
+
+  .tab-pin-btn {
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-size: 11px;
+    line-height: 1;
+    padding: 1px 2px;
+    cursor: pointer;
+    border-radius: 3px;
+    opacity: 0.65;
+    flex-shrink: 0;
+  }
+
+  .tab-pin-btn:hover {
+    opacity: 1;
+    background: rgba(56, 139, 253, 0.25);
+  }
+
+  .btn-collapse-group {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(248, 81, 73, 0.14);
+    border: 1px solid rgba(248, 81, 73, 0.4);
+    color: #ff7b72;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+
+  .btn-collapse-group:hover {
+    background: rgba(248, 81, 73, 0.28);
+    border-color: #f85149;
+    color: #ffa198;
+  }
+
+  .btn-restore-preview {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(46, 160, 67, 0.18);
+    border: 1px solid rgba(63, 185, 80, 0.45);
+    color: #56d364;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+
+  .btn-restore-preview:hover {
+    background: rgba(46, 160, 67, 0.3);
+    border-color: #3fb950;
   }
 
   .drop-indicator {

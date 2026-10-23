@@ -51,6 +51,10 @@
     getNextWindowUid,
     shouldSkipWindowReload,
     replaceModelInPath,
+    resolveContrastInitiator,
+    pinContrastWindow,
+    getContrastGroupInfo,
+    pruneAutoAllocatedWindows,
   } from "./lib/stores/tabsCore.js";
   import { getLayersForWindow, clearLayersForWindow } from "./lib/stores/layersCore.js";
   import { deleteWindowTimeline } from "./lib/stores/timeline.svelte.js";
@@ -541,30 +545,138 @@
     activeTab.activeWinIdx = Math.max(0, findWindowIndex(windows, activeWindow));
   }
 
-  function toggleTabsAndSplit() {
+  function handlePinWindow(win) {
+    if (!activeTab || !win) return;
+    const pinned = pinContrastWindow(activeTab, win);
+    if (pinned) {
+      updateWindowTitle(pinned);
+      showToast(`Pinned W${(pinned.winIdx ?? 0) + 1} as permanent tab`, "info");
+    }
+  }
+
+  async function handleCollapseContrastGroup(promoteWin = null) {
     if (!activeTab) return;
-    const newLayout = activeTab.layout === "1x1" ? (activeTab._lastSplitLayout || "2x2") : "1x1";
     if (activeTab.layout !== "1x1") {
       activeTab._lastSplitLayout = activeTab.layout;
     }
+    const initiator = resolveContrastInitiator(activeTab, promoteWin || activeWin);
+    const shouldAdopt = Boolean(promoteWin && initiator && promoteWin !== initiator);
+    pruneAutoAllocatedWindows(activeTab, {
+      keepCount: 0,
+      promoteWin,
+      onCleanupWindow: cleanupWindowResources,
+    });
+    activeTab.layout = "1x1";
+    activeTab.autoAllocation = "none";
+    activeTab.isMaximizedPreview = false;
+
+    const targetWin = activeTab.windows[activeTab.activeWinIdx] || initiator || activeTab.windows[0];
+    if (targetWin) {
+      handleWindowFocus(targetWin);
+      updateWindowTitle(targetWin);
+      if (shouldAdopt && targetWin.activeGroup) {
+        setTimeout(async () => {
+          let map = getMapInstance(targetWin.id);
+          if (!map) map = await waitForMapInstance(targetWin.id, 2000);
+          if (map) {
+            if (typeof map.resize === "function") {
+              try { map.resize(); } catch {}
+            }
+            const loadSeq = (targetWin.loadSeq || 0) + 1;
+            targetWin.loadSeq = loadSeq;
+            await loadPresetGroup(
+              map,
+              targetWin.activeGroup,
+              targetWin.period,
+              targetWin.level,
+              targetWin,
+              false,
+              loadSeq
+            ).catch(console.error);
+            if (!targetWin.isObservation) {
+              refreshForecastTimeline(targetWin, true);
+            }
+            updateWindowTitle(targetWin);
+            syncLayersState(targetWin.id);
+            syncLegendState(targetWin.id);
+          }
+        }, 40);
+      } else {
+        setTimeout(() => {
+          const map = getMapInstance(targetWin.id);
+          if (map && typeof map.resize === "function") {
+            try { map.resize(); } catch {}
+          }
+        }, 40);
+      }
+    }
+  }
+
+  function toggleTabsAndSplit(targetWin = null) {
+    if (!activeTab) return;
+    if (targetWin && activeTab.windows?.includes(targetWin)) {
+      handleWindowFocus(targetWin);
+    }
+    if (activeTab.layout !== "1x1") {
+      activeTab.isMaximizedPreview = !activeTab.isMaximizedPreview;
+      setTimeout(() => {
+        const visible = getVisibleWindows(activeTab);
+        for (const w of visible) {
+          const map = getMapInstance(w.id);
+          if (map && typeof map.resize === "function") {
+            try { map.resize(); } catch {}
+          }
+        }
+        if (!activeTab.isMaximizedPreview && activeTab.syncMap !== false) {
+          syncTabCameras(activeTab, { getMap: (id) => getMapInstance(id) });
+        }
+      }, 40);
+      return;
+    }
+    const newLayout = activeTab._lastSplitLayout || "2x2";
     handleChangeLayout(newLayout);
   }
 
   async function handleChangeLayout(layout, explicitAllocMode = null) {
     if (!activeTab) return;
+    activeTab.isMaximizedPreview = false;
     if (explicitAllocMode !== null) {
       activeTab.autoAllocation = explicitAllocMode;
     }
     const prevLayout = activeTab.layout;
+    if (prevLayout !== "1x1" && layout === "1x1") {
+      activeTab._lastSplitLayout = prevLayout;
+    }
     activeTab.layout = layout;
     const numNeeded = getNumVisible(layout);
     const prevNumNeeded = getNumVisible(prevLayout);
     const isSplit = layout !== "1x1";
     const wasTab = prevLayout === "1x1";
 
-    const baseWin = (activeTab.windows && activeTab.activeWinIdx != null && activeTab.windows[activeTab.activeWinIdx])
+    if (!isSplit) {
+      pruneAutoAllocatedWindows(activeTab, {
+        keepCount: 0,
+        onCleanupWindow: cleanupWindowResources,
+      });
+      const focusTarget = activeTab.windows[activeTab.activeWinIdx] || activeTab.windows[0];
+      if (focusTarget) {
+        handleWindowFocus(focusTarget);
+        setTimeout(() => {
+          const map = getMapInstance(focusTarget.id);
+          if (map && typeof map.resize === "function") {
+            try { map.resize(); } catch {}
+          }
+        }, 40);
+      }
+      return;
+    }
+
+    const rawBaseWin = (activeTab.windows && activeTab.activeWinIdx != null && activeTab.windows[activeTab.activeWinIdx])
       ? activeTab.windows[activeTab.activeWinIdx]
       : (activeWin || activeTab.windows?.[0] || null);
+    const baseWin = (rawBaseWin && rawBaseWin.isAutoAllocated && !rawBaseWin.isPinned)
+      ? resolveContrastInitiator(activeTab, rawBaseWin)
+      : rawBaseWin;
 
     if (isProfilePanelWindow(baseWin)) {
       activeTab.autoAllocation = "none";
@@ -574,7 +686,14 @@
       activeTab.autoAllocation = "none";
     }
 
-    if (!isSplit || activeTab.autoAllocation === "none") {
+    if (activeTab.autoAllocation === "none") {
+      if (prevNumNeeded > numNeeded) {
+        pruneAutoAllocatedWindows(activeTab, {
+          keepCount: Math.max(0, numNeeded - 1),
+          targetParentId: baseWin?.id || null,
+          onCleanupWindow: cleanupWindowResources,
+        });
+      }
       // Prior logic: load already-existed tab-windows
       while (activeTab.windows.length < numNeeded) {
         const uid = getNextWindowUid(activeTab);
@@ -609,7 +728,15 @@
     } else {
       // Other alloc mode (level, model, step, time):
       // Don't add/clear layers to exist tab-win with layers: only add to empty tab-win or create new tab-win.
-      prepareSplitWindows(activeTab, numNeeded, baseWin, (w) => isWindowEmpty(w, getLayersForWindow), wasTab, prevNumNeeded);
+      prepareSplitWindows(
+        activeTab,
+        numNeeded,
+        baseWin,
+        (w) => isWindowEmpty(w, getLayersForWindow),
+        wasTab,
+        prevNumNeeded,
+        cleanupWindowResources
+      );
       for (const w of activeTab.windows) {
         syncLayersState(w.id);
       }
@@ -636,9 +763,12 @@
     const allocSeq = (tab._allocSeq || 0) + 1;
     tab._allocSeq = allocSeq;
     tab.autoAllocation = mode;
-    const baseWin = (tab.windows && tab.activeWinIdx != null && tab.windows[tab.activeWinIdx])
+    const rawBaseWin = (tab.windows && tab.activeWinIdx != null && tab.windows[tab.activeWinIdx])
       ? tab.windows[tab.activeWinIdx]
       : (activeWin || tab.windows?.[0] || null);
+    const baseWin = (rawBaseWin && rawBaseWin.isAutoAllocated && !rawBaseWin.isPinned)
+      ? resolveContrastInitiator(tab, rawBaseWin)
+      : rawBaseWin;
 
     if (isProfilePanelWindow(baseWin)) {
       tab.autoAllocation = "none";
@@ -1869,10 +1999,23 @@
     syncLayersState(win.id);
     syncLegendState(win.id);
 
-    if (syncModelSplit && targetWin === activeWin && activeTab?.layout !== "1x1" && activeTab?.autoAllocation === "model") {
-      applyAutoAllocationModeToTab(activeTab, "model").catch((err) =>
-        console.error("[AutoAlloc] Model level sync error:", err)
-      );
+    if (syncModelSplit && targetWin === activeWin && activeTab?.layout !== "1x1") {
+      const alloc = activeTab?.autoAllocation;
+      if (alloc === "model") {
+        const initiator = resolveContrastInitiator(activeTab, activeWin);
+        if (initiator && initiator !== activeWin) {
+          initiator.level = lvl;
+        }
+        applyAutoAllocationModeToTab(activeTab, "model").catch((err) =>
+          console.error("[AutoAlloc] Model level sync error:", err)
+        );
+      } else if (alloc === "step" || alloc === "time") {
+        const visible = getVisibleWindows(activeTab);
+        for (const w of visible) {
+          if (!w || w === win || ((w.model === "SURFACE" || w.level === 0) && !w.activeGroup?.hasLevel)) continue;
+          await handleLevelSelect(lvl, w, false);
+        }
+      }
     }
   }
 
@@ -2165,13 +2308,8 @@
   }
 
   function cycleLayout() {
-    // F4 toggles split 1x1 <-> split layout (1x2 / 2x2 / 2x3 reachable via layout buttons).
-    if (!activeTab) return;
-    const newLayout = activeTab.layout === "1x1" ? (activeTab._lastSplitLayout || "2x2") : "1x1";
-    if (activeTab.layout !== "1x1") {
-      activeTab._lastSplitLayout = activeTab.layout;
-    }
-    handleChangeLayout(newLayout);
+    // F4 toggles maximized preview when in split mode, or enters split from 1x1 tab mode.
+    toggleTabsAndSplit();
   }
 
   function handleToggleConfig() {
@@ -2228,10 +2366,13 @@
     const isRight = e.key === "ArrowRight" || e.key === "Right" || e.code === "ArrowRight";
     const isUp = e.key === "ArrowUp" || e.key === "Up" || e.code === "ArrowUp";
     const isDown = e.key === "ArrowDown" || e.key === "Down" || e.code === "ArrowDown";
-    const isSplit = e.key === "F4" || (e.altKey && (e.key === "s" || e.key === "S" || e.code === "KeyS"));
+    const isCollapseSplit = e.key === "F4" && e.shiftKey;
+    const isSplit = (!e.shiftKey && e.key === "F4") || (e.altKey && (e.key === "s" || e.key === "S" || e.code === "KeyS"));
+    const isPinWin = e.altKey && (e.key === "p" || e.key === "P" || e.code === "KeyP");
+    const isAdoptWin = e.altKey && e.key === "Enter";
     const isSpace = e.code === "Space" || e.key === " " || e.key === "Spacebar";
 
-    if (!isLeft && !isRight && !isUp && !isDown && !isSplit && !isSpace) {
+    if (!isLeft && !isRight && !isUp && !isDown && !isCollapseSplit && !isSplit && !isPinWin && !isAdoptWin && !isSpace) {
       return;
     }
 
@@ -2263,6 +2404,19 @@
     } else if (isDown) {
       e.preventDefault();
       await stepVerticalLevel(-1);
+    } else if (isCollapseSplit) {
+      e.preventDefault();
+      await handleCollapseContrastGroup(null);
+    } else if (isPinWin) {
+      e.preventDefault();
+      if (activeWin?.isAutoAllocated && !activeWin?.isPinned) {
+        handlePinWindow(activeWin);
+      }
+    } else if (isAdoptWin) {
+      e.preventDefault();
+      if (activeWin?.isAutoAllocated && !activeWin?.isPinned) {
+        await handleCollapseContrastGroup(activeWin);
+      }
     } else if (isSplit) {
       e.preventDefault();
       cycleLayout();
@@ -2298,6 +2452,7 @@
     layout={activeTab?.layout || "1x1"}
     syncMap={activeTab?.syncMap !== false}
     autoAllocation={activeTab?.autoAllocation || "none"}
+    isMaximizedPreview={Boolean(activeTab?.isMaximizedPreview)}
     onSelectWin={handleWindowFocus}
     onAddWin={handleAddWindow}
     onCloseWin={handleCloseWindow}
@@ -2306,19 +2461,25 @@
     onToggleSync={handleToggleSync}
     onSelectAutoAlloc={handleSelectAutoAlloc}
     onToggleAutoAlloc={handleToggleAutoAlloc}
+    onPinWin={handlePinWindow}
+    onCollapseGroup={() => handleCollapseContrastGroup(null)}
+    onRestorePreview={toggleTabsAndSplit}
   />
 
   <main id="main-content" class="main-content">
     <div id="workspace-container">
-      <div class="windows-grid layout-{activeTab?.layout || '1x1'}">
+      <div class="windows-grid layout-{activeTab?.isMaximizedPreview ? '1x1' : (activeTab?.layout || '1x1')}">
         {#each activeTab?.windows || [] as win (win.id)}
           <WindowPanel
             {win}
             isActive={win === activeWin}
             isVisible={visibleWindows.includes(win)}
             perWindowLegend={perWindowLegend}
+            isMaximizedPreview={Boolean(activeTab?.isMaximizedPreview)}
             onFocus={handleWindowFocus}
             onToggleMax={toggleTabsAndSplit}
+            onPin={handlePinWindow}
+            onAdoptAndCollapse={(w) => handleCollapseContrastGroup(w)}
             onMapCreated={(map) => handleMapCreated(win, map)}
             onMapDestroyed={() => handleMapDestroyed(win)}
           />

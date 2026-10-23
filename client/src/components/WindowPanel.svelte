@@ -9,8 +9,11 @@
     isActive = false,
     isVisible = true,
     perWindowLegend = false,
+    isMaximizedPreview = false,
     onFocus = null,
     onToggleMax = null,
+    onPin = null,
+    onAdoptAndCollapse = null,
     onMapCreated = null,
     onMapDestroyed = null,
   } = $props();
@@ -96,18 +99,47 @@
     </div>
 
     <div class="win-actions">
+      {#if win?.isAutoAllocated && !win?.isPinned}
+        {#if onPin}
+          <button
+            type="button"
+            id={`win-pin-${win.tabId || 1}-${win.uid ?? win.winIdx}`}
+            class="win-btn-action win-btn-pin"
+            title="Pin as permanent independent tab (Alt+P)"
+            aria-label="Pin as permanent tab"
+            onclick={(e) => {
+              e.stopPropagation();
+              if (onPin) onPin(win);
+            }}
+          >📌</button>
+        {/if}
+        {#if onAdoptAndCollapse}
+          <button
+            type="button"
+            id={`win-adopt-${win.tabId || 1}-${win.uid ?? win.winIdx}`}
+            class="win-btn-action win-btn-adopt"
+            title="Adopt into Initiator tab & exit split (Alt+Enter)"
+            aria-label="Adopt into Initiator tab and exit split"
+            onclick={(e) => {
+              e.stopPropagation();
+              if (onAdoptAndCollapse) onAdoptAndCollapse(win);
+            }}
+          >✓</button>
+        {/if}
+      {/if}
       <button
         type="button"
         id={win.maxBtnId || `win-max-${win.tabId || 1}-${win.uid ?? win.winIdx}`}
         class="win-btn-max"
-        title="Maximize Window"
+        class:active={isMaximizedPreview}
+        title={isMaximizedPreview ? "Return to Split Grid (F4)" : "Maximize Window Preview (F4)"}
         aria-label="Maximize Window"
         onclick={(e) => {
           e.stopPropagation();
           if (onFocus) onFocus(win);
           if (onToggleMax) onToggleMax(win);
         }}
-      >⛶</button>
+      >{isMaximizedPreview ? "⊞" : "⛶"}</button>
     </div>
   </div>
 
@@ -268,9 +300,39 @@
     transition: color 0.15s ease, background 0.15s ease;
   }
 
-  .win-btn-max:hover {
+  .win-btn-max:hover,
+  .win-btn-max.active {
     color: #58a6ff;
     background: rgba(56, 139, 253, 0.18);
+  }
+
+  .win-btn-action {
+    background: transparent;
+    border: none;
+    color: #8b949e;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 5px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+
+  .win-btn-pin:hover {
+    color: #79c0ff;
+    background: rgba(56, 139, 253, 0.2);
+  }
+
+  .win-btn-adopt {
+    color: #56d364;
+  }
+
+  .win-btn-adopt:hover {
+    color: #7ee787;
+    background: rgba(46, 160, 67, 0.22);
   }
 
   .win-body {

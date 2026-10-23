@@ -395,7 +395,7 @@ export function getNumVisible(layout) {
 export function getVisibleWindows(tab) {
   if (!tab || !Array.isArray(tab.windows) || tab.windows.length === 0) return [];
   const numVisible = getNumVisible(tab.layout);
-  if (tab.layout === "1x1") {
+  if (tab.layout === "1x1" || tab.isMaximizedPreview) {
     const active = tab.windows[tab.activeWinIdx] || tab.windows[0];
     return active ? [active] : [];
   }
@@ -413,10 +413,276 @@ export function getVisibleWindows(tab) {
 
 export function isWindowVisible(tab, win) {
   if (!tab || !win) return false;
-  if (tab.layout === "1x1") {
-    return tab.windows[tab.activeWinIdx] === win;
+  if (tab.layout === "1x1" || tab.isMaximizedPreview) {
+    return (tab.windows[tab.activeWinIdx] || tab.windows[0]) === win;
   }
   return getVisibleWindows(tab).includes(win);
+}
+
+/**
+ * Resolves the root Initiator window for an auto-allocated contrast group.
+ * Prevents circular allocParentId chains when a user focuses a child window
+ * and changes layout or allocation mode.
+ */
+export function resolveContrastInitiator(tab, baseWin = null) {
+  if (!tab || !Array.isArray(tab.windows) || tab.windows.length === 0) {
+    return baseWin || null;
+  }
+  const inTab = baseWin && typeof baseWin === "object" && tab.windows.includes(baseWin);
+  let cur = inTab
+    ? baseWin
+    : ((tab.activeWinIdx != null && tab.windows[tab.activeWinIdx]) ? tab.windows[tab.activeWinIdx] : tab.windows[0]);
+
+  const visited = new Set();
+  while (cur && cur.isAutoAllocated && !cur.isPinned && cur.allocParentId && !visited.has(cur.id)) {
+    visited.add(cur.id);
+    const parent = tab.windows.find((w) => w && w.id === cur.allocParentId);
+    if (parent && parent !== cur) {
+      cur = parent;
+    } else {
+      break;
+    }
+  }
+
+  if (cur && cur.isAutoAllocated && !cur.isPinned) {
+    if (tab.allocAnchorId) {
+      const anchor = tab.windows.find((w) => w && w.id === tab.allocAnchorId && (!w.isAutoAllocated || w.isPinned));
+      if (anchor) return anchor;
+    }
+    const firstNonAlloc = tab.windows.find((w) => w && (!w.isAutoAllocated || w.isPinned));
+    if (firstNonAlloc) return firstNonAlloc;
+  }
+
+  return cur || tab.windows[0] || null;
+}
+
+/**
+ * Computes a compact differential badge label for a window in a split contrast group.
+ */
+export function computeAllocBadgeText(win, mode, slotIdx = 0) {
+  if (!win || !mode || mode === "none") return null;
+  if (mode === "level") {
+    return win.level != null ? `${win.level}hPa` : "SFC";
+  }
+  if (mode === "model") {
+    const raw = String(win.model || "");
+    if (!raw) return `M${slotIdx + 1}`;
+    return raw.replace(/_HR$|_MR$/, "");
+  }
+  if (mode === "step") {
+    if (win.isObservation && win.obsTime) {
+      const digits = String(win.obsTime).replace(/[^\d]/g, "");
+      if (digits.length >= 8) {
+        const dd = digits.length >= 10 ? digits.slice(6, 8) : digits.slice(4, 6);
+        const hh = digits.length >= 10 ? digits.slice(8, 10) : digits.slice(6, 8);
+        return `${dd}/${hh}h`;
+      }
+      return String(win.obsTime);
+    }
+    const p = Number(win.period ?? 0);
+    return `+${String(p).padStart(3, "0")}h`;
+  }
+  if (mode === "time") {
+    if (win.isObservation && win.obsTime) {
+      const digits = String(win.obsTime).replace(/[^\d]/g, "");
+      if (digits.length >= 8) {
+        const dd = digits.length >= 10 ? digits.slice(6, 8) : digits.slice(4, 6);
+        const hh = digits.length >= 10 ? digits.slice(8, 10) : digits.slice(6, 8);
+        return `${dd}/${hh}h`;
+      }
+      return String(win.obsTime);
+    }
+    const cyc = String(win.forecastCycle || "").replace(/[^\d]/g, "");
+    const p = Number(win.period ?? 0);
+    if (cyc.length >= 8) {
+      const dd = cyc.length >= 10 ? cyc.slice(6, 8) : cyc.slice(4, 6);
+      const hh = cyc.length >= 10 ? cyc.slice(8, 10) : cyc.slice(6, 8);
+      return `${dd}/${hh} +${String(p).padStart(3, "0")}h`;
+    }
+    return `+${String(p).padStart(3, "0")}h`;
+  }
+  return null;
+}
+
+/**
+ * Promotes an auto-allocated contrast window to a permanent, independent user tab.
+ */
+export function pinContrastWindow(tab, winOrId) {
+  if (!tab || !Array.isArray(tab.windows) || !winOrId) return null;
+  const win = typeof winOrId === "object"
+    ? tab.windows.find((w) => w === winOrId || (w && winOrId.id && w.id === winOrId.id))
+    : tab.windows.find((w) => w && w.id === winOrId);
+  if (!win) return null;
+  win.isPinned = true;
+  win.isAutoAllocated = false;
+  win.allocParentId = null;
+  win.allocMode = null;
+  win.allocBadgeText = null;
+  return win;
+}
+
+/**
+ * Returns structured metadata about the active contrast group on `tab`, or null if none.
+ */
+export function getContrastGroupInfo(tab) {
+  if (!tab || !Array.isArray(tab.windows)) return null;
+  const children = tab.windows.filter((w) => w && w.isAutoAllocated && !w.isPinned);
+  if (children.length === 0) return null;
+  const parentId = children[0].allocParentId || tab.allocAnchorId || null;
+  const initiator = (parentId ? tab.windows.find((w) => w && w.id === parentId) : null) ||
+    resolveContrastInitiator(tab, children[0]) ||
+    tab.windows[0];
+  const mode = (tab.autoAllocation && tab.autoAllocation !== "none")
+    ? tab.autoAllocation
+    : (children[0].allocMode || "level");
+  return {
+    initiator,
+    parentId: initiator?.id || parentId,
+    children,
+    mode,
+    totalCount: (initiator ? 1 : 0) + children.length,
+  };
+}
+
+/**
+ * Prunes ephemeral auto-allocated child windows (`isAutoAllocated && !isPinned`).
+ * Strictly preserves:
+ *  1. The Initiator window (`isAutoAllocated === false`)
+ *  2. All Original Non-Focused independent tabs (`isAutoAllocated === false`)
+ *  3. Any Pinned contrast tabs (`isPinned === true`)
+ *
+ * @param {Object} tab - The tab state object.
+ * @param {Object} [options]
+ * @param {number} [options.keepCount=0] - Number of auto-allocated children of targetParentId to retain.
+ * @param {string|null} [options.targetParentId=null] - Parent window ID whose children may be retained up to keepCount.
+ * @param {Object|null} [options.promoteWin=null] - Child window whose parameters should be adopted onto the initiator before pruning.
+ * @param {Function|null} [options.onCleanupWindow=null] - Callback invoked for each pruned window to release MapLibre/layer/timeline resources.
+ * @returns {Array} Array of pruned window objects.
+ */
+export function pruneAutoAllocatedWindows(tab, options = {}) {
+  if (!tab || !Array.isArray(tab.windows)) return [];
+  const {
+    keepCount = 0,
+    targetParentId = null,
+    promoteWin = null,
+    onCleanupWindow = null,
+  } = options;
+
+  const initiator = promoteWin
+    ? (tab.windows.find((w) => w && w.id === promoteWin.allocParentId) || resolveContrastInitiator(tab, promoteWin))
+    : (targetParentId
+      ? (tab.windows.find((w) => w && w.id === targetParentId) || resolveContrastInitiator(tab))
+      : resolveContrastInitiator(tab));
+
+  if (promoteWin && initiator && promoteWin !== initiator) {
+    initiator.level = promoteWin.level;
+    initiator.model = promoteWin.model;
+    initiator.element = promoteWin.element;
+    initiator.period = promoteWin.period;
+    initiator.forecastCycle = promoteWin.forecastCycle;
+    initiator.obsTime = promoteWin.obsTime;
+    initiator.isObservation = promoteWin.isObservation;
+    initiator.stepLength = promoteWin.stepLength;
+    if (Array.isArray(promoteWin.discretePeriods)) {
+      initiator.discretePeriods = [...promoteWin.discretePeriods];
+    }
+    if (Array.isArray(promoteWin.forecastCycles)) {
+      initiator.forecastCycles = [...promoteWin.forecastCycles];
+    }
+    if (promoteWin.activeGroup) {
+      try {
+        initiator.activeGroup = JSON.parse(JSON.stringify(promoteWin.activeGroup));
+      } catch {
+        initiator.activeGroup = promoteWin.activeGroup;
+      }
+    }
+    if (Array.isArray(promoteWin.layers)) {
+      try {
+        initiator.layers = JSON.parse(JSON.stringify(promoteWin.layers));
+      } catch {
+        initiator.layers = [...promoteWin.layers];
+      }
+    }
+    if (promoteWin._nwpTimeline) {
+      initiator._nwpTimeline = { ...promoteWin._nwpTimeline };
+    }
+    if (promoteWin._obsTimeline) {
+      initiator._obsTimeline = { ...promoteWin._obsTimeline };
+    }
+    initiator.isAutoAllocated = false;
+    initiator.allocParentId = null;
+  }
+
+  const prevActive = tab.windows[tab.activeWinIdx] || tab.windows[0] || null;
+  const effectiveParentId = targetParentId || initiator?.id || null;
+
+  let keptChildren = 0;
+  const survivors = [];
+  const pruned = [];
+
+  for (const w of tab.windows) {
+    const isEphemeral = Boolean(w && w.isAutoAllocated && !w.isPinned && w !== initiator);
+    if (!isEphemeral) {
+      if (keepCount === 0 && w) {
+        w.allocBadgeText = null;
+        w.allocMode = null;
+      }
+      survivors.push(w);
+    } else {
+      const matchesParent = !effectiveParentId || !w.allocParentId || w.allocParentId === effectiveParentId;
+      if (keepCount > 0 && matchesParent && keptChildren < keepCount) {
+        keptChildren += 1;
+        survivors.push(w);
+      } else {
+        pruned.push(w);
+      }
+    }
+  }
+
+  if (survivors.length === 0 && tab.windows.length > 0) {
+    const fallback = tab.windows[0];
+    fallback.isAutoAllocated = false;
+    fallback.allocParentId = null;
+    fallback.allocBadgeText = null;
+    survivors.push(fallback);
+    const idx = pruned.indexOf(fallback);
+    if (idx !== -1) pruned.splice(idx, 1);
+  }
+
+  if (typeof onCleanupWindow === "function") {
+    for (const w of pruned) {
+      try {
+        onCleanupWindow(w);
+      } catch {}
+    }
+  }
+
+  survivors.forEach((w, idx) => {
+    w.winIdx = idx;
+    if (w.title) w.title = String(w.title).replace(/^W\d+:\s*/, "");
+    if (w.baseTitle) w.baseTitle = String(w.baseTitle).replace(/^W\d+:\s*/, "");
+  });
+  tab.windows = survivors;
+
+  if (promoteWin && initiator && survivors.includes(initiator)) {
+    tab.activeWinIdx = survivors.indexOf(initiator);
+  } else if (prevActive && survivors.includes(prevActive)) {
+    tab.activeWinIdx = survivors.indexOf(prevActive);
+  } else if (prevActive && prevActive.allocParentId) {
+    const parentIdx = survivors.findIndex((w) => w && w.id === prevActive.allocParentId);
+    tab.activeWinIdx = parentIdx !== -1 ? parentIdx : Math.max(0, Math.min(tab.activeWinIdx || 0, survivors.length - 1));
+  } else if (initiator && survivors.includes(initiator)) {
+    tab.activeWinIdx = survivors.indexOf(initiator);
+  } else {
+    tab.activeWinIdx = Math.max(0, Math.min(tab.activeWinIdx || 0, survivors.length - 1));
+  }
+
+  if (keepCount === 0) {
+    tab.allocAnchorId = null;
+    tab.isMaximizedPreview = false;
+  }
+
+  return pruned;
 }
 
 /**
@@ -451,16 +717,24 @@ export function replaceModelInPath(path, newModel) {
   return path.replace(/^[^\/]+/, newModel);
 }
 
-export function applyAutoAllocation(tab, mode = "level", baseWin = null) {  if (!tab || !Array.isArray(tab.windows)) return;
+export function applyAutoAllocation(tab, mode = "level", baseWin = null) {
+  if (!tab || !Array.isArray(tab.windows)) return;
   tab.autoAllocation = mode;
   if (mode === "none") {
     revertAutoAllocation(tab, baseWin);
     return;
   }
   const visible = getVisibleWindows(tab);
-  const win0 = (baseWin && typeof baseWin === "object")
+  const baseInTab = Boolean(baseWin && typeof baseWin === "object" && tab.windows.includes(baseWin));
+  const anchorWin = baseInTab
+    ? resolveContrastInitiator(tab, baseWin)
+    : resolveContrastInitiator(tab, visible[0] || tab.windows[0] || null);
+  const win0 = (baseWin && typeof baseWin === "object" && !baseInTab)
     ? baseWin
-    : ((tab.activeWinIdx != null && tab.windows[tab.activeWinIdx]) ? tab.windows[tab.activeWinIdx] : (tab.windows[0] || {}));
+    : (anchorWin || (baseWin && typeof baseWin === "object" ? baseWin : null) || ((tab.activeWinIdx != null && tab.windows[tab.activeWinIdx]) ? tab.windows[tab.activeWinIdx] : (tab.windows[0] || {})));
+  if (anchorWin) {
+    tab.allocAnchorId = anchorWin.id;
+  }
   const win0Layers = (Array.isArray(win0.activeGroup?.layers) && win0.activeGroup.layers.length > 0)
     ? win0.activeGroup.layers
     : (Array.isArray(win0.layers) && win0.layers.length > 0
@@ -517,12 +791,16 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {  if (
     if (Array.isArray(win0.forecastCycles)) {
       win.forecastCycles = [...win0.forecastCycles];
     }
-    if (win !== win0) {
+    if (win === anchorWin) {
+      win.isAutoAllocated = false;
+      win.allocParentId = null;
+      win.allocMode = mode;
+    } else if (!win.isPinned) {
       win.isAutoAllocated = true;
-      win.allocParentId = win0.id;
+      win.allocParentId = anchorWin?.id || win0.id || null;
       win.allocMode = mode;
     }
-    if (win0.activeGroup && (!win.activeGroup || win !== win0)) {
+    if (win0.activeGroup && (!win.activeGroup || win !== anchorWin)) {
       try {
         win.activeGroup = JSON.parse(JSON.stringify(win0.activeGroup));
       } catch {
@@ -718,6 +996,7 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {  if (
         }
       }
     }
+    win.allocBadgeText = computeAllocBadgeText(win, mode, i);
   }
 
   if (mode === "step" && !isObs) {
@@ -745,10 +1024,12 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {  if (
 export function revertAutoAllocation(tab, baseWin = null) {
   if (!tab || !Array.isArray(tab.windows)) return;
   tab.autoAllocation = "none";
+  tab.allocAnchorId = null;
   for (const win of tab.windows) {
     win.isAutoAllocated = false;
     win.allocParentId = null;
     win.allocMode = null;
+    win.allocBadgeText = null;
   }
   const visible = getVisibleWindows(tab);
   const isNumericLevelOnly = typeof baseWin === "number";
@@ -826,11 +1107,22 @@ export function getNextWindowUid(tab) {
   return nextSeq;
 }
 
-export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmptyFn = isWindowEmpty, wasTab = true, prevNumVisible = null) {
+export function prepareSplitWindows(
+  tab,
+  numNeeded,
+  baseWin = null,
+  isWindowEmptyFn = isWindowEmpty,
+  wasTab = true,
+  prevNumVisible = null,
+  onCleanupWindow = null
+) {
   if (!tab || !Array.isArray(tab.windows)) return [];
   if (numNeeded <= 1) return tab.windows;
 
-  const targetBase = baseWin || (tab.activeWinIdx != null ? tab.windows[tab.activeWinIdx] : null) || tab.windows[0];
+  const rawBase = baseWin || (tab.activeWinIdx != null ? tab.windows[tab.activeWinIdx] : null) || tab.windows[0];
+  const targetBase = (rawBase && rawBase.isAutoAllocated && !rawBase.isPinned)
+    ? resolveContrastInitiator(tab, rawBase)
+    : rawBase;
 
   const targetLayers = (Array.isArray(targetBase?.activeGroup?.layers) && targetBase.activeGroup.layers.length > 0)
     ? targetBase.activeGroup.layers
@@ -848,6 +1140,9 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
   const effectiveBaseLevel = targetHasNoLevel ? null : (targetBase?.level ?? 500);
 
   if (targetBase) {
+    targetBase.isAutoAllocated = false;
+    targetBase.allocParentId = null;
+    tab.allocAnchorId = targetBase.id;
     if (targetHasNoLevel) {
       targetBase.level = null;
     }
@@ -858,27 +1153,46 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
   }
 
   if (wasTab) {
-    const emptyWins = [];
+    const allocForBaseWins = [];
+    const otherEphemeralAllocWins = [];
+    const trulyEmptyWins = [];
     const busyWins = [];
 
     for (const w of tab.windows) {
       if (w === targetBase || (targetBase && w.id && w.id === targetBase.id)) {
         continue;
       }
+      const isEphemeralAlloc = Boolean(w.isAutoAllocated && !w.isPinned);
       const isAllocForBase = Boolean(
-        (w.isAutoAllocated && targetBase && w.allocParentId === targetBase.id) ||
-        (tab.autoAllocation && tab.autoAllocation !== "none" && w.activeGroup?.id && targetBase?.activeGroup?.id && w.activeGroup.id === targetBase.activeGroup.id)
+        (isEphemeralAlloc && targetBase && w.allocParentId === targetBase.id) ||
+        (tab.autoAllocation && tab.autoAllocation !== "none" && w.isAutoAllocated !== false && w.activeGroup?.id && targetBase?.activeGroup?.id && w.activeGroup.id === targetBase.activeGroup.id)
       );
-      if (isWindowEmptyFn(w) || isAllocForBase) {
-        emptyWins.push(w);
+      if (isAllocForBase) {
+        allocForBaseWins.push(w);
+      } else if (isEphemeralAlloc) {
+        otherEphemeralAllocWins.push(w);
+      } else if (isWindowEmptyFn(w)) {
+        trulyEmptyWins.push(w);
       } else {
         busyWins.push(w);
       }
     }
 
+    const emptyWins = [...allocForBaseWins, ...otherEphemeralAllocWins, ...trulyEmptyWins];
     const neededExtra = numNeeded - 1;
     const usedEmpty = emptyWins.slice(0, neededExtra);
-    const unusedEmpty = emptyWins.slice(neededExtra);
+    const rawUnusedEmpty = emptyWins.slice(neededExtra);
+    const unusedEmpty = [];
+
+    for (const w of rawUnusedEmpty) {
+      if (w && w.isAutoAllocated && !w.isPinned) {
+        if (typeof onCleanupWindow === "function") {
+          try { onCleanupWindow(w); } catch {}
+        }
+      } else {
+        unusedEmpty.push(w);
+      }
+    }
 
     usedEmpty.forEach((winObj, idx) => {
       const posIdx = 1 + idx;
@@ -888,6 +1202,7 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
       if (tab.autoAllocation && tab.autoAllocation !== "none") {
         winObj.isAutoAllocated = true;
         if (targetBase) winObj.allocParentId = targetBase.id;
+        winObj.allocMode = tab.autoAllocation;
         if (tab.autoAllocation === "model") {
           const eligible = getEligibleModelsForAllocation(targetBase, effectiveBaseLevel, DEFAULT_MODELS);
           winObj.model = eligible[posIdx % eligible.length];
@@ -908,6 +1223,7 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
       if (tab.autoAllocation && tab.autoAllocation !== "none") {
         winObj.isAutoAllocated = true;
         if (targetBase) winObj.allocParentId = targetBase.id;
+        winObj.allocMode = tab.autoAllocation;
         if (tab.autoAllocation === "model") {
           const eligible = getEligibleModelsForAllocation(targetBase, effectiveBaseLevel, DEFAULT_MODELS);
           winObj.model = eligible[posIdx % eligible.length];
@@ -932,9 +1248,10 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
     const emptyWins = [];
     const busyWins = [];
     for (const w of remaining) {
+      const isEphemeralAlloc = Boolean(w.isAutoAllocated && !w.isPinned);
       const isAllocForBase = Boolean(
-        (w.isAutoAllocated && targetBase && w.allocParentId === targetBase.id) ||
-        (tab.autoAllocation && tab.autoAllocation !== "none" && w.activeGroup?.id && targetBase?.activeGroup?.id && w.activeGroup.id === targetBase.activeGroup.id)
+        isEphemeralAlloc ||
+        (tab.autoAllocation && tab.autoAllocation !== "none" && w.isAutoAllocated !== false && w.activeGroup?.id && targetBase?.activeGroup?.id && w.activeGroup.id === targetBase.activeGroup.id)
       );
       if (isWindowEmptyFn(w) || isAllocForBase) {
         emptyWins.push(w);
@@ -945,7 +1262,18 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
 
     const neededExtra = numNeeded - currentSplit.length;
     const usedEmpty = emptyWins.slice(0, Math.max(0, neededExtra));
-    const unusedEmpty = emptyWins.slice(Math.max(0, neededExtra));
+    const rawUnusedEmpty = emptyWins.slice(Math.max(0, neededExtra));
+    const unusedEmpty = [];
+
+    for (const w of rawUnusedEmpty) {
+      if (w && w.isAutoAllocated && !w.isPinned) {
+        if (typeof onCleanupWindow === "function") {
+          try { onCleanupWindow(w); } catch {}
+        }
+      } else {
+        unusedEmpty.push(w);
+      }
+    }
 
     usedEmpty.forEach((winObj, idx) => {
       const posIdx = currentSplit.length + idx;
@@ -955,6 +1283,7 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
       if (tab.autoAllocation && tab.autoAllocation !== "none") {
         winObj.isAutoAllocated = true;
         if (targetBase) winObj.allocParentId = targetBase.id;
+        winObj.allocMode = tab.autoAllocation;
         if (tab.autoAllocation === "model") {
           const eligible = getEligibleModelsForAllocation(targetBase, effectiveBaseLevel, DEFAULT_MODELS);
           winObj.model = eligible[posIdx % eligible.length];
@@ -975,6 +1304,7 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
       if (tab.autoAllocation && tab.autoAllocation !== "none") {
         winObj.isAutoAllocated = true;
         if (targetBase) winObj.allocParentId = targetBase.id;
+        winObj.allocMode = tab.autoAllocation;
         if (tab.autoAllocation === "model") {
           const eligible = getEligibleModelsForAllocation(targetBase, effectiveBaseLevel, DEFAULT_MODELS);
           winObj.model = eligible[posIdx % eligible.length];
@@ -993,7 +1323,11 @@ export function prepareSplitWindows(tab, numNeeded, baseWin = null, isWindowEmpt
     if (w.baseTitle) w.baseTitle = String(w.baseTitle).replace(/^W\d+:\s*/, "");
   });
 
-  tab.activeWinIdx = Math.max(0, tab.windows.findIndex((w) => w === targetBase || (targetBase && w.id && w.id === targetBase.id)));
+  if (!wasTab && rawBase && tab.windows.slice(0, numNeeded).includes(rawBase)) {
+    tab.activeWinIdx = Math.max(0, tab.windows.indexOf(rawBase));
+  } else {
+    tab.activeWinIdx = Math.max(0, tab.windows.findIndex((w) => w === targetBase || (targetBase && w.id && w.id === targetBase.id)));
+  }
   return tab.windows;
 }
 

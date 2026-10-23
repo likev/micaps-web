@@ -26,6 +26,11 @@ import {
   prepareSplitWindows,
   setDefaultLayerResolver,
   getNextWindowUid,
+  resolveContrastInitiator,
+  computeAllocBadgeText,
+  pinContrastWindow,
+  getContrastGroupInfo,
+  pruneAutoAllocatedWindows,
 } from "./tabsCore.js";
 import { getLayersForWindow as coreGetLayersForWindow } from "./layersCore.js";
 import { setDefaultWinResolver } from "./legendCore.js";
@@ -113,4 +118,9 @@ export {
   prepareSplitWindows,
   setDefaultLayerResolver,
   getNextWindowUid,
+  resolveContrastInitiator,
+  computeAllocBadgeText,
+  pinContrastWindow,
+  getContrastGroupInfo,
+  pruneAutoAllocatedWindows,
 };
