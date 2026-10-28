@@ -52,6 +52,7 @@ describe("Specialized Station Datasets", () => {
         level: 500,
       };
       expect(isUpperAirStationLayer(soundingLayer)).toBe(true);
+      expect(getStationDatasetType(soundingLayer)).toBe("upper_air");
     });
 
     it("returns standard for default synoptic surface station", () => {

@@ -414,7 +414,7 @@
         </div>
       {:else if layer.type === "station"}
         <div class="config-subtab-pane" class:active={currentSubtab === "elements"} role="tabpanel">
-          {#if !stationType || stationType === "standard"}
+          {#if !stationType || stationType === "standard" || stationType === "upper_air"}
             <div class="config-row">
               <label for="chk-show-temp-{layer.id}">
                 <input
