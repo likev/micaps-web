@@ -27,3 +27,18 @@ export function formatFy4bChannel(level) {
   const ch = FY4B_CHANNELS[num];
   return `${id} \u00b7 ${ch.wl}\u00b5m ${ch.band} \u00b7 ${ch.desc}`;
 }
+
+/**
+ * Rewrites only the leading C0xx_ token of an FY-4B file name to target channel ch.
+ * Returns null if file does not match ^C\d{3}_ or if ch is out of 1..15.
+ * Clamps at boundaries (never wraps).
+ */
+export function swapChannelPrefix(file, ch) {
+  if (!file || typeof file !== "string") return null;
+  const num = parseInt(typeof ch === "string" && ch.toUpperCase().startsWith("C") ? ch.slice(1) : ch, 10);
+  if (isNaN(num) || num < 1 || num > 15) return null;
+  const match = file.match(/^C\d{3}_/);
+  if (!match) return null;
+  const prefix = `C${String(num).padStart(3, "0")}_`;
+  return `${prefix}${file.slice(match[0].length)}`;
+}

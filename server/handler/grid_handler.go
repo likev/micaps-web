@@ -22,6 +22,17 @@ type GridHandler struct {
 	Cache    *filecache.Cache
 	MockMode bool
 	Derived  *DerivedHandler
+	Source   *BlobSource
+}
+
+func (h *GridHandler) getSource() *BlobSource {
+	if h.Source != nil {
+		return h.Source
+	}
+	return &BlobSource{
+		Fetcher: &DBBlobFetcher{Client: h.Client},
+		Cache:   h.Cache,
+	}
 }
 
 // JSONHandler handles /api/data/grid
@@ -97,29 +108,7 @@ func (h *GridHandler) BinaryHandler(w http.ResponseWriter, r *http.Request) {
 func (h *GridHandler) fetchGrid(r *http.Request) (*model.GridResponse, error) {
 	dataPath := sanitizeGridPath(r.URL.Query().Get("path"))
 	file := sanitizeFile(r.URL.Query().Get("file"))
-	if (strings.Contains(dataPath, "FY4B/L1/CHINA") || strings.Contains(dataPath, "FY4B/L1/DISK")) && !strings.Contains(dataPath, "/C0") {
-		var chanNum int
-		if lvl := strings.TrimSpace(r.URL.Query().Get("level")); lvl != "" {
-			if upper := strings.ToUpper(lvl); strings.HasPrefix(upper, "C") && len(upper) == 4 {
-				if n, err := strconv.Atoi(upper[1:]); err == nil && n >= 1 && n <= 15 {
-					chanNum = n
-				}
-			} else if n, err := strconv.Atoi(lvl); err == nil && n >= 1 && n <= 15 {
-				chanNum = n
-			}
-		}
-		if chanNum == 0 && file != "" {
-			upperFile := strings.ToUpper(file)
-			if strings.HasPrefix(upperFile, "C") && len(upperFile) >= 4 {
-				if n, err := strconv.Atoi(upperFile[1:4]); err == nil && n >= 1 && n <= 15 {
-					chanNum = n
-				}
-			}
-		}
-		if chanNum >= 1 && chanNum <= 15 {
-			dataPath = fmt.Sprintf("%s/C%03d", dataPath, chanNum)
-		}
-	}
+	levelStr := strings.TrimSpace(r.URL.Query().Get("level"))
 
 	beforeDate, pErr := ParseHistoryDateParam(r)
 	if pErr != nil {
@@ -151,40 +140,29 @@ func (h *GridHandler) fetchGrid(r *http.Request) (*model.GridResponse, error) {
 		return dH.CalculateDerivedGrid(dReq)
 	}
 
-	levelStr := strings.TrimSpace(r.URL.Query().Get("level"))
-	if levelStr != "" {
-		if (strings.Contains(dataPath, "FY4B/L1/CHINA") || strings.Contains(dataPath, "FY4B/L1/DISK")) && !strings.Contains(dataPath, "/C0") {
-			if l, err := strconv.Atoi(levelStr); err == nil && l >= 1 && l <= 15 {
-				dataPath = fmt.Sprintf("%s/C%03d", dataPath, l)
-			}
-		}
-	} else if (strings.HasSuffix(dataPath, "FY4B/L1/CHINA") || strings.HasSuffix(dataPath, "FY4B/L1/DISK")) && !strings.Contains(dataPath, "/C0") {
-		dataPath = fmt.Sprintf("%s/C012", dataPath)
-	}
-
 	if h.Client != nil && !h.MockMode && dataPath != "" && (file == "" || file == "latest") {
-		latest, err := db.GetLatestCycle(h.Client, dataPath, "", beforeDate)
+		// If FY4B without channel in dataPath, resolve channel first for latest query
+		queryPath := dataPath
+		if (strings.Contains(queryPath, "FY4B/L1/CHINA") || strings.Contains(queryPath, "FY4B/L1/DISK")) && !strings.Contains(queryPath, "/C0") {
+			ch := 12
+			if levelStr != "" {
+				if upper := strings.ToUpper(levelStr); strings.HasPrefix(upper, "C") && len(upper) == 4 {
+					if n, err := strconv.Atoi(upper[1:]); err == nil && n >= 1 && n <= 15 {
+						ch = n
+					}
+				} else if n, err := strconv.Atoi(levelStr); err == nil && n >= 1 && n <= 15 {
+					ch = n
+				}
+			}
+			queryPath = fmt.Sprintf("%s/C%03d", queryPath, ch)
+		}
+		latest, err := db.GetLatestCycle(h.Client, queryPath, "", beforeDate)
 		if err == nil && latest != "" {
 			file = latest
 		} else {
-			files, fErr := db.GetFileList(h.Client, dataPath, 1, beforeDate)
+			files, fErr := db.GetFileList(h.Client, queryPath, 1, beforeDate)
 			if fErr == nil && len(files) > 0 {
 				file = files[0].Name
-			}
-		}
-	}
-
-	// Defensive channel prefix normalization for FY-4B:
-	// If dataPath contains "/C0xx" and file starts with "C0yy_", rewrite prefix to "C0xx_"
-	if strings.Contains(dataPath, "FY4B") && strings.Contains(dataPath, "/C0") {
-		pList := strings.Split(dataPath, "/")
-		targetChannel := pList[len(pList)-1]
-		if strings.HasPrefix(targetChannel, "C0") && len(targetChannel) == 4 {
-			if len(file) > 5 && strings.HasPrefix(file, "C0") && file[4] == '_' {
-				fileChannel := file[0:4]
-				if fileChannel != targetChannel {
-					file = targetChannel + file[4:]
-				}
 			}
 		}
 	}
@@ -200,52 +178,14 @@ func (h *GridHandler) fetchGrid(r *http.Request) (*model.GridResponse, error) {
 		return h.getFallbackGrid(r), nil
 	}
 
-	cleanDir := dataPath
-	parts := strings.Split(cleanDir, "/")
-	table := parts[0]
-	var subDataPath string
-	if len(parts) > 1 {
-		subDataPath = strings.Join(parts[1:], "/")
-	}
-	if strings.Contains(cleanDir, "TLOGP") {
-		table = "UPPER_AIR"
-		subDataPath = "TLOGP"
+	ref, err := CanonicalGridRef(dataPath, file, levelStr)
+	if err != nil {
+		return nil, err
 	}
 
-	// Check file cache
-	if h.Cache != nil {
-		if cachedBlob, _, ok := h.Cache.Get(table, subDataPath, file); ok {
-			return decodeGridPayload(cachedBlob, r)
-		}
-	}
-
-	var rawBlob []byte
-	if h.Cache != nil && h.Cache.Singleflight() != nil {
-		cacheKey := filecache.Key(table, subDataPath, file)
-		b, err := h.Cache.Singleflight().Do(cacheKey, func() ([]byte, error) {
-			if cachedBlob, _, ok := h.Cache.Get(table, subDataPath, file); ok {
-				return cachedBlob, nil
-			}
-			blob, err := db.GetBlob(h.Client, dataPath, file)
-			if err != nil {
-				return nil, err
-			}
-			_ = h.Cache.Put(table, subDataPath, file, blob, nil)
-			return blob, nil
-		})
-		if err != nil {
-			return nil, err
-		}
-		rawBlob = b
-	} else {
-		blob, err := db.GetBlob(h.Client, dataPath, file)
-		if err != nil {
-			return nil, err
-		}
-		if h.Cache != nil {
-			_ = h.Cache.Put(table, subDataPath, file, blob, nil)
-		}
-		rawBlob = blob
+	rawBlob, err := h.getSource().GetOrFetch(ref)
+	if err != nil {
+		return nil, err
 	}
 
 	return decodeGridPayload(rawBlob, r)

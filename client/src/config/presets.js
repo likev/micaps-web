@@ -43,6 +43,31 @@ export function getMaxEffectiveCells(overrideValue) {
   return Math.max(MIN_MAX_EFFECTIVE_CELLS, Math.min(MAX_MAX_EFFECTIVE_CELLS, fromConfig));
 }
 
+export const DEFAULT_PREFETCH_CONFIG = {
+  serverWarm: true,
+  maxItems: 12,
+  playbackLookahead: 2,
+};
+
+export function getPrefetchConfig() {
+  const pick = (v) => (typeof v === "object" && v !== null ? v : null);
+  let fromConfig = null;
+  try {
+    fromConfig = pick(CURRENT_CONFIG?.performance?.prefetch);
+  } catch {}
+  if (!fromConfig) {
+    try {
+      fromConfig = pick(typeof window !== "undefined" ? window.__MICAPS_CONFIG__?.performance?.prefetch : null);
+    } catch {}
+  }
+  const cfg = fromConfig || {};
+  return {
+    serverWarm: cfg.serverWarm !== undefined ? Boolean(cfg.serverWarm) : DEFAULT_PREFETCH_CONFIG.serverWarm,
+    maxItems: typeof cfg.maxItems === "number" && cfg.maxItems > 0 ? cfg.maxItems : DEFAULT_PREFETCH_CONFIG.maxItems,
+    playbackLookahead: typeof cfg.playbackLookahead === "number" && cfg.playbackLookahead > 0 ? cfg.playbackLookahead : DEFAULT_PREFETCH_CONFIG.playbackLookahead,
+  };
+}
+
 let autoSaveTimer = null;
 
 export function isDivider(entry) {

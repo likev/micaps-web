@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"micaps-web/filecache"
 	"micaps-web/model"
 )
 
@@ -129,5 +132,70 @@ func TestImageHandlerJSONAndMock(t *testing.T) {
 	}
 	if cfg.Width <= 0 || cfg.Height <= 0 {
 		t.Errorf("Invalid mock PNG dimensions: %dx%d", cfg.Width, cfg.Height)
+	}
+}
+
+func TestImageHandler_CacheKeyAndOutputByteIdentical(t *testing.T) {
+	tempDir := t.TempDir()
+	c, err := filecache.New(filecache.Config{
+		Dir:      tempDir,
+		CapBytes: 10 * 1024 * 1024,
+		TTL:      1 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("failed to init cache: %v", err)
+	}
+	defer c.Close()
+
+	bmpPayload := createSyntheticBMP(60, 40)
+	var fetchCalls int
+	fakeFetcher := BlobFetcherFunc(func(dataPath, file string) ([]byte, error) {
+		fetchCalls++
+		return bmpPayload, nil
+	})
+
+	source := NewBlobSource(fakeFetcher, c)
+	h := &ImageHandler{
+		Cache:  c,
+		Source: source,
+	}
+
+	path := "SATELLITE/FY2G/L2/DUST"
+	file := "FY2G_DST_RGB_20261028_0400.BMP"
+
+	// First request: triggers fetch
+	req1 := httptest.NewRequest("GET", fmt.Sprintf("/api/data/image?path=%s&file=%s&format=png&step=1", path, file), nil)
+	w1 := httptest.NewRecorder()
+	h.Handler(w1, req1)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", w1.Code)
+	}
+	bytes1 := w1.Body.Bytes()
+
+	if fetchCalls != 1 {
+		t.Fatalf("expected 1 fetch call, got %d", fetchCalls)
+	}
+
+	// Verify key in cache is (Table: "SATELLITE", SubDataPath: "FY2G/L2/DUST", File: file)
+	if !c.Has("SATELLITE", "FY2G/L2/DUST", file) {
+		t.Errorf("expected blob cached under table=SATELLITE, subDataPath=FY2G/L2/DUST")
+	}
+
+	// Second request: served from cache
+	req2 := httptest.NewRequest("GET", fmt.Sprintf("/api/data/image?path=%s&file=%s&format=png&step=1", path, file), nil)
+	w2 := httptest.NewRecorder()
+	h.Handler(w2, req2)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", w2.Code)
+	}
+	bytes2 := w2.Body.Bytes()
+
+	if fetchCalls != 1 {
+		t.Errorf("expected 0 additional fetch calls on cache hit, got %d total", fetchCalls)
+	}
+
+	// Output must be byte-identical
+	if !bytes.Equal(bytes1, bytes2) {
+		t.Errorf("expected byte-identical output between cold fetch and cached hit")
 	}
 }

@@ -1,12 +1,19 @@
-// prefetchService.js - Intelligent prefetch engine for keyboard shortcuts (Left/Right/Up/Down)
 import { getAdjacentTimeSteps } from "../ui/timeSlider.js";
-import { fetchGridData, fetchGridBinaryStream, fetchStationObservations } from "../api/catalogApi.js";
+import { fetchGridData, fetchGridBinaryStream, fetchStationObservations, warmServerCache, gridParams } from "../api/catalogApi.js";
 import { isCached, fetchJson } from "../api/apiClient.js";
 import { getLayersForWindow } from "../ui/layerControl.js";
+import { isSatelliteLayer, collectSatelliteItems } from "./satellitePrefetch.js";
+import { getPrefetchConfig } from "../config/presets.js";
 
 export const VERTICAL_LEVELS = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
 
 const prefetchTimers = new Map(); // winKey -> timer
+const windowGenerations = new Map(); // winKey -> monotonic int
+
+export function getWindowPrefetchGen(win) {
+  const key = prefetchWinKey(win);
+  return windowGenerations.get(key) || 0;
+}
 
 // Single key resolution shared by schedule + cancel. A mismatch here would
 // silently miss the cancel (stale timer keeps a dead win + gridData alive
@@ -87,15 +94,22 @@ export function getPrefetchTargets(win, options = {}) {
   const mode = timelineSteps.mode || (win.isObservation ? "obs" : "nwp");
   const activeGroup = win.activeGroup;
 
-  // Retrieve active window layers if available
+  // Retrieve active window weather layers
   let winLayers = [];
-  try {
-    if (typeof getLayersForWindow === "function") {
-      winLayers = getLayersForWindow(win) || [];
-    }
-  } catch {}
-  if ((!winLayers || winLayers.length === 0) && Array.isArray(win.layers)) {
+  if (Array.isArray(win.layers) && win.layers.length > 0) {
     winLayers = win.layers;
+  } else if (Array.isArray(activeGroup?.layers) && activeGroup.layers.length > 0) {
+    winLayers = activeGroup.layers;
+  } else {
+    try {
+      if (typeof getLayersForWindow === "function") {
+        const stored = getLayersForWindow(win) || [];
+        const weatherLayers = stored.filter((l) => l.element || l.model || l.type === "station" || l.type === "contour" || l.type === "image" || l.type === "raster");
+        if (weatherLayers.length > 0) {
+          winLayers = weatherLayers;
+        }
+      }
+    } catch {}
   }
 
   const hasRasterActive = (element, model) => {
@@ -118,8 +132,31 @@ export function getPrefetchTargets(win, options = {}) {
     down: { direction: "down", mode, items: [] },
   };
 
+  // Satellite detection & prefetch target resolution
+  const satLayers = winLayers.filter((l) => isSatelliteLayer(l, win));
+  const hasSatellite = isSatelliteLayer(null, win) || satLayers.length > 0;
+
+  if (hasSatellite) {
+    const targetLayers = satLayers.length > 0 ? satLayers : [{
+      model: win.model || "SATELLITE",
+      element: win.element,
+      path: win.path || win.activeGroup?.path || "SATELLITE/FY4B/L1/CHINA",
+      type: win.type || "contour",
+    }];
+
+    for (const satLayer of targetLayers) {
+      const satRes = collectSatelliteItems(win, satLayer, timelineSteps, options.directions, options);
+      if (satRes.left?.length) targets.left.items.push(...satRes.left);
+      if (satRes.right?.length) targets.right.items.push(...satRes.right);
+      if (satRes.up?.length) targets.up.items.push(...satRes.up);
+      if (satRes.down?.length) targets.down.items.push(...satRes.down);
+      if (satRes.upLevel !== null) targets.up.level = satRes.upLevel;
+      if (satRes.downLevel !== null) targets.down.level = satRes.downLevel;
+    }
+  }
+
   // ── 1. Left & Right (Time steps) ──────────────────────────────────────────
-  if (mode === "nwp") {
+  if (mode === "nwp" && !hasSatellite) {
     const cycle = win.forecastCycle || timelineSteps.periods?.cycle;
     const curPeriod = timelineSteps.periods?.current ?? win.period ?? 24;
     const prevPeriod = timelineSteps.periods?.prev;
@@ -147,11 +184,12 @@ export function getPrefetchTargets(win, options = {}) {
     targets.left.obsFile = prevObsFile;
     targets.right.obsFile = nextObsFile;
 
+    // Collect non-satellite observation items
     if (shouldFetchLeft && prevObsFile && prevObsFile !== curObsFile) {
-      targets.left.items = collectObsItems(win, prevObsFile, "left");
+      targets.left.items.push(...collectObsItems(win, prevObsFile, "left"));
     }
     if (shouldFetchRight && nextObsFile && nextObsFile !== curObsFile) {
-      targets.right.items = collectObsItems(win, nextObsFile, "right");
+      targets.right.items.push(...collectObsItems(win, nextObsFile, "right"));
     }
   }
 
@@ -167,42 +205,54 @@ export function getPrefetchTargets(win, options = {}) {
   }
 
   if (supportsLevels) {
-    const curLevel = win.level ?? (activeGroup?.hasLevel ? activeGroup.defaultLevel : 500);
-    let idx = VERTICAL_LEVELS.indexOf(curLevel);
-    if (idx === -1) idx = 4; // Default 500 hPa
+    // G2 fix: prioritize activeGroup.levels over static VERTICAL_LEVELS
+    const levels = Array.isArray(activeGroup?.levels) && activeGroup.levels.length > 0
+      ? activeGroup.levels
+      : VERTICAL_LEVELS;
+    const curLevel = win.level ?? (activeGroup?.hasLevel ? (activeGroup.defaultLevel ?? levels[0]) : levels[0]);
+    let idx = levels.findIndex((x) => String(x) === String(curLevel));
+    if (idx === -1) idx = levels.indexOf(Number(curLevel));
+    if (idx === -1) idx = levels.findIndex((x) => String(x) === String(activeGroup?.defaultLevel));
+    if (idx === -1) idx = 0;
 
-    const upLevel = idx + 1 < VERTICAL_LEVELS.length ? VERTICAL_LEVELS[idx + 1] : null;
-    const downLevel = idx - 1 >= 0 ? VERTICAL_LEVELS[idx - 1] : null;
+    const upLevel = idx + 1 < levels.length ? levels[idx + 1] : null;
+    const downLevel = idx - 1 >= 0 ? levels[idx - 1] : null;
 
-    targets.up.level = upLevel;
-    targets.down.level = downLevel;
-
-    if (shouldFetchUp && upLevel !== null) {
-      if (mode === "nwp") {
-        const cycle = win.forecastCycle || timelineSteps.periods?.cycle;
-        const curPeriod = timelineSteps.periods?.current ?? win.period ?? 24;
-        if (cycle) {
-          targets.up.items = collectNwpItems(win, curPeriod, cycle, hasRasterActive, "up", upLevel);
-        }
-      } else {
-        const curObsFile = timelineSteps.obsFiles?.current ?? win.obsTime;
-        if (curObsFile) {
-          targets.up.items = collectObsItems(win, curObsFile, "up", upLevel);
-        }
-      }
+    if (targets.up.level === undefined || targets.up.level === null) {
+      targets.up.level = upLevel;
+    }
+    if (targets.down.level === undefined || targets.down.level === null) {
+      targets.down.level = downLevel;
     }
 
-    if (shouldFetchDown && downLevel !== null) {
-      if (mode === "nwp") {
-        const cycle = win.forecastCycle || timelineSteps.periods?.cycle;
-        const curPeriod = timelineSteps.periods?.current ?? win.period ?? 24;
-        if (cycle) {
-          targets.down.items = collectNwpItems(win, curPeriod, cycle, hasRasterActive, "down", downLevel);
+    if (!hasSatellite) {
+      if (shouldFetchUp && upLevel !== null) {
+        if (mode === "nwp") {
+          const cycle = win.forecastCycle || timelineSteps.periods?.cycle;
+          const curPeriod = timelineSteps.periods?.current ?? win.period ?? 24;
+          if (cycle) {
+            targets.up.items = collectNwpItems(win, curPeriod, cycle, hasRasterActive, "up", upLevel);
+          }
+        } else {
+          const curObsFile = timelineSteps.obsFiles?.current ?? win.obsTime;
+          if (curObsFile) {
+            targets.up.items = collectObsItems(win, curObsFile, "up", upLevel);
+          }
         }
-      } else {
-        const curObsFile = timelineSteps.obsFiles?.current ?? win.obsTime;
-        if (curObsFile) {
-          targets.down.items = collectObsItems(win, curObsFile, "down", downLevel);
+      }
+
+      if (shouldFetchDown && downLevel !== null) {
+        if (mode === "nwp") {
+          const cycle = win.forecastCycle || timelineSteps.periods?.cycle;
+          const curPeriod = timelineSteps.periods?.current ?? win.period ?? 24;
+          if (cycle) {
+            targets.down.items = collectNwpItems(win, curPeriod, cycle, hasRasterActive, "down", downLevel);
+          }
+        } else {
+          const curObsFile = timelineSteps.obsFiles?.current ?? win.obsTime;
+          if (curObsFile) {
+            targets.down.items = collectObsItems(win, curObsFile, "down", downLevel);
+          }
         }
       }
     }
@@ -382,7 +432,7 @@ export async function prefetchSurroundingData(win, options = {}) {
   const seen = new Set();
   const uniqueItems = [];
   for (const item of allItems) {
-    const key = `${item.type}:${item.path}:${item.file}:${item.station || ""}`;
+    const key = `${item.type}:${item.path}:${item.file}:${item.level || ""}:${item.station || ""}`;
     if (!seen.has(key)) {
       seen.add(key);
       uniqueItems.push(item);
@@ -400,14 +450,39 @@ export async function prefetchSurroundingData(win, options = {}) {
     return lastPrefetchStats;
   }
 
-  // Filter out items already cached within TTL
+  // Partition items: satellite items go to server-warm only, other items go to client data cache
+  const serverWarmItems = [];
+  const clientFetchItems = [];
+  for (const item of uniqueItems) {
+    if (item.type === "sat-grid" || item.type === "sat-image") {
+      serverWarmItems.push(item);
+    } else {
+      clientFetchItems.push(item);
+    }
+  }
+
+  const prefetchCfg = getPrefetchConfig();
+  const scope = prefetchWinKey(win);
+  const gen = options.gen ?? (windowGenerations.get(scope) || 1);
+
+  // Warm server cache for satellite items (no browser data cache footprint)
+  let serverWarmPromise = null;
+  if (serverWarmItems.length > 0 && prefetchCfg.serverWarm !== false) {
+    serverWarmPromise = warmServerCache(serverWarmItems, {
+      scope,
+      gen,
+      maxItems: prefetchCfg.maxItems,
+    }).catch(() => null);
+  }
+
+  // Filter out client items already cached within TTL (Fix G4: includes level and date params)
   let cachedCount = 0;
-  const itemsToFetch = uniqueItems.filter((item) => {
+  const itemsToFetch = clientFetchItems.filter((item) => {
     let cached = false;
     if (item.type === "grid") {
-      cached = isCached("/api/data/grid", { path: item.path, file: item.file });
+      cached = isCached("/api/data/grid", gridParams(item.path, item.file, item.level, { date: item.date }));
     } else if (item.type === "binary") {
-      cached = isCached("/api/data/grid/binary", { path: item.path, file: item.file });
+      cached = isCached("/api/data/grid/binary", gridParams(item.path, item.file, item.level, { date: item.date }));
     } else if (item.type === "station") {
       cached = isCached("/api/data/station", { path: item.path, file: item.file });
     } else if (item.type === "tlogp") {
@@ -420,24 +495,13 @@ export async function prefetchSurroundingData(win, options = {}) {
     return true;
   });
 
-  if (itemsToFetch.length === 0) {
-    lastPrefetchStats = {
-      timestamp: Date.now(),
-      prefetchedCount: uniqueItems.length,
-      successfulCount: uniqueItems.length,
-      cachedCount,
-      targets,
-    };
-    return lastPrefetchStats;
-  }
-
-  const results = await Promise.allSettled(
+  const clientFetchPromise = Promise.allSettled(
     itemsToFetch.map(async (item) => {
       try {
         if (item.type === "grid") {
-          return await fetchGridData(item.path, item.file);
+          return await fetchGridData(item.path, item.file, item.level, { date: item.date });
         } else if (item.type === "binary") {
-          return await fetchGridBinaryStream(item.path, item.file);
+          return await fetchGridBinaryStream(item.path, item.file, item.level, { date: item.date });
         } else if (item.type === "station") {
           return await fetchStationObservations(item.path, item.file);
         } else if (item.type === "tlogp") {
@@ -450,13 +514,14 @@ export async function prefetchSurroundingData(win, options = {}) {
     })
   );
 
-  const newSuccessCount = results.filter((r) => r.status === "fulfilled" && r.value !== null).length;
-  const successfulCount = cachedCount + newSuccessCount;
+  const [clientResults] = await Promise.all([clientFetchPromise, serverWarmPromise]);
+  const newSuccessCount = clientResults.filter((r) => r.status === "fulfilled" && r.value !== null).length;
+  const successfulCount = cachedCount + newSuccessCount + serverWarmItems.length;
 
   lastPrefetchStats = {
     timestamp: Date.now(),
     prefetchedCount: uniqueItems.length,
-    fetchedCount: itemsToFetch.length,
+    fetchedCount: itemsToFetch.length + serverWarmItems.length,
     successfulCount,
     cachedCount,
     targets,
@@ -478,7 +543,9 @@ export function schedulePrefetch(win, delayMs = 150, options = {}) {
     clearTimeout(prefetchTimers.get(winKey));
     prefetchTimers.delete(winKey);
   }
-  const opts = { ...(options || {}) };
+  const nextGen = (windowGenerations.get(winKey) || 0) + 1;
+  windowGenerations.set(winKey, nextGen);
+  const opts = { ...(options || {}), gen: nextGen };
   if (win) {
     // Direction hints are single-use: an explicit options.directions wins,
     // otherwise consume a pending win.prefetchDirections (set per keyboard
@@ -509,6 +576,7 @@ export function cancelScheduledPrefetch(win = null) {
       clearTimeout(timer);
     }
     prefetchTimers.clear();
+    windowGenerations.clear();
   }
 }
 

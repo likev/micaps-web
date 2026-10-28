@@ -42,6 +42,24 @@ export const MAX_DATA_CACHE_ENTRIES = 64;
 // In-flight requests map: url -> Promise
 const inflightRequests = new Map();
 
+// Server-warmed items cache: key -> expiresAt (5 minutes TTL)
+export const SERVER_WARMED_TTL_MS = 5 * 60 * 1000;
+const serverWarmed = new Map();
+
+export function isServerWarmed(key, now = Date.now()) {
+  const exp = serverWarmed.get(key);
+  if (!exp) return false;
+  if (now > exp) {
+    serverWarmed.delete(key);
+    return false;
+  }
+  return true;
+}
+
+export function markServerWarmed(key, now = Date.now()) {
+  serverWarmed.set(key, now + SERVER_WARMED_TTL_MS);
+}
+
 function enforceDataCacheCap() {
   while (dataCache.size > MAX_DATA_CACHE_ENTRIES) {
     const oldest = dataCache.keys().next().value;
@@ -72,6 +90,7 @@ export function getCacheTTL() {
 export function clearDataCache() {
   dataCache.clear();
   inflightRequests.clear();
+  serverWarmed.clear();
 }
 
 export function pruneExpiredCache(now = Date.now()) {
@@ -82,11 +101,36 @@ export function pruneExpiredCache(now = Date.now()) {
       prunedCount++;
     }
   }
+  for (const [key, exp] of serverWarmed.entries()) {
+    if (now > exp) {
+      serverWarmed.delete(key);
+    }
+  }
   return prunedCount;
 }
 
 export function getCachedEntry(url, now = Date.now()) {
-  const entry = dataCache.get(url);
+  let entry = dataCache.get(url);
+  if (!entry && (url.includes("/api/data/grid") || url.includes("/api/data/grid/binary"))) {
+    try {
+      const parsed = new URL(url, "http://localhost");
+      const pathParam = parsed.searchParams.get("path");
+      const fileParam = parsed.searchParams.get("file");
+      const levelParam = parsed.searchParams.get("level");
+      const pathLevel = pathParam ? pathParam.match(/\/(\d+)$/)?.[1] : null;
+
+      if (pathParam && fileParam) {
+        if (!levelParam && pathLevel) {
+          // Caller omitted level, but path has level (e.g. TMP/500).
+          // Check if cached with level=<pathLevel>
+          entry = dataCache.get(buildUrl(parsed.pathname, { path: pathParam, file: fileParam, level: pathLevel }));
+        } else if (levelParam && pathLevel && levelParam === pathLevel) {
+          // Caller passed level redundant with path level; check if cached without level
+          entry = dataCache.get(buildUrl(parsed.pathname, { path: pathParam, file: fileParam }));
+        }
+      }
+    } catch {}
+  }
   if (!entry) return null;
   if (now > entry.expiresAt) {
     dataCache.delete(url);

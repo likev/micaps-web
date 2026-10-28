@@ -28,6 +28,7 @@ client/dist/
 dist/
 dist-ssr/
 *.zip
+th-cache/
 
 # Logs & Temporary Files
 *.log

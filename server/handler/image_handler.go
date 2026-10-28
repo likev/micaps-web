@@ -25,6 +25,17 @@ type ImageHandler struct {
 	Client   *db.CQLClient
 	Cache    *filecache.Cache
 	MockMode bool
+	Source   *BlobSource
+}
+
+func (h *ImageHandler) getSource() *BlobSource {
+	if h.Source != nil {
+		return h.Source
+	}
+	return &BlobSource{
+		Fetcher: &DBBlobFetcher{Client: h.Client},
+		Cache:   h.Cache,
+	}
 }
 
 // Handler handles /api/data/image returning either JSON image metadata or binary PNG stream
@@ -104,28 +115,18 @@ func (h *ImageHandler) fetchAndConvertImage(dataPath, file string, step int, bef
 		file = "latest"
 	}
 
-	var rawBlob []byte
-	if h.Cache != nil {
-		if cached, _, ok := h.Cache.Get("SATELLITE", dataPath, file); ok {
-			rawBlob = cached
-		}
+	if h.Client == nil && h.MockMode {
+		return mock.GenerateMockImagePNG(step), nil
 	}
 
-	if rawBlob == nil {
-		if h.Client == nil {
-			if h.MockMode {
-				return mock.GenerateMockImagePNG(step), nil
-			}
-			return nil, fmt.Errorf("missing CQL client connection")
-		}
-		b, err := db.GetBlob(h.Client, dataPath, file)
-		if err != nil {
-			return nil, err
-		}
-		if h.Cache != nil {
-			_ = h.Cache.Put("SATELLITE", dataPath, file, b, nil)
-		}
-		rawBlob = b
+	ref, err := CanonicalImageRef(dataPath, file)
+	if err != nil {
+		return nil, err
+	}
+
+	rawBlob, err := h.getSource().GetOrFetch(ref)
+	if err != nil {
+		return nil, err
 	}
 
 	unwrapped, err := parser.UnwrapPayload(rawBlob)

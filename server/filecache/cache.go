@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -23,6 +22,7 @@ type Meta struct {
 	ByteSize   int64     `json:"byteSize"`
 	StoredAt   time.Time `json:"storedAt"`
 	IsSpeedDir *bool     `json:"isSpeedDir,omitempty"`
+	Prefetched bool      `json:"prefetched,omitempty"`
 }
 
 // Config configures the server file cache
@@ -35,16 +35,18 @@ type Config struct {
 
 // Cache provides a bounded, on-disk LRU file cache for raw Cassandra blobs
 type Cache struct {
-	dir          string
-	capBytes     int64
-	ttl          time.Duration
-	disabled     bool
-	currentBytes atomic.Int64
-	entries      atomic.Int64
-	mu           sync.Mutex
-	singleflight *Singleflight
-	stopChan     chan struct{}
-	wg           sync.WaitGroup
+	dir               string
+	capBytes          int64
+	ttl               time.Duration
+	disabled          bool
+	currentBytes      atomic.Int64
+	entries           atomic.Int64
+	prefetchedEntries atomic.Int64
+	prefetchHits      atomic.Int64
+	mu                sync.Mutex
+	singleflight      *Singleflight
+	stopChan          chan struct{}
+	wg                sync.WaitGroup
 }
 
 // Singleflight deduplicates concurrent in-flight requests for the same key
@@ -147,6 +149,11 @@ func New(cfg Config) (*Cache, error) {
 	return c, nil
 }
 
+// IsDisabled reports whether the cache is nil or disabled
+func (c *Cache) IsDisabled() bool {
+	return c == nil || c.disabled
+}
+
 // Close gracefully stops the background sweeper
 func (c *Cache) Close() {
 	if c.disabled || c.stopChan == nil {
@@ -173,6 +180,7 @@ func (c *Cache) rebuildIndex() {
 
 	var totalBytes int64
 	var count int64
+	var prefetchedCount int64
 
 	for _, entry := range entries {
 		name := entry.Name()
@@ -219,14 +227,87 @@ func (c *Cache) rebuildIndex() {
 
 		totalBytes += info.Size()
 		count++
+		if meta.Prefetched {
+			prefetchedCount++
+		}
 	}
 
 	c.currentBytes.Store(totalBytes)
 	c.entries.Store(count)
+	c.prefetchedEntries.Store(prefetchedCount)
 
 	if totalBytes > c.capBytes {
 		c.evictUnderLock(c.capBytes)
 	}
+}
+
+// Has checks presence and TTL without reading the binary payload.
+func (c *Cache) Has(table, dataPath, file string) bool {
+	if c.disabled {
+		return false
+	}
+
+	key := Key(table, dataPath, file)
+	binPath := filepath.Join(c.dir, key+".bin")
+	metaPath := filepath.Join(c.dir, key+".meta")
+
+	fi, err := os.Stat(binPath)
+	if err != nil {
+		return false
+	}
+
+	expired := false
+	var meta Meta
+	metaBytes, err := os.ReadFile(metaPath)
+	if err != nil {
+		return false
+	}
+	if err := json.Unmarshal(metaBytes, &meta); err != nil {
+		return false
+	}
+
+	if c.ttl > 0 {
+		if !meta.StoredAt.IsZero() && time.Since(meta.StoredAt) > c.ttl {
+			expired = true
+		} else if time.Since(fi.ModTime()) > c.ttl {
+			expired = true
+		}
+	}
+
+	if expired {
+		c.mu.Lock()
+		_ = os.Remove(binPath)
+		_ = os.Remove(metaPath)
+		c.currentBytes.Add(-fi.Size())
+		c.entries.Add(-1)
+		if meta.Prefetched {
+			c.prefetchedEntries.Add(-1)
+			if c.prefetchedEntries.Load() < 0 {
+				c.prefetchedEntries.Store(0)
+			}
+		}
+		if c.currentBytes.Load() < 0 {
+			c.currentBytes.Store(0)
+		}
+		if c.entries.Load() < 0 {
+			c.entries.Store(0)
+		}
+		c.mu.Unlock()
+		return false
+	}
+
+	return true
+}
+
+// Touch refreshes the LRU mtime of the cached entry without reading its payload.
+func (c *Cache) Touch(table, dataPath, file string) {
+	if c.disabled {
+		return
+	}
+	key := Key(table, dataPath, file)
+	binPath := filepath.Join(c.dir, key+".bin")
+	now := time.Now()
+	_ = os.Chtimes(binPath, now, now)
 }
 
 // Get fetches the compressed blob and metadata for a key. Returns (data, meta, true) on hit.
@@ -269,6 +350,12 @@ func (c *Cache) Get(table, dataPath, file string) ([]byte, *Meta, bool) {
 		_ = os.Remove(metaPath)
 		c.currentBytes.Add(-int64(len(data)))
 		c.entries.Add(-1)
+		if meta.Prefetched {
+			c.prefetchedEntries.Add(-1)
+			if c.prefetchedEntries.Load() < 0 {
+				c.prefetchedEntries.Store(0)
+			}
+		}
 		if c.currentBytes.Load() < 0 {
 			c.currentBytes.Store(0)
 		}
@@ -277,6 +364,10 @@ func (c *Cache) Get(table, dataPath, file string) ([]byte, *Meta, bool) {
 		}
 		c.mu.Unlock()
 		return nil, nil, false
+	}
+
+	if meta.Prefetched {
+		c.prefetchHits.Add(1)
 	}
 
 	// Update mtime as LRU signal
@@ -288,6 +379,15 @@ func (c *Cache) Get(table, dataPath, file string) ([]byte, *Meta, bool) {
 
 // Put saves a compressed blob and metadata sidecar. Best-effort; never returns fatal error.
 func (c *Cache) Put(table, dataPath, file string, data []byte, isSpeedDir *bool) error {
+	return c.putInternal(table, dataPath, file, data, isSpeedDir, false)
+}
+
+// PutPrefetched saves a blob marked as prefetched.
+func (c *Cache) PutPrefetched(table, dataPath, file string, data []byte, isSpeedDir *bool) error {
+	return c.putInternal(table, dataPath, file, data, isSpeedDir, true)
+}
+
+func (c *Cache) putInternal(table, dataPath, file string, data []byte, isSpeedDir *bool, prefetched bool) error {
 	if c.disabled || len(data) == 0 {
 		return nil
 	}
@@ -321,10 +421,17 @@ func (c *Cache) Put(table, dataPath, file string, data []byte, isSpeedDir *bool)
 	defer c.mu.Unlock()
 
 	var oldSize int64
+	var oldPrefetched bool
 	isNew := true
 	if oldInfo, err := os.Stat(binPath); err == nil {
 		isNew = false
 		oldSize = oldInfo.Size()
+		if oldMetaBytes, err := os.ReadFile(metaPath); err == nil {
+			var om Meta
+			if json.Unmarshal(oldMetaBytes, &om) == nil {
+				oldPrefetched = om.Prefetched
+			}
+		}
 	}
 
 	// Atomic rename
@@ -342,6 +449,7 @@ func (c *Cache) Put(table, dataPath, file string, data []byte, isSpeedDir *bool)
 		ByteSize:   int64(len(data)),
 		StoredAt:   time.Now().UTC(),
 		IsSpeedDir: isSpeedDir,
+		Prefetched: prefetched,
 	}
 	metaBytes, _ := json.Marshal(meta)
 	_ = os.WriteFile(metaPath, metaBytes, 0644)
@@ -350,10 +458,21 @@ func (c *Cache) Put(table, dataPath, file string, data []byte, isSpeedDir *bool)
 	if isNew {
 		c.currentBytes.Add(int64(len(data)))
 		c.entries.Add(1)
+		if prefetched {
+			c.prefetchedEntries.Add(1)
+		}
 	} else {
 		c.currentBytes.Add(int64(len(data)) - oldSize)
+		if prefetched && !oldPrefetched {
+			c.prefetchedEntries.Add(1)
+		} else if !prefetched && oldPrefetched {
+			c.prefetchedEntries.Add(-1)
+		}
 	}
 
+	if c.prefetchedEntries.Load() < 0 {
+		c.prefetchedEntries.Store(0)
+	}
 	if c.currentBytes.Load() < 0 {
 		c.currentBytes.Store(0)
 	}
@@ -368,135 +487,13 @@ func (c *Cache) Put(table, dataPath, file string, data []byte, isSpeedDir *bool)
 	return nil
 }
 
-type fileInfoItem struct {
-	path     string
-	metaPath string
-	modTime  time.Time
-	size     int64
-}
-
-// evictUnderLock removes oldest-mtime entries until currentBytes <= targetCap
-func (c *Cache) evictUnderLock(targetCap int64) {
-	entries, err := os.ReadDir(c.dir)
-	if err != nil {
-		return
-	}
-
-	var items []fileInfoItem
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".bin" {
-			continue
-		}
-		info, err := entry.Info()
-		if err != nil {
-			continue
-		}
-		base := strings.TrimSuffix(entry.Name(), ".bin")
-		items = append(items, fileInfoItem{
-			path:     filepath.Join(c.dir, entry.Name()),
-			metaPath: filepath.Join(c.dir, base+".meta"),
-			modTime:  info.ModTime(),
-			size:     info.Size(),
-		})
-	}
-
-	// Sort oldest mtime first
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].modTime.Before(items[j].modTime)
-	})
-
-	for _, item := range items {
-		if c.currentBytes.Load() <= targetCap {
-			break
-		}
-		_ = os.Remove(item.path)
-		_ = os.Remove(item.metaPath)
-		c.currentBytes.Add(-item.size)
-		c.entries.Add(-1)
-	}
-
-	if c.currentBytes.Load() < 0 {
-		c.currentBytes.Store(0)
-	}
-	if c.entries.Load() < 0 {
-		c.entries.Store(0)
-	}
-}
-
-func (c *Cache) sweeper() {
-	defer c.wg.Done()
-	ticker := time.NewTicker(60 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-c.stopChan:
-			return
-		case <-ticker.C:
-			c.sweep()
-		}
-	}
-}
-
-func (c *Cache) sweep() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	entries, err := os.ReadDir(c.dir)
-	if err != nil {
-		return
-	}
-
-	now := time.Now()
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".bin" {
-			continue
-		}
-		info, err := entry.Info()
-		if err != nil {
-			continue
-		}
-
-		base := strings.TrimSuffix(entry.Name(), ".bin")
-		metaPath := filepath.Join(c.dir, base+".meta")
-
-		expired := false
-		if c.ttl > 0 {
-			if now.Sub(info.ModTime()) > c.ttl {
-				expired = true
-			} else if metaBytes, err := os.ReadFile(metaPath); err == nil {
-				var meta Meta
-				if err := json.Unmarshal(metaBytes, &meta); err == nil && !meta.StoredAt.IsZero() && now.Sub(meta.StoredAt) > c.ttl {
-					expired = true
-				}
-			}
-		}
-
-		if expired {
-			_ = os.Remove(filepath.Join(c.dir, entry.Name()))
-			_ = os.Remove(metaPath)
-			c.currentBytes.Add(-info.Size())
-			c.entries.Add(-1)
-		}
-	}
-
-	if c.currentBytes.Load() < 0 {
-		c.currentBytes.Store(0)
-	}
-	if c.entries.Load() < 0 {
-		c.entries.Store(0)
-	}
-
-	if c.currentBytes.Load() > c.capBytes {
-		c.evictUnderLock(c.capBytes)
-	}
-}
-
 // Stats returns counters for monitoring
 func (c *Cache) Stats() map[string]interface{} {
 	return map[string]interface{}{
-		"entries":  c.entries.Load(),
-		"bytes":    c.currentBytes.Load(),
-		"capBytes": c.capBytes,
+		"entries":           c.entries.Load(),
+		"bytes":             c.currentBytes.Load(),
+		"capBytes":          c.capBytes,
+		"prefetchedEntries": c.prefetchedEntries.Load(),
+		"prefetchHits":      c.prefetchHits.Load(),
 	}
 }

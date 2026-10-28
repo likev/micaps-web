@@ -17,8 +17,9 @@ var startTime = time.Now()
 
 // StaticHandler serves the client SPA and PMTiles files
 type StaticHandler struct {
-	Cfg       *config.Config
-	FileCache *filecache.Cache
+	Cfg             *config.Config
+	FileCache       *filecache.Cache
+	PrefetchHandler *PrefetchHandler
 }
 
 // PMTilesHandler serves PMTiles files (*.pmtiles) supporting HTTP 206 Range requests
@@ -98,6 +99,18 @@ func (h *StaticHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 			"entries":  int64(0),
 			"bytes":    int64(0),
 			"capBytes": int64(0),
+		}
+	}
+	if h.PrefetchHandler != nil {
+		status["prefetch"] = h.PrefetchHandler.Stats()
+	} else {
+		status["prefetch"] = map[string]interface{}{
+			"queued":       int64(0),
+			"running":      int64(0),
+			"warmed":       int64(0),
+			"failed":       int64(0),
+			"dropped":      int64(0),
+			"negativeHits": int64(0),
 		}
 	}
 	json.NewEncoder(w).Encode(status)

@@ -3,6 +3,7 @@ import { setTimelineMode, filterObsFilesByStep } from "../ui/timeSlider.js";
 import { getActiveWindow } from "../ui/tabWindowManager.js";
 import { DEFAULT_MOCK_OBS_FILES } from "../config/presets.js";
 import { parseTimestamp } from "./timeResolver.js";
+import { getObsStepOptions, isSatelliteGroup } from "../ui/timeline/timelineMath.js";
 import { getActiveHistoryDate } from "../store/appState.js";
 
 const forecastCyclesCache = {};
@@ -250,12 +251,38 @@ export async function resolveLatestForecastCycle(model = "ECMWF_HR", element = "
   return cycles[0] || generateDynamicForecastCycles(null, 1)[0];
 }
 
+/**
+ * Keeps the user's time position when the file list is re-synced.
+ * Exact name first. For satellite, a channel step swaps the channel prefix
+ * (C012_<ts>_FY4B.AWX -> C013_<ts>_FY4B.AWX), so match the same timestamp (or the
+ * nearest scan within 1 h when that channel lacks it) instead of jumping to latest.
+ */
+export function matchCurrentObsFile(currentFile, files, isSatellite = false) {
+  if (!currentFile || !Array.isArray(files) || files.length === 0) return null;
+  if (files.includes(currentFile)) return currentFile;
+  if (!isSatellite) return null;
+  const target = parseTimestamp(currentFile);
+  if (target === null) return null;
+  let best = null;
+  let bestDiff = Infinity;
+  for (const f of files) {
+    const t = parseTimestamp(f);
+    if (t === null) continue;
+    const d = Math.abs(t - target);
+    if (d < bestDiff) { bestDiff = d; best = f; }
+  }
+  return best !== null && bestDiff <= 3600000 ? best : null;
+}
+
 export async function syncObservationTimeline(path, currentFile = null, winTitle = "", win = null, options = {}) {
   const forceLatest = options === true || Boolean(options?.forceLatest);
   const isUpper = path.includes("UPPER_AIR") || path.includes("TLOGP") || winTitle.toLowerCase().includes("upper") || winTitle.toLowerCase().includes("sounding") || winTitle.toLowerCase().includes("tlogp");
   const defaultStep = isUpper ? 12 : 3;
-  const validSteps = isUpper ? [12, 24, 6] : [1, 3, 6, 12, 24];
-  let stepLength = (win && win.stepLength && validSteps.includes(win.stepLength)) ? win.stepLength : defaultStep;
+  // Same option list the step-length select offers (satellite adds 15 min = 0.25 h);
+  // a hand-rolled list here silently reset a valid 15 min step to the default.
+  const isSatellite = !isUpper && isSatelliteGroup(path);
+  const validSteps = getObsStepOptions({ isUpper, isSatellite });
+  let stepLength = (win && win.stepLength && validSteps.includes(parseFloat(win.stepLength))) ? parseFloat(win.stepLength) : defaultStep;
   if (forceLatest) {
     stepLength = defaultStep;
     if (win) win.stepLength = defaultStep;
@@ -301,8 +328,9 @@ export async function syncObservationTimeline(path, currentFile = null, winTitle
           : chronologicalFiles.slice(-100);
 
         const filteredFiles = filterObsFilesByStep(rawFiles, stepLength, isUpper);
-        let targetFile = !forceLatest && currentFile && filteredFiles.includes(currentFile)
-          ? currentFile
+        const keptFile = !forceLatest ? matchCurrentObsFile(currentFile, filteredFiles, isSatellite) : null;
+        let targetFile = keptFile
+          ? keptFile
           : (filteredFiles.length > 0 ? filteredFiles[filteredFiles.length - 1] : rawFiles[rawFiles.length - 1]);
         if (isUpper && currentFile && !filteredFiles.includes(currentFile)) {
           // If a requested file was outside standard 08:00/20:00 soundings, lock to latest valid sounding
@@ -317,8 +345,9 @@ export async function syncObservationTimeline(path, currentFile = null, winTitle
   }
   const rawFallback = [...mockObsFiles];
   const filteredFallback = filterObsFilesByStep(rawFallback, stepLength, isUpper);
-  let fallbackFile = !forceLatest && currentFile && filteredFallback.includes(currentFile)
-    ? currentFile
+  const keptFallback = !forceLatest ? matchCurrentObsFile(currentFile, filteredFallback, isSatellite) : null;
+  let fallbackFile = keptFallback
+    ? keptFallback
     : (filteredFallback.length > 0 ? filteredFallback[filteredFallback.length - 1] : rawFallback[rawFallback.length - 1]);
   if (isUpper && currentFile && !filteredFallback.includes(currentFile)) {
     fallbackFile = filteredFallback.length > 0 ? filteredFallback[filteredFallback.length - 1] : (rawFallback[rawFallback.length - 1] || currentFile);

@@ -29,9 +29,11 @@
   - `-port <port>`: HTTP workstation port (default `8088`)
   - `-static <path>`: Path to frontend `dist` directory (default `../client/dist`)
   - `-pmtiles <path>`: Path to `map-china.pmtiles` file (default `../client/public/map-china.pmtiles`)
-  - `-th-cache-dir <path>`: Server-side on-disk file cache directory for NWP profile grids (default `./th-cache`)
+  - `-th-cache-dir <path>`: Server-side on-disk file cache directory for NWP profile grids and satellite prefetch (default `./th-cache`)
   - `-th-cache-mb <int>`: Server file cache disk cap in MB (default `2000` MB, set to `0` to run cacheless)
   - `-th-cache-ttl <duration>`: File cache entry TTL (default `6h`, e.g. `24h`, `30m`)
+  - `-prefetch-workers <int>`: Worker pool size for backend cache warming (default `3`, set to `0` to disable backend prefetch)
+  - `-prefetch-queue <int>`: Bounded job queue size for backend cache warming (default `64`)
   - `-mock`: Enable offline synthetic mock data generator (default `false`)
 
 ### 2. Run Server

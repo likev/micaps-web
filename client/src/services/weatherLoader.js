@@ -155,7 +155,12 @@ export async function loadWeatherField(map, model, element, level, period, custo
 
   if (isObservationProduct && dataPath && (!win?._obsTimeline || !isTimeStep)) {
     try {
-      const syncFile = await syncObservationTimeline(dataPath, customOptions?.obsFile || win?.obsTime, win?.title || name, win, { forceLatest: !isTimeStep, level: targetLevel });
+      // Only a FRESH observation load (no timeline / file yet) jumps to the latest
+      // file and resets the step length to its default. A vertical level/channel
+      // step (Up/Down) arrives here with isTimeStep=false too, but must keep the
+      // user's step length and time position. Mirrors presetLoader's freshObsLoad.
+      const freshObsLoad = !isTimeStep && !win?._obsTimeline && !win?.obsTime;
+      const syncFile = await syncObservationTimeline(dataPath, customOptions?.obsFile || win?.obsTime, win?.title || name, win, { forceLatest: freshObsLoad, level: targetLevel });
       if (win && syncFile) {
         win.obsTime = syncFile;
         win.obsFile = syncFile;

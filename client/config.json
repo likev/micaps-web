@@ -8,7 +8,12 @@
     "showWorld": true
   },
   "performance": {
-    "maxEffectiveCells": 50000
+    "maxEffectiveCells": 50000,
+    "prefetch": {
+      "serverWarm": true,
+      "maxItems": 12,
+      "playbackLookahead": 2
+    }
   },
   "presets": [
     {

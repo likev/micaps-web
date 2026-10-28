@@ -1938,6 +1938,22 @@ The CMA AWX format is China Meteorological Administration's standard binary form
   - "气象卫星遥感 (Satellite Remote Sensing)" with satellite icon `🛰️` in `PresetMenu.svelte`.
   - Colormaps added for `IR_TEMP`, `ALBEDO`, `WV`, `CTT`, and `DUST`.
 
+### 16.7. Satellite Prefetch & Backend Warming Pipeline (`POST /api/prefetch`)
+- **Backend-Warm Architecture**:
+  - Satellite grids are multi-megabyte payloads. Rather than caching decoded grids in browser memory (heap hazard), satellite prefetch warms the backend disk cache (`th-cache/`, `server/filecache`).
+  - The client calculates directional targets (Left/Right scan times, Up/Down sibling channels) and dispatches lightweight keepalive requests (`POST /api/prefetch`) containing target references with no response payload (`202 Accepted`).
+  - When the user navigates via keyboard or stepper buttons, requests to `/api/data/grid` and `/api/data/image` hit local disk cache directly, bypassing the Cassandra network round-trip.
+- **Unified Canonicalisation & Shared Singleflight**:
+  - `server/handler/blobref.go` provides canonical reference resolution (`CanonicalGridRef`, `CanonicalImageRef`). Both prefetch workers and HTTP data handlers resolve the exact same cache keys.
+  - Concurrent user requests and prefetch warming jobs join the same `Singleflight` group, executing at most one Cassandra fetch per unique blob.
+- **Worker Pool, Queue Bounds & Supersede Generation**:
+  - Server prefetch runs on a bounded worker pool (`-prefetch-workers=3`, `-prefetch-queue=64`).
+  - Each prefetch request carries a per-window monotonic `gen` counter and `scope`. If a user rapidly presses keys, newer generations supersede queued jobs from older generations before workers start fetching, avoiding queue starvation.
+  - A 30-second negative cache prevents hammering Cassandra for missing scans or missing sibling channels.
+- **Lookahead & Step-Preservation**:
+  - During playback at 15-minute steps ($\le 0.25\text{h}$), the prefetch engine warms up to 2 frames ahead of the playback cursor.
+  - Up/Down vertical channel stepping maintains the active scan timestamp and step length across channels without jumping to latest or reverting to 3-hour defaults.
+
 
 ## Config file layout (config.json / colormaps.json)
 

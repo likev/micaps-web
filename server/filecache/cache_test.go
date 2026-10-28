@@ -351,3 +351,112 @@ func TestFileCacheGetTTLExpiry(t *testing.T) {
 		t.Errorf("expected .meta to be deleted after TTL expiry")
 	}
 }
+
+func TestFileCacheHasAndTouch(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "th_cache_has_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	c, err := New(Config{
+		Dir:      tempDir,
+		CapBytes: 10 * 1024 * 1024,
+		TTL:      100 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("failed to init cache: %v", err)
+	}
+	defer c.Close()
+
+	table := "SATELLITE"
+	path := "FY4B/L1/CHINA/C012"
+	file := "C012_20261028120000_FY4B.AWX"
+	data := []byte("fake-satellite-blob-data")
+
+	// 1. Has on non-existent entry returns false
+	if c.Has(table, path, file) {
+		t.Errorf("expected Has to return false for non-existent entry")
+	}
+
+	// 2. Put entry and verify Has returns true
+	if err := c.Put(table, path, file, data, nil); err != nil {
+		t.Fatalf("put failed: %v", err)
+	}
+	if !c.Has(table, path, file) {
+		t.Errorf("expected Has to return true for existing entry")
+	}
+
+	// 3. Test Touch updates mtime
+	key := Key(table, path, file)
+	binPath := filepath.Join(tempDir, key+".bin")
+	past := time.Now().Add(-10 * time.Second)
+	_ = os.Chtimes(binPath, past, past)
+	fiBefore, _ := os.Stat(binPath)
+
+	c.Touch(table, path, file)
+	fiAfter, _ := os.Stat(binPath)
+	if !fiAfter.ModTime().After(fiBefore.ModTime()) {
+		t.Errorf("expected Touch to advance ModTime: before=%v, after=%v", fiBefore.ModTime(), fiAfter.ModTime())
+	}
+
+	// 4. Test Has expires after TTL
+	time.Sleep(120 * time.Millisecond)
+	if c.Has(table, path, file) {
+		t.Errorf("expected Has to return false after TTL expiry")
+	}
+	// Files should be removed by Has on expiration detection
+	if _, err := os.Stat(binPath); !os.IsNotExist(err) {
+		t.Errorf("expected bin to be removed after expired Has call")
+	}
+}
+
+func TestFileCachePrefetchedStats(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "th_cache_pref_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	c, err := New(Config{
+		Dir:      tempDir,
+		CapBytes: 10 * 1024 * 1024,
+		TTL:      1 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("failed to init cache: %v", err)
+	}
+	defer c.Close()
+
+	table := "SATELLITE"
+	path := "FY4B/L1/CHINA/C013"
+	file := "C013_20261028120000_FY4B.AWX"
+	data := []byte("prefetched-satellite-blob")
+
+	// Put prefetched
+	if err := c.PutPrefetched(table, path, file, data, nil); err != nil {
+		t.Fatalf("put prefetched failed: %v", err)
+	}
+
+	stats := c.Stats()
+	if stats["prefetchedEntries"].(int64) != 1 {
+		t.Errorf("expected prefetchedEntries=1, got %v", stats["prefetchedEntries"])
+	}
+	if stats["prefetchHits"].(int64) != 0 {
+		t.Errorf("expected prefetchHits=0, got %v", stats["prefetchHits"])
+	}
+
+	// Get entry -> prefetchHits increments
+	got, meta, ok := c.Get(table, path, file)
+	if !ok || !bytes.Equal(got, data) {
+		t.Fatalf("expected Get hit with matching data")
+	}
+	if meta == nil || !meta.Prefetched {
+		t.Errorf("expected meta.Prefetched to be true")
+	}
+
+	stats = c.Stats()
+	if stats["prefetchHits"].(int64) != 1 {
+		t.Errorf("expected prefetchHits=1 after Get, got %v", stats["prefetchHits"])
+	}
+}

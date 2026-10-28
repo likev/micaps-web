@@ -76,17 +76,20 @@ func main() {
 		}
 	}
 
+	blobSource := handler.NewBlobSource(&handler.DBBlobFetcher{Client: cqlClient}, fc)
 	catH := &handler.CatalogHandler{Client: cqlClient, MockMode: cfg.MockMode}
 	derivedH := &handler.DerivedHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode}
-	gridH := &handler.GridHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode, Derived: derivedH}
+	gridH := &handler.GridHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode, Derived: derivedH, Source: blobSource}
 	profileH := &handler.ProfileHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode}
 	lineH := &handler.LineHeightHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode}
 	hovH := &handler.HovmollerHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode}
 	statH := &handler.StationHandler{Client: cqlClient, MockMode: cfg.MockMode, Derived: derivedH}
 	tlogpH := &handler.TLogPHandler{Client: cqlClient, MockMode: cfg.MockMode}
 	profilerH := &handler.ProfilerHandler{Client: cqlClient, MockMode: cfg.MockMode}
-	imageH := &handler.ImageHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode}
-	staticH := &handler.StaticHandler{Cfg: cfg, FileCache: fc}
+	imageH := &handler.ImageHandler{Client: cqlClient, Cache: fc, MockMode: cfg.MockMode, Source: blobSource}
+	prefetchH := handler.NewPrefetchHandler(blobSource, fc, cfg.MockMode, cfg.PrefetchWorkers, cfg.PrefetchQueue)
+	defer prefetchH.Close()
+	staticH := &handler.StaticHandler{Cfg: cfg, FileCache: fc, PrefetchHandler: prefetchH}
 
 	mux := http.NewServeMux()
 
@@ -110,6 +113,7 @@ func main() {
 	mux.HandleFunc("/api/data/tlogp", tlogpH.Handler)
 	mux.HandleFunc("/api/data/windprofiler", profilerH.Handler)
 	mux.HandleFunc("/api/data/image", imageH.Handler)
+	mux.HandleFunc("/api/prefetch", prefetchH.Handler)
 
 	// Map and PMTiles route (serves configured PMTiles file, defaulting to map-china.pmtiles)
 	mux.HandleFunc("/map-china.pmtiles", staticH.PMTilesHandler)

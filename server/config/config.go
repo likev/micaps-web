@@ -25,9 +25,11 @@ type Config struct {
 	MockMode      bool   `json:"mock_mode"`
 	StaticDir     string `json:"static_dir"`
 	PMTilesPath   string `json:"pmtiles_path"`
-	THCacheDir    string `json:"th_cache_dir"`
-	THCacheMB     int64  `json:"th_cache_mb"`
-	THCacheTTL    string `json:"th_cache_ttl"`
+	THCacheDir      string `json:"th_cache_dir"`
+	THCacheMB       int64  `json:"th_cache_mb"`
+	THCacheTTL      string `json:"th_cache_ttl"`
+	PrefetchWorkers int    `json:"prefetch_workers"`
+	PrefetchQueue   int    `json:"prefetch_queue"`
 }
 
 type xmlAddEntry struct {
@@ -273,9 +275,11 @@ func LoadConfig() *Config {
 		MockMode:      getEnvBool("MOCK_MODE", false),
 		StaticDir:     getEnv("STATIC_DIR", "../client/dist"),
 		PMTilesPath:   getEnv("PMTILES_PATH", "../client/map/map-china.pmtiles"),
-		THCacheDir:    getEnv("TH_CACHE_DIR", "./th-cache"),
-		THCacheMB:     int64(getEnvInt("TH_CACHE_MB", 2000)),
-		THCacheTTL:    getEnv("TH_CACHE_TTL", "6h"),
+		THCacheDir:      getEnv("TH_CACHE_DIR", "./th-cache"),
+		THCacheMB:       int64(getEnvInt("TH_CACHE_MB", 2000)),
+		THCacheTTL:      getEnv("TH_CACHE_TTL", "6h"),
+		PrefetchWorkers: getEnvInt("PREFETCH_WORKERS", 3),
+		PrefetchQueue:   getEnvInt("PREFETCH_QUEUE", 64),
 	}
 
 	fs := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
@@ -289,6 +293,8 @@ func LoadConfig() *Config {
 	thCacheDirFlag := fs.String("th-cache-dir", cfg.THCacheDir, "Path to server file cache directory (default: ./th-cache)")
 	thCacheMBFlag := fs.Int64("th-cache-mb", cfg.THCacheMB, "Maximum disk cache size in MB (default: 2000)")
 	thCacheTTLFlag := fs.String("th-cache-ttl", cfg.THCacheTTL, "Disk cache retention TTL (default: 6h)")
+	prefetchWorkersFlag := fs.Int("prefetch-workers", cfg.PrefetchWorkers, "Prefetch worker pool size (default: 3, 0 disables prefetch endpoint)")
+	prefetchQueueFlag := fs.Int("prefetch-queue", cfg.PrefetchQueue, "Prefetch worker bounded queue size (default: 64)")
 
 	if err := fs.Parse(os.Args[1:]); err != nil {
 		if err == flag.ErrHelp {
@@ -322,6 +328,8 @@ func LoadConfig() *Config {
 	cfg.THCacheDir = *thCacheDirFlag
 	cfg.THCacheMB = *thCacheMBFlag
 	cfg.THCacheTTL = *thCacheTTLFlag
+	cfg.PrefetchWorkers = *prefetchWorkersFlag
+	cfg.PrefetchQueue = *prefetchQueueFlag
 
 	// Validate HTTP port
 	portNum, err := strconv.Atoi(cfg.HTTPPort)

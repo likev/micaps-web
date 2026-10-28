@@ -21,6 +21,7 @@ export {
   getTimelineObsFiles,
   getRawObsFiles,
   getAdjacentTimeSteps,
+  getFollowingTimeSteps,
   setActiveWindowProvider,
   getActiveWindowProvider,
   setTimeChangeCallback,

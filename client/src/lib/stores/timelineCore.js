@@ -223,6 +223,47 @@ export function getAdjacentTimeSteps(state = timelineState) {
   };
 }
 
+/**
+ * Returns up to n following frames forward from the current position without wrapping,
+ * clamping at the end of the obs-file list.
+ *
+ * @param {Object} [state=timelineState]
+ * @param {number} [n=2]
+ * @returns {Array<string>}
+ */
+export function getFollowingTimeSteps(state = timelineState, n = 2) {
+  if (!state) return [];
+  const obsFiles = Array.isArray(state.obsFiles)
+    ? state.obsFiles
+    : (Array.isArray(state.files)
+      ? state.files
+      : (Array.isArray(state.rawFiles)
+        ? state.rawFiles
+        : (Array.isArray(state._state?.obsFiles)
+          ? state._state.obsFiles
+          : null)));
+  if (!obsFiles || obsFiles.length === 0) {
+    return [];
+  }
+  let currentObsIdx = typeof state.currentObsIdx === "number" ? state.currentObsIdx : -1;
+  if (currentObsIdx < 0) {
+    const cur = state.file || state.currentFile || state.obsFiles?.current;
+    if (cur) currentObsIdx = obsFiles.indexOf(cur);
+  }
+  if (currentObsIdx < 0) return [];
+  const count = typeof n === "number" && n > 0 ? n : 2;
+  const following = [];
+  for (let i = 1; i <= count; i++) {
+    const idx = currentObsIdx + i;
+    if (idx < obsFiles.length) {
+      following.push(obsFiles[idx]);
+    } else {
+      break;
+    }
+  }
+  return following;
+}
+
 export function setTimelineModeSetting(tl, mode) {
   if (!tl) return;
   tl.timelineMode = mode === "live" ? "live" : "review";

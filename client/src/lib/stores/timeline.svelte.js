@@ -3,6 +3,7 @@ import {
   DEFAULT_PLAYBACK_MS,
   createTimelineState,
   getAdjacentTimeSteps,
+  getFollowingTimeSteps,
   fireTimeChange,
   setActiveWindowProvider,
   getActiveWindowProvider,
@@ -65,6 +66,7 @@ export function deleteWindowTimeline(winId) {
 export {
   DEFAULT_PLAYBACK_MS,
   getAdjacentTimeSteps,
+  getFollowingTimeSteps,
   fireTimeChange,
   selectObsChipsWindow,
   filterObsFilesByStep,

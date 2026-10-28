@@ -150,27 +150,6 @@ export function filterObsFilesByStep(files, stepHours, isUpper = false) {
     }
   }
 
-  // Surface synoptic 24h interval: 08:00 UTC+8 daily
-  if (stepNum === 24) {
-    const synoptic24 = files.filter((f) => getFileHour(f) === 8 && getFileMin(f) === 0);
-    if (synoptic24.length >= 2) return synoptic24;
-  }
-
-  // Surface synoptic 12h interval: 08:00 and 20:00 UTC+8
-  if (stepNum === 12) {
-    const synoptic12 = files.filter((f) => (getFileHour(f) === 8 || getFileHour(f) === 20) && getFileMin(f) === 0);
-    if (synoptic12.length >= 2) return synoptic12;
-  }
-
-  // Surface synoptic 6h interval: 02:00, 08:00, 14:00, 20:00 UTC+8
-  if (stepNum === 6) {
-    const synoptic6 = files.filter((f) => {
-      const h = getFileHour(f);
-      return (h === 2 || h === 8 || h === 14 || h === 20) && getFileMin(f) === 0;
-    });
-    if (synoptic6.length >= 2) return synoptic6;
-  }
-
   // Sub-hourly step (e.g. 15 min FY-4B): keep files on the step grid when possible.
   if (stepNum < 1) {
     const stepMin = Math.max(1, Math.round(stepNum * 60));
@@ -184,12 +163,57 @@ export function filterObsFilesByStep(files, stepHours, isUpper = false) {
     return hourly.length >= 2 ? hourly : [...files];
   }
 
+  // 3h interval on the hour: prefer standard clock grid (00, 03, 06, 09, 12, 15, 18, 21),
+  // fallback to synoptic 3h (02, 05, 08, 11, 14, 17, 20, 23) for surface stations.
+  if (stepNum === 3) {
+    const standard3 = files.filter((f) => getFileMin(f) === 0 && getFileHour(f) % 3 === 0);
+    if (standard3.length >= 2) return standard3;
+    const synoptic3 = files.filter((f) => getFileMin(f) === 0 && ((getFileHour(f) + 1) % 3 === 0));
+    if (synoptic3.length >= 2) return synoptic3;
+  }
+
+  // 6h interval on the hour: prefer standard clock grid (00, 06, 12, 18),
+  // fallback to surface synoptic 6h (02, 08, 14, 20).
+  if (stepNum === 6) {
+    const standard6 = files.filter((f) => getFileMin(f) === 0 && getFileHour(f) % 6 === 0);
+    if (standard6.length >= 2) return standard6;
+    const synoptic6 = files.filter((f) => {
+      const h = getFileHour(f);
+      return (h === 2 || h === 8 || h === 14 || h === 20) && getFileMin(f) === 0;
+    });
+    if (synoptic6.length >= 2) return synoptic6;
+  }
+
+  // 12h interval on the hour: prefer standard clock grid (00, 12),
+  // fallback to surface synoptic 12h (08, 20).
+  if (stepNum === 12) {
+    const standard12 = files.filter((f) => getFileMin(f) === 0 && getFileHour(f) % 12 === 0);
+    if (standard12.length >= 2) return standard12;
+    const synoptic12 = files.filter((f) => (getFileHour(f) === 8 || getFileHour(f) === 20) && getFileMin(f) === 0);
+    if (synoptic12.length >= 2) return synoptic12;
+  }
+
+  // 24h interval on the hour: prefer standard midnight (00:00),
+  // fallback to surface synoptic 24h (08:00).
+  if (stepNum === 24) {
+    const standard24 = files.filter((f) => getFileMin(f) === 0 && getFileHour(f) === 0);
+    if (standard24.length >= 2) return standard24;
+    const synoptic24 = files.filter((f) => getFileHour(f) === 8 && getFileMin(f) === 0);
+    if (synoptic24.length >= 2) return synoptic24;
+  }
+
+  // Fallback for general or arbitrary hourly step: always restrict to on-the-hour files
+  // when available so sub-hourly data never lands on :30 / :15.
+  const hourlyFiles = files.filter((f) => getFileMin(f) === 0);
+  const candidates = hourlyFiles.length >= 2 ? hourlyFiles : files;
+
   const filtered = [];
   let lastTimeMs = 0;
-  for (const file of files) {
+  const minIntervalMs = stepNum * 3600000 - 60000;
+  for (const file of candidates) {
     const timeMs = parseTimestamp(file);
     if (timeMs !== null) {
-      if (lastTimeMs === 0 || Math.abs(timeMs - lastTimeMs) >= (stepNum * 3600000 - 1800000)) {
+      if (lastTimeMs === 0 || Math.abs(timeMs - lastTimeMs) >= minIntervalMs) {
         filtered.push(file);
         lastTimeMs = timeMs;
       }

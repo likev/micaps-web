@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -111,5 +112,39 @@ func TestPMTilesHandler_ConfigInServer(t *testing.T) {
 	}
 	if rec.Body.String() != string(customContent) {
 		t.Errorf("Expected body to be custom configured file %q, got %q", string(customContent), rec.Body.String())
+	}
+}
+
+func TestStatusHandler_IncludesPrefetchAndThCache(t *testing.T) {
+	cfg := &config.Config{
+		CassandraHost: "127.0.0.1",
+		CassandraPort: 9042,
+	}
+	h := &StaticHandler{Cfg: cfg}
+
+	req := httptest.NewRequest("GET", "/api/status", nil)
+	rec := httptest.NewRecorder()
+	h.StatusHandler(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", rec.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if _, ok := resp["thCache"]; !ok {
+		t.Errorf("expected thCache in status response")
+	}
+	prefetchStats, ok := resp["prefetch"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected prefetch in status response")
+	}
+	for _, field := range []string{"queued", "running", "warmed", "failed", "dropped", "negativeHits"} {
+		if _, exists := prefetchStats[field]; !exists {
+			t.Errorf("missing field %s in prefetch status", field)
+		}
 	}
 }
