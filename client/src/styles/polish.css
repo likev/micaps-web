@@ -103,7 +103,7 @@ html, body {
 
 /* Shared control look: buttons / selects / triggers */
 #app :is(.btn, .btn-menu, .btn-nav-layout, .preset-menu-trigger, .layout-btn, .layout-select,
-  .step-nav-btn, .btn-add-tab, .btn-toggle-layers, .multitrack-toggle-btn, .btn-inline) {
+  .step-nav-btn, .btn-add-tab, .btn-toggle-layers, .btn-toggle-lighting, .multitrack-toggle-btn, .btn-inline) {
   border-radius: var(--radius-md);
   transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease),
     color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform 80ms var(--ease);
@@ -321,7 +321,7 @@ html, body {
   gap: 12px;
 }
 #app .status-cursor-probe { border-radius: var(--radius-md); }
-#app .btn-toggle-layers { border-radius: var(--radius-pill); }
+#app .btn-toggle-layers, #app .btn-toggle-lighting { border-radius: var(--radius-pill); }
 #app .status-dot { box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 0%, transparent); }
 
 /* ---------- Tooltips / toasts ---------- */
@@ -430,7 +430,7 @@ html, body {
   box-shadow: 0 0 0 #111;
   transform: translate(2px, 2px);
 }
-[data-theme="brutalism"] #app :is(.layout-btn.active, .btn-nav-layout.active, .btn-toggle-layers.active, .chip-btn.active,
+[data-theme="brutalism"] #app :is(.layout-btn.active, .btn-nav-layout.active, .btn-toggle-layers.active, .btn-toggle-lighting.active, .chip-btn.active,
   .config-subtab-btn.active, .quick-pill.active, .btn-menu.active, .btn-menu[aria-expanded="true"],
   .btn-nav-layout[aria-expanded="true"], .preset-menu-trigger[aria-expanded="true"], .btn-primary) {
   background: #111 !important;

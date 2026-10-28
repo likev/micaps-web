@@ -96,14 +96,30 @@ func (h *GridHandler) BinaryHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *GridHandler) fetchGrid(r *http.Request) (*model.GridResponse, error) {
 	dataPath := sanitizeGridPath(r.URL.Query().Get("path"))
-	if lvl := strings.TrimSpace(r.URL.Query().Get("level")); lvl != "" {
-		if (strings.Contains(dataPath, "FY4B/L1/CHINA") || strings.Contains(dataPath, "FY4B/L1/DISK")) && !strings.Contains(dataPath, "/C0") {
-			if num, err := strconv.Atoi(lvl); err == nil && num >= 1 && num <= 15 {
-				dataPath = fmt.Sprintf("%s/C%03d", dataPath, num)
+	file := sanitizeFile(r.URL.Query().Get("file"))
+	if (strings.Contains(dataPath, "FY4B/L1/CHINA") || strings.Contains(dataPath, "FY4B/L1/DISK")) && !strings.Contains(dataPath, "/C0") {
+		var chanNum int
+		if lvl := strings.TrimSpace(r.URL.Query().Get("level")); lvl != "" {
+			if upper := strings.ToUpper(lvl); strings.HasPrefix(upper, "C") && len(upper) == 4 {
+				if n, err := strconv.Atoi(upper[1:]); err == nil && n >= 1 && n <= 15 {
+					chanNum = n
+				}
+			} else if n, err := strconv.Atoi(lvl); err == nil && n >= 1 && n <= 15 {
+				chanNum = n
 			}
 		}
+		if chanNum == 0 && file != "" {
+			upperFile := strings.ToUpper(file)
+			if strings.HasPrefix(upperFile, "C") && len(upperFile) >= 4 {
+				if n, err := strconv.Atoi(upperFile[1:4]); err == nil && n >= 1 && n <= 15 {
+					chanNum = n
+				}
+			}
+		}
+		if chanNum >= 1 && chanNum <= 15 {
+			dataPath = fmt.Sprintf("%s/C%03d", dataPath, chanNum)
+		}
 	}
-	file := sanitizeFile(r.URL.Query().Get("file"))
 
 	beforeDate, pErr := ParseHistoryDateParam(r)
 	if pErr != nil {
@@ -262,12 +278,52 @@ func decodeGridPayload(payload []byte, r *http.Request) (*model.GridResponse, er
 
 	if parser.IsAWX(unwrapped) {
 		step := 0
-		if stepStr := r.URL.Query().Get("step"); stepStr != "" {
-			if s, err := strconv.Atoi(stepStr); err == nil && s > 0 {
-				step = s
+		if r != nil && r.URL != nil {
+			if stepStr := r.URL.Query().Get("step"); stepStr != "" {
+				if s, err := strconv.Atoi(stepStr); err == nil && s > 0 {
+					step = s
+				}
 			}
 		}
-		return parser.ParseAWXGrid(unwrapped, step)
+		resp, err := parser.ParseAWXGrid(unwrapped, step)
+		if err != nil {
+			return nil, err
+		}
+		if resp != nil && r != nil && r.URL != nil {
+			var chanNum int
+			p := r.URL.Query().Get("path")
+			for _, part := range strings.Split(strings.Trim(p, "/"), "/") {
+				upper := strings.ToUpper(part)
+				if strings.HasPrefix(upper, "C") && len(upper) == 4 {
+					if n, err := strconv.Atoi(upper[1:]); err == nil && n >= 1 && n <= 15 {
+						chanNum = n
+						break
+					}
+				}
+			}
+			if chanNum == 0 {
+				lvl := strings.TrimSpace(r.URL.Query().Get("level"))
+				if upper := strings.ToUpper(lvl); strings.HasPrefix(upper, "C") && len(upper) == 4 {
+					if n, err := strconv.Atoi(upper[1:]); err == nil && n >= 1 && n <= 15 {
+						chanNum = n
+					}
+				} else if n, err := strconv.Atoi(lvl); err == nil && n >= 1 && n <= 15 {
+					chanNum = n
+				}
+			}
+			if chanNum == 0 {
+				file := strings.ToUpper(r.URL.Query().Get("file"))
+				if strings.HasPrefix(file, "C") && len(file) >= 4 {
+					if n, err := strconv.Atoi(file[1:4]); err == nil && n >= 1 && n <= 15 {
+						chanNum = n
+					}
+				}
+			}
+			if chanNum >= 1 && chanNum <= 15 {
+				resp.Header.Element = fmt.Sprintf("C%03d", chanNum)
+			}
+		}
+		return resp, nil
 	}
 
 	return parser.ParseGridData(unwrapped)
@@ -327,6 +383,29 @@ func sanitizeFile(f string) string {
 func (h *GridHandler) getFallbackGrid(r *http.Request) *model.GridResponse {
 	dataPath := sanitizeGridPath(r.URL.Query().Get("path"))
 	file := sanitizeFile(r.URL.Query().Get("file"))
+	if (strings.Contains(dataPath, "FY4B/L1/CHINA") || strings.Contains(dataPath, "FY4B/L1/DISK")) && !strings.Contains(dataPath, "/C0") {
+		var chanNum int
+		if lvl := strings.TrimSpace(r.URL.Query().Get("level")); lvl != "" {
+			if upper := strings.ToUpper(lvl); strings.HasPrefix(upper, "C") && len(upper) == 4 {
+				if n, err := strconv.Atoi(upper[1:]); err == nil && n >= 1 && n <= 15 {
+					chanNum = n
+				}
+			} else if n, err := strconv.Atoi(lvl); err == nil && n >= 1 && n <= 15 {
+				chanNum = n
+			}
+		}
+		if chanNum == 0 && file != "" {
+			upperFile := strings.ToUpper(file)
+			if strings.HasPrefix(upperFile, "C") && len(upperFile) >= 4 {
+				if n, err := strconv.Atoi(upperFile[1:4]); err == nil && n >= 1 && n <= 15 {
+					chanNum = n
+				}
+			}
+		}
+		if chanNum >= 1 && chanNum <= 15 {
+			dataPath = fmt.Sprintf("%s/C%03d", dataPath, chanNum)
+		}
+	}
 	element := "TMP"
 	var level float32 = 850
 	var period int32 = 24

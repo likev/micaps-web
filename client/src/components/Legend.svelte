@@ -44,6 +44,11 @@
                 <span class="legend-time-text">{item.timeBadge}</span>
               </span>
             {/if}
+            {#if item.lightingCompensated}
+              <span class="legend-lighting-badge" title="Solar Lighting Compensation Active (Normalizes sun-angle & slant-path cloud/vapor colors)">
+                <span class="lighting-badge-icon" aria-hidden="true">☀</span> SZA
+              </span>
+            {/if}
           </div>
           <span class="legend-unit">{item.unit ? `(${item.unit})` : ""}</span>
         </div>
@@ -240,5 +245,23 @@
     justify-content: space-between;
     font-size: 10px;
     color: var(--text-secondary, #8b949e);
+  }
+
+  .legend-lighting-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(210, 153, 34, 0.2);
+    border: 1px solid #d29922;
+    color: #e3b341;
+    font-size: 9px;
+    font-weight: 700;
+    font-family: var(--font-mono, monospace);
+  }
+
+  .lighting-badge-icon {
+    font-size: 9.5px;
   }
 </style>

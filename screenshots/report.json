@@ -1,0 +1,33 @@
+{
+  "success": true,
+  "steps": [
+    "page_loaded",
+    "initial_toggle_verified:pill=OFF,active=False",
+    "satellite_preset_loaded",
+    "toggle_on_clicked:pill=ON,active=True",
+    "legend_badge:\u2600\nSZA",
+    "cursor_probe:\ud83d\udccd\n34.5\u00b0N, 109.1\u00b0E\n|\nFY4B/L1/CHINA: 264.8K (raw 263.7K)",
+    "toggle_off_again:pill=OFF,active=False"
+  ],
+  "screenshots": {
+    "lighting_off": "/content/screenshots/1_satellite_cloud_lighting_off.png",
+    "lighting_on": "/content/screenshots/2_satellite_cloud_lighting_on.png",
+    "cursor_probe": "/content/screenshots/3_satellite_cloud_cursor_probe.png",
+    "toggled_off": "/content/screenshots/4_satellite_cloud_toggled_off.png"
+  },
+  "metadata": {
+    "placed_left_of_center": true,
+    "initial_pill": "OFF",
+    "toggled_pill": "ON",
+    "off_again_pill": "OFF",
+    "legend_badge": "\u2600\nSZA",
+    "probe_reading": "\ud83d\udccd\n34.5\u00b0N, 109.1\u00b0E\n|\nFY4B/L1/CHINA: 264.8K (raw 263.7K)"
+  },
+  "console_logs": [
+    "[error] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[error] Error: Bad response code: 404\n    at K4.<anonymous> (http://127.0.0.1:8088/assets/index-CMLpmp5O.js:804:184627)\n    at Generator.next (<anonymous>)\n    at u (http://127.0.0.1:8088/assets/index-CMLpmp5O.js:804:172007)",
+    "[log] [App] Load Data: group=preset-fy4b_china_grouped overrideLevel=12 win=tab-1-win-0 period=24",
+    "[log] [PresetGroup] Loading \"\u98ce\u4e91\u56db\u53f7B\u661f\u4e2d\u56fd\u533a (FY-4B CHINA 15\u901a\u9053) / FY-4B CHINA Multi-Channel\" with levelOverride=12, period=+24h, cycle=null..."
+  ],
+  "errors": []
+}

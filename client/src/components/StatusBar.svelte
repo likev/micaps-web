@@ -16,8 +16,9 @@
   import { getWindowById } from "../lib/stores/tabs.svelte.js";
   import { formatStepLabel } from "../lib/stores/timelineMath.js";
   import { cursorProbeState } from "../lib/stores/cursorProbe.svelte.js";
+  import { reapplyLightingCompensation } from "../services/lightingController.js";
 
-  let { winId = "default", onTimeChange = null } = $props();
+  let { winId = "default", onTimeChange = null, onToggleLighting = null } = $props();
 
   $effect(() => {
     if (winId && !timelinesByWindow[winId]) {
@@ -104,6 +105,15 @@
   function toggleLayers() {
     ui.layersOpen = !ui.layersOpen;
   }
+
+  function toggleLightingCompensation() {
+    app.lightingCompensation = !app.lightingCompensation;
+    if (typeof onToggleLighting === "function") {
+      onToggleLighting(app.lightingCompensation);
+    } else {
+      reapplyLightingCompensation();
+    }
+  }
 </script>
 
 <footer id="status-bar" class="status-bar statebar" aria-label="Status Bar">
@@ -117,6 +127,36 @@
       ></span>
       <span id="nav-status-text" class="status-text">{statusText}</span>
     </div>
+  </div>
+
+  <!-- Lighting Compensation toggle button: placed immediately left of status-bar-center -->
+  <div class="status-bar-lighting">
+    <button
+      id="btn-toggle-lighting"
+      type="button"
+      class="btn-toggle-lighting"
+      class:active={app.lightingCompensation}
+      role="switch"
+      aria-checked={app.lightingCompensation}
+      aria-label="Toggle Solar Lighting Compensation"
+      title={app.lightingCompensation
+        ? "Solar Lighting Compensation: ON (Normalizes sun-angle & slant-path cloud/vapor color differences)"
+        : "Solar Lighting Compensation: OFF (Click to normalize morning/noon/evening & longitude sun-angle differences)"}
+      onclick={toggleLightingCompensation}
+    >
+      <span class="lighting-icon" aria-hidden="true">
+        <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor">
+          <path d="M8 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0 1a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"/>
+        </svg>
+      </span>
+      <span class="lighting-label">Lighting</span>
+      <span class="toggle-switch-ui" class:on={app.lightingCompensation} aria-hidden="true">
+        <span class="toggle-thumb"></span>
+      </span>
+      <span class="toggle-state-pill" class:active={app.lightingCompensation}>
+        {app.lightingCompensation ? "ON" : "OFF"}
+      </span>
+    </button>
   </div>
 
   <!-- Center section: timeline-info -->
@@ -227,11 +267,16 @@
   }
 
   .status-bar-left,
+  .status-bar-lighting,
   .status-bar-right {
     display: flex;
     align-items: center;
     gap: 8px;
     flex-shrink: 0;
+  }
+
+  .status-bar-lighting {
+    margin-right: 4px;
   }
 
   .status-bar-center {
@@ -240,6 +285,51 @@
     min-width: 0;
     flex: 1;
     justify-content: center;
+  }
+
+  .btn-toggle-lighting {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--bg-card, #21262d);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    color: var(--text-primary, #e6edf3);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .btn-toggle-lighting:hover {
+    background: var(--bg-hover, #30363d);
+    border-color: rgba(210, 153, 34, 0.4);
+  }
+
+  .btn-toggle-lighting.active {
+    background: rgba(210, 153, 34, 0.16);
+    border-color: rgba(210, 153, 34, 0.55);
+    color: #e3b341;
+  }
+
+  .btn-toggle-lighting.active .toggle-state-pill.active {
+    background: rgba(210, 153, 34, 0.25);
+    color: #e3b341;
+  }
+
+  .btn-toggle-lighting.active .toggle-switch-ui.on {
+    background: #d29922;
+  }
+
+  .lighting-icon {
+    display: inline-flex;
+    align-items: center;
+    color: inherit;
+  }
+
+  .lighting-label {
+    font-weight: 600;
   }
 
   .btn-toggle-layers {

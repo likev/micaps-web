@@ -34,6 +34,7 @@
   import { handleLayerAction as serviceHandleLayerAction } from "./ui/layerActions.js";
   import { resolveForecastCycles, invalidateForecastCyclesCache } from "./utils/timelineSync.js";
   import { resolveLayerTime, parseTimestamp } from "./utils/timeResolver.js";
+  import { reapplyLightingCompensation } from "./services/lightingController.js";
   import {
     DEFAULT_LEVELS,
     DEFAULT_MODELS,
@@ -2532,6 +2533,7 @@
   <StatusBar
     winId={activeWin?.id}
     onTimeChange={handleTimeChange}
+    onToggleLighting={() => reapplyLightingCompensation(activeTab)}
   />
 </div>
 

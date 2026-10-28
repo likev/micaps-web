@@ -1,0 +1,77 @@
+{
+  "channels": {
+    "c002_visible": {
+      "name": "FY-4B Channel 2 (0.65 \u00b5m Visible Albedo / Cloud Refl)",
+      "preset": "preset-fy4b_china_grouped",
+      "level": 2,
+      "screenshots": {
+        "lighting_off": "/content/screenshots_channels/c002_visible_lighting_off.png",
+        "lighting_on": "/content/screenshots_channels/c002_visible_lighting_on.png",
+        "cursor_probe": "/content/screenshots_channels/c002_visible_cursor_probe.png"
+      },
+      "probe_reading": "\ud83d\udccd\n34.5\u00b0N, 109.1\u00b0E\n|\nFY4B/L1/CHINA: 85.9% (raw 56.8%, SZA 50.7\u00b0)",
+      "legend_badge": "\u2600\nSZA",
+      "success": true
+    },
+    "c008_water_vapor": {
+      "name": "FY-4B Channel 8 (6.25 \u00b5m Upper-Troposphere Water Vapor)",
+      "preset": "preset-fy4b_china_grouped",
+      "level": 8,
+      "screenshots": {
+        "lighting_off": "/content/screenshots_channels/c008_water_vapor_lighting_off.png",
+        "lighting_on": "/content/screenshots_channels/c008_water_vapor_lighting_on.png",
+        "cursor_probe": "/content/screenshots_channels/c008_water_vapor_cursor_probe.png"
+      },
+      "probe_reading": "\ud83d\udccd\n34.5\u00b0N, 109.1\u00b0E\n|\nFY4B/L1/CHINA: 291.3K (raw 290.1K)",
+      "legend_badge": "\u2600\nSZA",
+      "success": true
+    },
+    "c007_mwir_hybrid": {
+      "name": "FY-4B Channel 7 (3.75 \u00b5m MWIR Hybrid Solar/Thermal)",
+      "preset": "preset-fy4b_china_grouped",
+      "level": 7,
+      "screenshots": {
+        "lighting_off": "/content/screenshots_channels/c007_mwir_hybrid_lighting_off.png",
+        "lighting_on": "/content/screenshots_channels/c007_mwir_hybrid_lighting_on.png",
+        "cursor_probe": "/content/screenshots_channels/c007_mwir_hybrid_cursor_probe.png"
+      },
+      "probe_reading": "\ud83d\udccd\n34.5\u00b0N, 105.8\u00b0E\n|\nFY4B/L1/CHINA: 294.5K (raw 295.5K)",
+      "legend_badge": "\u2600\nSZA",
+      "success": true
+    },
+    "c006_swir": {
+      "name": "FY-4B Channel 6 (2.25 \u00b5m Cloud Phase SWIR)",
+      "preset": "preset-fy4b_china_grouped",
+      "level": 6,
+      "screenshots": {
+        "lighting_off": "/content/screenshots_channels/c006_swir_lighting_off.png",
+        "lighting_on": "/content/screenshots_channels/c006_swir_lighting_on.png",
+        "cursor_probe": "/content/screenshots_channels/c006_swir_cursor_probe.png"
+      },
+      "probe_reading": "\ud83d\udccd\n34.5\u00b0N, 109.1\u00b0E\n|\nFY4B/L1/CHINA: 48.6% (raw 30.2%, SZA 53.7\u00b0)",
+      "legend_badge": "\u2600\nSZA",
+      "success": true
+    },
+    "fy2g_dust_rgb": {
+      "name": "FY-2G Dust RGB BMP Georeferenced Image",
+      "preset": "preset-fy2g_dust",
+      "level": null,
+      "screenshots": {
+        "lighting_off": "/content/screenshots_channels/fy2g_dust_rgb_lighting_off.png",
+        "lighting_on": "/content/screenshots_channels/fy2g_dust_rgb_lighting_on.png",
+        "cursor_probe": "/content/screenshots_channels/fy2g_dust_rgb_cursor_probe.png"
+      },
+      "probe_reading": "\ud83d\udccd\n34.5\u00b0N, 105.8\u00b0E",
+      "legend_badge": "NOT_FOUND",
+      "success": true
+    }
+  },
+  "overall_success": true,
+  "summary": [
+    "FY-4B Channel 2 (0.65 \u00b5m Visible Albedo / Cloud Refl): Success=True, Probe='\ud83d\udccd\n34.5\u00b0N, 109.1\u00b0E\n|\nFY4B/L1/CHINA: 85.9% (raw 56.8%, SZA 50.7\u00b0)'",
+    "FY-4B Channel 8 (6.25 \u00b5m Upper-Troposphere Water Vapor): Success=True, Probe='\ud83d\udccd\n34.5\u00b0N, 109.1\u00b0E\n|\nFY4B/L1/CHINA: 291.3K (raw 290.1K)'",
+    "FY-4B Channel 7 (3.75 \u00b5m MWIR Hybrid Solar/Thermal): Success=True, Probe='\ud83d\udccd\n34.5\u00b0N, 105.8\u00b0E\n|\nFY4B/L1/CHINA: 294.5K (raw 295.5K)'",
+    "FY-4B Channel 6 (2.25 \u00b5m Cloud Phase SWIR): Success=True, Probe='\ud83d\udccd\n34.5\u00b0N, 109.1\u00b0E\n|\nFY4B/L1/CHINA: 48.6% (raw 30.2%, SZA 53.7\u00b0)'",
+    "FY-2G Dust RGB BMP Georeferenced Image: Success=True, Probe='\ud83d\udccd\n34.5\u00b0N, 105.8\u00b0E'"
+  ]
+}

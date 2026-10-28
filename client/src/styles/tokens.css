@@ -86,6 +86,7 @@
 [data-theme="light"] #btn-layout-select,
 [data-theme="light"] .btn-add-tab,
 [data-theme="light"] .btn-toggle-layers,
+[data-theme="light"] .btn-toggle-lighting,
 [data-theme="light"] .init-time-select,
 [data-theme="light"] .config-subtab-btn,
 [data-theme="light"] .btn-inline,
@@ -299,6 +300,19 @@
 [data-theme="light"] .toggle-state-pill.active {
   background-color: rgba(26, 127, 55, 0.15) !important;
   color: var(--accent-green) !important;
+}
+
+[data-theme="light"] .btn-toggle-lighting.active {
+  background-color: rgba(154, 103, 0, 0.12) !important;
+  border-color: #d4a72c !important;
+  color: #9a6700 !important;
+}
+[data-theme="light"] .btn-toggle-lighting.active .toggle-state-pill.active {
+  background-color: rgba(154, 103, 0, 0.18) !important;
+  color: #9a6700 !important;
+}
+[data-theme="light"] .btn-toggle-lighting.active .toggle-switch-ui.on {
+  background-color: #d4a72c !important;
 }
 
 [data-theme="light"] .nav-menu-item:hover,

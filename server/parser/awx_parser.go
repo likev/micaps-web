@@ -166,6 +166,18 @@ func ParseAWXGrid(data []byte, step int) (*model.GridResponse, error) {
 	}
 }
 
+func isReflectiveAWXChannel(channel int16, calibRaw []uint16) bool {
+	if channel == 4 {
+		return true
+	}
+	if channel >= 1 && channel <= 6 && len(calibRaw) >= 1024 {
+		if calibRaw[0] < 1000 && calibRaw[63] > 0 && (calibRaw[64] == calibRaw[1023] || calibRaw[64] == calibRaw[63]) {
+			return true
+		}
+	}
+	return false
+}
+
 // parseAWXCategory1 handles geostationary imagery (FY-4B CHINA and DISK, FY-2G).
 func parseAWXCategory1(data []byte, h1 *AWXHeader1, order binary.ByteOrder, step int) (*model.GridResponse, error) {
 	if len(data) < 40+64 {
@@ -216,8 +228,8 @@ func parseAWXCategory1(data []byte, h1 *AWXHeader1, order binary.ByteOrder, step
 			calibRaw[i] = order.Uint16(calibBytes[i*2 : i*2+2])
 		}
 
-		if h2.Channel == 4 {
-			// Visible channel: first 64 entries scaled by 0.01 and repeated 4 times
+		if isReflectiveAWXChannel(h2.Channel, calibRaw) {
+			// Visible / reflective channel: first 64 entries scaled by 0.01 and repeated 4 times
 			for dn := 0; dn < 256; dn++ {
 				idx := dn / 4
 				if idx >= 64 {

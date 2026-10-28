@@ -221,3 +221,47 @@ func TestAWXErrorsAndTruncation(t *testing.T) {
 		t.Errorf("Expected error for truncated AWX payload")
 	}
 }
+
+func TestAWXReflectiveChannelLUTDetection(t *testing.T) {
+	// 1. Channel 4 is legacy reflective channel code
+	if !isReflectiveAWXChannel(4, nil) {
+		t.Errorf("Channel 4 should always be recognized as reflective")
+	}
+
+	// 2. Reflective 64-entry LUT (entries 64..1023 are padded with the 63rd entry value)
+	reflectiveCalib := make([]uint16, 1024)
+	for i := 0; i < 64; i++ {
+		reflectiveCalib[i] = uint16(i * 187) // 0 to ~11981 (albedo 0..119.81%)
+	}
+	for i := 64; i < 1024; i++ {
+		reflectiveCalib[i] = reflectiveCalib[63]
+	}
+
+	for ch := int16(1); ch <= 6; ch++ {
+		if !isReflectiveAWXChannel(ch, reflectiveCalib) {
+			t.Errorf("Channel %d with 64-bin reflectance table should be detected as reflective", ch)
+		}
+	}
+
+	// 3. IR / WV channel table with continuous 1024 monotonic entries (e.g., 180K to 330K)
+	// (e.g. FY-2 channels 1, 2, 3 which are IR1, IR2, IR3/WV)
+	irCalib := make([]uint16, 1024)
+	for i := 0; i < 1024; i++ {
+		irCalib[i] = uint16(18000 + i*15) // 180.00K to 333.60K
+	}
+
+	for _, ch := range []int16{1, 2, 3, 5, 6} {
+		if isReflectiveAWXChannel(ch, irCalib) {
+			t.Errorf("Channel %d with IR continuous curve should NOT be detected as reflective", ch)
+		}
+	}
+
+
+	// 4. Non-reflective channels (e.g., C007 MWIR, C008..C015 IR/WV) should never be detected as reflective
+	for ch := int16(7); ch <= 15; ch++ {
+		if isReflectiveAWXChannel(ch, reflectiveCalib) {
+			t.Errorf("Channel %d should never be detected as reflective", ch)
+		}
+	}
+}
+

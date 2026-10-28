@@ -25,6 +25,22 @@ import {
   triggerStationStreamlines,
   triggerVortDivOverlay,
 } from "../../services/overlayTriggers.js";
+import { buildLayerLightingOptions } from "../../services/lightingController.js";
+import { getCompensatedGridView } from "../../utils/solarLighting.js";
+
+function getEffectiveGrid(layer, win) {
+  if (!layer?.gridData) return null;
+  if (!appState.get("lightingCompensation")) return layer.gridData;
+  const opts = buildLayerLightingOptions(layer, win, true);
+  if (!opts || opts.mode === "none") return layer.gridData;
+  return getCompensatedGridView(layer.gridData, opts);
+}
+
+function getLightingCompensated(layer, win) {
+  if (!appState.get("lightingCompensation")) return false;
+  const opts = buildLayerLightingOptions(layer, win, true);
+  return Boolean(opts && opts.mode !== "none");
+}
 
 const paletteSeq = new Map();
 
@@ -137,7 +153,7 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
       const hasLineFeatures = lineSrc ? (lineSrc._data?.geojson?.features || lineSrc._data?.features || lineSrc.data?.features || []).length > 0 : false;
       if (value.showLine && isVisible && !hasLineFeatures) {
         if (layer.gridData) {
-          renderContourLayers(map, layer.gridData, layer.element || "TMP", {
+          renderContourLayers(map, getEffectiveGrid(layer, winObj), layer.element || "TMP", {
             ...layer.config,
             layerId,
             showFill: isVisible && Boolean(layer.config?.showFill),
@@ -175,7 +191,7 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
             preserveIsolines: true,
           });
         } else if (layer.gridData) {
-          renderContourLayers(map, layer.gridData, layer.element || "TMP", {
+          renderContourLayers(map, getEffectiveGrid(layer, winObj), layer.element || "TMP", {
             ...layer.config,
             layerId,
             showFill: isVisible && Boolean(layer.config?.showFill),
@@ -224,6 +240,7 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
           isSoftStale: layer.isSoftStale,
           isHardStale: layer.isHardStale,
           isDesync: layer.isDesync,
+          lightingCompensated: getLightingCompensated(layer, winObj),
         });
       }
     }
@@ -324,7 +341,7 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
       } else if (isNwpKinematic) {
         triggerVortDivOverlay(map, layer, winObj);
       } else if (layer.gridData) {
-        renderContourLayers(map, layer.gridData, layer.element || "TMP", {
+        renderContourLayers(map, getEffectiveGrid(layer, winObj), layer.element || "TMP", {
           ...layer.config,
           layerId,
           levels,
@@ -377,7 +394,7 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
           canonical.config.palettePath = null;
         }
         if (layer.type === "contour" && layer.gridData) {
-          renderContourLayers(map, layer.gridData, elem, {
+          renderContourLayers(map, getEffectiveGrid(layer, winObj), elem, {
             ...layer.config,
             layerId: effId,
             colormap: elem,
@@ -405,6 +422,7 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
               isSoftStale: layer.isSoftStale,
               isHardStale: layer.isHardStale,
               isDesync: layer.isDesync,
+              lightingCompensated: getLightingCompensated(layer, winObj),
             });
           } else {
             removeLegend(effId || elem, winObj);
@@ -472,7 +490,7 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
                 if (isNwpKinematic) {
                   triggerVortDivOverlay(map, layer, winObj);
                 } else if (layer.type === "contour" && layer.gridData) {
-                  renderContourLayers(map, layer.gridData, elem, {
+                  renderContourLayers(map, getEffectiveGrid(layer, winObj), elem, {
                     ...layer.config,
                     layerId: effId,
                     colormap: key,
@@ -500,6 +518,7 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
                       isSoftStale: layer.isSoftStale,
                       isHardStale: layer.isHardStale,
                       isDesync: layer.isDesync,
+                      lightingCompensated: getLightingCompensated(layer, winObj),
                     });
                   } else {
                     removeLegend(effId || elem, winObj);
@@ -549,7 +568,7 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
         canonical.config.colormap = targetColormap;
       }
       if (layer.type === "contour" && layer.gridData) {
-        renderContourLayers(map, layer.gridData, elem, {
+        renderContourLayers(map, getEffectiveGrid(layer, winObj), elem, {
           ...layer.config,
           layerId: effId,
           colormap: targetColormap,
@@ -577,6 +596,7 @@ export function handleConfigAction(map, layerId, value, layer, winObj) {
             isSoftStale: layer.isSoftStale,
             isHardStale: layer.isHardStale,
             isDesync: layer.isDesync,
+            lightingCompensated: getLightingCompensated(layer, winObj),
           });
         } else {
           removeLegend(effId || elem, winObj);

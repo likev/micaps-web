@@ -230,4 +230,41 @@ func TestGridHandlerMockMode_SatelliteDISK(t *testing.T) {
 	}
 }
 
+func TestGridHandler_AGRIChannelResolution(t *testing.T) {
+	h := &handler.GridHandler{
+		Client:   nil,
+		MockMode: true,
+	}
+
+	// 1. Channel specified via level query parameter
+	req1 := httptest.NewRequest("GET", "/api/data/grid?path=SATELLITE/FY4B/L1/CHINA&level=4&file=latest", nil)
+	w1 := httptest.NewRecorder()
+	h.JSONHandler(w1, req1)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", w1.Code)
+	}
+	var resp1 model.GridResponse
+	if err := json.Unmarshal(w1.Body.Bytes(), &resp1); err != nil {
+		t.Fatalf("decode JSON error: %v", err)
+	}
+	if resp1.Header.Element != "C004" {
+		t.Errorf("expected Header.Element C004 from level=4, got %s", resp1.Header.Element)
+	}
+
+	// 2. Channel specified via filename prefix
+	req2 := httptest.NewRequest("GET", "/api/data/grid?path=SATELLITE/FY4B/L1/CHINA&file=C006_20261028120000_FY4B.AWX", nil)
+	w2 := httptest.NewRecorder()
+	h.JSONHandler(w2, req2)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", w2.Code)
+	}
+	var resp2 model.GridResponse
+	if err := json.Unmarshal(w2.Body.Bytes(), &resp2); err != nil {
+		t.Fatalf("decode JSON error: %v", err)
+	}
+	if resp2.Header.Element != "C006" {
+		t.Errorf("expected Header.Element C006 from file=C006_..., got %s", resp2.Header.Element)
+	}
+}
+
 

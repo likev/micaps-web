@@ -221,6 +221,7 @@ export function buildLegendItems(winOrId, legendsMap = windowLegends, winResolve
       isStale,
       isHardStale,
       isDesync,
+      lightingCompensated: Boolean(item.lightingCompensated),
       layerId: layer?.id || item.layerId || null,
     };
   });

@@ -2,6 +2,9 @@
 import { normalizeHeader } from "../../layers/wind/windSampling.js";
 import { getWindowById } from "./tabs.svelte.js";
 import { getLayersForWindow } from "./layersCore.js";
+import { appState } from "../../store/appState.js";
+import { classifyLightingMode, compensateScalarValue, computeSolarZenithAngle } from "../../utils/solarLighting.js";
+import { buildLayerLightingOptions } from "../../services/lightingController.js";
 
 function isMissingValue(v) {
   return v == null || Number.isNaN(v) || Math.abs(v) >= 9990;
@@ -139,7 +142,29 @@ export function updateCursorProbe(lng, lat, winOrId = null) {
       if (l.gridData && l.gridData.values) {
         const val = sampleScalarGrid(l.gridData, lng, lat);
         if (val !== null) {
-          if (elem.includes("TMP") || elem === "T") {
+          const mode = classifyLightingMode(l);
+          if (mode !== "none") {
+            const isCompActive = Boolean(appState.get("lightingCompensation"));
+            const lightingOpts = buildLayerLightingOptions(l, win, isCompActive);
+            if (mode === "reflective") {
+              if (isCompActive) {
+                const compVal = compensateScalarValue(val, lng, lat, lightingOpts);
+                const { szaDeg } = computeSolarZenithAngle(lat, lng, lightingOpts.utcMs);
+                samples.push(`${elem}: ${compVal.toFixed(1)}% (raw ${val.toFixed(1)}%, SZA ${szaDeg.toFixed(1)}°)`);
+              } else {
+                samples.push(`${elem}: ${val.toFixed(1)}%`);
+              }
+            } else if (mode === "vapor_ir_limb" || mode === "mwir_hybrid") {
+              if (isCompActive) {
+                const compVal = compensateScalarValue(val, lng, lat, lightingOpts);
+                samples.push(`${elem}: ${compVal.toFixed(1)}K (raw ${val.toFixed(1)}K)`);
+              } else {
+                samples.push(`${elem}: ${val.toFixed(1)}K`);
+              }
+            } else {
+              samples.push(`${elem || "VAL"}: ${val.toFixed(1)}`);
+            }
+          } else if (elem.includes("TMP") || elem === "T") {
             samples.push(`TMP: ${val.toFixed(1)}°C`);
           } else if (elem.includes("HGT") || elem === "GH" || elem === "H") {
             samples.push(`HGT: ${Math.round(val)} gpm`);

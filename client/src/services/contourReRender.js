@@ -8,6 +8,9 @@ import { COLORMAPS, setColormaps } from "../utils/colormaps.js";
 import { loadXMLPalette } from "../utils/paletteLoader.js";
 import { updateLegend } from "../ui/legend.js";
 import { mapInstances } from "../lib/stores/tabsCore.js";
+import { appState } from "../store/appState.js";
+import { buildLayerLightingOptions } from "./lightingController.js";
+import { getCompensatedGridView } from "../utils/solarLighting.js";
 
 const reRenderTimers = new Map();   // key: `${winKey}::${layerId}` -> timeout ID
 const reRenderHandlers = new Map(); // key -> handler function
@@ -293,7 +296,13 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
                 }
               }
             } catch {}
-            renderContourLayers(map, liveLayer.gridData, liveLayer.element || "TMP", {
+            const lightingOpts = buildLayerLightingOptions(liveLayer, win, appState.get("lightingCompensation"));
+            const effectiveGrid =
+              appState.get("lightingCompensation") && lightingOpts && lightingOpts.mode !== "none"
+                ? getCompensatedGridView(liveLayer.gridData, lightingOpts)
+                : liveLayer.gridData;
+
+            renderContourLayers(map, effectiveGrid, liveLayer.element || "TMP", {
               ...liveLayer.config,
               layerId: liveLayer.id,
               colormap: targetColormap,
@@ -334,6 +343,10 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
           const hasShad = liveLayer.visible !== false && (Boolean(liveLayer.config?.showFill) || Boolean(liveLayer.config?.showRaster));
           if (hasShad) {
             try {
+              const lightingOpts = buildLayerLightingOptions(liveLayer, win, appState.get("lightingCompensation"));
+              const isLightingActive = Boolean(
+                appState.get("lightingCompensation") && lightingOpts && lightingOpts.mode !== "none"
+              );
               if (isWindLayer) {
                 updateLegend("WIND", targetColormap, 0, undefined, win, {
                   layerId: liveLayer.id,
@@ -343,6 +356,7 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
                   isSoftStale: liveLayer.isSoftStale,
                   isHardStale: liveLayer.isHardStale,
                   isDesync: liveLayer.isDesync,
+                  lightingCompensated: isLightingActive,
                 });
               } else {
                 updateLegend(effectiveElem, targetColormap, liveGridData?.stats?.min, liveGridData?.stats?.max, win, {
@@ -353,6 +367,7 @@ export function armContourReRender(map, layer, win = null, opts = {}) {
                   isSoftStale: liveLayer.isSoftStale,
                   isHardStale: liveLayer.isHardStale,
                   isDesync: liveLayer.isDesync,
+                  lightingCompensated: isLightingActive,
                 });
               }
             } catch {}

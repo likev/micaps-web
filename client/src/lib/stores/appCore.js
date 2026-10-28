@@ -38,6 +38,8 @@ export function createInitialAppState() {
 
     historyMode: false,
     historyDate: "", // "YYYY-MM-DD", e.g. "2026-09-10"
+
+    lightingCompensation: false,
   };
 }
 

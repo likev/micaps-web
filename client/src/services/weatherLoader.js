@@ -15,6 +15,8 @@ import * as contourReRenderModule from "./contourReRender.js";
 import { getCachedWindGrid, setCachedWindGrid } from "../utils/windGridCache.js";
 import { showErrorToast } from "../ui/toast.js";
 import { resolveLayerTime, parseTimestamp, parseOffset, getReferenceNowMs } from "../utils/timeResolver.js";
+import { buildLayerLightingOptions } from "./lightingController.js";
+import { getCompensatedGridView } from "../utils/solarLighting.js";
 
 /**
  * Resolve a contour's stroke color across a timeline reload.
@@ -482,8 +484,19 @@ export async function loadWeatherField(map, model, element, level, period, custo
         win.colormap = colormap;
       }
     }
+
+    const lightingOpts = buildLayerLightingOptions(
+      { model, element, level: targetLevel, path: dataPath, file, gridData },
+      win,
+      appState.get("lightingCompensation")
+    );
+    const effectiveGrid =
+      appState.get("lightingCompensation") && lightingOpts && lightingOpts.mode !== "none"
+        ? getCompensatedGridView(gridData, lightingOpts)
+        : gridData;
+
     if (!isWind && (showFill || showLine)) {
-      renderContourLayers(map, gridData, element, {
+      renderContourLayers(map, effectiveGrid, element, {
         layerId,
         levels,
         showFill: isVisible && showFill,
@@ -603,7 +616,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
           isHardStale: resolved.isHardStale,
         },
       };
-      armContourReRender(map, layerObj, win);
+      armContourReRender(map, { ...layerObj, gridData: effectiveGrid }, win);
     }
 
     // Bug fix: addOrUpdateLayer only re-renders the panel when winId === currentActiveWinId.
@@ -620,6 +633,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
         status: resolved.status,
         isSoftStale: resolved.status === "soft-stale",
         isHardStale: resolved.isHardStale,
+        lighting: lightingOpts,
       };
       if (gridData && (gridData.values || (gridData.u && gridData.v))) {
         renderGridRaster(map, gridData, element, colormap, rasterOpts);
@@ -644,7 +658,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
 
     const hasShading = isVisible && (Boolean(showFill) || Boolean(showRaster));
     if (hasShading) {
-      updateLegend(element, colormap, gridData.stats?.min, gridData.stats?.max, win, {
+      updateLegend(element, colormap, effectiveGrid.stats?.min ?? gridData.stats?.min, effectiveGrid.stats?.max ?? gridData.stats?.max, win, {
         layerId,
         id: layerId,
         name,
@@ -652,6 +666,9 @@ export async function loadWeatherField(map, model, element, level, period, custo
         status: resolved.status,
         isSoftStale: resolved.status === "soft-stale",
         isHardStale: resolved.isHardStale,
+        lightingCompensated: Boolean(
+          appState.get("lightingCompensation") && lightingOpts && lightingOpts.mode !== "none"
+        ),
       });
     } else {
       removeLegend(layerId || element, win);

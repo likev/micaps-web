@@ -1,5 +1,6 @@
 // rasterLayer.js - Zero-copy Float32Array streaming to Canvas & MapLibre raster image (§8.8.3)
 import { createColorResolver } from "../utils/colormaps.js";
+import { createSeparableRasterLighting } from "../utils/solarLighting.js";
 
 // Active Blob URL tracking per raster source for memory leak prevention (§8.8.3).
 //
@@ -217,10 +218,17 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
     }
   }
 
+  // Precompute separable solar & slant-path lighting context if enabled
+  const lightSampler =
+    opts.lighting?.enabled && opts.lighting?.mode !== "none"
+      ? createSeparableRasterLighting(opts.lighting, leftLonRaw, rightLonRaw, outWidth, srcColLookup, nlon)
+      : null;
+
   // Reproject rows from Plate Carrée (EPSG:4326) to Web Mercator (EPSG:3857) so MapLibre quad texture aligns exactly
   for (let j = 0; j < outHeight; j++) {
     const yMerc = yTop - ((j + 0.5) / outHeight) * ySpan;
     const latGeo = mercatorYToLat(yMerc);
+    const rowLight = lightSampler ? lightSampler.prepareRow(latGeo) : null;
 
     // Compute fractional source row in Plate Carrée data
     let rowFrac;
@@ -264,6 +272,7 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
       if (val === undefined || val === null || isNaN(val) || val < -9900) {
         data[dstIdx + 3] = 0; // Transparent
       } else {
+        if (rowLight) val = rowLight.apply(i, val);
         resolveColor(val, data, dstIdx);
       }
     }

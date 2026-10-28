@@ -23,6 +23,8 @@ import {
   triggerWindBarbs,
   triggerStationStreamlines,
 } from "./overlayWind.js";
+import { buildLayerLightingOptions } from "./lightingController.js";
+import { getCompensatedGridView } from "../utils/solarLighting.js";
 
 export {
   triggerVortDivOverlay,
@@ -89,7 +91,15 @@ export async function triggerIsobandOverlay(map, layer = null, win = null) {
   // 1. Direct in-memory gridData from layer
   if (layer.gridData && layer.gridData.header) {
     const isVisible = layer.visible !== false;
-    renderContourLayers(map, layer.gridData, layer.element || "TMP", {
+    const lightingOpts = buildLayerLightingOptions(layer, win, appState.get("lightingCompensation"));
+    const isLightingActive = Boolean(
+      appState.get("lightingCompensation") && lightingOpts && lightingOpts.mode !== "none"
+    );
+    const effectiveGrid = isLightingActive
+      ? getCompensatedGridView(layer.gridData, lightingOpts)
+      : layer.gridData;
+
+    renderContourLayers(map, effectiveGrid, layer.element || "TMP", {
       ...layer.config,
       layerId,
       levels: layer.config?.levels,
@@ -108,7 +118,7 @@ export async function triggerIsobandOverlay(map, layer = null, win = null) {
       labelSize: layer.config?.labelSize,
       viewportBounds: map && typeof map.getBounds === "function" ? map.getBounds().toArray() : null,
     });
-    armContourReRender(map, layer, win);
+    armContourReRender(map, { ...layer, gridData: effectiveGrid }, win);
     if (isVisible && layer.element) {
       updateLegend(layer.element, colormap, layer.gridData?.stats?.min, layer.gridData?.stats?.max, win, {
         layerId: layer.id || layerId,
@@ -118,6 +128,7 @@ export async function triggerIsobandOverlay(map, layer = null, win = null) {
         isSoftStale: layer.isSoftStale,
         isHardStale: layer.isHardStale,
         isDesync: layer.isDesync,
+        lightingCompensated: isLightingActive,
       });
     }
     return;
@@ -161,7 +172,15 @@ export async function triggerIsobandOverlay(map, layer = null, win = null) {
       if (gridData && gridData.header) {
         layer.gridData = gridData;
         const isVisible = layer.visible !== false;
-        renderContourLayers(map, gridData, layer.element || "TMP", {
+        const lightingOpts = buildLayerLightingOptions(layer, win, appState.get("lightingCompensation"));
+        const isLightingActive = Boolean(
+          appState.get("lightingCompensation") && lightingOpts && lightingOpts.mode !== "none"
+        );
+        const effectiveGrid = isLightingActive
+          ? getCompensatedGridView(gridData, lightingOpts)
+          : gridData;
+
+        renderContourLayers(map, effectiveGrid, layer.element || "TMP", {
           ...layer.config,
           layerId,
           levels: layer.config?.levels,
@@ -179,7 +198,7 @@ export async function triggerIsobandOverlay(map, layer = null, win = null) {
           labelSize: layer.config?.labelSize,
           viewportBounds: map && typeof map.getBounds === "function" ? map.getBounds().toArray() : null,
         });
-        armContourReRender(map, layer, win);
+        armContourReRender(map, { ...layer, gridData: effectiveGrid }, win);
         if (isVisible && layer.element) {
           updateLegend(layer.element, colormap, gridData.stats?.min, gridData.stats?.max, win, {
             layerId: layer.id,
@@ -189,6 +208,7 @@ export async function triggerIsobandOverlay(map, layer = null, win = null) {
             isSoftStale: layer.isSoftStale,
             isHardStale: layer.isHardStale,
             isDesync: layer.isDesync,
+            lightingCompensated: isLightingActive,
           });
         }
         return;
@@ -246,7 +266,8 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
 
   // 1. Direct in-memory gridData from layer (e.g. RH, HGT, Wind, Surface SLP, or Sounding Analysis)
   if (layer?.gridData) {
-    renderGridRaster(map, layer.gridData, element, colormap, { layerId, opacity });
+    const lightingOpts = buildLayerLightingOptions(layer, win, appState.get("lightingCompensation"));
+    renderGridRaster(map, layer.gridData, element, colormap, { layerId, opacity, lighting: lightingOpts });
     if (layer.visible !== false) {
       updateLegend(element, colormap, layer.gridData.stats?.min, layer.gridData.stats?.max, win, {
         layerId: layer?.id || layerId,
@@ -256,6 +277,9 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
         isSoftStale: layer?.isSoftStale,
         isHardStale: layer?.isHardStale,
         isDesync: layer?.isDesync,
+        lightingCompensated: Boolean(
+          appState.get("lightingCompensation") && lightingOpts && lightingOpts.mode !== "none"
+        ),
       });
     }
     armContourReRender(map, layer, win);
@@ -326,9 +350,14 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
     file = `${cycle}.${String(period).padStart(3, "0")}`;
   }
 
+  const lightingOpts = buildLayerLightingOptions(layer, win, appState.get("lightingCompensation"));
+  const isLightingActive = Boolean(
+    appState.get("lightingCompensation") && lightingOpts && lightingOpts.mode !== "none"
+  );
+
   fetchGridBinaryStream(path, file)
     .then((bin) => {
-      renderBinaryRaster(map, bin, element, colormap, { layerId, opacity });
+      renderBinaryRaster(map, bin, element, colormap, { layerId, opacity, lighting: lightingOpts });
       if (layer?.visible !== false) {
         updateLegend(element, colormap, layer?.gridData?.stats?.min, layer?.gridData?.stats?.max, win, {
           layerId: layer?.id || layerId,
@@ -338,6 +367,7 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
           isSoftStale: layer?.isSoftStale,
           isHardStale: layer?.isHardStale,
           isDesync: layer?.isDesync,
+          lightingCompensated: isLightingActive,
         });
       }
     })
@@ -347,7 +377,7 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
         .then((grid) => {
           if (grid && (grid.values || (grid.u && grid.v))) {
             if (layer) layer.gridData = grid;
-            renderGridRaster(map, grid, element, colormap, { layerId, opacity });
+            renderGridRaster(map, grid, element, colormap, { layerId, opacity, lighting: lightingOpts });
             if (layer?.visible !== false) {
               updateLegend(element, colormap, grid.stats?.min, grid.stats?.max, win, {
                 layerId: layer?.id || layerId,
@@ -357,6 +387,7 @@ export async function triggerRasterOverlay(map, layer = null, win = null) {
                 isSoftStale: layer?.isSoftStale,
                 isHardStale: layer?.isHardStale,
                 isDesync: layer?.isDesync,
+                lightingCompensated: isLightingActive,
               });
             }
             if (layer) armContourReRender(map, layer, win);
