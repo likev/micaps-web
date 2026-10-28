@@ -30,14 +30,18 @@ export async function changeVerticalLevel(map, direction, explicitLevel = null, 
 
   if (targetLevel === null) {
     const curLevel = win?.level !== undefined && win?.level !== null ? win.level : levels[0];
-    let idx = levels.indexOf(curLevel);
+    let idx = levels.findIndex((x) => String(x) === String(curLevel));
+    if (idx === -1) idx = levels.findIndex((x) => String(x) === String(activeGroup?.defaultLevel));
     if (idx === -1) idx = 0;
 
     let newIdx = idx + direction;
     if (newIdx < 0) newIdx = 0;
     if (newIdx >= levels.length) newIdx = levels.length - 1;
     targetLevel = levels[newIdx];
-    if (targetLevel === curLevel) return;
+    if (String(targetLevel) === String(curLevel)) return;
+  } else {
+    const matched = levels.find((x) => String(x) === String(targetLevel));
+    if (matched !== undefined) targetLevel = matched;
   }
 
   if (win) {

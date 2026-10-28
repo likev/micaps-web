@@ -134,9 +134,11 @@ describe("T6: UI Integration, Chrome, Formatters, & Palettes (§7-T6)", () => {
     expect(divLevels).toEqual(DIV_LEVELS);
   });
 
-  test("config.json contains valid VOR and DIV colormaps; NWP VOR is runtime-added", () => {
+  test("colormaps.json contains valid VOR and DIV colormaps; NWP VOR is runtime-added", () => {
     const configRaw = fs.readFileSync(new URL("../../config.json", import.meta.url), "utf8");
     const config = JSON.parse(configRaw);
+    expect(config.colormaps).toBeUndefined();
+    config.colormaps = JSON.parse(fs.readFileSync(new URL("../../colormaps.json", import.meta.url), "utf8"));
 
     expect(config.colormaps.VOR).toBeDefined();
     expect(config.colormaps.DIV).toBeDefined();

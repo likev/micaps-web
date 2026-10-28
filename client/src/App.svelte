@@ -19,6 +19,7 @@
   import { syncLayersState, reorderLayers, syncMapLayerOrder, getLayers } from "./lib/stores/layers.svelte.js";
   import { syncLegendState, deleteWindowLegends } from "./lib/stores/legend.svelte.js";
   import { getOrCreateTimeline, playback, selectObsChipsWindow, filterObsFilesByStep, getPeriodsForStep, timelinesByWindow } from "./lib/stores/timeline.svelte.js";
+  import { getObsStepOptions, isSatelliteGroup } from "./lib/stores/timelineMath.js";
   import { setLiveTimelineResolver, cancelScheduledPrefetch } from "./services/prefetchService.js";
 
   // Feed the prefetch engine the live per-window timeline (not the frozen
@@ -1290,8 +1291,8 @@
         (Array.isArray(groupCopy.layers) && groupCopy.layers.some((l) =>
           l?.model === "UPPER_AIR" || String(l?.path || "").includes("TLOGP") || l?.element === "TLOGP"));
       const defaultStep = isUpperLoad ? 12 : 3;
-      const validSteps = isUpperLoad ? [12, 24, 6] : [1, 3, 6, 12, 24];
-      let coercedStep = parseInt(win.stepLength, 10);
+      const validSteps = getObsStepOptions({ isUpper: isUpperLoad, isSatellite: isSatelliteGroup(groupCopy) });
+      let coercedStep = parseFloat(win.stepLength);
       if (!validSteps.includes(coercedStep)) coercedStep = defaultStep;
       if (previousGroupId !== groupCopy.id) coercedStep = defaultStep;
       win.stepLength = coercedStep;
@@ -1356,9 +1357,9 @@
         tl.currentMode = "obs";
         tl.isUpperAirMode = Boolean(t.isUpper);
         const defaultStep = tl.isUpperAirMode ? 12 : 3;
-        const validSteps = tl.isUpperAirMode ? [12, 24, 6] : [1, 3, 6, 12, 24];
-        let step = parseInt(win.stepLength, 10);
-        if (!validSteps.includes(step)) step = parseInt(t.stepLength, 10);
+        const validSteps = getObsStepOptions({ isUpper: tl.isUpperAirMode, isSatellite: isSatelliteGroup(groupCopy) });
+        let step = parseFloat(win.stepLength);
+        if (!validSteps.includes(step)) step = parseFloat(t.stepLength);
         if (!validSteps.includes(step)) step = defaultStep;
         if (previousGroupId !== groupCopy.id) step = defaultStep;
         win.stepLength = step;
@@ -2208,12 +2209,27 @@
       if (lineHeightController.isActive(win) || hovmollerController.isActive(win)) return;
     } catch {}
 
-    const levels = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
+    const DEFAULT_PRESSURE_LEVELS = [1000, 925, 850, 700, 500, 400, 300, 200, 100];
+    // Presets that define their own level list (FY-4B channels 1..15, radar heights, ...)
+    // step through that list; everything else uses the standard pressure levels.
+    const levelsFor = (w) => {
+      const gl = w?.activeGroup?.levels || w?.levels || (Array.isArray(w?.layers) && w.layers.find((l) => Array.isArray(l.levels))?.levels);
+      return Array.isArray(gl) && gl.length > 0 ? gl : DEFAULT_PRESSURE_LEVELS;
+    };
+    const hasLevelFor = (w) => {
+      if (!w) return false;
+      if (w.activeGroup?.hasLevel !== undefined) return Boolean(w.activeGroup.hasLevel);
+      if (w.model === "SURFACE" || w.level === 0) return false;
+      return true;
+    };
+    const indexIn = (list, v) => list.findIndex((x) => String(x) === String(v));
+    const fallbackLevel = (w, d) => w?.level ?? w?.activeGroup?.defaultLevel ?? d;
 
     if (isSplit && alloc === "level") {
       for (const w of visible) {
-        if (!w || ((w.model === "SURFACE" || w.level === 0) && !w.activeGroup?.hasLevel)) continue;
-        const wIdx = levels.indexOf(w.level ?? 500);
+        if (!hasLevelFor(w)) continue;
+        const levels = levelsFor(w);
+        let wIdx = indexIn(levels, fallbackLevel(w, levels[0]));
         if (wIdx !== -1) {
           const shifted = Math.max(0, Math.min(levels.length - 1, wIdx + delta));
           if (shifted !== wIdx) {
@@ -2226,24 +2242,30 @@
     }
 
     if (isSplit && (alloc === "model" || alloc === "step" || alloc === "time")) {
-      const curLvl = activeWin?.level ?? visible.find((w) => w && w.level != null)?.level ?? app.level ?? 500;
-      const idx = levels.indexOf(curLvl);
-      if (idx === -1) return;
+      const refWin = activeWin || visible.find((w) => w && w.level != null) || visible[0];
+      const levels = levelsFor(refWin);
+      const curLvl = activeWin?.level ?? visible.find((w) => w && w.level != null)?.level ?? app.level ?? fallbackLevel(refWin, levels[0]);
+      let idx = indexIn(levels, curLvl);
+      if (idx === -1) idx = 0;
       const nextIdx = Math.max(0, Math.min(levels.length - 1, idx + delta));
       if (nextIdx === idx) return;
       const targetLevel = levels[nextIdx];
       for (const w of visible) {
-        if (!w || ((w.model === "SURFACE" || w.level === 0) && !w.activeGroup?.hasLevel)) continue;
+        if (!hasLevelFor(w)) continue;
         await handleLevelSelect(targetLevel, w, false);
       }
       app.level = targetLevel;
       return;
     }
 
-    if ((win.model === "SURFACE" || win.level === 0) && !win.activeGroup?.hasLevel) return;
-    const cur = app.level ?? win?.level ?? 500;
-    const idx = levels.indexOf(cur);
-    if (idx === -1) return;
+    if (!hasLevelFor(win)) return;
+    const levels = levelsFor(win);
+    const cur = app.level ?? win?.level ?? fallbackLevel(win, levels[0]);
+    let idx = indexIn(levels, cur);
+    if (idx === -1) {
+      idx = indexIn(levels, win?.activeGroup?.defaultLevel);
+      if (idx === -1) idx = 0;
+    }
     const nextIdx = Math.max(0, Math.min(levels.length - 1, idx + delta));
     if (nextIdx !== idx) {
       await handleLevelSelect(levels[nextIdx], win);

@@ -40,6 +40,42 @@ export function selectObsChipsWindow(files, targetFile = "") {
   return files.slice(start, start + MAX_OBS_CHIPS);
 }
 
+/** Step options (hours) offered by the step-length select; 0.25 = 15 min (satellite only). */
+export function getObsStepOptions({ isUpper = false, isSatellite = false } = {}) {
+  if (isUpper) return [12, 24, 6];
+  return isSatellite ? [0.25, 1, 3, 6, 12, 24] : [1, 3, 6, 12, 24];
+}
+
+export function formatStepLabel(step) {
+  const n = parseFloat(step);
+  if (!(n > 0)) return "";
+  return n < 1 ? `${Math.round(n * 60)}min` : `${n}h`;
+}
+
+/** True when a preset group carries FY-4B / satellite imagery layers. */
+export function isSatelliteGroup(group) {
+  if (!group) return false;
+  if (typeof group === "string") {
+    const s = group.toUpperCase();
+    return s.includes("SATELLITE") || s.includes("FY4") || s.includes("FY-4");
+  }
+  const id = String(group.id || "").toUpperCase();
+  const name = String(group.name || "").toUpperCase();
+  const path = String(group.path || "").toUpperCase();
+  if (id.includes("SATELLITE") || id.includes("FY4") || id.includes("FY-4") ||
+      name.includes("SATELLITE") || name.includes("FY4") || name.includes("FY-4") ||
+      path.includes("SATELLITE") || path.includes("FY4") || path.includes("FY-4")) {
+    return true;
+  }
+  const layers = Array.isArray(group.layers) ? group.layers : [];
+  return layers.some((l) =>
+    l?.model === "SATELLITE" ||
+    String(l?.path || "").toUpperCase().includes("FY4") ||
+    String(l?.path || "").toUpperCase().includes("SATELLITE") ||
+    String(l?.element || "").toUpperCase().includes("FY4")
+  );
+}
+
 export function getPeriodsForStep(step = 6) {
   const stepNum = parseInt(step, 10) || 6;
   const periods = [0];
@@ -65,7 +101,8 @@ export function getPeriodsForStep(step = 6) {
 export function filterObsFilesByStep(files, stepHours, isUpper = false) {
   if (!Array.isArray(files) || files.length === 0) return [];
 
-  const stepNum = parseInt(stepHours, 10) || (isUpper ? 12 : 3);
+  // Steps are expressed in hours; fractional values (0.25 = 15 min) are allowed for sub-hourly products.
+  const stepNum = parseFloat(stepHours) || (isUpper ? 12 : 3);
 
   const getFileHour = (f) => {
     if (typeof f === "string" && f.length >= 10 && /^\d+$/.test(f.slice(0, 10))) {
@@ -134,7 +171,18 @@ export function filterObsFilesByStep(files, stepHours, isUpper = false) {
     if (synoptic6.length >= 2) return synoptic6;
   }
 
-  if (stepNum <= 1) return [...files];
+  // Sub-hourly step (e.g. 15 min FY-4B): keep files on the step grid when possible.
+  if (stepNum < 1) {
+    const stepMin = Math.max(1, Math.round(stepNum * 60));
+    const aligned = files.filter((f) => getFileMin(f) % stepMin === 0);
+    return aligned.length >= 2 ? aligned : [...files];
+  }
+
+  // 1h on sub-hourly data (satellite 15 min, radar 6 min): keep the on-the-hour files only.
+  if (stepNum === 1) {
+    const hourly = files.filter((f) => getFileMin(f) === 0);
+    return hourly.length >= 2 ? hourly : [...files];
+  }
 
   const filtered = [];
   let lastTimeMs = 0;

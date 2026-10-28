@@ -14,6 +14,7 @@
     formatForecastValidTime,
   } from "../utils/formatters.js";
   import { getWindowById } from "../lib/stores/tabs.svelte.js";
+  import { formatStepLabel } from "../lib/stores/timelineMath.js";
   import { cursorProbeState } from "../lib/stores/cursorProbe.svelte.js";
 
   let { winId = "default", onTimeChange = null } = $props();
@@ -159,9 +160,9 @@
 
       <div id="sl-time-valid-label" class="valid-label">
         {#if isObs}
-          Real-time Observation (Step: {stepLength}h)
+          Real-time Observation (Step: {formatStepLabel(stepLength)})
         {:else if currentCycle}
-          Valid: {formatForecastValidTime(currentCycle, activePeriod)} (Step: {stepLength}h)
+          Valid: {formatForecastValidTime(currentCycle, activePeriod)} (Step: {formatStepLabel(stepLength)})
         {:else}
           --
         {/if}

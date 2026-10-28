@@ -11,7 +11,8 @@ describe("Configuration File Validation & Auto-Save (config.json)", () => {
 
     const parsed = JSON.parse(raw);
     expect(parsed).toHaveProperty("presets");
-    expect(parsed).toHaveProperty("colormaps");
+    // colormaps live in colormaps.json, not config.json
+    expect(parsed).not.toHaveProperty("colormaps");
     expect(Array.isArray(parsed.presets)).toBe(true);
     expect(parsed.presets.length).toBeGreaterThan(0);
 

@@ -105,6 +105,9 @@
     font-size: 11px;
     font-family: var(--font-mono, monospace);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    /* left:50% shrinks the available width to half the viewport; size to content instead */
+    width: max-content;
+    min-width: 380px;
     max-width: min(90%, 720px);
     max-height: 120px;
     overflow: auto;
@@ -119,7 +122,8 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    min-width: 190px;
+    min-width: 360px;
+    flex: 1 1 360px;
   }
 
   .legend-header {

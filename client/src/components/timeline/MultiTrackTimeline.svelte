@@ -216,7 +216,7 @@
 
     // 3. User-selected timeline stepLength (e.g. 1h, 3h, 6h, 12h, 24h)
     if (timeline?.currentStepLength) {
-      const stepH = parseInt(timeline.currentStepLength, 10);
+      const stepH = parseFloat(timeline.currentStepLength);
       if (Number.isFinite(stepH) && stepH > 0) {
         return stepH * 3600 * 1000;
       }

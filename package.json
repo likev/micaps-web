@@ -1,11 +1,12 @@
 {
   "name": "micaps-web",
-  "version": "1.11.0",
+  "version": "1.11.1",
   "private": true,
   "scripts": {
     "test": "cd client && bun test",
     "test:railway": "node scripts/runner_railway.cjs",
     "test:cdp": "node scripts/runner_cdp.cjs",
+    "compact:config": "node scripts/compact-config.mjs",
     "build:client": "cd client && npm run build",
     "build:server": "cd server && go build -o micaps-server cmd/main.go",
     "build": "npm run build:client && npm run build:server"

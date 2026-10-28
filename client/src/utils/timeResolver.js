@@ -308,11 +308,6 @@ export function parseTimestamp(input) {
     const sec = parseInt(rawDigits.slice(12, 14), 10);
     let ts = Date.UTC(y, m, d, h, min, sec);
 
-    // FY-4B filenames use Beijing Time (UTC+8); convert to UTC
-    if (basename.includes("FY4B") || basename.includes("FY-4B")) {
-      ts -= 8 * 3600 * 1000;
-    }
-
     // SWAN extrapolation lead time: .F006 .. .F360 (minutes)
     const fLeadMatch = basename.match(/\.F(\d{3})\./i);
     if (fLeadMatch) {

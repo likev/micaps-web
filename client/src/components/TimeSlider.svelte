@@ -16,7 +16,7 @@
     formatObsTimestamp,
     formatObsChipLabel,
   } from "../utils/formatters.js";
-  import { getPeriodsForStep, filterObsFilesByStep, selectObsChipsWindow, findClosestFile } from "../lib/stores/timelineMath.js";
+  import { getPeriodsForStep, filterObsFilesByStep, selectObsChipsWindow, findClosestFile, getObsStepOptions, formatStepLabel, isSatelliteGroup } from "../lib/stores/timelineMath.js";
   import { stepWindowTimeline } from "../lib/services/appWorkflow.js";
   import { getWindowById } from "../lib/stores/tabs.svelte.js";
   import { getLayersForWindow } from "../lib/stores/layersCore.js";
@@ -64,11 +64,24 @@
   // into the valid option set (step: upper 12/24/6 default 12 like v1.1.0,
   // otherwise 1/3/6/12/24; speed: 3000/1500/750 default 1500). The store
   // itself is corrected on next load/change.
+  // FY-4B (satellite) windows additionally offer a 15 min step (0.25 h).
+  let isSatellite = $derived.by(() => {
+    if (!isObs) return false;
+    const win = getWindowById(winId);
+    if (isSatelliteGroup(win?.activeGroup)) return true;
+    if (win?.model === "SATELLITE") return true;
+    if (layers.some((l) => l?.model === "SATELLITE" || String(l?.path || "").includes("FY4B") || String(l?.element || "").includes("FY4B"))) return true;
+    return false;
+  });
+  let stepOptions = $derived(
+    !isObs && !timeline.isUpperAirMode
+      ? [1, 3, 6, 12, 24]
+      : getObsStepOptions({ isUpper: timeline.isUpperAirMode, isSatellite })
+  );
   let stepValue = $derived.by(() => {
-    const valid = timeline.isUpperAirMode ? [12, 24, 6] : [1, 3, 6, 12, 24];
     const defaultStep = timeline.isUpperAirMode ? 12 : (isObs ? 3 : 6);
-    const cur = parseInt(timeline.currentStepLength, 10);
-    return String(valid.includes(cur) ? cur : defaultStep);
+    const cur = parseFloat(timeline.currentStepLength);
+    return String(stepOptions.includes(cur) ? cur : defaultStep);
   });
   let speedValue = $derived.by(() => {
     const valid = [3000, 1500, 750];
@@ -172,7 +185,7 @@
     // v1.1.0 (legacy setStepLength, triggerCallback=true): preserve the
     // current position, re-filter, snap to closest when the current value
     // drops out, and reload the map at the snapped position.
-    const step = parseInt(e.target.value, 10);
+    const step = parseFloat(e.target.value);
     pause();
     const tl = timelinesByWindow[winId] || getOrCreateTimeline(winId);
     tl.currentStepLength = step;
@@ -596,17 +609,9 @@
           value={stepValue}
           onchange={handleStepLengthChange}
         >
-          {#if timeline.isUpperAirMode}
-            <option value="12">12h</option>
-            <option value="24">24h</option>
-            <option value="6">6h</option>
-          {:else}
-            <option value="1">1h</option>
-            <option value="3">3h</option>
-            <option value="6">6h</option>
-            <option value="12">12h</option>
-            <option value="24">24h</option>
-          {/if}
+          {#each stepOptions as opt}
+            <option value={String(opt)}>{formatStepLabel(opt)}</option>
+          {/each}
         </select>
       </div>
 

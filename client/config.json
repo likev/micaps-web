@@ -7,434 +7,6 @@
     "showProvinces": true,
     "showWorld": true
   },
-  "colormaps": {
-    "DIV": [
-      {
-        "color": [118, 42, 131, 255],
-        "val": -20
-      },
-      {
-        "color": [153, 112, 171, 255],
-        "val": -10
-      },
-      {
-        "color": [194, 165, 207, 255],
-        "val": -4
-      },
-      {
-        "color": [231, 212, 232, 255],
-        "val": -2
-      },
-      {
-        "color": [245, 245, 245, 0],
-        "val": 0
-      },
-      {
-        "color": [254, 224, 182, 255],
-        "val": 2
-      },
-      {
-        "color": [253, 174, 97, 255],
-        "val": 4
-      },
-      {
-        "color": [227, 74, 51, 255],
-        "val": 10
-      },
-      {
-        "color": [179, 0, 0, 255],
-        "val": 20
-      }
-    ],
-    "VOR": [
-      {
-        "color": [30, 60, 180, 255],
-        "val": -20
-      },
-      {
-        "color": [60, 120, 220, 255],
-        "val": -10
-      },
-      {
-        "color": [140, 190, 240, 255],
-        "val": -4
-      },
-      {
-        "color": [200, 225, 250, 255],
-        "val": -2
-      },
-      {
-        "color": [240, 240, 240, 0],
-        "val": 0
-      },
-      {
-        "color": [254, 224, 182, 255],
-        "val": 2
-      },
-      {
-        "color": [253, 174, 97, 255],
-        "val": 4
-      },
-      {
-        "color": [227, 74, 51, 255],
-        "val": 10
-      },
-      {
-        "color": [179, 0, 0, 255],
-        "val": 20
-      }
-    ],
-    "new_colormap": [
-      {
-        "color": [0, 0, 255, 255],
-        "val": 0
-      },
-      {
-        "color": [255, 255, 255, 255],
-        "val": 50
-      },
-      {
-        "color": [255, 0, 0, 255],
-        "val": 100
-      }
-    ],
-    "new_colormap_copy": [
-      {
-        "color": [0, 0, 255, 255],
-        "val": 0
-      },
-      {
-        "color": [255, 255, 255, 255],
-        "val": 50
-      },
-      {
-        "color": [255, 0, 0, 255],
-        "val": 100
-      },
-      {
-        "color": [255, 255, 255, 255],
-        "val": 150
-      },
-      {
-        "color": [255, 255, 255, 255],
-        "val": 200
-      },
-      {
-        "color": [255, 255, 255, 255],
-        "val": 250
-      },
-      {
-        "color": [255, 255, 255, 255],
-        "val": 300
-      },
-      {
-        "color": [255, 255, 255, 255],
-        "val": 350
-      }
-    ],
-    "K_INDEX": [
-      {
-        "color": [240, 240, 240, 0],
-        "val": 0
-      },
-      {
-        "color": [160, 220, 240, 180],
-        "val": 15
-      },
-      {
-        "color": [100, 190, 220, 220],
-        "val": 20
-      },
-      {
-        "color": [120, 210, 120, 240],
-        "val": 25
-      },
-      {
-        "color": [240, 220, 60, 255],
-        "val": 30
-      },
-      {
-        "color": [245, 140, 40, 255],
-        "val": 35
-      },
-      {
-        "color": [230, 40, 40, 255],
-        "val": 40
-      },
-      {
-        "color": [160, 20, 160, 255],
-        "val": 45
-      }
-    ],
-    "SHOWALTER": [
-      {
-        "color": [160, 20, 160, 255],
-        "val": -8
-      },
-      {
-        "color": [220, 30, 30, 255],
-        "val": -6
-      },
-      {
-        "color": [245, 120, 30, 255],
-        "val": -4
-      },
-      {
-        "color": [245, 200, 50, 255],
-        "val": -2
-      },
-      {
-        "color": [240, 240, 240, 0],
-        "val": 0
-      },
-      {
-        "color": [140, 210, 230, 180],
-        "val": 2
-      },
-      {
-        "color": [60, 140, 210, 240],
-        "val": 6
-      }
-    ],
-    "LIFTED": [
-      {
-        "color": [160, 20, 160, 255],
-        "val": -8
-      },
-      {
-        "color": [220, 30, 30, 255],
-        "val": -6
-      },
-      {
-        "color": [245, 120, 30, 255],
-        "val": -4
-      },
-      {
-        "color": [245, 200, 50, 255],
-        "val": -2
-      },
-      {
-        "color": [240, 240, 240, 0],
-        "val": 0
-      },
-      {
-        "color": [140, 210, 230, 180],
-        "val": 2
-      },
-      {
-        "color": [60, 140, 210, 240],
-        "val": 6
-      }
-    ],
-    "SWEAT": [
-      {
-        "color": [240, 240, 240, 0],
-        "val": 100
-      },
-      {
-        "color": [100, 200, 220, 200],
-        "val": 200
-      },
-      {
-        "color": [120, 220, 100, 240],
-        "val": 250
-      },
-      {
-        "color": [240, 210, 50, 255],
-        "val": 300
-      },
-      {
-        "color": [240, 130, 30, 255],
-        "val": 350
-      },
-      {
-        "color": [220, 30, 30, 255],
-        "val": 400
-      },
-      {
-        "color": [160, 20, 160, 255],
-        "val": 500
-      }
-    ],
-    "TT": [
-      {
-        "color": [240, 240, 240, 0],
-        "val": 35
-      },
-      {
-        "color": [100, 200, 220, 220],
-        "val": 44
-      },
-      {
-        "color": [240, 210, 50, 255],
-        "val": 48
-      },
-      {
-        "color": [240, 130, 30, 255],
-        "val": 52
-      },
-      {
-        "color": [220, 30, 30, 255],
-        "val": 56
-      },
-      {
-        "color": [160, 20, 160, 255],
-        "val": 65
-      }
-    ],
-    "SHEAR": [
-      {
-        "color": [240, 240, 240, 0],
-        "val": 0
-      },
-      {
-        "color": [120, 190, 245, 140],
-        "val": 6
-      },
-      {
-        "color": [70, 200, 120, 180],
-        "val": 12
-      },
-      {
-        "color": [230, 210, 50, 220],
-        "val": 18
-      },
-      {
-        "color": [240, 120, 40, 240],
-        "val": 25
-      },
-      {
-        "color": [230, 40, 40, 255],
-        "val": 35
-      },
-      {
-        "color": [160, 20, 120, 255],
-        "val": 45
-      }
-    ],
-    "THICKNESS": [
-      {
-        "color": [30, 50, 140, 255],
-        "val": 5100
-      },
-      {
-        "color": [70, 160, 235, 255],
-        "val": 5280
-      },
-      {
-        "color": [100, 210, 200, 255],
-        "val": 5400
-      },
-      {
-        "color": [140, 230, 130, 255],
-        "val": 5520
-      },
-      {
-        "color": [230, 220, 50, 255],
-        "val": 5640
-      },
-      {
-        "color": [245, 140, 40, 255],
-        "val": 5760
-      },
-      {
-        "color": [230, 50, 40, 255],
-        "val": 5880
-      }
-    ],
-    "T_VAR": [
-      {
-        "color": [20, 30, 140, 255],
-        "val": -16
-      },
-      {
-        "color": [30, 80, 200, 255],
-        "val": -12
-      },
-      {
-        "color": [50, 140, 230, 255],
-        "val": -8
-      },
-      {
-        "color": [120, 200, 245, 230],
-        "val": -4
-      },
-      {
-        "color": [190, 235, 250, 200],
-        "val": -2
-      },
-      {
-        "color": [245, 245, 245, 0],
-        "val": 0
-      },
-      {
-        "color": [254, 230, 170, 200],
-        "val": 2
-      },
-      {
-        "color": [253, 175, 95, 230],
-        "val": 4
-      },
-      {
-        "color": [235, 95, 55, 255],
-        "val": 8
-      },
-      {
-        "color": [200, 30, 30, 255],
-        "val": 12
-      },
-      {
-        "color": [130, 15, 20, 255],
-        "val": 16
-      }
-    ],
-    "SLP_VAR": [
-      {
-        "color": [110, 30, 140, 255],
-        "val": -16
-      },
-      {
-        "color": [30, 60, 180, 255],
-        "val": -12
-      },
-      {
-        "color": [50, 130, 220, 255],
-        "val": -8
-      },
-      {
-        "color": [130, 195, 245, 230],
-        "val": -4
-      },
-      {
-        "color": [195, 235, 250, 200],
-        "val": -2
-      },
-      {
-        "color": [245, 245, 245, 0],
-        "val": 0
-      },
-      {
-        "color": [254, 230, 170, 200],
-        "val": 2
-      },
-      {
-        "color": [253, 175, 95, 230],
-        "val": 4
-      },
-      {
-        "color": [235, 95, 55, 255],
-        "val": 8
-      },
-      {
-        "color": [190, 35, 35, 255],
-        "val": 12
-      },
-      {
-        "color": [120, 15, 20, 255],
-        "val": 16
-      }
-    ]
-  },
   "performance": {
     "maxEffectiveCells": 50000
   },
@@ -468,16 +40,13 @@
             "filterVal1": "",
             "filterVal2": "",
             "showCloud": false,
-            "showDewpoint": false,
-            "showPressure": false,
             "showRain6": false,
             "showStreamlines": false,
-            "showTemp": false,
             "showTendency": false,
             "showVisibility": true,
-            "showWeather": false,
-            "showWind": false
+            "showWeather": false
           },
+          "renderRef": "station-2",
           "type": "station"
         },
         {
@@ -508,18 +77,12 @@
             ],
             "interval": null,
             "lineColor": "#a371f7",
-            "lineWidth": 2,
             "opacity": 0.75,
-            "palettePath": null,
-            "showBarbs": false,
             "showFill": true,
             "showLabels": true,
-            "showLine": false,
-            "showRaster": false,
-            "showWind": false,
-            "smooth": true,
-            "smoothIterations": 2
+            "showLine": false
           },
+          "renderRef": "contour-7",
           "type": "contour"
         }
       ],
@@ -639,17 +202,11 @@
             "colormap": "RH",
             "interval": null,
             "lineColor": "#ffffff",
-            "lineWidth": 2,
             "opacity": 0.55,
-            "palettePath": null,
-            "showBarbs": false,
             "showFill": true,
-            "showLine": false,
-            "showRaster": false,
-            "showWind": false,
-            "smooth": true,
-            "smoothIterations": 2
+            "showLine": false
           },
+          "renderRef": "contour-7",
           "type": "contour"
         },
         {
@@ -698,18 +255,12 @@
               600
             ],
             "lineColor": "#917373",
-            "lineWidth": 2,
-            "opacity": 0.75,
             "palettePath": null,
             "showBarbs": false,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
             "showRaster": false,
-            "showWind": false,
-            "smooth": true,
-            "smoothIterations": 2
+            "showWind": false
           },
+          "renderRef": "contour-1",
           "type": "contour"
         },
         {
@@ -718,13 +269,9 @@
           "model": "ECMWF_HR",
           "name": "Wind Field (Streamlines)",
           "render": {
-            "colormap": "WIND",
-            "keepWind": true,
-            "palettePath": null,
-            "showBarbs": true,
-            "showRaster": false,
-            "showWind": false
+            "palettePath": null
           },
+          "renderRef": "wind-1",
           "type": "wind"
         }
       ],
@@ -814,17 +361,11 @@
               28
             ],
             "lineColor": "#ae2d97",
-            "lineWidth": 2,
             "opacity": 0.75,
-            "palettePath": null,
-            "showBarbs": false,
             "showFill": false,
-            "showLine": true,
-            "showRaster": false,
-            "showWind": false,
-            "smooth": true,
-            "smoothIterations": 2
+            "showLine": true
           },
+          "renderRef": "contour-7",
           "type": "contour"
         },
         {
@@ -833,13 +374,9 @@
           "model": "ECMWF_HR",
           "name": "850hPa Wind Streamlines",
           "render": {
-            "colormap": "WIND",
-            "keepWind": true,
-            "palettePath": null,
-            "showBarbs": true,
-            "showRaster": false,
-            "showWind": false
+            "palettePath": null
           },
+          "renderRef": "wind-1",
           "type": "wind"
         }
       ],
@@ -897,18 +434,12 @@
               600
             ],
             "lineColor": "#917373",
-            "lineWidth": 2,
-            "opacity": 0.75,
             "palettePath": null,
             "showBarbs": false,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
             "showRaster": false,
-            "showWind": false,
-            "smooth": true,
-            "smoothIterations": 2
+            "showWind": false
           },
+          "renderRef": "contour-1",
           "type": "contour"
         },
         {
@@ -917,13 +448,9 @@
           "model": "ECMWF_HR",
           "name": "200hPa Jet Streamlines",
           "render": {
-            "colormap": "WIND",
-            "keepWind": true,
-            "palettePath": null,
-            "showBarbs": true,
-            "showRaster": false,
-            "showWind": false
+            "palettePath": null
           },
+          "renderRef": "wind-1",
           "type": "wind"
         }
       ],
@@ -933,7 +460,6 @@
       "category": "NWP Synoptic",
       "hasLevel": false,
       "id": "composite-ecmwf-slp",
-      "name": "ECMWF Sea Level Pressure (SLP)",
       "layers": [
         {
           "element": "PRMSL",
@@ -941,7 +467,6 @@
           "model": "ECMWF_HR",
           "name": "Sea Level Pressure (Isobars)",
           "path": "ECMWF_HR/PRMSL",
-          "type": "contour",
           "render": {
             "boldLineWidth": 4,
             "boldValues": [
@@ -950,26 +475,21 @@
             ],
             "colormap": "SLP_VAR",
             "lineColor": "#58a6ff",
-            "lineWidth": 2,
             "opacity": 0.8,
-            "palettePath": null,
-            "showBarbs": false,
             "showFill": false,
             "showLabels": true,
-            "showLine": true,
-            "showRaster": false,
-            "showWind": false,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "showLine": true
+          },
+          "renderRef": "contour-7",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "ECMWF Sea Level Pressure (SLP)"
     },
     {
       "category": "NWP Synoptic",
       "hasLevel": false,
       "id": "composite-ecmwf-t2m",
-      "name": "ECMWF 2m Temperature (T2m)",
       "layers": [
         {
           "element": "TMP_2M",
@@ -977,28 +497,23 @@
           "model": "ECMWF_HR",
           "name": "2m Temperature (TMP_2M)",
           "path": "ECMWF_HR/TMP_2M",
-          "type": "contour",
           "render": {
             "boldLineWidth": 4,
             "boldValues": [
               0
             ],
             "colormap": "TMP",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
             "opacity": 0.75,
             "palettePath": null,
             "showBarbs": false,
-            "showFill": true,
-            "showLabels": true,
-            "showLine": true,
             "showRaster": false,
-            "showWind": false,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "showWind": false
+          },
+          "renderRef": "contour-2",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "ECMWF 2m Temperature (T2m)"
     },
     {
       "divider": true,
@@ -1189,9 +704,6 @@
       "hasLevel": false,
       "id": "composite-convective-nowcast",
       "isObservation": true,
-      "mode": "live",
-      "name": "Convective Nowcast (Multi-Cadence)",
-      "pacemaker": "surface-obs-nowcast",
       "layers": [
         {
           "element": "PLOT_GLOBAL_3H",
@@ -1241,7 +753,10 @@
           "tolerance": "6h",
           "type": "contour"
         }
-      ]
+      ],
+      "mode": "live",
+      "name": "Convective Nowcast (Multi-Cadence)",
+      "pacemaker": "surface-obs-nowcast"
     },
     {
       "category": "Multi-Time Recipes",
@@ -1249,9 +764,6 @@
       "hasLevel": false,
       "id": "composite-radar-motion-compare",
       "isObservation": true,
-      "mode": "review",
-      "name": "Surface Motion Compare (T0 vs T-30m)",
-      "pacemaker": "surface-obs-t0",
       "layers": [
         {
           "element": "PLOT_GLOBAL_3H",
@@ -1281,13 +793,15 @@
           "tolerance": "30m",
           "type": "station"
         }
-      ]
+      ],
+      "mode": "review",
+      "name": "Surface Motion Compare (T0 vs T-30m)",
+      "pacemaker": "surface-obs-t0"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
       "id": "composite-derived-stability",
-      "name": "NWP Derived Stability & Severe Indices (ECMWF)",
       "layers": [
         {
           "element": "K-INDEX",
@@ -1295,18 +809,12 @@
           "model": "ECMWF_HR",
           "name": "Derived K-Index (ECMWF)",
           "path": "/api/derived/ECMWF_HR/K-INDEX",
-          "type": "contour",
           "render": {
             "colormap": "K_INDEX",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.65,
-            "showFill": true,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "opacity": 0.65
+          },
+          "renderRef": "contour-2",
+          "type": "contour"
         },
         {
           "element": "TT",
@@ -1314,47 +822,35 @@
           "model": "ECMWF_HR",
           "name": "Derived Total Totals TT (ECMWF)",
           "path": "/api/derived/ECMWF_HR/TT",
-          "type": "contour",
           "render": {
             "colormap": "TT",
-            "lineColor": "#d29922",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#d29922"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         },
         {
           "element": "TMP",
-          "level": "850-500",
           "id": "derived-ecmwf-t850-500",
+          "level": "850-500",
           "model": "ECMWF_HR",
           "name": "Derived T850-500 Lapse Rate (ECMWF)",
           "path": "/api/derived/ECMWF_HR/TMP/850-500",
-          "type": "contour",
           "render": {
             "colormap": "TMP",
-            "lineColor": "#e3b341",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#e3b341"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "NWP Derived Stability & Severe Indices (ECMWF)"
     },
     {
       "category": "Upper-Air Observations",
       "hasLevel": false,
-      "isObservation": true,
       "id": "composite-upperair-derived",
-      "name": "Sounding Derived Multi-Level Analysis",
+      "isObservation": true,
       "layers": [
         {
           "element": "K-INDEX",
@@ -1362,47 +858,35 @@
           "model": "UPPER_AIR",
           "name": "Sounding Derived K-Index",
           "path": "/api/derived/UPPER_AIR/PLOT/K-INDEX",
-          "type": "contour",
           "render": {
             "colormap": "K_INDEX",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.65,
-            "showFill": true,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "opacity": 0.65
+          },
+          "renderRef": "contour-2",
+          "type": "contour"
         },
         {
           "element": "TMP",
-          "level": "850-500",
           "id": "derived-sounding-t850-500",
+          "level": "850-500",
           "model": "UPPER_AIR",
           "name": "Sounding Derived T850-500 Difference",
           "path": "/api/derived/UPPER_AIR/PLOT/TMP/850-500",
-          "type": "contour",
           "render": {
             "colormap": "TMP",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#f85149"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Sounding Derived Multi-Level Analysis"
     },
     {
       "category": "Upper-Air Observations",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-sounding-k-index",
-      "name": "Sounding Derived K-Index",
+      "isObservation": true,
       "layers": [
         {
           "element": "K-INDEX",
@@ -1410,27 +894,21 @@
           "model": "UPPER_AIR",
           "name": "Sounding Derived K-Index",
           "path": "/api/derived/UPPER_AIR/PLOT/K-INDEX",
-          "type": "contour",
           "render": {
             "colormap": "K_INDEX",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.65,
-            "showFill": true,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "opacity": 0.65
+          },
+          "renderRef": "contour-2",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Sounding Derived K-Index"
     },
     {
       "category": "Upper-Air Observations",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-sounding-showalter",
-      "name": "Sounding Derived Showalter Index",
+      "isObservation": true,
       "layers": [
         {
           "element": "SHOWALTER",
@@ -1438,27 +916,21 @@
           "model": "UPPER_AIR",
           "name": "Sounding Derived Showalter Index",
           "path": "/api/derived/UPPER_AIR/PLOT/SHOWALTER",
-          "type": "contour",
           "render": {
             "colormap": "SHOWALTER",
-            "lineColor": "#e3b341",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#e3b341"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Sounding Derived Showalter Index"
     },
     {
       "category": "Upper-Air Observations",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-sounding-lifted",
-      "name": "Sounding Derived Lifted Index",
+      "isObservation": true,
       "layers": [
         {
           "element": "LIFTED",
@@ -1466,27 +938,21 @@
           "model": "UPPER_AIR",
           "name": "Sounding Derived Lifted Index",
           "path": "/api/derived/UPPER_AIR/PLOT/LIFTED",
-          "type": "contour",
           "render": {
             "colormap": "LIFTED",
-            "lineColor": "#e3b341",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#e3b341"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Sounding Derived Lifted Index"
     },
     {
       "category": "Upper-Air Observations",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-sounding-sweat",
-      "name": "Sounding Derived SWEAT Index",
+      "isObservation": true,
       "layers": [
         {
           "element": "SWEAT",
@@ -1494,27 +960,21 @@
           "model": "UPPER_AIR",
           "name": "Sounding Derived SWEAT Index",
           "path": "/api/derived/UPPER_AIR/PLOT/SWEAT",
-          "type": "contour",
           "render": {
             "colormap": "SWEAT",
-            "lineColor": "#da3633",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#da3633"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Sounding Derived SWEAT Index"
     },
     {
       "category": "Upper-Air Observations",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-sounding-tt",
-      "name": "Sounding Derived Total Totals TT",
+      "isObservation": true,
       "layers": [
         {
           "element": "TT",
@@ -1522,113 +982,89 @@
           "model": "UPPER_AIR",
           "name": "Sounding Derived Total Totals TT",
           "path": "/api/derived/UPPER_AIR/PLOT/TT",
-          "type": "contour",
           "render": {
             "colormap": "TT",
-            "lineColor": "#d29922",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#d29922"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Sounding Derived Total Totals TT"
     },
     {
       "category": "Upper-Air Observations",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-sounding-shear",
-      "name": "Sounding Derived Vertical Wind Shear",
+      "isObservation": true,
       "layers": [
         {
           "element": "SHEAR",
-          "level": "850-500",
           "id": "derived-sounding-shear-layer",
+          "level": "850-500",
           "model": "UPPER_AIR",
           "name": "Sounding Derived Vertical Wind Shear",
           "path": "/api/derived/UPPER_AIR/PLOT/SHEAR",
-          "type": "contour",
           "render": {
             "colormap": "SHEAR",
-            "lineColor": "#58a6ff",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#58a6ff"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Sounding Derived Vertical Wind Shear"
     },
     {
       "category": "Upper-Air Observations",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-sounding-thickness",
-      "name": "Sounding Derived 1000-500hPa Thickness",
+      "isObservation": true,
       "layers": [
         {
           "element": "THICKNESS",
-          "level": "1000-500",
           "id": "derived-sounding-thickness-layer",
+          "level": "1000-500",
           "model": "UPPER_AIR",
           "name": "Sounding Derived 1000-500hPa Thickness",
           "path": "/api/derived/UPPER_AIR/PLOT/THICKNESS",
-          "type": "contour",
           "render": {
             "colormap": "THICKNESS",
-            "lineColor": "#58a6ff",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#58a6ff"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Sounding Derived 1000-500hPa Thickness"
     },
     {
       "category": "Upper-Air Observations",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-sounding-t850-500",
-      "name": "Sounding Derived T850-500 Difference",
+      "isObservation": true,
       "layers": [
         {
           "element": "TMP",
-          "level": "850-500",
           "id": "derived-sounding-t850-500-layer",
+          "level": "850-500",
           "model": "UPPER_AIR",
           "name": "Sounding Derived T850-500 Difference",
           "path": "/api/derived/UPPER_AIR/PLOT/TMP/850-500",
-          "type": "contour",
           "render": {
             "colormap": "TMP",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#f85149"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Sounding Derived T850-500 Difference"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
       "id": "derived-ecmwf-k-index",
-      "name": "Derived K-Index (ECMWF)",
       "layers": [
         {
           "element": "K-INDEX",
@@ -1636,26 +1072,20 @@
           "model": "ECMWF_HR",
           "name": "Derived K-Index (ECMWF)",
           "path": "/api/derived/ECMWF_HR/K-INDEX",
-          "type": "contour",
           "render": {
             "colormap": "K_INDEX",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.65,
-            "showFill": true,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "opacity": 0.65
+          },
+          "renderRef": "contour-2",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Derived K-Index (ECMWF)"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
       "id": "derived-ecmwf-showalter",
-      "name": "Derived Showalter Index (ECMWF)",
       "layers": [
         {
           "element": "SHOWALTER",
@@ -1663,26 +1093,20 @@
           "model": "ECMWF_HR",
           "name": "Derived Showalter Index (ECMWF)",
           "path": "/api/derived/ECMWF_HR/SHOWALTER",
-          "type": "contour",
           "render": {
             "colormap": "SHOWALTER",
-            "lineColor": "#e3b341",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#e3b341"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Derived Showalter Index (ECMWF)"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
       "id": "derived-ecmwf-lifted",
-      "name": "Derived Lifted Index (ECMWF)",
       "layers": [
         {
           "element": "LIFTED",
@@ -1690,26 +1114,20 @@
           "model": "ECMWF_HR",
           "name": "Derived Lifted Index (ECMWF)",
           "path": "/api/derived/ECMWF_HR/LIFTED",
-          "type": "contour",
           "render": {
             "colormap": "LIFTED",
-            "lineColor": "#e3b341",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#e3b341"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Derived Lifted Index (ECMWF)"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
       "id": "derived-ecmwf-sweat",
-      "name": "Derived SWEAT Index (ECMWF)",
       "layers": [
         {
           "element": "SWEAT",
@@ -1717,26 +1135,20 @@
           "model": "ECMWF_HR",
           "name": "Derived SWEAT Index (ECMWF)",
           "path": "/api/derived/ECMWF_HR/SWEAT",
-          "type": "contour",
           "render": {
             "colormap": "SWEAT",
-            "lineColor": "#da3633",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#da3633"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Derived SWEAT Index (ECMWF)"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
       "id": "derived-ecmwf-tt",
-      "name": "Derived Total Totals TT (ECMWF)",
       "layers": [
         {
           "element": "TT",
@@ -1744,111 +1156,87 @@
           "model": "ECMWF_HR",
           "name": "Derived Total Totals TT (ECMWF)",
           "path": "/api/derived/ECMWF_HR/TT",
-          "type": "contour",
           "render": {
             "colormap": "TT",
-            "lineColor": "#d29922",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#d29922"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Derived Total Totals TT (ECMWF)"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
       "id": "derived-ecmwf-shear",
-      "name": "Derived Vertical Wind Shear (ECMWF)",
       "layers": [
         {
           "element": "SHEAR",
-          "level": "850-500",
           "id": "derived-ecmwf-shear-layer",
+          "level": "850-500",
           "model": "ECMWF_HR",
           "name": "Derived Vertical Wind Shear (ECMWF)",
           "path": "/api/derived/ECMWF_HR/SHEAR",
-          "type": "contour",
           "render": {
             "colormap": "SHEAR",
-            "lineColor": "#58a6ff",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#58a6ff"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Derived Vertical Wind Shear (ECMWF)"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
       "id": "derived-ecmwf-thickness",
-      "name": "Derived 1000-500hPa Thickness (ECMWF)",
       "layers": [
         {
           "element": "THICKNESS",
-          "level": "1000-500",
           "id": "derived-ecmwf-thickness-layer",
+          "level": "1000-500",
           "model": "ECMWF_HR",
           "name": "Derived 1000-500hPa Thickness (ECMWF)",
           "path": "/api/derived/ECMWF_HR/THICKNESS",
-          "type": "contour",
           "render": {
             "colormap": "THICKNESS",
-            "lineColor": "#58a6ff",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#58a6ff"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Derived 1000-500hPa Thickness (ECMWF)"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
       "id": "derived-ecmwf-t850-500",
-      "name": "Derived T850-500 Lapse Rate (ECMWF)",
       "layers": [
         {
           "element": "TMP",
-          "level": "850-500",
           "id": "derived-ecmwf-t850-500-layer",
+          "level": "850-500",
           "model": "ECMWF_HR",
           "name": "Derived T850-500 Lapse Rate (ECMWF)",
           "path": "/api/derived/ECMWF_HR/TMP/850-500",
-          "type": "contour",
           "render": {
             "colormap": "TMP",
-            "lineColor": "#e3b341",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#e3b341"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Derived T850-500 Lapse Rate (ECMWF)"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-diag-sounding-composite",
-      "name": "Sounding Derived Multi-Level Analysis",
+      "isObservation": true,
       "layers": [
         {
           "element": "K-INDEX",
@@ -1856,47 +1244,35 @@
           "model": "UPPER_AIR",
           "name": "Sounding Derived K-Index",
           "path": "/api/derived/UPPER_AIR/PLOT/K-INDEX",
-          "type": "contour",
           "render": {
             "colormap": "K_INDEX",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.65,
-            "showFill": true,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "opacity": 0.65
+          },
+          "renderRef": "contour-2",
+          "type": "contour"
         },
         {
           "element": "TMP",
-          "level": "850-500",
           "id": "derived-sounding-t850-500-comp",
+          "level": "850-500",
           "model": "UPPER_AIR",
           "name": "Sounding Derived T850-500 Difference",
           "path": "/api/derived/UPPER_AIR/PLOT/TMP/850-500",
-          "type": "contour",
           "render": {
             "colormap": "TMP",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#f85149"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Sounding Derived Multi-Level Analysis"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-diag-sounding-k-index",
-      "name": "Sounding Derived K-Index",
+      "isObservation": true,
       "layers": [
         {
           "element": "K-INDEX",
@@ -1904,27 +1280,21 @@
           "model": "UPPER_AIR",
           "name": "Sounding Derived K-Index",
           "path": "/api/derived/UPPER_AIR/PLOT/K-INDEX",
-          "type": "contour",
           "render": {
             "colormap": "K_INDEX",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.65,
-            "showFill": true,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "opacity": 0.65
+          },
+          "renderRef": "contour-2",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Sounding Derived K-Index"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-diag-sounding-showalter",
-      "name": "Sounding Derived Showalter Index",
+      "isObservation": true,
       "layers": [
         {
           "element": "SHOWALTER",
@@ -1932,27 +1302,21 @@
           "model": "UPPER_AIR",
           "name": "Sounding Derived Showalter Index",
           "path": "/api/derived/UPPER_AIR/PLOT/SHOWALTER",
-          "type": "contour",
           "render": {
             "colormap": "SHOWALTER",
-            "lineColor": "#e3b341",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#e3b341"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Sounding Derived Showalter Index"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-diag-sounding-lifted",
-      "name": "Sounding Derived Lifted Index",
+      "isObservation": true,
       "layers": [
         {
           "element": "LIFTED",
@@ -1960,27 +1324,21 @@
           "model": "UPPER_AIR",
           "name": "Sounding Derived Lifted Index",
           "path": "/api/derived/UPPER_AIR/PLOT/LIFTED",
-          "type": "contour",
           "render": {
             "colormap": "LIFTED",
-            "lineColor": "#e3b341",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#e3b341"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Sounding Derived Lifted Index"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-diag-sounding-sweat",
-      "name": "Sounding Derived SWEAT Index",
+      "isObservation": true,
       "layers": [
         {
           "element": "SWEAT",
@@ -1988,27 +1346,21 @@
           "model": "UPPER_AIR",
           "name": "Sounding Derived SWEAT Index",
           "path": "/api/derived/UPPER_AIR/PLOT/SWEAT",
-          "type": "contour",
           "render": {
             "colormap": "SWEAT",
-            "lineColor": "#da3633",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#da3633"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Sounding Derived SWEAT Index"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-diag-sounding-tt",
-      "name": "Sounding Derived Total Totals TT",
+      "isObservation": true,
       "layers": [
         {
           "element": "TT",
@@ -2016,114 +1368,90 @@
           "model": "UPPER_AIR",
           "name": "Sounding Derived Total Totals TT",
           "path": "/api/derived/UPPER_AIR/PLOT/TT",
-          "type": "contour",
           "render": {
             "colormap": "TT",
-            "lineColor": "#d29922",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#d29922"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Sounding Derived Total Totals TT"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-diag-sounding-shear",
-      "name": "Sounding Derived Vertical Wind Shear",
+      "isObservation": true,
       "layers": [
         {
           "element": "SHEAR",
-          "level": "850-500",
           "id": "derived-diag-sounding-shear-layer",
+          "level": "850-500",
           "model": "UPPER_AIR",
           "name": "Sounding Derived Vertical Wind Shear",
           "path": "/api/derived/UPPER_AIR/PLOT/SHEAR",
-          "type": "contour",
           "render": {
             "colormap": "SHEAR",
-            "lineColor": "#58a6ff",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#58a6ff"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Sounding Derived Vertical Wind Shear"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-diag-sounding-thickness",
-      "name": "Sounding Derived 1000-500hPa Thickness",
+      "isObservation": true,
       "layers": [
         {
           "element": "THICKNESS",
-          "level": "1000-500",
           "id": "derived-diag-sounding-thickness-layer",
+          "level": "1000-500",
           "model": "UPPER_AIR",
           "name": "Sounding Derived 1000-500hPa Thickness",
           "path": "/api/derived/UPPER_AIR/PLOT/THICKNESS",
-          "type": "contour",
           "render": {
             "colormap": "THICKNESS",
-            "lineColor": "#58a6ff",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#58a6ff"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Sounding Derived 1000-500hPa Thickness"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-diag-sounding-t850-500",
-      "name": "Sounding Derived T850-500 Difference",
+      "isObservation": true,
       "layers": [
         {
           "element": "TMP",
-          "level": "850-500",
           "id": "derived-diag-sounding-t850-500-layer",
+          "level": "850-500",
           "model": "UPPER_AIR",
           "name": "Sounding Derived T850-500 Difference",
           "path": "/api/derived/UPPER_AIR/PLOT/TMP/850-500",
-          "type": "contour",
           "render": {
             "colormap": "TMP",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#f85149"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Sounding Derived T850-500 Difference"
     },
     {
       "category": "Surface Observations",
       "hasLevel": false,
-      "isObservation": true,
       "id": "obs-surface-t-var-24h",
-      "name": "Surface Station 24h Temperature Variation",
+      "isObservation": true,
       "layers": [
         {
           "element": "PLOT_GLOBAL_3H",
@@ -2139,27 +1467,21 @@
           "model": "SURFACE",
           "name": "Surface 24h Temperature Variation",
           "path": "/api/derived/SURFACE/T-VARIATION-24H",
-          "type": "contour",
           "render": {
             "colormap": "T_VAR",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#f85149"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Surface Station 24h Temperature Variation"
     },
     {
       "category": "Surface Observations",
       "hasLevel": false,
-      "isObservation": true,
       "id": "obs-surface-t-var-48h",
-      "name": "Surface Station 48h Temperature Variation",
+      "isObservation": true,
       "layers": [
         {
           "element": "PLOT_GLOBAL_3H",
@@ -2175,27 +1497,21 @@
           "model": "SURFACE",
           "name": "Surface 48h Temperature Variation",
           "path": "/api/derived/SURFACE/T-VARIATION-48H",
-          "type": "contour",
           "render": {
             "colormap": "T_VAR",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#f85149"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Surface Station 48h Temperature Variation"
     },
     {
       "category": "Surface Observations",
       "hasLevel": false,
-      "isObservation": true,
       "id": "obs-surface-slp-var-24h",
-      "name": "Surface Station 24h SLP Variation",
+      "isObservation": true,
       "layers": [
         {
           "element": "PLOT_GLOBAL_3H",
@@ -2211,27 +1527,21 @@
           "model": "SURFACE",
           "name": "Surface 24h SLP Variation",
           "path": "/api/derived/SURFACE/SLP-VARIATION-24H",
-          "type": "contour",
           "render": {
             "colormap": "SLP_VAR",
-            "lineColor": "#58a6ff",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#58a6ff"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Surface Station 24h SLP Variation"
     },
     {
       "category": "Surface Observations",
       "hasLevel": false,
-      "isObservation": true,
       "id": "obs-surface-slp-var-48h",
-      "name": "Surface Station 48h SLP Variation",
+      "isObservation": true,
       "layers": [
         {
           "element": "PLOT_GLOBAL_3H",
@@ -2247,28 +1557,22 @@
           "model": "SURFACE",
           "name": "Surface 48h SLP Variation",
           "path": "/api/derived/SURFACE/SLP-VARIATION-48H",
-          "type": "contour",
           "render": {
             "colormap": "SLP_VAR",
-            "lineColor": "#58a6ff",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#58a6ff"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Surface Station 48h SLP Variation"
     },
     {
       "category": "Upper-Air Observations",
       "defaultLevel": 850,
       "hasLevel": true,
-      "isObservation": true,
       "id": "obs-upperair-850-t-var-24h",
-      "name": "850hPa Sounding 24h Temperature Variation",
+      "isObservation": true,
       "layers": [
         {
           "element": "PLOT",
@@ -2286,28 +1590,22 @@
           "model": "UPPER_AIR",
           "name": "850hPa 24h Temperature Variation",
           "path": "/api/derived/UPPER_AIR/PLOT/T-VARIATION-24H/850",
-          "type": "contour",
           "render": {
             "colormap": "T_VAR",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#f85149"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "850hPa Sounding 24h Temperature Variation"
     },
     {
       "category": "Upper-Air Observations",
       "defaultLevel": 850,
       "hasLevel": true,
-      "isObservation": true,
       "id": "obs-upperair-850-t-var-48h",
-      "name": "850hPa Sounding 48h Temperature Variation",
+      "isObservation": true,
       "layers": [
         {
           "element": "PLOT",
@@ -2325,26 +1623,20 @@
           "model": "UPPER_AIR",
           "name": "850hPa 48h Temperature Variation",
           "path": "/api/derived/UPPER_AIR/PLOT/T-VARIATION-48H/850",
-          "type": "contour",
           "render": {
             "colormap": "T_VAR",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#f85149"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "850hPa Sounding 48h Temperature Variation"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
       "id": "derived-ecmwf-sfc-t-var-24h",
-      "name": "ECMWF Surface 24h Temperature Variation",
       "layers": [
         {
           "element": "T-VARIATION-24H",
@@ -2352,26 +1644,20 @@
           "model": "ECMWF_HR",
           "name": "ECMWF Surface 24h Temperature Variation",
           "path": "/api/derived/ECMWF_HR/T-VARIATION-24H",
-          "type": "contour",
           "render": {
             "colormap": "T_VAR",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.65,
-            "showFill": true,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "opacity": 0.65
+          },
+          "renderRef": "contour-2",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "ECMWF Surface 24h Temperature Variation"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
       "id": "derived-ecmwf-sfc-t-var-48h",
-      "name": "ECMWF Surface 48h Temperature Variation",
       "layers": [
         {
           "element": "T-VARIATION-48H",
@@ -2379,84 +1665,66 @@
           "model": "ECMWF_HR",
           "name": "ECMWF Surface 48h Temperature Variation",
           "path": "/api/derived/ECMWF_HR/T-VARIATION-48H",
-          "type": "contour",
           "render": {
             "colormap": "T_VAR",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.65,
-            "showFill": true,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "opacity": 0.65
+          },
+          "renderRef": "contour-2",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "ECMWF Surface 48h Temperature Variation"
     },
     {
       "category": "Derived Diagnostics",
       "defaultLevel": 850,
       "hasLevel": true,
       "id": "derived-ecmwf-850-t-var-24h",
-      "name": "ECMWF 850hPa 24h Temperature Variation",
       "layers": [
         {
           "element": "T-VARIATION-24H",
-          "level": 850,
           "id": "derived-ecmwf-850-t-var-24h-layer",
+          "level": 850,
           "model": "ECMWF_HR",
           "name": "ECMWF 850hPa 24h Temperature Variation",
           "path": "/api/derived/ECMWF_HR/T-VARIATION-24H/850",
-          "type": "contour",
           "render": {
             "colormap": "T_VAR",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.65,
-            "showFill": true,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "opacity": 0.65
+          },
+          "renderRef": "contour-2",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "ECMWF 850hPa 24h Temperature Variation"
     },
     {
       "category": "Derived Diagnostics",
       "defaultLevel": 850,
       "hasLevel": true,
       "id": "derived-ecmwf-850-t-var-48h",
-      "name": "ECMWF 850hPa 48h Temperature Variation",
       "layers": [
         {
           "element": "T-VARIATION-48H",
-          "level": 850,
           "id": "derived-ecmwf-850-t-var-48h-layer",
+          "level": 850,
           "model": "ECMWF_HR",
           "name": "ECMWF 850hPa 48h Temperature Variation",
           "path": "/api/derived/ECMWF_HR/T-VARIATION-48H/850",
-          "type": "contour",
           "render": {
             "colormap": "T_VAR",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.65,
-            "showFill": true,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "opacity": 0.65
+          },
+          "renderRef": "contour-2",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "ECMWF 850hPa 48h Temperature Variation"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
       "id": "derived-ecmwf-slp-var-24h",
-      "name": "ECMWF 24h Sea Level Pressure Variation",
       "layers": [
         {
           "element": "SLP-VARIATION-24H",
@@ -2464,26 +1732,16 @@
           "model": "ECMWF_HR",
           "name": "ECMWF 24h Sea Level Pressure Variation",
           "path": "/api/derived/ECMWF_HR/SLP-VARIATION-24H",
-          "type": "contour",
-          "render": {
-            "colormap": "SLP_VAR",
-            "lineColor": "#58a6ff",
-            "lineWidth": 2,
-            "opacity": 0.65,
-            "showFill": true,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+          "renderRef": "contour-8",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "ECMWF 24h Sea Level Pressure Variation"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
       "id": "derived-ecmwf-slp-var-48h",
-      "name": "ECMWF 48h Sea Level Pressure Variation",
       "layers": [
         {
           "element": "SLP-VARIATION-48H",
@@ -2491,27 +1749,17 @@
           "model": "ECMWF_HR",
           "name": "ECMWF 48h Sea Level Pressure Variation",
           "path": "/api/derived/ECMWF_HR/SLP-VARIATION-48H",
-          "type": "contour",
-          "render": {
-            "colormap": "SLP_VAR",
-            "lineColor": "#58a6ff",
-            "lineWidth": 2,
-            "opacity": 0.65,
-            "showFill": true,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+          "renderRef": "contour-8",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "ECMWF 48h Sea Level Pressure Variation"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-diag-surface-t-var-24h",
-      "name": "Surface Station 24h Temperature Variation",
+      "isObservation": true,
       "layers": [
         {
           "element": "T_VARIATION_24H",
@@ -2519,27 +1767,21 @@
           "model": "SURFACE",
           "name": "Surface 24h Temperature Variation",
           "path": "/api/derived/SURFACE/T-VARIATION-24H",
-          "type": "contour",
           "render": {
             "colormap": "T_VAR",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#f85149"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Surface Station 24h Temperature Variation"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-diag-surface-slp-var-24h",
-      "name": "Surface Station 24h SLP Variation",
+      "isObservation": true,
       "layers": [
         {
           "element": "SLP_VARIATION_24H",
@@ -2547,27 +1789,21 @@
           "model": "SURFACE",
           "name": "Surface 24h SLP Variation",
           "path": "/api/derived/SURFACE/SLP-VARIATION-24H",
-          "type": "contour",
           "render": {
             "colormap": "SLP_VAR",
-            "lineColor": "#58a6ff",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#58a6ff"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Surface Station 24h SLP Variation"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-diag-surface-t-var-48h",
-      "name": "Surface Station 48h Temperature Variation",
+      "isObservation": true,
       "layers": [
         {
           "element": "T_VARIATION_48H",
@@ -2575,27 +1811,21 @@
           "model": "SURFACE",
           "name": "Surface 48h Temperature Variation",
           "path": "/api/derived/SURFACE/T-VARIATION-48H",
-          "type": "contour",
           "render": {
             "colormap": "T_VAR",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#f85149"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Surface Station 48h Temperature Variation"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": false,
-      "isObservation": true,
       "id": "derived-diag-surface-slp-var-48h",
-      "name": "Surface Station 48h SLP Variation",
+      "isObservation": true,
       "layers": [
         {
           "element": "SLP_VARIATION_48H",
@@ -2603,87 +1833,69 @@
           "model": "SURFACE",
           "name": "Surface 48h SLP Variation",
           "path": "/api/derived/SURFACE/SLP-VARIATION-48H",
-          "type": "contour",
           "render": {
             "colormap": "SLP_VAR",
-            "lineColor": "#58a6ff",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#58a6ff"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Surface Station 48h SLP Variation"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": true,
-      "level": 850,
-      "isObservation": true,
       "id": "derived-diag-sounding-850-t-var-24h",
-      "name": "850hPa Sounding 24h Temperature Variation",
+      "isObservation": true,
       "layers": [
         {
           "element": "T_VARIATION_24H",
-          "level": 850,
           "id": "derived-diag-sounding-850-t-var-24h-layer",
+          "level": 850,
           "model": "UPPER_AIR",
           "name": "850hPa Sounding 24h Temp Variation",
           "path": "/api/derived/UPPER_AIR/PLOT/T-VARIATION-24H/850",
-          "type": "contour",
           "render": {
             "colormap": "T_VAR",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#f85149"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "level": 850,
+      "name": "850hPa Sounding 24h Temperature Variation"
     },
     {
       "category": "Derived Diagnostics",
       "hasLevel": true,
-      "level": 850,
-      "isObservation": true,
       "id": "derived-diag-sounding-850-t-var-48h",
-      "name": "850hPa Sounding 48h Temperature Variation",
+      "isObservation": true,
       "layers": [
         {
           "element": "T_VARIATION_48H",
-          "level": 850,
           "id": "derived-diag-sounding-850-t-var-48h-layer",
+          "level": 850,
           "model": "UPPER_AIR",
           "name": "850hPa Sounding 48h Temp Variation",
           "path": "/api/derived/UPPER_AIR/PLOT/T-VARIATION-48H/850",
-          "type": "contour",
           "render": {
             "colormap": "T_VAR",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#f85149"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "level": 850,
+      "name": "850hPa Sounding 48h Temperature Variation"
     },
     {
       "category": "Multi-Time Recipes",
       "hasLevel": false,
-      "isObservation": true,
       "id": "recipe-surface-variation-24h",
-      "name": "Surface 24h Synoptic Variation (T-var + SLP-var)",
+      "isObservation": true,
       "layers": [
         {
           "element": "PLOT_GLOBAL_3H",
@@ -2699,18 +1911,12 @@
           "model": "SURFACE",
           "name": "Surface 24h Temp Variation (Fills)",
           "path": "/api/derived/SURFACE/T-VARIATION-24H",
-          "type": "contour",
           "render": {
             "colormap": "T_VAR",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.6,
-            "showFill": true,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "opacity": 0.6
+          },
+          "renderRef": "contour-2",
+          "type": "contour"
         },
         {
           "derivedFrom": "surface-obs",
@@ -2719,27 +1925,21 @@
           "model": "SURFACE",
           "name": "Surface 24h SLP Variation (Isobars)",
           "path": "/api/derived/SURFACE/SLP-VARIATION-24H",
-          "type": "contour",
           "render": {
             "colormap": "SLP_VAR",
-            "lineColor": "#58a6ff",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#58a6ff"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Surface 24h Synoptic Variation (T-var + SLP-var)"
     },
     {
       "category": "Multi-Time Recipes",
       "hasLevel": false,
-      "isObservation": true,
       "id": "recipe-surface-variation-48h",
-      "name": "Surface 48h Synoptic Variation (T-var + SLP-var)",
+      "isObservation": true,
       "layers": [
         {
           "element": "PLOT_GLOBAL_3H",
@@ -2755,18 +1955,12 @@
           "model": "SURFACE",
           "name": "Surface 48h Temp Variation (Fills)",
           "path": "/api/derived/SURFACE/T-VARIATION-48H",
-          "type": "contour",
           "render": {
             "colormap": "T_VAR",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.6,
-            "showFill": true,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "opacity": 0.6
+          },
+          "renderRef": "contour-2",
+          "type": "contour"
         },
         {
           "derivedFrom": "surface-obs",
@@ -2775,46 +1969,34 @@
           "model": "SURFACE",
           "name": "Surface 48h SLP Variation (Isobars)",
           "path": "/api/derived/SURFACE/SLP-VARIATION-48H",
-          "type": "contour",
           "render": {
             "colormap": "SLP_VAR",
-            "lineColor": "#58a6ff",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#58a6ff"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "Surface 48h Synoptic Variation (T-var + SLP-var)"
     },
     {
       "category": "Multi-Time Recipes",
       "hasLevel": false,
       "id": "recipe-nwp-variation-24h",
-      "name": "NWP 24h Synoptic Variation (ECMWF 850 T-var + SLP-var)",
       "layers": [
         {
           "element": "T-VARIATION-24H",
-          "level": 850,
           "id": "recipe-nwp-t-var-24h-850",
+          "level": 850,
           "model": "ECMWF_HR",
           "name": "ECMWF 850hPa 24h Temp Variation (Fills)",
           "path": "/api/derived/ECMWF_HR/T-VARIATION-24H/850",
-          "type": "contour",
           "render": {
             "colormap": "T_VAR",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.6,
-            "showFill": true,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "opacity": 0.6
+          },
+          "renderRef": "contour-2",
+          "type": "contour"
         },
         {
           "element": "SLP-VARIATION-24H",
@@ -2822,46 +2004,34 @@
           "model": "ECMWF_HR",
           "name": "ECMWF 24h SLP Variation (Isobars)",
           "path": "/api/derived/ECMWF_HR/SLP-VARIATION-24H",
-          "type": "contour",
           "render": {
             "colormap": "SLP_VAR",
-            "lineColor": "#58a6ff",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#58a6ff"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "NWP 24h Synoptic Variation (ECMWF 850 T-var + SLP-var)"
     },
     {
       "category": "Multi-Time Recipes",
       "hasLevel": false,
       "id": "recipe-nwp-variation-48h",
-      "name": "NWP 48h Synoptic Variation (ECMWF 850 T-var + SLP-var)",
       "layers": [
         {
           "element": "T-VARIATION-48H",
-          "level": 850,
           "id": "recipe-nwp-t-var-48h-850",
+          "level": 850,
           "model": "ECMWF_HR",
           "name": "ECMWF 850hPa 48h Temp Variation (Fills)",
           "path": "/api/derived/ECMWF_HR/T-VARIATION-48H/850",
-          "type": "contour",
           "render": {
             "colormap": "T_VAR",
-            "lineColor": "#f85149",
-            "lineWidth": 2,
-            "opacity": 0.6,
-            "showFill": true,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "opacity": 0.6
+          },
+          "renderRef": "contour-2",
+          "type": "contour"
         },
         {
           "element": "SLP-VARIATION-48H",
@@ -2869,25 +2039,37 @@
           "model": "ECMWF_HR",
           "name": "ECMWF 48h SLP Variation (Isobars)",
           "path": "/api/derived/ECMWF_HR/SLP-VARIATION-48H",
-          "type": "contour",
           "render": {
             "colormap": "SLP_VAR",
-            "lineColor": "#58a6ff",
-            "lineWidth": 2,
-            "opacity": 0.75,
-            "showFill": false,
-            "showLabels": true,
-            "showLine": true,
-            "smooth": true,
-            "smoothIterations": 2
-          }
+            "lineColor": "#58a6ff"
+          },
+          "renderRef": "contour-1",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "NWP 48h Synoptic Variation (ECMWF 850 T-var + SLP-var)"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
-      "hasLevel": true,
       "defaultLevel": 500,
+      "hasLevel": true,
+      "id": "preset-ecmwf_pvort",
+      "layers": [
+        {
+          "element": "PVORT",
+          "id": "layer-ecmwf_pvort",
+          "level": 500,
+          "model": "ECMWF_HR",
+          "name": "ECMWF PVORT (10-1000hPa)",
+          "path": "ECMWF_HR/PVORT",
+          "render": {
+            "colormap": "HELICITY",
+            "lineColor": "#58a6ff"
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
+        }
+      ],
       "levels": [
         10,
         20,
@@ -2909,73 +2091,29 @@
         950,
         1000
       ],
-      "id": "preset-ecmwf_pvort",
-      "name": "位涡多层分析 (10-1000hPa) / ECMWF Potential Vorticity (PVORT)",
-      "layers": [
-        {
-          "id": "layer-ecmwf_pvort",
-          "name": "ECMWF PVORT (10-1000hPa)",
-          "type": "contour",
-          "model": "ECMWF_HR",
-          "element": "PVORT",
-          "path": "ECMWF_HR/PVORT",
-          "level": 500,
-          "render": {
-            "colormap": "HELICITY",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
-            "lineColor": "#58a6ff"
-          }
-        }
-      ]
+      "name": "位涡多层分析 (10-1000hPa) / ECMWF Potential Vorticity (PVORT)"
     },
     {
       "category": "气象卫星遥感 (Satellite Remote Sensing)",
-      "hasLevel": true,
       "defaultLevel": 12,
-      "levels": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12,
-        13,
-        14,
-        15
-      ],
+      "hasLevel": true,
       "id": "preset-fy4b_china_grouped",
-      "name": "风云四号B星中国区 (FY-4B CHINA 15通道) / FY-4B CHINA Multi-Channel",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-fy4b_china_grouped",
-          "name": "FY-4B CHINA (15 Channels)",
-          "type": "contour",
-          "model": "SATELLITE",
           "element": "FY4B/L1/CHINA",
-          "path": "SATELLITE/FY4B/L1/CHINA",
+          "id": "layer-fy4b_china_grouped",
           "level": 12,
+          "model": "SATELLITE",
+          "name": "FY-4B CHINA (15 Channels)",
+          "path": "SATELLITE/FY4B/L1/CHINA",
           "render": {
-            "colormap": "IR_TEMP",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "IR_TEMP"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
-    },
-    {
-      "category": "气象卫星遥感 (Satellite Remote Sensing)",
-      "hasLevel": true,
-      "defaultLevel": 12,
+      ],
       "levels": [
         1,
         2,
@@ -2993,2151 +2131,1907 @@
         14,
         15
       ],
+      "name": "风云四号B星中国区 (FY-4B CHINA 15通道) / FY-4B CHINA Multi-Channel"
+    },
+    {
+      "category": "气象卫星遥感 (Satellite Remote Sensing)",
+      "defaultLevel": 12,
+      "hasLevel": true,
       "id": "preset-fy4b_disk_grouped",
-      "name": "风云四号B星全圆盘 (FY-4B DISK 15通道) / FY-4B DISK Multi-Channel",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-fy4b_disk_grouped",
-          "name": "FY-4B DISK (15 Channels)",
-          "type": "contour",
-          "model": "SATELLITE",
           "element": "FY4B/L1/DISK",
-          "path": "SATELLITE/FY4B/L1/DISK",
+          "id": "layer-fy4b_disk_grouped",
           "level": 12,
+          "model": "SATELLITE",
+          "name": "FY-4B DISK (15 Channels)",
+          "path": "SATELLITE/FY4B/L1/DISK",
           "render": {
-            "colormap": "IR_TEMP",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "IR_TEMP"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "levels": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "name": "风云四号B星全圆盘 (FY-4B DISK 15通道) / FY-4B DISK Multi-Channel"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_cape",
-      "name": "对流有效位能 / CAPE",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_cape",
-          "name": "对流有效位能 / CAPE",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "CAPE",
+          "id": "layer-ecmwf_hr_cape",
+          "model": "ECMWF_HR",
+          "name": "对流有效位能 / CAPE",
           "path": "ECMWF_HR/CAPE",
           "render": {
             "colormap": "CAPE",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#e3b341"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "对流有效位能 / CAPE"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_cape_shear",
-      "name": "CAPE切变 / CAPE Shear",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_cape_shear",
-          "name": "CAPE切变 / CAPE Shear",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "CAPE_SHEAR",
+          "id": "layer-ecmwf_hr_cape_shear",
+          "model": "ECMWF_HR",
+          "name": "CAPE切变 / CAPE Shear",
           "path": "ECMWF_HR/CAPE_SHEAR",
           "render": {
             "colormap": "CAPE",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#e3b341"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "CAPE切变 / CAPE Shear"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_gust3h",
-      "name": "3小时10米最大阵风 / 10m Wind Gust (3h Max)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_gust3h",
-          "name": "3小时10米最大阵风 / 10m Wind Gust (3h Max)",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "10_METRE_WIND_GUST_IN_THE_LAST_3_HOURS",
+          "id": "layer-ecmwf_hr_gust3h",
+          "model": "ECMWF_HR",
+          "name": "3小时10米最大阵风 / 10m Wind Gust (3h Max)",
           "path": "ECMWF_HR/10_METRE_WIND_GUST_IN_THE_LAST_3_HOURS",
           "render": {
             "colormap": "WIND",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "3小时10米最大阵风 / 10m Wind Gust (3h Max)"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_gust6h",
-      "name": "6小时10米最大阵风 / 10m Wind Gust (6h Max)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_gust6h",
-          "name": "6小时10米最大阵风 / 10m Wind Gust (6h Max)",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "10_METRE_WIND_GUST_IN_THE_LAST_6_HOURS",
+          "id": "layer-ecmwf_hr_gust6h",
+          "model": "ECMWF_HR",
+          "name": "6小时10米最大阵风 / 10m Wind Gust (6h Max)",
           "path": "ECMWF_HR/10_METRE_WIND_GUST_IN_THE_LAST_6_HOURS",
           "render": {
             "colormap": "WIND",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "6小时10米最大阵风 / 10m Wind Gust (6h Max)"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_fzra03",
-      "name": "3小时冻雨 / Freezing Rain (3h)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_fzra03",
-          "name": "3小时冻雨 / Freezing Rain (3h)",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "FREEZING_RAIN03",
+          "id": "layer-ecmwf_hr_fzra03",
+          "model": "ECMWF_HR",
+          "name": "3小时冻雨 / Freezing Rain (3h)",
           "path": "ECMWF_HR/FREEZING_RAIN03",
-          "render": {
-            "colormap": "RAIN",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-6",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "3小时冻雨 / Freezing Rain (3h)"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_fzra06",
-      "name": "6小时冻雨 / Freezing Rain (6h)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_fzra06",
-          "name": "6小时冻雨 / Freezing Rain (6h)",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "FREEZING_RAIN06",
+          "id": "layer-ecmwf_hr_fzra06",
+          "model": "ECMWF_HR",
+          "name": "6小时冻雨 / Freezing Rain (6h)",
           "path": "ECMWF_HR/FREEZING_RAIN06",
-          "render": {
-            "colormap": "RAIN",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-6",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "6小时冻雨 / Freezing Rain (6h)"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_fzra12",
-      "name": "12小时冻雨 / Freezing Rain (12h)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_fzra12",
-          "name": "12小时冻雨 / Freezing Rain (12h)",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "FREEZING_RAIN12",
+          "id": "layer-ecmwf_hr_fzra12",
+          "model": "ECMWF_HR",
+          "name": "12小时冻雨 / Freezing Rain (12h)",
           "path": "ECMWF_HR/FREEZING_RAIN12",
-          "render": {
-            "colormap": "RAIN",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-6",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "12小时冻雨 / Freezing Rain (12h)"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_fzra24",
-      "name": "24小时冻雨 / Freezing Rain (24h)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_fzra24",
-          "name": "24小时冻雨 / Freezing Rain (24h)",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "FREEZING_RAIN24",
+          "id": "layer-ecmwf_hr_fzra24",
+          "model": "ECMWF_HR",
+          "name": "24小时冻雨 / Freezing Rain (24h)",
           "path": "ECMWF_HR/FREEZING_RAIN24",
-          "render": {
-            "colormap": "RAIN",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-6",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "24小时冻雨 / Freezing Rain (24h)"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_fzra",
-      "name": "冻雨降水量 / Freezing Rain Rate",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_fzra",
-          "name": "冻雨降水量 / Freezing Rain Rate",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "FZRA",
+          "id": "layer-ecmwf_hr_fzra",
+          "model": "ECMWF_HR",
+          "name": "冻雨降水量 / Freezing Rain Rate",
           "path": "ECMWF_HR/FZRA",
           "render": {
             "colormap": "TMP",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "冻雨降水量 / Freezing Rain Rate"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_precip_type",
-      "name": "降水相态 / Precipitation Type",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_precip_type",
-          "name": "降水相态 / Precipitation Type",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "PRECIPITATION_TYPE",
+          "id": "layer-ecmwf_hr_precip_type",
+          "model": "ECMWF_HR",
+          "name": "降水相态 / Precipitation Type",
           "path": "ECMWF_HR/PRECIPITATION_TYPE",
           "render": {
-            "colormap": "PRECIP_TYPE",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "PRECIP_TYPE"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "降水相态 / Precipitation Type"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_asnow",
-      "name": "累计降雪量 / Snow Accumulation",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_asnow",
-          "name": "累计降雪量 / Snow Accumulation",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "ASNOW",
+          "id": "layer-ecmwf_hr_asnow",
+          "model": "ECMWF_HR",
+          "name": "累计降雪量 / Snow Accumulation",
           "path": "ECMWF_HR/ASNOW",
-          "render": {
-            "colormap": "SNOW",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-5",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "累计降雪量 / Snow Accumulation"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_snod",
-      "name": "积雪深度 / Snow Depth",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_snod",
-          "name": "积雪深度 / Snow Depth",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "SNOD",
+          "id": "layer-ecmwf_hr_snod",
+          "model": "ECMWF_HR",
+          "name": "积雪深度 / Snow Depth",
           "path": "ECMWF_HR/SNOD",
-          "render": {
-            "colormap": "SNOW",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-5",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "积雪深度 / Snow Depth"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_snow03",
-      "name": "3小时降雪 / Snow (3h)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_snow03",
-          "name": "3小时降雪 / Snow (3h)",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "SNOW03",
+          "id": "layer-ecmwf_hr_snow03",
+          "model": "ECMWF_HR",
+          "name": "3小时降雪 / Snow (3h)",
           "path": "ECMWF_HR/SNOW03",
-          "render": {
-            "colormap": "SNOW",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-5",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "3小时降雪 / Snow (3h)"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_snow06",
-      "name": "6小时降雪 / Snow (6h)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_snow06",
-          "name": "6小时降雪 / Snow (6h)",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "SNOW06",
+          "id": "layer-ecmwf_hr_snow06",
+          "model": "ECMWF_HR",
+          "name": "6小时降雪 / Snow (6h)",
           "path": "ECMWF_HR/SNOW06",
-          "render": {
-            "colormap": "SNOW",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-5",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "6小时降雪 / Snow (6h)"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_snow12",
-      "name": "12小时降雪 / Snow (12h)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_snow12",
-          "name": "12小时降雪 / Snow (12h)",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "SNOW12",
+          "id": "layer-ecmwf_hr_snow12",
+          "model": "ECMWF_HR",
+          "name": "12小时降雪 / Snow (12h)",
           "path": "ECMWF_HR/SNOW12",
-          "render": {
-            "colormap": "SNOW",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-5",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "12小时降雪 / Snow (12h)"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_snow24",
-      "name": "24小时降雪 / Snow (24h)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_snow24",
-          "name": "24小时降雪 / Snow (24h)",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "SNOW24",
+          "id": "layer-ecmwf_hr_snow24",
+          "model": "ECMWF_HR",
+          "name": "24小时降雪 / Snow (24h)",
           "path": "ECMWF_HR/SNOW24",
-          "render": {
-            "colormap": "SNOW",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-5",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "24小时降雪 / Snow (24h)"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_sden",
-      "name": "雪密度 / Snow Density",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_sden",
-          "name": "雪密度 / Snow Density",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "SDEN",
+          "id": "layer-ecmwf_hr_sden",
+          "model": "ECMWF_HR",
+          "name": "雪密度 / Snow Density",
           "path": "ECMWF_HR/SDEN",
           "render": {
             "colormap": "TMP",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "雪密度 / Snow Density"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_swe",
-      "name": "雪水当量 / Snow Water Equivalent",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_swe",
-          "name": "雪水当量 / Snow Water Equivalent",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "WATER_EQUIVALENT_OF_ACCUMULATED_SNOW_DEPTH",
+          "id": "layer-ecmwf_hr_swe",
+          "model": "ECMWF_HR",
+          "name": "雪水当量 / Snow Water Equivalent",
           "path": "ECMWF_HR/WATER_EQUIVALENT_OF_ACCUMULATED_SNOW_DEPTH",
-          "render": {
-            "colormap": "SNOW",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-5",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "雪水当量 / Snow Water Equivalent"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_zero_degree_level",
-      "name": "零度层高度 / Freezing Level (0°C)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_zero_degree_level",
-          "name": "零度层高度 / Freezing Level (0°C)",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "ZERO_DEGREE_LEVEL",
+          "id": "layer-ecmwf_hr_zero_degree_level",
+          "model": "ECMWF_HR",
+          "name": "零度层高度 / Freezing Level (0°C)",
           "path": "ECMWF_HR/ZERO_DEGREE_LEVEL",
           "render": {
             "colormap": "TMP",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "零度层高度 / Freezing Level (0°C)"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_wind_100m",
-      "name": "100米风场 / 100m Wind Field",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_wind_100m",
-          "name": "100米风场 / 100m Wind Field",
-          "type": "wind",
-          "model": "ECMWF_HR",
           "element": "WIND_100M",
+          "id": "layer-ecmwf_hr_wind_100m",
+          "model": "ECMWF_HR",
+          "name": "100米风场 / 100m Wind Field",
           "path": "ECMWF_HR/WIND_100M",
-          "render": {
-            "colormap": "WIND",
-            "showWind": false,
-            "showBarbs": true,
-            "showRaster": false,
-            "keepWind": true
-          }
+          "renderRef": "wind-1",
+          "type": "wind"
         }
-      ]
+      ],
+      "name": "100米风场 / 100m Wind Field"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_ugrd_100m",
-      "name": "100米U分量 / 100m U-Wind",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_ugrd_100m",
-          "name": "100米U分量 / 100m U-Wind",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "UGRD_100M",
+          "id": "layer-ecmwf_hr_ugrd_100m",
+          "model": "ECMWF_HR",
+          "name": "100米U分量 / 100m U-Wind",
           "path": "ECMWF_HR/UGRD_100M",
           "render": {
             "colormap": "WIND",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "100米U分量 / 100m U-Wind"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_vgrd_100m",
-      "name": "100米V分量 / 100m V-Wind",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_vgrd_100m",
-          "name": "100米V分量 / 100m V-Wind",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "VGRD_100M",
+          "id": "layer-ecmwf_hr_vgrd_100m",
+          "model": "ECMWF_HR",
+          "name": "100米V分量 / 100m V-Wind",
           "path": "ECMWF_HR/VGRD_100M",
           "render": {
             "colormap": "WIND",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "100米V分量 / 100m V-Wind"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_sst",
-      "name": "海表温度(SST) / Sea Surface Temperature",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_sst",
-          "name": "海表温度(SST) / Sea Surface Temperature",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "SST",
+          "id": "layer-ecmwf_hr_sst",
+          "model": "ECMWF_HR",
+          "name": "海表温度(SST) / Sea Surface Temperature",
           "path": "ECMWF_HR/SST",
           "render": {
             "colormap": "SST",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "海表温度(SST) / Sea Surface Temperature"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_tcwv",
-      "name": "整层水汽总量(TCWV) / Total Column Water Vapor",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_tcwv",
-          "name": "整层水汽总量(TCWV) / Total Column Water Vapor",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "TCWV",
+          "id": "layer-ecmwf_hr_tcwv",
+          "model": "ECMWF_HR",
+          "name": "整层水汽总量(TCWV) / Total Column Water Vapor",
           "path": "ECMWF_HR/TCWV",
           "render": {
             "colormap": "TCWV",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "整层水汽总量(TCWV) / Total Column Water Vapor"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_tcw",
-      "name": "整层总含水量(TCW) / Total Column Water",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_tcw",
-          "name": "整层总含水量(TCW) / Total Column Water",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "TCW",
+          "id": "layer-ecmwf_hr_tcw",
+          "model": "ECMWF_HR",
+          "name": "整层总含水量(TCW) / Total Column Water",
           "path": "ECMWF_HR/TCW",
           "render": {
             "colormap": "TCWV",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "整层总含水量(TCW) / Total Column Water"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_tcdc",
-      "name": "总云量(TCDC) / Total Cloud Cover",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_tcdc",
-          "name": "总云量(TCDC) / Total Cloud Cover",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "TCDC",
+          "id": "layer-ecmwf_hr_tcdc",
+          "model": "ECMWF_HR",
+          "name": "总云量(TCDC) / Total Cloud Cover",
           "path": "ECMWF_HR/TCDC",
           "render": {
             "colormap": "TMP",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "总云量(TCDC) / Total Cloud Cover"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_lcdc",
-      "name": "低云量(LCDC) / Low Cloud Cover",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_hr_lcdc",
-          "name": "低云量(LCDC) / Low Cloud Cover",
-          "type": "contour",
-          "model": "ECMWF_HR",
           "element": "LCDC",
+          "id": "layer-ecmwf_hr_lcdc",
+          "model": "ECMWF_HR",
+          "name": "低云量(LCDC) / Low Cloud Cover",
           "path": "ECMWF_HR/LCDC",
           "render": {
             "colormap": "TMP",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "低云量(LCDC) / Low Cloud Cover"
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
       "hasLevel": false,
       "id": "preset-grapes_3km_uh",
-      "name": "0-5km上升螺旋度 / Updraft Helicity (0-5km)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_3km_uh",
-          "name": "0-5km上升螺旋度 / Updraft Helicity (0-5km)",
-          "type": "contour",
-          "model": "GRAPES_3KM",
           "element": "UPDRAFT_HELICITY/5000M_ABOVE_GROUND",
+          "id": "layer-grapes_3km_uh",
+          "model": "GRAPES_3KM",
+          "name": "0-5km上升螺旋度 / Updraft Helicity (0-5km)",
           "path": "GRAPES_3KM/UPDRAFT_HELICITY/5000M_ABOVE_GROUND",
           "render": {
             "colormap": "HELICITY",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#3fb950"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "0-5km上升螺旋度 / Updraft Helicity (0-5km)"
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
       "hasLevel": false,
       "id": "preset-grapes_3km_dcape",
-      "name": "下沉对流有效位能 / DCAPE",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_3km_dcape",
-          "name": "下沉对流有效位能 / DCAPE",
-          "type": "contour",
-          "model": "GRAPES_3KM",
           "element": "DCAPE",
+          "id": "layer-grapes_3km_dcape",
+          "model": "GRAPES_3KM",
+          "name": "下沉对流有效位能 / DCAPE",
           "path": "GRAPES_3KM/DCAPE",
           "render": {
             "colormap": "CAPE",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#e3b341"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "下沉对流有效位能 / DCAPE"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_3km_shear600m",
-      "name": "600m垂直风切变 / Vertical Shear (600m)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_3km_shear600m",
-          "name": "600m垂直风切变 / Vertical Shear (600m)",
-          "type": "contour",
-          "model": "GRAPES_3KM",
           "element": "MAX_VERTICAL_SPEED_SHEAR/600M_ABOVE_GROUND",
+          "id": "layer-grapes_3km_shear600m",
+          "model": "GRAPES_3KM",
+          "name": "600m垂直风切变 / Vertical Shear (600m)",
           "path": "GRAPES_3KM/MAX_VERTICAL_SPEED_SHEAR/600M_ABOVE_GROUND",
           "render": {
             "colormap": "WIND",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "600m垂直风切变 / Vertical Shear (600m)"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_3km_shear_angle600m",
-      "name": "600m垂直风切变角 / Shear Angle (600m)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_3km_shear_angle600m",
-          "name": "600m垂直风切变角 / Shear Angle (600m)",
-          "type": "contour",
-          "model": "GRAPES_3KM",
           "element": "MAX_VERTICAL_SPEED_SHEAR_ANGLE/600M_ABOVE_GROUND",
+          "id": "layer-grapes_3km_shear_angle600m",
+          "model": "GRAPES_3KM",
+          "name": "600m垂直风切变角 / Shear Angle (600m)",
           "path": "GRAPES_3KM/MAX_VERTICAL_SPEED_SHEAR_ANGLE/600M_ABOVE_GROUND",
           "render": {
             "colormap": "WIND",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "600m垂直风切变角 / Shear Angle (600m)"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_3km_max_wind10m",
-      "name": "10m最大风速 / Max Wind (10m)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_3km_max_wind10m",
-          "name": "10m最大风速 / Max Wind (10m)",
-          "type": "contour",
-          "model": "GRAPES_3KM",
           "element": "MAX_WIND/10M_ABOVE_GROUND",
+          "id": "layer-grapes_3km_max_wind10m",
+          "model": "GRAPES_3KM",
+          "name": "10m最大风速 / Max Wind (10m)",
           "path": "GRAPES_3KM/MAX_WIND/10M_ABOVE_GROUND",
           "render": {
             "colormap": "WIND",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "10m最大风速 / Max Wind (10m)"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_3km_max_ugrd10m",
-      "name": "10m最大U风 / Max U-Wind (10m)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_3km_max_ugrd10m",
-          "name": "10m最大U风 / Max U-Wind (10m)",
-          "type": "contour",
-          "model": "GRAPES_3KM",
           "element": "MAX_UGRD/10M_ABOVE_GROUND",
+          "id": "layer-grapes_3km_max_ugrd10m",
+          "model": "GRAPES_3KM",
+          "name": "10m最大U风 / Max U-Wind (10m)",
           "path": "GRAPES_3KM/MAX_UGRD/10M_ABOVE_GROUND",
           "render": {
             "colormap": "WIND",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "10m最大U风 / Max U-Wind (10m)"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_3km_max_vgrd10m",
-      "name": "10m最大V风 / Max V-Wind (10m)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_3km_max_vgrd10m",
-          "name": "10m最大V风 / Max V-Wind (10m)",
-          "type": "contour",
-          "model": "GRAPES_3KM",
           "element": "MAX_VGRD/10M_ABOVE_GROUND",
+          "id": "layer-grapes_3km_max_vgrd10m",
+          "model": "GRAPES_3KM",
+          "name": "10m最大V风 / Max V-Wind (10m)",
           "path": "GRAPES_3KM/MAX_VGRD/10M_ABOVE_GROUND",
           "render": {
             "colormap": "WIND",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "10m最大V风 / Max V-Wind (10m)"
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
       "hasLevel": false,
       "id": "preset-grapes_3km_radar_refl_max",
-      "name": "雷达组合反射率最大值 / Radar Refl. Maximum",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_3km_radar_refl_max",
-          "name": "雷达组合反射率最大值 / Radar Refl. Maximum",
-          "type": "contour",
-          "model": "GRAPES_3KM",
           "element": "RADAR_COMBINATION_REFLECTIVITY/MAXIMUM",
+          "id": "layer-grapes_3km_radar_refl_max",
+          "model": "GRAPES_3KM",
+          "name": "雷达组合反射率最大值 / Radar Refl. Maximum",
           "path": "GRAPES_3KM/RADAR_COMBINATION_REFLECTIVITY/MAXIMUM",
           "render": {
-            "colormap": "RADAR",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "RADAR"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "雷达组合反射率最大值 / Radar Refl. Maximum"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_3km_rain01",
-      "name": "1小时降水 / RAIN01",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_3km_rain01",
-          "name": "1小时降水 / RAIN01",
-          "type": "contour",
-          "model": "GRAPES_3KM",
           "element": "RAIN01",
+          "id": "layer-grapes_3km_rain01",
+          "model": "GRAPES_3KM",
+          "name": "1小时降水 / RAIN01",
           "path": "GRAPES_3KM/RAIN01",
-          "render": {
-            "colormap": "RAIN",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-6",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "1小时降水 / RAIN01"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_3km_rain03",
-      "name": "3小时降水 / RAIN03",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_3km_rain03",
-          "name": "3小时降水 / RAIN03",
-          "type": "contour",
-          "model": "GRAPES_3KM",
           "element": "RAIN03",
+          "id": "layer-grapes_3km_rain03",
+          "model": "GRAPES_3KM",
+          "name": "3小时降水 / RAIN03",
           "path": "GRAPES_3KM/RAIN03",
-          "render": {
-            "colormap": "RAIN",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-6",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "3小时降水 / RAIN03"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_3km_rain06",
-      "name": "6小时降水 / RAIN06",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_3km_rain06",
-          "name": "6小时降水 / RAIN06",
-          "type": "contour",
-          "model": "GRAPES_3KM",
           "element": "RAIN06",
+          "id": "layer-grapes_3km_rain06",
+          "model": "GRAPES_3KM",
+          "name": "6小时降水 / RAIN06",
           "path": "GRAPES_3KM/RAIN06",
-          "render": {
-            "colormap": "RAIN",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-6",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "6小时降水 / RAIN06"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_3km_rain12",
-      "name": "12小时降水 / RAIN12",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_3km_rain12",
-          "name": "12小时降水 / RAIN12",
-          "type": "contour",
-          "model": "GRAPES_3KM",
           "element": "RAIN12",
+          "id": "layer-grapes_3km_rain12",
+          "model": "GRAPES_3KM",
+          "name": "12小时降水 / RAIN12",
           "path": "GRAPES_3KM/RAIN12",
-          "render": {
-            "colormap": "RAIN",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-6",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "12小时降水 / RAIN12"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_3km_rain24",
-      "name": "24小时降水 / RAIN24",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_3km_rain24",
-          "name": "24小时降水 / RAIN24",
-          "type": "contour",
-          "model": "GRAPES_3KM",
           "element": "RAIN24",
+          "id": "layer-grapes_3km_rain24",
+          "model": "GRAPES_3KM",
+          "name": "24小时降水 / RAIN24",
           "path": "GRAPES_3KM/RAIN24",
-          "render": {
-            "colormap": "RAIN",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-6",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "24小时降水 / RAIN24"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_3km_snow01",
-      "name": "1小时降雪 / SNOW01",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_3km_snow01",
-          "name": "1小时降雪 / SNOW01",
-          "type": "contour",
-          "model": "GRAPES_3KM",
           "element": "SNOW01",
+          "id": "layer-grapes_3km_snow01",
+          "model": "GRAPES_3KM",
+          "name": "1小时降雪 / SNOW01",
           "path": "GRAPES_3KM/SNOW01",
-          "render": {
-            "colormap": "SNOW",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-5",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "1小时降雪 / SNOW01"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_3km_snow03",
-      "name": "3小时降雪 / SNOW03",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_3km_snow03",
-          "name": "3小时降雪 / SNOW03",
-          "type": "contour",
-          "model": "GRAPES_3KM",
           "element": "SNOW03",
+          "id": "layer-grapes_3km_snow03",
+          "model": "GRAPES_3KM",
+          "name": "3小时降雪 / SNOW03",
           "path": "GRAPES_3KM/SNOW03",
-          "render": {
-            "colormap": "SNOW",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-5",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "3小时降雪 / SNOW03"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_3km_snow06",
-      "name": "6小时降雪 / SNOW06",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_3km_snow06",
-          "name": "6小时降雪 / SNOW06",
-          "type": "contour",
-          "model": "GRAPES_3KM",
           "element": "SNOW06",
+          "id": "layer-grapes_3km_snow06",
+          "model": "GRAPES_3KM",
+          "name": "6小时降雪 / SNOW06",
           "path": "GRAPES_3KM/SNOW06",
-          "render": {
-            "colormap": "SNOW",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-5",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "6小时降雪 / SNOW06"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_3km_snow12",
-      "name": "12小时降雪 / SNOW12",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_3km_snow12",
-          "name": "12小时降雪 / SNOW12",
-          "type": "contour",
-          "model": "GRAPES_3KM",
           "element": "SNOW12",
+          "id": "layer-grapes_3km_snow12",
+          "model": "GRAPES_3KM",
+          "name": "12小时降雪 / SNOW12",
           "path": "GRAPES_3KM/SNOW12",
-          "render": {
-            "colormap": "SNOW",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-5",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "12小时降雪 / SNOW12"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_3km_snow24",
-      "name": "24小时降雪 / SNOW24",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_3km_snow24",
-          "name": "24小时降雪 / SNOW24",
-          "type": "contour",
-          "model": "GRAPES_3KM",
           "element": "SNOW24",
+          "id": "layer-grapes_3km_snow24",
+          "model": "GRAPES_3KM",
+          "name": "24小时降雪 / SNOW24",
           "path": "GRAPES_3KM/SNOW24",
-          "render": {
-            "colormap": "SNOW",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-5",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "24小时降雪 / SNOW24"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_3km_asnow",
-      "name": "累计降雪 / ASNOW",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_3km_asnow",
-          "name": "累计降雪 / ASNOW",
-          "type": "contour",
-          "model": "GRAPES_3KM",
           "element": "ASNOW",
+          "id": "layer-grapes_3km_asnow",
+          "model": "GRAPES_3KM",
+          "name": "累计降雪 / ASNOW",
           "path": "GRAPES_3KM/ASNOW",
-          "render": {
-            "colormap": "SNOW",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-5",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "累计降雪 / ASNOW"
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_hail",
-      "name": "冰雹预警 / HAIL Alert",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-nwfd_scmoc_hail",
-          "name": "冰雹预警 / HAIL Alert",
-          "type": "contour",
-          "model": "NWFD_SCMOC",
           "element": "HAIL",
+          "id": "layer-nwfd_scmoc_hail",
+          "model": "NWFD_SCMOC",
+          "name": "冰雹预警 / HAIL Alert",
           "path": "NWFD_SCMOC/HAIL",
           "render": {
-            "colormap": "HAZARDS",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "HAZARDS"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "冰雹预警 / HAIL Alert"
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_fog",
-      "name": "大雾预警 / FOG Advisory",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-nwfd_scmoc_fog",
-          "name": "大雾预警 / FOG Advisory",
-          "type": "contour",
-          "model": "NWFD_SCMOC",
           "element": "FOG",
+          "id": "layer-nwfd_scmoc_fog",
+          "model": "NWFD_SCMOC",
+          "name": "大雾预警 / FOG Advisory",
           "path": "NWFD_SCMOC/FOG",
           "render": {
-            "colormap": "HAZARDS",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "HAZARDS"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "大雾预警 / FOG Advisory"
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_haze",
-      "name": "霾预警 / HAZE Advisory",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-nwfd_scmoc_haze",
-          "name": "霾预警 / HAZE Advisory",
-          "type": "contour",
-          "model": "NWFD_SCMOC",
           "element": "HAZE",
+          "id": "layer-nwfd_scmoc_haze",
+          "model": "NWFD_SCMOC",
+          "name": "霾预警 / HAZE Advisory",
           "path": "NWFD_SCMOC/HAZE",
           "render": {
-            "colormap": "HAZARDS",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "HAZARDS"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "霾预警 / HAZE Advisory"
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_heavy_rainfall",
-      "name": "暴雨预警 / HEAVY_RAINFALL",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-nwfd_scmoc_heavy_rainfall",
-          "name": "暴雨预警 / HEAVY_RAINFALL",
-          "type": "contour",
-          "model": "NWFD_SCMOC",
           "element": "HEAVY_RAINFALL",
+          "id": "layer-nwfd_scmoc_heavy_rainfall",
+          "model": "NWFD_SCMOC",
+          "name": "暴雨预警 / HEAVY_RAINFALL",
           "path": "NWFD_SCMOC/HEAVY_RAINFALL",
           "render": {
-            "colormap": "HAZARDS",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "HAZARDS"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "暴雨预警 / HEAVY_RAINFALL"
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_sand",
-      "name": "沙尘预警 / SAND (Dust)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-nwfd_scmoc_sand",
-          "name": "沙尘预警 / SAND (Dust)",
-          "type": "contour",
-          "model": "NWFD_SCMOC",
           "element": "SAND",
+          "id": "layer-nwfd_scmoc_sand",
+          "model": "NWFD_SCMOC",
+          "name": "沙尘预警 / SAND (Dust)",
           "path": "NWFD_SCMOC/SAND",
           "render": {
-            "colormap": "HAZARDS",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "HAZARDS"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "沙尘预警 / SAND (Dust)"
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_thunderstorm",
-      "name": "雷暴预警 / THUNDERSTORM",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-nwfd_scmoc_thunderstorm",
-          "name": "雷暴预警 / THUNDERSTORM",
-          "type": "contour",
-          "model": "NWFD_SCMOC",
           "element": "THUNDERSTORM",
+          "id": "layer-nwfd_scmoc_thunderstorm",
+          "model": "NWFD_SCMOC",
+          "name": "雷暴预警 / THUNDERSTORM",
           "path": "NWFD_SCMOC/THUNDERSTORM",
           "render": {
-            "colormap": "HAZARDS",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "HAZARDS"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "雷暴预警 / THUNDERSTORM"
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_thunder_wind",
-      "name": "雷暴大风预警 / THUNDER_WIND",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-nwfd_scmoc_thunder_wind",
-          "name": "雷暴大风预警 / THUNDER_WIND",
-          "type": "wind",
-          "model": "NWFD_SCMOC",
           "element": "THUNDER_WIND",
+          "id": "layer-nwfd_scmoc_thunder_wind",
+          "model": "NWFD_SCMOC",
+          "name": "雷暴大风预警 / THUNDER_WIND",
           "path": "NWFD_SCMOC/THUNDER_WIND",
-          "render": {
-            "colormap": "WIND",
-            "showWind": false,
-            "showBarbs": true,
-            "showRaster": false,
-            "keepWind": true
-          }
+          "renderRef": "wind-1",
+          "type": "wind"
         }
-      ]
+      ],
+      "name": "雷暴大风预警 / THUNDER_WIND"
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_precip_type",
-      "name": "降水相态预报 / PRECIPITATION_TYPE",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-nwfd_scmoc_precip_type",
-          "name": "降水相态预报 / PRECIPITATION_TYPE",
-          "type": "contour",
-          "model": "NWFD_SCMOC",
           "element": "PRECIPITATION_TYPE",
+          "id": "layer-nwfd_scmoc_precip_type",
+          "model": "NWFD_SCMOC",
+          "name": "降水相态预报 / PRECIPITATION_TYPE",
           "path": "NWFD_SCMOC/PRECIPITATION_TYPE",
           "render": {
-            "colormap": "PRECIP_TYPE",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "PRECIP_TYPE"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "降水相态预报 / PRECIPITATION_TYPE"
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_1h_rain01",
-      "name": "1小时降水指导 / 1h Rain Guidance",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-nwfd_scmoc_1h_rain01",
-          "name": "1小时降水指导 / 1h Rain Guidance",
-          "type": "contour",
-          "model": "NWFD_SCMOC_1H",
           "element": "RAIN01",
+          "id": "layer-nwfd_scmoc_1h_rain01",
+          "model": "NWFD_SCMOC_1H",
+          "name": "1小时降水指导 / 1h Rain Guidance",
           "path": "NWFD_SCMOC_1H/RAIN01",
-          "render": {
-            "colormap": "RAIN",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-6",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "1小时降水指导 / 1h Rain Guidance"
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_max_tmp_2m",
-      "name": "2m日最高气温 / Max Temperature (2m)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-nwfd_scmoc_max_tmp_2m",
-          "name": "2m日最高气温 / Max Temperature (2m)",
-          "type": "contour",
-          "model": "NWFD_SCMOC",
           "element": "MAXIMUM_TEMPERATURE/2M_ABOVE_GROUND",
+          "id": "layer-nwfd_scmoc_max_tmp_2m",
+          "model": "NWFD_SCMOC",
+          "name": "2m日最高气温 / Max Temperature (2m)",
           "path": "NWFD_SCMOC/MAXIMUM_TEMPERATURE/2M_ABOVE_GROUND",
           "render": {
             "colormap": "TMP",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "2m日最高气温 / Max Temperature (2m)"
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_min_tmp_2m",
-      "name": "2m日最低气温 / Min Temperature (2m)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-nwfd_scmoc_min_tmp_2m",
-          "name": "2m日最低气温 / Min Temperature (2m)",
-          "type": "contour",
-          "model": "NWFD_SCMOC",
           "element": "MINIMUM_TEMPERATURE/2M_ABOVE_GROUND",
+          "id": "layer-nwfd_scmoc_min_tmp_2m",
+          "model": "NWFD_SCMOC",
+          "name": "2m日最低气温 / Min Temperature (2m)",
           "path": "NWFD_SCMOC/MINIMUM_TEMPERATURE/2M_ABOVE_GROUND",
           "render": {
             "colormap": "TMP",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "2m日最低气温 / Min Temperature (2m)"
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_tmp_change_24h_2m",
-      "name": "2m 24小时变温 / 24h Temp Change (2m)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-nwfd_scmoc_tmp_change_24h_2m",
-          "name": "2m 24小时变温 / 24h Temp Change (2m)",
-          "type": "contour",
-          "model": "NWFD_SCMOC",
           "element": "TMP_CHANGE_24H/2M_ABOVE_GROUND",
+          "id": "layer-nwfd_scmoc_tmp_change_24h_2m",
+          "model": "NWFD_SCMOC",
+          "name": "2m 24小时变温 / 24h Temp Change (2m)",
           "path": "NWFD_SCMOC/TMP_CHANGE_24H/2M_ABOVE_GROUND",
           "render": {
             "colormap": "TMP",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "2m 24小时变温 / 24h Temp Change (2m)"
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_tmp_change_48h_2m",
-      "name": "2m 48小时变温 / 48h Temp Change (2m)",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-nwfd_scmoc_tmp_change_48h_2m",
-          "name": "2m 48小时变温 / 48h Temp Change (2m)",
-          "type": "contour",
-          "model": "NWFD_SCMOC",
           "element": "TMP_CHANGE_48H/2M_ABOVE_GROUND",
+          "id": "layer-nwfd_scmoc_tmp_change_48h_2m",
+          "model": "NWFD_SCMOC",
+          "name": "2m 48小时变温 / 48h Temp Change (2m)",
           "path": "NWFD_SCMOC/TMP_CHANGE_48H/2M_ABOVE_GROUND",
           "render": {
             "colormap": "TMP",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "2m 48小时变温 / 48h Temp Change (2m)"
     },
     {
       "category": "实况融合 (Land Surface Reanalysis)",
       "hasLevel": false,
       "id": "preset-cldas_rain01",
-      "name": "1小时融合降水 / 1h Merged Rain",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-cldas_rain01",
-          "name": "1小时融合降水 / 1h Merged Rain",
-          "type": "contour",
-          "model": "CLDAS",
           "element": "RAIN01_BI_DATA_SOURCE",
+          "id": "layer-cldas_rain01",
+          "model": "CLDAS",
+          "name": "1小时融合降水 / 1h Merged Rain",
           "path": "CLDAS/RAIN01_BI_DATA_SOURCE",
-          "render": {
-            "colormap": "RAIN",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-6",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "1小时融合降水 / 1h Merged Rain"
     },
     {
       "category": "实况融合 (Land Surface Reanalysis)",
       "hasLevel": false,
       "id": "preset-cldas_apcp_10min",
-      "name": "10分钟融合降水 / 10m Merged Rain",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-cldas_apcp_10min",
-          "name": "10分钟融合降水 / 10m Merged Rain",
-          "type": "contour",
-          "model": "CLDAS",
           "element": "APCP_10MIN_BI_DATA_SOURCE",
+          "id": "layer-cldas_apcp_10min",
+          "model": "CLDAS",
+          "name": "10分钟融合降水 / 10m Merged Rain",
           "path": "CLDAS/APCP_10MIN_BI_DATA_SOURCE",
-          "render": {
-            "colormap": "RAIN",
-            "showFill": true,
-            "showLine": false
-          }
+          "renderRef": "contour-6",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "10分钟融合降水 / 10m Merged Rain"
     },
     {
       "category": "实况融合 (Land Surface Reanalysis)",
       "hasLevel": false,
       "id": "preset-cldas_tmp_2m",
-      "name": "2米气温实况融合 / 2m Temperature",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-cldas_tmp_2m",
-          "name": "2米气温实况融合 / 2m Temperature",
-          "type": "contour",
-          "model": "CLDAS",
           "element": "TMP/2M_ABOVE_GROUND",
+          "id": "layer-cldas_tmp_2m",
+          "model": "CLDAS",
+          "name": "2米气温实况融合 / 2m Temperature",
           "path": "CLDAS/TMP/2M_ABOVE_GROUND",
           "render": {
             "colormap": "TMP",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "2米气温实况融合 / 2m Temperature"
     },
     {
       "category": "实况融合 (Land Surface Reanalysis)",
       "hasLevel": false,
       "id": "preset-cldas_vis",
-      "name": "能见度实况融合 / Visibility",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-cldas_vis",
-          "name": "能见度实况融合 / Visibility",
-          "type": "contour",
-          "model": "CLDAS",
           "element": "VIS",
+          "id": "layer-cldas_vis",
+          "model": "CLDAS",
+          "name": "能见度实况融合 / Visibility",
           "path": "CLDAS/VIS",
           "render": {
             "colormap": "TMP",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "能见度实况融合 / Visibility"
     },
     {
       "category": "实况融合 (Land Surface Reanalysis)",
       "hasLevel": false,
       "id": "preset-cldas_wind_10m",
-      "name": "10米风场实况融合 / 10m Wind Field",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-cldas_wind_10m",
-          "name": "10米风场实况融合 / 10m Wind Field",
-          "type": "wind",
-          "model": "CLDAS",
           "element": "WIND/10M_ABOVE_GROUND",
+          "id": "layer-cldas_wind_10m",
+          "model": "CLDAS",
+          "name": "10米风场实况融合 / 10m Wind Field",
           "path": "CLDAS/WIND/10M_ABOVE_GROUND",
-          "render": {
-            "colormap": "WIND",
-            "showWind": false,
-            "showBarbs": true,
-            "showRaster": false,
-            "keepWind": true
-          }
+          "renderRef": "wind-1",
+          "type": "wind"
         }
-      ]
+      ],
+      "name": "10米风场实况融合 / 10m Wind Field"
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_avg_tmp_850",
-      "name": "集合平均850hPa气温 / Ensemble Mean 850hPa TMP",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_ens_avg_tmp_850",
-          "name": "集合平均850hPa气温 / Ensemble Mean 850hPa TMP",
-          "type": "contour",
-          "model": "ECMWF_ENSEMBLE_PRODUCT",
           "element": "AVERAGE/TMP/850",
+          "id": "layer-ecmwf_ens_avg_tmp_850",
+          "model": "ECMWF_ENSEMBLE_PRODUCT",
+          "name": "集合平均850hPa气温 / Ensemble Mean 850hPa TMP",
           "path": "ECMWF_ENSEMBLE_PRODUCT/AVERAGE/TMP/850",
           "render": {
             "colormap": "TMP",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "集合平均850hPa气温 / Ensemble Mean 850hPa TMP"
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_avg_hgt_500",
-      "name": "集合平均500hPa高度 / Ensemble Mean 500hPa HGT",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_ens_avg_hgt_500",
-          "name": "集合平均500hPa高度 / Ensemble Mean 500hPa HGT",
-          "type": "contour",
-          "model": "ECMWF_ENSEMBLE_PRODUCT",
           "element": "AVERAGE/HGT/500",
+          "id": "layer-ecmwf_ens_avg_hgt_500",
+          "model": "ECMWF_ENSEMBLE_PRODUCT",
+          "name": "集合平均500hPa高度 / Ensemble Mean 500hPa HGT",
           "path": "ECMWF_ENSEMBLE_PRODUCT/AVERAGE/HGT/500",
           "render": {
             "colormap": "TMP",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "集合平均500hPa高度 / Ensemble Mean 500hPa HGT"
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_avg_rh_850",
-      "name": "集合平均850hPa相对湿度 / Ensemble Mean 850hPa RH",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_ens_avg_rh_850",
-          "name": "集合平均850hPa相对湿度 / Ensemble Mean 850hPa RH",
-          "type": "contour",
-          "model": "ECMWF_ENSEMBLE_PRODUCT",
           "element": "AVERAGE/RH/850",
+          "id": "layer-ecmwf_ens_avg_rh_850",
+          "model": "ECMWF_ENSEMBLE_PRODUCT",
+          "name": "集合平均850hPa相对湿度 / Ensemble Mean 850hPa RH",
           "path": "ECMWF_ENSEMBLE_PRODUCT/AVERAGE/RH/850",
           "render": {
             "colormap": "TMP",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "集合平均850hPa相对湿度 / Ensemble Mean 850hPa RH"
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_avg_rh_500",
-      "name": "集合平均500hPa相对湿度 / Ensemble Mean 500hPa RH",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_ens_avg_rh_500",
-          "name": "集合平均500hPa相对湿度 / Ensemble Mean 500hPa RH",
-          "type": "contour",
-          "model": "ECMWF_ENSEMBLE_PRODUCT",
           "element": "AVERAGE/RH/500",
+          "id": "layer-ecmwf_ens_avg_rh_500",
+          "model": "ECMWF_ENSEMBLE_PRODUCT",
+          "name": "集合平均500hPa相对湿度 / Ensemble Mean 500hPa RH",
           "path": "ECMWF_ENSEMBLE_PRODUCT/AVERAGE/RH/500",
           "render": {
             "colormap": "TMP",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "集合平均500hPa相对湿度 / Ensemble Mean 500hPa RH"
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_avg_tmp_2m",
-      "name": "集合平均2m气温 / Ensemble Mean 2m TMP",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_ens_avg_tmp_2m",
-          "name": "集合平均2m气温 / Ensemble Mean 2m TMP",
-          "type": "contour",
-          "model": "ECMWF_ENSEMBLE_PRODUCT",
           "element": "AVERAGE/TMP_2M",
+          "id": "layer-ecmwf_ens_avg_tmp_2m",
+          "model": "ECMWF_ENSEMBLE_PRODUCT",
+          "name": "集合平均2m气温 / Ensemble Mean 2m TMP",
           "path": "ECMWF_ENSEMBLE_PRODUCT/AVERAGE/TMP_2M",
           "render": {
             "colormap": "TMP",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "集合平均2m气温 / Ensemble Mean 2m TMP"
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_var_tmp_850",
-      "name": "集合方差850hPa气温 / Ensemble Var 850hPa TMP",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_ens_var_tmp_850",
-          "name": "集合方差850hPa气温 / Ensemble Var 850hPa TMP",
-          "type": "contour",
-          "model": "ECMWF_ENSEMBLE_PRODUCT",
           "element": "VARIANCE/TMP/850",
+          "id": "layer-ecmwf_ens_var_tmp_850",
+          "model": "ECMWF_ENSEMBLE_PRODUCT",
+          "name": "集合方差850hPa气温 / Ensemble Var 850hPa TMP",
           "path": "ECMWF_ENSEMBLE_PRODUCT/VARIANCE/TMP/850",
           "render": {
             "colormap": "VARIANCE",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "集合方差850hPa气温 / Ensemble Var 850hPa TMP"
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_var_hgt_500",
-      "name": "集合方差500hPa高度 / Ensemble Var 500hPa HGT",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_ens_var_hgt_500",
-          "name": "集合方差500hPa高度 / Ensemble Var 500hPa HGT",
-          "type": "contour",
-          "model": "ECMWF_ENSEMBLE_PRODUCT",
           "element": "VARIANCE/HGT/500",
+          "id": "layer-ecmwf_ens_var_hgt_500",
+          "model": "ECMWF_ENSEMBLE_PRODUCT",
+          "name": "集合方差500hPa高度 / Ensemble Var 500hPa HGT",
           "path": "ECMWF_ENSEMBLE_PRODUCT/VARIANCE/HGT/500",
           "render": {
             "colormap": "VARIANCE",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "集合方差500hPa高度 / Ensemble Var 500hPa HGT"
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_var_rh_850",
-      "name": "集合方差850hPa相对湿度 / Ensemble Var 850hPa RH",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_ens_var_rh_850",
-          "name": "集合方差850hPa相对湿度 / Ensemble Var 850hPa RH",
-          "type": "contour",
-          "model": "ECMWF_ENSEMBLE_PRODUCT",
           "element": "VARIANCE/RH/850",
+          "id": "layer-ecmwf_ens_var_rh_850",
+          "model": "ECMWF_ENSEMBLE_PRODUCT",
+          "name": "集合方差850hPa相对湿度 / Ensemble Var 850hPa RH",
           "path": "ECMWF_ENSEMBLE_PRODUCT/VARIANCE/RH/850",
           "render": {
             "colormap": "VARIANCE",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "集合方差850hPa相对湿度 / Ensemble Var 850hPa RH"
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_var_rh_500",
-      "name": "集合方差500hPa相对湿度 / Ensemble Var 500hPa RH",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_ens_var_rh_500",
-          "name": "集合方差500hPa相对湿度 / Ensemble Var 500hPa RH",
-          "type": "contour",
-          "model": "ECMWF_ENSEMBLE_PRODUCT",
           "element": "VARIANCE/RH/500",
+          "id": "layer-ecmwf_ens_var_rh_500",
+          "model": "ECMWF_ENSEMBLE_PRODUCT",
+          "name": "集合方差500hPa相对湿度 / Ensemble Var 500hPa RH",
           "path": "ECMWF_ENSEMBLE_PRODUCT/VARIANCE/RH/500",
           "render": {
             "colormap": "VARIANCE",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "集合方差500hPa相对湿度 / Ensemble Var 500hPa RH"
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_var_tmp_2m",
-      "name": "集合方差2m气温 / Ensemble Var 2m TMP",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_ens_var_tmp_2m",
-          "name": "集合方差2m气温 / Ensemble Var 2m TMP",
-          "type": "contour",
-          "model": "ECMWF_ENSEMBLE_PRODUCT",
           "element": "VARIANCE/TMP_2M",
+          "id": "layer-ecmwf_ens_var_tmp_2m",
+          "model": "ECMWF_ENSEMBLE_PRODUCT",
+          "name": "集合方差2m气温 / Ensemble Var 2m TMP",
           "path": "ECMWF_ENSEMBLE_PRODUCT/VARIANCE/TMP_2M",
           "render": {
             "colormap": "VARIANCE",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "集合方差2m气温 / Ensemble Var 2m TMP"
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_prob_rain24_10",
-      "name": "24小时降水>10mm概率 / Rain Prob > 10.0mm",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_ens_prob_rain24_10",
-          "name": "24小时降水>10mm概率 / Rain Prob > 10.0mm",
-          "type": "contour",
-          "model": "ECMWF_ENSEMBLE_PRODUCT",
           "element": "GRID_PROBABILITY/RAIN24/10.0MM",
+          "id": "layer-ecmwf_ens_prob_rain24_10",
+          "model": "ECMWF_ENSEMBLE_PRODUCT",
+          "name": "24小时降水>10mm概率 / Rain Prob > 10.0mm",
           "path": "ECMWF_ENSEMBLE_PRODUCT/GRID_PROBABILITY/RAIN24/10.0MM",
           "render": {
-            "colormap": "PROBABILITY",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "PROBABILITY"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "24小时降水>10mm概率 / Rain Prob > 10.0mm"
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_prob_rain24_25",
-      "name": "24小时降水>25mm概率 / Rain Prob > 25.0mm",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_ens_prob_rain24_25",
-          "name": "24小时降水>25mm概率 / Rain Prob > 25.0mm",
-          "type": "contour",
-          "model": "ECMWF_ENSEMBLE_PRODUCT",
           "element": "GRID_PROBABILITY/RAIN24/25.0MM",
+          "id": "layer-ecmwf_ens_prob_rain24_25",
+          "model": "ECMWF_ENSEMBLE_PRODUCT",
+          "name": "24小时降水>25mm概率 / Rain Prob > 25.0mm",
           "path": "ECMWF_ENSEMBLE_PRODUCT/GRID_PROBABILITY/RAIN24/25.0MM",
           "render": {
-            "colormap": "PROBABILITY",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "PROBABILITY"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "24小时降水>25mm概率 / Rain Prob > 25.0mm"
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_prob_rain24_100",
-      "name": "24小时降水>100mm概率 / Rain Prob > 100.0mm",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-ecmwf_ens_prob_rain24_100",
-          "name": "24小时降水>100mm概率 / Rain Prob > 100.0mm",
-          "type": "contour",
-          "model": "ECMWF_ENSEMBLE_PRODUCT",
           "element": "GRID_PROBABILITY/RAIN24/100.0MM",
+          "id": "layer-ecmwf_ens_prob_rain24_100",
+          "model": "ECMWF_ENSEMBLE_PRODUCT",
+          "name": "24小时降水>100mm概率 / Rain Prob > 100.0mm",
           "path": "ECMWF_ENSEMBLE_PRODUCT/GRID_PROBABILITY/RAIN24/100.0MM",
           "render": {
-            "colormap": "PROBABILITY",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "PROBABILITY"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "24小时降水>100mm概率 / Rain Prob > 100.0mm"
     },
     {
       "category": "高密地面与海洋观测 (High-Density Observations)",
       "hasLevel": false,
       "id": "preset-surface_plot_all",
-      "name": "全网高密地面观测(6万+站) / PLOT_ALL (>60k AWS)",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-surface_plot_all",
-          "name": "全网高密地面观测(6万+站) / PLOT_ALL (>60k AWS)",
-          "type": "station",
-          "model": "SURFACE",
           "element": "PLOT_ALL",
+          "id": "layer-surface_plot_all",
+          "model": "SURFACE",
+          "name": "全网高密地面观测(6万+站) / PLOT_ALL (>60k AWS)",
           "path": "SURFACE/PLOT_ALL",
-          "render": {
-            "showTemp": true,
-            "showDewpoint": true,
-            "showPressure": true,
-            "showWind": true,
-            "showVisibility": true
-          }
+          "renderRef": "station-1",
+          "type": "station"
         }
-      ]
+      ],
+      "name": "全网高密地面观测(6万+站) / PLOT_ALL (>60k AWS)"
     },
     {
       "category": "高密地面与海洋观测 (High-Density Observations)",
       "hasLevel": false,
       "id": "preset-surface_plot_traffic",
-      "name": "高速公路交通气象站 / PLOT_TRAFFIC (Expressway)",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-surface_plot_traffic",
-          "name": "高速公路交通气象站 / PLOT_TRAFFIC (Expressway)",
-          "type": "station",
-          "model": "SURFACE",
           "element": "PLOT_TRAFFIC",
+          "id": "layer-surface_plot_traffic",
+          "model": "SURFACE",
+          "name": "高速公路交通气象站 / PLOT_TRAFFIC (Expressway)",
           "path": "SURFACE/PLOT_TRAFFIC",
-          "render": {
-            "showTemp": true,
-            "showDewpoint": true,
-            "showPressure": true,
-            "showWind": true,
-            "showVisibility": true
-          }
+          "renderRef": "station-1",
+          "type": "station"
         }
-      ]
+      ],
+      "name": "高速公路交通气象站 / PLOT_TRAFFIC (Expressway)"
     },
     {
       "category": "高密地面与海洋观测 (High-Density Observations)",
       "hasLevel": false,
       "id": "preset-surface_plot_traffic_5min",
-      "name": "高速公路交通站(5分钟) / PLOT_TRAFFIC_5MIN",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-surface_plot_traffic_5min",
-          "name": "高速公路交通站(5分钟) / PLOT_TRAFFIC_5MIN",
-          "type": "station",
-          "model": "SURFACE",
           "element": "PLOT_TRAFFIC_5MIN",
+          "id": "layer-surface_plot_traffic_5min",
+          "model": "SURFACE",
+          "name": "高速公路交通站(5分钟) / PLOT_TRAFFIC_5MIN",
           "path": "SURFACE/PLOT_TRAFFIC_5MIN",
-          "render": {
-            "showTemp": true,
-            "showDewpoint": true,
-            "showPressure": true,
-            "showWind": true,
-            "showVisibility": true
-          }
+          "renderRef": "station-1",
+          "type": "station"
         }
-      ]
+      ],
+      "name": "高速公路交通站(5分钟) / PLOT_TRAFFIC_5MIN"
     },
     {
       "category": "高密地面与海洋观测 (High-Density Observations)",
       "hasLevel": false,
       "id": "preset-surface_pres_change_3h",
-      "name": "全国3小时变压 / PRES_CHANGE_3H_NATIONAL",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-surface_pres_change_3h",
-          "name": "全国3小时变压 / PRES_CHANGE_3H_NATIONAL",
-          "type": "station",
-          "model": "SURFACE",
           "element": "PRES_CHANGE_3H_NATIONAL",
+          "id": "layer-surface_pres_change_3h",
+          "model": "SURFACE",
+          "name": "全国3小时变压 / PRES_CHANGE_3H_NATIONAL",
           "path": "SURFACE/PRES_CHANGE_3H_NATIONAL",
           "render": {
             "showPressDiff3h": true,
             "showPressureChange": true,
             "showTendency": true,
-            "showTemp": false,
-            "showDewpoint": false,
-            "showPressure": false,
-            "showWind": false,
             "showVisibility": false
-          }
+          },
+          "renderRef": "station-2",
+          "type": "station"
         }
-      ]
+      ],
+      "name": "全国3小时变压 / PRES_CHANGE_3H_NATIONAL"
     },
     {
       "category": "高密地面与海洋观测 (High-Density Observations)",
       "hasLevel": false,
       "id": "preset-surface_pres_change_24h",
-      "name": "全国24小时变压 / PRES_CHANGE_24H_NATIONAL",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-surface_pres_change_24h",
-          "name": "全国24小时变压 / PRES_CHANGE_24H_NATIONAL",
-          "type": "station",
-          "model": "SURFACE",
           "element": "PRES_CHANGE_24H_NATIONAL",
+          "id": "layer-surface_pres_change_24h",
+          "model": "SURFACE",
+          "name": "全国24小时变压 / PRES_CHANGE_24H_NATIONAL",
           "path": "SURFACE/PRES_CHANGE_24H_NATIONAL",
           "render": {
             "showPressDiff24h": true,
             "showPressureChange": true,
             "showTendency": true,
-            "showTemp": false,
-            "showDewpoint": false,
-            "showPressure": false,
-            "showWind": false,
             "showVisibility": false
-          }
+          },
+          "renderRef": "station-2",
+          "type": "station"
         }
-      ]
+      ],
+      "name": "全国24小时变压 / PRES_CHANGE_24H_NATIONAL"
     },
     {
       "category": "高密地面与海洋观测 (High-Density Observations)",
       "hasLevel": false,
       "id": "preset-surface_vis_1min",
-      "name": "1分钟水平能见度 / HORIZONTAL_VISIBILITY_1MIN",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-surface_vis_1min",
-          "name": "1分钟水平能见度 / HORIZONTAL_VISIBILITY_1MIN",
-          "type": "station",
-          "model": "SURFACE",
           "element": "HORIZONTAL_VISIBILITY_1MIN_ALL_STATION",
+          "id": "layer-surface_vis_1min",
+          "model": "SURFACE",
+          "name": "1分钟水平能见度 / HORIZONTAL_VISIBILITY_1MIN",
           "path": "SURFACE/HORIZONTAL_VISIBILITY_1MIN_ALL_STATION",
           "render": {
-            "showVisibility": true,
-            "showTemp": false,
-            "showDewpoint": false,
-            "showPressure": false,
-            "showWind": false
-          }
+            "showVisibility": true
+          },
+          "renderRef": "station-2",
+          "type": "station"
         }
-      ]
+      ],
+      "name": "1分钟水平能见度 / HORIZONTAL_VISIBILITY_1MIN"
     },
     {
       "category": "高密地面与海洋观测 (High-Density Observations)",
       "hasLevel": false,
       "id": "preset-surface_snow_depth",
-      "name": "全国积雪深度实况 / SNOW_DEPTH_ALL_STATION",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-surface_snow_depth",
-          "name": "全国积雪深度实况 / SNOW_DEPTH_ALL_STATION",
-          "type": "station",
-          "model": "SURFACE",
           "element": "SNOW_DEPTH_ALL_STATION",
+          "id": "layer-surface_snow_depth",
+          "model": "SURFACE",
+          "name": "全国积雪深度实况 / SNOW_DEPTH_ALL_STATION",
           "path": "SURFACE/SNOW_DEPTH_ALL_STATION",
           "render": {
             "showSnowDepth": true,
-            "showTemp": false,
-            "showDewpoint": false,
-            "showPressure": false,
-            "showWind": false,
             "showVisibility": false
-          }
+          },
+          "renderRef": "station-2",
+          "type": "station"
         }
-      ]
+      ],
+      "name": "全国积雪深度实况 / SNOW_DEPTH_ALL_STATION"
     },
     {
       "category": "高密地面与海洋观测 (High-Density Observations)",
       "hasLevel": false,
       "id": "preset-marine_rocea_1h",
-      "name": "海洋浮标与海岛站(1小时) / ROCEA_1H (Marine Buoys)",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-marine_rocea_1h",
-          "name": "海洋浮标与海岛站(1小时) / ROCEA_1H (Marine Buoys)",
-          "type": "station",
-          "model": "MARINE",
           "element": "ROCEA_1H",
+          "id": "layer-marine_rocea_1h",
+          "model": "MARINE",
+          "name": "海洋浮标与海岛站(1小时) / ROCEA_1H (Marine Buoys)",
           "path": "MARINE/ROCEA_1H",
-          "render": {
-            "showTemp": true,
-            "showDewpoint": true,
-            "showPressure": true,
-            "showWind": true,
-            "showVisibility": true
-          }
+          "renderRef": "station-1",
+          "type": "station"
         }
-      ]
+      ],
+      "name": "海洋浮标与海岛站(1小时) / ROCEA_1H (Marine Buoys)"
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
       "hasLevel": false,
       "id": "preset-swan_mcr",
-      "name": "组合反射率 / MCR (Composite Refl)",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-swan_mcr",
-          "name": "组合反射率 / MCR (Composite Refl)",
-          "type": "contour",
-          "model": "SWAN_PRODUCT",
           "element": "LOCAL/NCRAD/TDPRODUCT/MCR",
+          "id": "layer-swan_mcr",
+          "model": "SWAN_PRODUCT",
+          "name": "组合反射率 / MCR (Composite Refl)",
           "path": "SWAN_PRODUCT/LOCAL/NCRAD/TDPRODUCT/MCR",
           "render": {
-            "colormap": "RADAR",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "RADAR"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "组合反射率 / MCR (Composite Refl)"
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
       "hasLevel": false,
       "id": "preset-swan_mtop",
-      "name": "回波顶高 / MTOP (Echo Tops)",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-swan_mtop",
-          "name": "回波顶高 / MTOP (Echo Tops)",
-          "type": "contour",
-          "model": "SWAN_PRODUCT",
           "element": "LOCAL/NCRAD/TDPRODUCT/MTOP",
+          "id": "layer-swan_mtop",
+          "model": "SWAN_PRODUCT",
+          "name": "回波顶高 / MTOP (Echo Tops)",
           "path": "SWAN_PRODUCT/LOCAL/NCRAD/TDPRODUCT/MTOP",
           "render": {
-            "colormap": "ECHO_TOP",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "ECHO_TOP"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "回波顶高 / MTOP (Echo Tops)"
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
       "hasLevel": false,
       "id": "preset-swan_mvil",
-      "name": "垂直积分液态含水量 / MVIL (Vert. Int. Liquid)",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-swan_mvil",
-          "name": "垂直积分液态含水量 / MVIL (Vert. Int. Liquid)",
-          "type": "contour",
-          "model": "SWAN_PRODUCT",
           "element": "LOCAL/NCRAD/TDPRODUCT/MVIL",
+          "id": "layer-swan_mvil",
+          "model": "SWAN_PRODUCT",
+          "name": "垂直积分液态含水量 / MVIL (Vert. Int. Liquid)",
           "path": "SWAN_PRODUCT/LOCAL/NCRAD/TDPRODUCT/MVIL",
           "render": {
-            "colormap": "VIL",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "VIL"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "垂直积分液态含水量 / MVIL (Vert. Int. Liquid)"
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
       "hasLevel": false,
       "id": "preset-swan_qpe6min",
-      "name": "6分钟定量降水估测 / QPE6MIN",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-swan_qpe6min",
-          "name": "6分钟定量降水估测 / QPE6MIN",
-          "type": "contour",
-          "model": "SWAN_PRODUCT",
           "element": "LOCAL/NCRAD/TDPRODUCT/QPE6MIN",
+          "id": "layer-swan_qpe6min",
+          "model": "SWAN_PRODUCT",
+          "name": "6分钟定量降水估测 / QPE6MIN",
           "path": "SWAN_PRODUCT/LOCAL/NCRAD/TDPRODUCT/QPE6MIN",
           "render": {
-            "colormap": "QPE",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "QPE"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "6分钟定量降水估测 / QPE6MIN"
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
       "hasLevel": false,
       "id": "preset-swan_qpe60",
-      "name": "1小时定量降水估测 / QPE60",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-swan_qpe60",
-          "name": "1小时定量降水估测 / QPE60",
-          "type": "contour",
-          "model": "SWAN_PRODUCT",
           "element": "LOCAL/NCRAD/TDPRODUCT/QPE60",
+          "id": "layer-swan_qpe60",
+          "model": "SWAN_PRODUCT",
+          "name": "1小时定量降水估测 / QPE60",
           "path": "SWAN_PRODUCT/LOCAL/NCRAD/TDPRODUCT/QPE60",
           "render": {
-            "colormap": "QPE",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "QPE"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "1小时定量降水估测 / QPE60"
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
+      "defaultLevel": 500,
       "hasLevel": true,
       "id": "preset-swan_tdmosaic",
-      "name": "3D雷达反射率三维拼图 / TDMOSAIC (3D Volume)",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-swan_tdmosaic",
-          "name": "3D雷达反射率三维拼图 / TDMOSAIC (3D Volume)",
-          "type": "contour",
-          "model": "SWAN_PRODUCT",
           "element": "LOCAL/NCRAD/TDMOSAIC",
+          "id": "layer-swan_tdmosaic",
+          "level": 500,
+          "model": "SWAN_PRODUCT",
+          "name": "3D雷达反射率三维拼图 / TDMOSAIC (3D Volume)",
           "path": "SWAN_PRODUCT/LOCAL/NCRAD/TDMOSAIC",
           "render": {
-            "colormap": "RADAR",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
+            "colormap": "RADAR"
           },
-          "level": 500
+          "renderRef": "contour-4",
+          "type": "contour"
         }
       ],
-      "defaultLevel": 500,
       "levels": [
         500,
         1000,
@@ -5160,649 +4054,664 @@
         15500,
         17000,
         19000
-      ]
+      ],
+      "name": "3D雷达反射率三维拼图 / TDMOSAIC (3D Volume)"
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
       "hasLevel": false,
       "id": "preset-swan_tvs",
-      "name": "龙卷涡旋特征 / TVS (Tornado Vortex Sig)",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-swan_tvs",
-          "name": "龙卷涡旋特征 / TVS (Tornado Vortex Sig)",
-          "type": "event",
-          "model": "SWAN_PRODUCT",
           "element": "LOCAL/SEVERE_STORM/NOWCASTING/TVS",
+          "eventType": "tvs",
+          "id": "layer-swan_tvs",
+          "model": "SWAN_PRODUCT",
+          "name": "龙卷涡旋特征 / TVS (Tornado Vortex Sig)",
           "path": "SWAN_PRODUCT/LOCAL/SEVERE_STORM/NOWCASTING/TVS",
-          "render": {
-            "colormap": "TMP",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
-            "lineColor": "#58a6ff"
-          },
-          "eventType": "tvs"
+          "renderRef": "event-1",
+          "type": "event"
         }
-      ]
+      ],
+      "name": "龙卷涡旋特征 / TVS (Tornado Vortex Sig)"
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
       "hasLevel": false,
       "id": "preset-swan_hail",
-      "name": "冰雹预警 / HAIL Warning",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-swan_hail",
-          "name": "冰雹预警 / HAIL Warning",
-          "type": "event",
-          "model": "SWAN_PRODUCT",
           "element": "LOCAL/SEVERE_STORM/NOWCASTING/HAIL",
+          "eventType": "hail",
+          "id": "layer-swan_hail",
+          "model": "SWAN_PRODUCT",
+          "name": "冰雹预警 / HAIL Warning",
           "path": "SWAN_PRODUCT/LOCAL/SEVERE_STORM/NOWCASTING/HAIL",
-          "render": {
-            "colormap": "HAZARDS",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          },
-          "eventType": "hail"
+          "renderRef": "event-2",
+          "type": "event"
         }
-      ]
+      ],
+      "name": "冰雹预警 / HAIL Warning"
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
       "hasLevel": false,
       "id": "preset-swan_gale",
-      "name": "雷暴大风预警 / GALE Warning",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-swan_gale",
-          "name": "雷暴大风预警 / GALE Warning",
-          "type": "event",
-          "model": "SWAN_PRODUCT",
           "element": "LOCAL/SEVERE_STORM/NOWCASTING/GALE",
+          "eventType": "gale",
+          "id": "layer-swan_gale",
+          "model": "SWAN_PRODUCT",
+          "name": "雷暴大风预警 / GALE Warning",
           "path": "SWAN_PRODUCT/LOCAL/SEVERE_STORM/NOWCASTING/GALE",
-          "render": {
-            "colormap": "HAZARDS",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          },
-          "eventType": "gale"
+          "renderRef": "event-2",
+          "type": "event"
         }
-      ]
+      ],
+      "name": "雷暴大风预警 / GALE Warning"
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
       "hasLevel": false,
       "id": "preset-swan_ref_fst",
-      "name": "0-2小时雷达反射率外推 / REF_FST (0-2h Extrap.)",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-swan_ref_fst",
-          "name": "0-2小时雷达反射率外推 / REF_FST (0-2h Extrap.)",
-          "type": "contour",
-          "model": "SWAN_PRODUCT",
           "element": "LOCAL/EXTRAPOLATION_IUM/REF_FST",
+          "id": "layer-swan_ref_fst",
+          "model": "SWAN_PRODUCT",
+          "name": "0-2小时雷达反射率外推 / REF_FST (0-2h Extrap.)",
           "path": "SWAN_PRODUCT/LOCAL/EXTRAPOLATION_IUM/REF_FST",
           "render": {
-            "colormap": "RADAR",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "RADAR"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "0-2小时雷达反射率外推 / REF_FST (0-2h Extrap.)"
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
       "hasLevel": false,
       "id": "preset-swan_hail_fst",
-      "name": "0-2小时冰雹临近预警 / HAIL Nowcast (0-2h)",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-swan_hail_fst",
-          "name": "0-2小时冰雹临近预警 / HAIL Nowcast (0-2h)",
-          "type": "contour",
-          "model": "SWAN_PRODUCT",
           "element": "LOCAL/EXTRAPOLATION_IUM/HAIL",
+          "id": "layer-swan_hail_fst",
+          "model": "SWAN_PRODUCT",
+          "name": "0-2小时冰雹临近预警 / HAIL Nowcast (0-2h)",
           "path": "SWAN_PRODUCT/LOCAL/EXTRAPOLATION_IUM/HAIL",
           "render": {
-            "colormap": "HAZARDS",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "HAZARDS"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "0-2小时冰雹临近预警 / HAIL Nowcast (0-2h)"
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
       "hasLevel": false,
       "id": "preset-swan_windy_fst",
-      "name": "0-2小时大风临近预警 / WINDY Nowcast (0-2h)",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-swan_windy_fst",
-          "name": "0-2小时大风临近预警 / WINDY Nowcast (0-2h)",
-          "type": "contour",
-          "model": "SWAN_PRODUCT",
           "element": "LOCAL/EXTRAPOLATION_IUM/WINDY",
+          "id": "layer-swan_windy_fst",
+          "model": "SWAN_PRODUCT",
+          "name": "0-2小时大风临近预警 / WINDY Nowcast (0-2h)",
           "path": "SWAN_PRODUCT/LOCAL/EXTRAPOLATION_IUM/WINDY",
           "render": {
-            "colormap": "HAZARDS",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "HAZARDS"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "0-2小时大风临近预警 / WINDY Nowcast (0-2h)"
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
       "hasLevel": false,
       "id": "preset-swan_qpf_fst",
-      "name": "0-2小时定量降水外推预报 / QPF Nowcast (0-2h)",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-swan_qpf_fst",
-          "name": "0-2小时定量降水外推预报 / QPF Nowcast (0-2h)",
-          "type": "contour",
-          "model": "SWAN_PRODUCT",
           "element": "LOCAL/EXTRAPOLATION_IUM/QPF",
+          "id": "layer-swan_qpf_fst",
+          "model": "SWAN_PRODUCT",
+          "name": "0-2小时定量降水外推预报 / QPF Nowcast (0-2h)",
           "path": "SWAN_PRODUCT/LOCAL/EXTRAPOLATION_IUM/QPF",
           "render": {
-            "colormap": "QPE",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "QPE"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "0-2小时定量降水外推预报 / QPF Nowcast (0-2h)"
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
       "hasLevel": false,
       "id": "preset-swan_cotrecwind",
-      "name": "雷达跟踪风场(TREC Wind) / COTRECWIND (TREC Wind)",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-swan_cotrecwind",
-          "name": "雷达跟踪风场(TREC Wind) / COTRECWIND (TREC Wind)",
-          "type": "wind",
-          "model": "SWAN_PRODUCT",
           "element": "LOCAL/GD/COTRECWIND",
+          "id": "layer-swan_cotrecwind",
+          "model": "SWAN_PRODUCT",
+          "name": "雷达跟踪风场(TREC Wind) / COTRECWIND (TREC Wind)",
           "path": "SWAN_PRODUCT/LOCAL/GD/COTRECWIND",
-          "render": {
-            "colormap": "WIND",
-            "showWind": false,
-            "showBarbs": true,
-            "showRaster": false,
-            "keepWind": true
-          }
+          "renderRef": "wind-1",
+          "type": "wind"
         }
-      ]
+      ],
+      "name": "雷达跟踪风场(TREC Wind) / COTRECWIND (TREC Wind)"
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
       "hasLevel": false,
       "id": "preset-swan_gd_ref_fst",
-      "name": "光流雷达外推反射率 / GD REF_FST",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-swan_gd_ref_fst",
-          "name": "光流雷达外推反射率 / GD REF_FST",
-          "type": "contour",
-          "model": "SWAN_PRODUCT",
           "element": "LOCAL/GD/REF_FST",
+          "id": "layer-swan_gd_ref_fst",
+          "model": "SWAN_PRODUCT",
+          "name": "光流雷达外推反射率 / GD REF_FST",
           "path": "SWAN_PRODUCT/LOCAL/GD/REF_FST",
           "render": {
-            "colormap": "RADAR",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "RADAR"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "光流雷达外推反射率 / GD REF_FST"
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
       "hasLevel": false,
       "id": "preset-surface_lightning_10min",
-      "name": "10分钟闪电定位 / LIGHTNING_10MIN",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-surface_lightning_10min",
-          "name": "10分钟闪电定位 / LIGHTNING_10MIN",
-          "type": "event",
-          "model": "SURFACE",
           "element": "LIGHTNING_10MIN",
+          "eventType": "lightning",
+          "id": "layer-surface_lightning_10min",
+          "model": "SURFACE",
+          "name": "10分钟闪电定位 / LIGHTNING_10MIN",
           "path": "SURFACE/LIGHTNING_10MIN",
-          "render": {
-            "colormap": "TMP",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
-            "lineColor": "#58a6ff"
-          },
-          "eventType": "lightning"
+          "renderRef": "event-1",
+          "type": "event"
         }
-      ]
+      ],
+      "name": "10分钟闪电定位 / LIGHTNING_10MIN"
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
       "hasLevel": false,
       "id": "preset-surface_lightning_1h",
-      "name": "1小时闪电定位 / LIGHTNING_1H",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-surface_lightning_1h",
-          "name": "1小时闪电定位 / LIGHTNING_1H",
-          "type": "event",
-          "model": "SURFACE",
           "element": "LIGHTNING_1H",
+          "eventType": "lightning",
+          "id": "layer-surface_lightning_1h",
+          "model": "SURFACE",
+          "name": "1小时闪电定位 / LIGHTNING_1H",
           "path": "SURFACE/LIGHTNING_1H",
-          "render": {
-            "colormap": "TMP",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
-            "lineColor": "#58a6ff"
-          },
-          "eventType": "lightning"
+          "renderRef": "event-1",
+          "type": "event"
         }
-      ]
+      ],
+      "name": "1小时闪电定位 / LIGHTNING_1H"
     },
     {
       "category": "高密地面与海洋观测 (High-Density Observations)",
       "hasLevel": false,
       "id": "preset-wind_profiler_rad",
-      "name": "风廓线雷达径向数据 / WIND_PROFILER/RAD",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-wind_profiler_rad",
-          "name": "风廓线雷达径向数据 / WIND_PROFILER/RAD",
-          "type": "profiler",
-          "model": "WIND_PROFILER",
           "element": "RAD",
+          "id": "layer-wind_profiler_rad",
+          "model": "WIND_PROFILER",
+          "name": "风廓线雷达径向数据 / WIND_PROFILER/RAD",
           "path": "WIND_PROFILER/RAD",
-          "render": {
-            "colormap": "WIND",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
-            "lineColor": "#58a6ff"
-          },
           "product": "RAD",
-          "stationId": "AH001"
+          "renderRef": "profiler-1",
+          "stationId": "AH001",
+          "type": "profiler"
         }
-      ]
+      ],
+      "name": "风廓线雷达径向数据 / WIND_PROFILER/RAD"
     },
     {
       "category": "高密地面与海洋观测 (High-Density Observations)",
       "hasLevel": false,
       "id": "preset-wind_profiler_robs",
-      "name": "风廓线雷达水平风观测 / WIND_PROFILER/ROBS",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-wind_profiler_robs",
-          "name": "风廓线雷达水平风观测 / WIND_PROFILER/ROBS",
-          "type": "profiler",
-          "model": "WIND_PROFILER",
           "element": "ROBS",
+          "id": "layer-wind_profiler_robs",
+          "model": "WIND_PROFILER",
+          "name": "风廓线雷达水平风观测 / WIND_PROFILER/ROBS",
           "path": "WIND_PROFILER/ROBS",
-          "render": {
-            "colormap": "WIND",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
-            "lineColor": "#58a6ff"
-          },
           "product": "ROBS",
-          "stationId": "54511"
+          "renderRef": "profiler-1",
+          "stationId": "54511",
+          "type": "profiler"
         }
-      ]
+      ],
+      "name": "风廓线雷达水平风观测 / WIND_PROFILER/ROBS"
     },
     {
       "category": "预报员指导 (Forecaster Guidance)",
       "hasLevel": false,
       "id": "preset-forecast_nmc_wind",
-      "name": "中央气象台指导极大风 / NMC Forecaster Max Wind",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-forecast_nmc_wind",
-          "name": "中央气象台指导极大风 / NMC Forecaster Max Wind",
-          "type": "wind",
-          "model": "FORECAST_PRODUCT",
           "element": "NMC/WIND",
+          "id": "layer-forecast_nmc_wind",
+          "model": "FORECAST_PRODUCT",
+          "name": "中央气象台指导极大风 / NMC Forecaster Max Wind",
           "path": "FORECAST_PRODUCT/NMC/WIND",
-          "render": {
-            "colormap": "WIND",
-            "showWind": false,
-            "showBarbs": true,
-            "showRaster": false,
-            "keepWind": true
-          }
+          "renderRef": "wind-1",
+          "type": "wind"
         }
-      ]
+      ],
+      "name": "中央气象台指导极大风 / NMC Forecaster Max Wind"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_gfs_cape",
-      "name": "GRAPES_GFS对流有效位能 / GRAPES_GFS CAPE",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_gfs_cape",
-          "name": "GRAPES_GFS对流有效位能 / GRAPES_GFS CAPE",
-          "type": "contour",
-          "model": "GRAPES_GFS",
           "element": "CAPE/SURFACE",
+          "id": "layer-grapes_gfs_cape",
+          "model": "GRAPES_GFS",
+          "name": "GRAPES_GFS对流有效位能 / GRAPES_GFS CAPE",
           "path": "GRAPES_GFS/CAPE/SURFACE",
           "render": {
             "colormap": "CAPE",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#e3b341"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "GRAPES_GFS对流有效位能 / GRAPES_GFS CAPE"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_gfs_cin",
-      "name": "GRAPES_GFS对流抑制能量 / GRAPES_GFS CIN",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_gfs_cin",
-          "name": "GRAPES_GFS对流抑制能量 / GRAPES_GFS CIN",
-          "type": "contour",
-          "model": "GRAPES_GFS",
           "element": "CIN/SURFACE",
+          "id": "layer-grapes_gfs_cin",
+          "model": "GRAPES_GFS",
+          "name": "GRAPES_GFS对流抑制能量 / GRAPES_GFS CIN",
           "path": "GRAPES_GFS/CIN/SURFACE",
           "render": {
             "colormap": "CAPE",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#e3b341"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "GRAPES_GFS对流抑制能量 / GRAPES_GFS CIN"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_gfs_dcape",
-      "name": "GRAPES_GFS下沉对流有效位能 / GRAPES_GFS DCAPE",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_gfs_dcape",
-          "name": "GRAPES_GFS下沉对流有效位能 / GRAPES_GFS DCAPE",
-          "type": "contour",
-          "model": "GRAPES_GFS",
           "element": "DCAPE",
+          "id": "layer-grapes_gfs_dcape",
+          "model": "GRAPES_GFS",
+          "name": "GRAPES_GFS下沉对流有效位能 / GRAPES_GFS DCAPE",
           "path": "GRAPES_GFS/DCAPE",
           "render": {
             "colormap": "CAPE",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#e3b341"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "GRAPES_GFS下沉对流有效位能 / GRAPES_GFS DCAPE"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_gfs_sweat",
-      "name": "GRAPES_GFS强天气威胁指数 / GRAPES_GFS SWEAT_INDEX",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_gfs_sweat",
-          "name": "GRAPES_GFS强天气威胁指数 / GRAPES_GFS SWEAT_INDEX",
-          "type": "contour",
-          "model": "GRAPES_GFS",
           "element": "SWEAT_INDEX",
+          "id": "layer-grapes_gfs_sweat",
+          "model": "GRAPES_GFS",
+          "name": "GRAPES_GFS强天气威胁指数 / GRAPES_GFS SWEAT_INDEX",
           "path": "GRAPES_GFS/SWEAT_INDEX",
           "render": {
             "colormap": "CAPE",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#e3b341"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "GRAPES_GFS强天气威胁指数 / GRAPES_GFS SWEAT_INDEX"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
       "hasLevel": false,
       "id": "preset-grapes_gfs_k_index",
-      "name": "GRAPES_GFS K指数 / GRAPES_GFS K_INDEX",
       "isObservation": false,
       "layers": [
         {
-          "id": "layer-grapes_gfs_k_index",
-          "name": "GRAPES_GFS K指数 / GRAPES_GFS K_INDEX",
-          "type": "contour",
-          "model": "GRAPES_GFS",
           "element": "K_INDEX",
+          "id": "layer-grapes_gfs_k_index",
+          "model": "GRAPES_GFS",
+          "name": "GRAPES_GFS K指数 / GRAPES_GFS K_INDEX",
           "path": "GRAPES_GFS/K_INDEX",
           "render": {
             "colormap": "CAPE",
-            "showFill": true,
-            "showLine": true,
-            "lineWidth": 1.5,
             "lineColor": "#e3b341"
-          }
+          },
+          "renderRef": "contour-3",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "GRAPES_GFS K指数 / GRAPES_GFS K_INDEX"
     },
     {
       "category": "气象卫星遥感 (Satellite Remote Sensing)",
       "hasLevel": false,
       "id": "preset-fy2g_dust",
-      "name": "沙尘真彩监测图 / DUST RGB BMP",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-fy2g_dust",
-          "name": "沙尘真彩监测图 / DUST RGB BMP",
-          "type": "image",
-          "model": "SATELLITE",
+          "bounds": [45, 5, 155, 55],
           "element": "FY2G/L2/DUST",
+          "id": "layer-fy2g_dust",
+          "model": "SATELLITE",
+          "name": "沙尘真彩监测图 / DUST RGB BMP",
           "path": "SATELLITE/FY2G/L2/DUST",
           "render": {
             "colormap": "DUST",
-            "showRaster": true,
             "showFill": false,
-            "showLine": false
+            "showLine": false,
+            "showRaster": true
           },
-          "bounds": [45, 5, 155, 55]
+          "type": "image"
         }
-      ]
+      ],
+      "name": "沙尘真彩监测图 / DUST RGB BMP"
     },
     {
       "category": "气象卫星遥感 (Satellite Remote Sensing)",
       "hasLevel": false,
       "id": "preset-fy2g_ctt",
-      "name": "云顶亮温(CTT) / CTT (Cloud Top Temp)",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-fy2g_ctt",
-          "name": "云顶亮温(CTT) / CTT (Cloud Top Temp)",
-          "type": "contour",
-          "model": "SATELLITE",
           "element": "FY2G/L2/CTT",
+          "id": "layer-fy2g_ctt",
+          "model": "SATELLITE",
+          "name": "云顶亮温(CTT) / CTT (Cloud Top Temp)",
           "path": "SATELLITE/FY2G/L2/CTT",
           "render": {
-            "colormap": "CTT",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "CTT"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "云顶亮温(CTT) / CTT (Cloud Top Temp)"
     },
     {
       "category": "气象卫星遥感 (Satellite Remote Sensing)",
+      "defaultLevel": 200,
       "hasLevel": true,
       "id": "preset-fy2g_amv_ir1",
-      "name": "云导风IR1 / AMV IR1 (Wind Barbs)",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-fy2g_amv_ir1",
-          "name": "云导风IR1 / AMV IR1 (Wind Barbs)",
-          "type": "station",
-          "model": "SATELLITE",
           "element": "FY2G/L2/AMV/IR1",
+          "id": "layer-fy2g_amv_ir1",
+          "level": 200,
+          "model": "SATELLITE",
+          "name": "云导风IR1 / AMV IR1 (Wind Barbs)",
           "path": "SATELLITE/FY2G/L2/AMV/IR1",
-          "render": {
-            "colormap": "WIND",
-            "showWind": true,
-            "showBarbs": true,
-            "showTemp": false,
-            "showPressure": false,
-            "showVisibility": false
-          },
-          "level": 200
+          "renderRef": "station-3",
+          "type": "station"
         }
       ],
-      "defaultLevel": 200,
       "levels": [
         200,
         300,
         500,
         700,
         850
-      ]
+      ],
+      "name": "云导风IR1 / AMV IR1 (Wind Barbs)"
     },
     {
       "category": "气象卫星遥感 (Satellite Remote Sensing)",
+      "defaultLevel": 200,
       "hasLevel": true,
       "id": "preset-fy2g_amv_ir3",
-      "name": "云导风IR3 / AMV IR3 (Wind Barbs)",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-fy2g_amv_ir3",
-          "name": "云导风IR3 / AMV IR3 (Wind Barbs)",
-          "type": "station",
-          "model": "SATELLITE",
           "element": "FY2G/L2/AMV/IR3",
+          "id": "layer-fy2g_amv_ir3",
+          "level": 200,
+          "model": "SATELLITE",
+          "name": "云导风IR3 / AMV IR3 (Wind Barbs)",
           "path": "SATELLITE/FY2G/L2/AMV/IR3",
-          "render": {
-            "colormap": "WIND",
-            "showWind": true,
-            "showBarbs": true,
-            "showTemp": false,
-            "showPressure": false,
-            "showVisibility": false
-          },
-          "level": 200
+          "renderRef": "station-3",
+          "type": "station"
         }
       ],
-      "defaultLevel": 200,
       "levels": [
         200,
         300,
         500,
         700,
         850
-      ]
+      ],
+      "name": "云导风IR3 / AMV IR3 (Wind Barbs)"
     },
     {
       "category": "气象卫星遥感 (Satellite Remote Sensing)",
       "hasLevel": false,
       "id": "preset-fy2g_qpe001",
-      "name": "1小时卫星降水估测 / QPE001 (1h Sat Rain)",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-fy2g_qpe001",
-          "name": "1小时卫星降水估测 / QPE001 (1h Sat Rain)",
-          "type": "contour",
-          "model": "SATELLITE",
           "element": "FY2G/L2/QPE001",
+          "id": "layer-fy2g_qpe001",
+          "model": "SATELLITE",
+          "name": "1小时卫星降水估测 / QPE001 (1h Sat Rain)",
           "path": "SATELLITE/FY2G/L2/QPE001",
           "render": {
-            "colormap": "QPE",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "QPE"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "1小时卫星降水估测 / QPE001 (1h Sat Rain)"
     },
     {
       "category": "气象卫星遥感 (Satellite Remote Sensing)",
       "hasLevel": false,
       "id": "preset-fy2g_qpe003",
-      "name": "3小时卫星降水估测 / QPE003 (3h Sat Rain)",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-fy2g_qpe003",
-          "name": "3小时卫星降水估测 / QPE003 (3h Sat Rain)",
-          "type": "contour",
-          "model": "SATELLITE",
           "element": "FY2G/L2/QPE003",
+          "id": "layer-fy2g_qpe003",
+          "model": "SATELLITE",
+          "name": "3小时卫星降水估测 / QPE003 (3h Sat Rain)",
           "path": "SATELLITE/FY2G/L2/QPE003",
           "render": {
-            "colormap": "QPE",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "QPE"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "3小时卫星降水估测 / QPE003 (3h Sat Rain)"
     },
     {
       "category": "气象卫星遥感 (Satellite Remote Sensing)",
       "hasLevel": false,
       "id": "preset-fy2g_qpe006",
-      "name": "6小时卫星降水估测 / QPE006 (6h Sat Rain)",
       "isObservation": true,
       "layers": [
         {
-          "id": "layer-fy2g_qpe006",
-          "name": "6小时卫星降水估测 / QPE006 (6h Sat Rain)",
-          "type": "contour",
-          "model": "SATELLITE",
           "element": "FY2G/L2/QPE006",
+          "id": "layer-fy2g_qpe006",
+          "model": "SATELLITE",
+          "name": "6小时卫星降水估测 / QPE006 (6h Sat Rain)",
           "path": "SATELLITE/FY2G/L2/QPE006",
           "render": {
-            "colormap": "QPE",
-            "showRaster": true,
-            "showFill": false,
-            "showLine": false
-          }
+            "colormap": "QPE"
+          },
+          "renderRef": "contour-4",
+          "type": "contour"
         }
-      ]
+      ],
+      "name": "6小时卫星降水估测 / QPE006 (6h Sat Rain)"
     }
-  ]
+  ],
+  "renderProfiles": {
+    "contour-1": {
+      "lineWidth": 2,
+      "opacity": 0.75,
+      "showFill": false,
+      "showLabels": true,
+      "showLine": true,
+      "smooth": true,
+      "smoothIterations": 2
+    },
+    "contour-2": {
+      "lineColor": "#f85149",
+      "lineWidth": 2,
+      "showFill": true,
+      "showLabels": true,
+      "showLine": true,
+      "smooth": true,
+      "smoothIterations": 2
+    },
+    "contour-3": {
+      "lineWidth": 1.5,
+      "showFill": true,
+      "showLine": true
+    },
+    "contour-4": {
+      "showFill": false,
+      "showLine": false,
+      "showRaster": true
+    },
+    "contour-5": {
+      "colormap": "SNOW",
+      "showFill": true,
+      "showLine": false
+    },
+    "contour-6": {
+      "colormap": "RAIN",
+      "showFill": true,
+      "showLine": false
+    },
+    "contour-7": {
+      "lineWidth": 2,
+      "palettePath": null,
+      "showBarbs": false,
+      "showRaster": false,
+      "showWind": false,
+      "smooth": true,
+      "smoothIterations": 2
+    },
+    "contour-8": {
+      "colormap": "SLP_VAR",
+      "lineColor": "#58a6ff",
+      "lineWidth": 2,
+      "opacity": 0.65,
+      "showFill": true,
+      "showLabels": true,
+      "showLine": true,
+      "smooth": true,
+      "smoothIterations": 2
+    },
+    "event-1": {
+      "colormap": "TMP",
+      "lineColor": "#58a6ff",
+      "lineWidth": 1.5,
+      "showFill": true,
+      "showLine": true
+    },
+    "event-2": {
+      "colormap": "HAZARDS",
+      "showFill": false,
+      "showLine": false,
+      "showRaster": true
+    },
+    "profiler-1": {
+      "colormap": "WIND",
+      "lineColor": "#58a6ff",
+      "lineWidth": 1.5,
+      "showFill": true,
+      "showLine": true
+    },
+    "station-1": {
+      "showDewpoint": true,
+      "showPressure": true,
+      "showTemp": true,
+      "showVisibility": true,
+      "showWind": true
+    },
+    "station-2": {
+      "showDewpoint": false,
+      "showPressure": false,
+      "showTemp": false,
+      "showWind": false
+    },
+    "station-3": {
+      "colormap": "WIND",
+      "showBarbs": true,
+      "showPressure": false,
+      "showTemp": false,
+      "showVisibility": false,
+      "showWind": true
+    },
+    "wind-1": {
+      "colormap": "WIND",
+      "keepWind": true,
+      "showBarbs": true,
+      "showRaster": false,
+      "showWind": false
+    }
+  }
 }

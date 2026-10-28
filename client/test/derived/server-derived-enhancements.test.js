@@ -300,7 +300,9 @@ describe("Server-Side Derived Layers & Index Configuration", () => {
     const raw = fs.readFileSync("/root/downloads/micaps-web/client/config.json", "utf-8");
     const cfg = JSON.parse(raw);
 
-    // Verify all 7 colormaps are in config.json
+    // Verify all 7 colormaps are in colormaps.json (not config.json)
+    expect(cfg.colormaps).toBeUndefined();
+    cfg.colormaps = JSON.parse(fs.readFileSync("/root/downloads/micaps-web/client/colormaps.json", "utf-8"));
     expect(cfg.colormaps.K_INDEX).toBeDefined();
     expect(cfg.colormaps.K_INDEX.length).toBeGreaterThanOrEqual(2);
     expect(cfg.colormaps.SHOWALTER).toBeDefined();

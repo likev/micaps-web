@@ -1,5 +1,6 @@
 // presets.js - Runtime-loaded composite preset & layer configuration (config.json)
 import { setColormaps } from "../utils/colormaps.js";
+import { expandRenderProfiles, compactConfigForSave } from "./renderProfiles.js";
 import { isUpperAirStationLayer } from "../ui/layers/layerDefaults.js";
 
 const CONFIG_URL = new URL("./config.json", (typeof document !== "undefined" && document.baseURI) ? document.baseURI : "http://localhost:8088/");
@@ -155,6 +156,9 @@ export async function loadPresetGroups() {
     throw new Error("Config must be an array of groups with id and layers");
   }
 
+  // Expand shared render profiles so layers always carry complete `render` objects.
+  if (!Array.isArray(config)) expandRenderProfiles(config);
+
   const colormapsLoaded = colormapsRes.status === "fulfilled" ? colormapsRes.value : null;
   const mergedColormaps = {
     ...(colormapsLoaded || {}),
@@ -191,10 +195,22 @@ export function formatCompactJSON(obj) {
 }
 
 export async function savePresetConfig(configObj = CURRENT_CONFIG) {
+  // colormaps live in colormaps.json; render options shared via renderProfiles.
+  const hasColormaps = !Array.isArray(configObj) && configObj?.colormaps && typeof configObj.colormaps === "object";
+  if (hasColormaps) {
+    const cmRes = await fetch("/api/colormaps", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: formatCompactJSON(configObj.colormaps),
+    });
+    if (!cmRes.ok) {
+      throw new Error(`Failed to save colormaps (${cmRes.status})`);
+    }
+  }
   const res = await fetch("/api/config", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: formatCompactJSON(configObj),
+    body: formatCompactJSON(Array.isArray(configObj) ? configObj : compactConfigForSave(configObj)),
   });
   if (!res.ok) {
     throw new Error(`Failed to save config (${res.status})`);

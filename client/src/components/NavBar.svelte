@@ -1,5 +1,6 @@
 <script>
   import { tick } from "svelte";
+  import { formatFy4bChannel } from "../utils/fy4bChannels.js";
   import { ui } from "../lib/stores/ui.svelte.js";
   import { app } from "../lib/stores/app.svelte.js";
   import { PRESET_GROUPS, isDivider } from "../config/presets.js";
@@ -140,10 +141,14 @@
 
   let isFY4B = $derived(
     Boolean(
-      currentGroup?.id?.includes("fy4") ||
-      currentGroup?.name?.includes("FY-4") ||
-      currentGroup?.path?.includes("FY4") ||
-      (currentGroup?.levels?.length === 15 && currentGroup?.levels[0] === 1)
+      currentGroup?.id?.toLowerCase().includes("fy4") ||
+      currentGroup?.name?.toUpperCase().includes("FY-4") ||
+      currentGroup?.name?.toUpperCase().includes("FY4") ||
+      currentGroup?.path?.toUpperCase().includes("FY4") ||
+      (currentGroup?.levels?.length === 15 && currentGroup?.levels[0] === 1) ||
+      (activeWin?.activeGroup?.id?.toLowerCase().includes("fy4")) ||
+      (activeWin?.activeGroup?.levels?.length === 15 && activeWin?.activeGroup?.levels[0] === 1) ||
+      (activeWin?.model === "SATELLITE" && activeWin?.levels?.length === 15)
     )
   );
 
@@ -161,8 +166,7 @@
   function formatLevelText(lvl) {
     if (lvl === null || lvl === undefined || lvl === "") return "None";
     if (isFY4B) {
-      const num = parseInt(lvl, 10);
-      return !isNaN(num) && num >= 1 && num <= 15 ? `C${String(num).padStart(3, "0")}` : `${lvl}`;
+      return formatFy4bChannel(lvl);
     }
     if (isMeterHeight) {
       const num = parseInt(lvl, 10);

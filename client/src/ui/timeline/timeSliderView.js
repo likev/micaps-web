@@ -218,7 +218,7 @@ export function updateLabels() {
 
 export function setStepLength(stepVal, triggerCallback = false) {
   pausePlayback();
-  timelineState.currentStepLength = parseInt(stepVal, 10) || (timelineState.currentMode === "obs" ? 3 : 6);
+  timelineState.currentStepLength = parseFloat(stepVal) || (timelineState.currentMode === "obs" ? 3 : 6);
   const selStep = typeof document !== "undefined" ? document.getElementById("select-step-length") : null;
   if (selStep) {
     const hasOpt = selStep.options && Array.from(selStep.options).some((o) => String(o.value) === String(timelineState.currentStepLength));

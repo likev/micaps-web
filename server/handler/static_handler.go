@@ -182,10 +182,10 @@ func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-// ColormapsHandler reads client/colormaps.json
+// ColormapsHandler reads or updates client/colormaps.json
 func (h *StaticHandler) ColormapsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
 	if r.Method == http.MethodOptions {
@@ -200,6 +200,39 @@ func (h *StaticHandler) ColormapsHandler(w http.ResponseWriter, r *http.Request)
 	if exePath, err := os.Executable(); err == nil {
 		exeDir := filepath.Dir(exePath)
 		candidates = append(candidates, filepath.Join(exeDir, "client", "colormaps.json"))
+	}
+
+	if r.Method == http.MethodPost || r.Method == http.MethodPut {
+		var obj map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&obj); err != nil {
+			http.Error(w, `{"error":"Invalid JSON: `+err.Error()+`"}`, http.StatusBadRequest)
+			return
+		}
+		formatted, err := json.MarshalIndent(obj, "", "  ")
+		if err != nil {
+			http.Error(w, `{"error":"Format error: `+err.Error()+`"}`, http.StatusInternalServerError)
+			return
+		}
+		str := string(formatted)
+		reColor := regexp.MustCompile(`\[\s*(-?\d+),\s*(-?\d+),\s*(-?\d+),\s*(-?\d+)\s*\]`)
+		str = reColor.ReplaceAllString(str, `[$1, $2, $3, $4]`)
+		reValColor := regexp.MustCompile(`\{\s*"color":\s*(\[[^\]]+\]),\s*"val":\s*(-?[\d.]+)\s*\}`)
+		str = reValColor.ReplaceAllString(str, `{ "color": $1, "val": $2 }`)
+
+		targetSavePath := "client/colormaps.json"
+		for _, p := range candidates {
+			if _, err := os.Stat(p); err == nil {
+				targetSavePath = p
+				break
+			}
+		}
+		if err := os.WriteFile(targetSavePath, []byte(str+"\n"), 0644); err != nil {
+			http.Error(w, `{"error":"Save error: `+err.Error()+`"}`, http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"ok","message":"Colormaps saved successfully to client/colormaps.json"}`))
+		return
 	}
 
 	for _, p := range candidates {

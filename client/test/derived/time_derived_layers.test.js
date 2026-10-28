@@ -320,7 +320,8 @@ describe("Multi-Time Derived Layers (24H/48H T and SLP variations)", () => {
     const config = JSON.parse(rawConfig);
 
     test("colormaps section has T_VAR and SLP_VAR definitions", () => {
-      expect(config.colormaps).toBeDefined();
+      expect(config.colormaps).toBeUndefined();
+      config.colormaps = JSON.parse(readFileSync(resolve(import.meta.dir, "../../colormaps.json"), "utf-8"));
       expect(config.colormaps.T_VAR).toBeDefined();
       expect(config.colormaps.SLP_VAR).toBeDefined();
       expect(config.colormaps.T_VAR.length).toBeGreaterThan(5);

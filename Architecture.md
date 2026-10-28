@@ -1938,3 +1938,9 @@ The CMA AWX format is China Meteorological Administration's standard binary form
   - "气象卫星遥感 (Satellite Remote Sensing)" with satellite icon `🛰️` in `PresetMenu.svelte`.
   - Colormaps added for `IR_TEMP`, `ALBEDO`, `WV`, `CTT`, and `DUST`.
 
+
+## Config file layout (config.json / colormaps.json)
+
+- `client/colormaps.json` holds all colormaps; `config.json` no longer has a `colormaps` key. The client merges them at load time and `savePresetConfig` writes colormaps via `POST /api/colormaps`.
+- `config.json` has a top-level `renderProfiles` map. A layer with `renderRef: "<name>"` inherits that profile and its `render` only lists overrides. The client expands profiles on load (`client/src/config/renderProfiles.js`) and re-compacts on save.
+- After regenerating presets (`scripts/gen-presets.mjs`), run `npm run compact:config` to re-extract colormaps and shared render profiles (idempotent).

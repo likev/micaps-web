@@ -65,6 +65,16 @@ describe("Time Resolver Engine (Part 2 of Meteorological Explorer Design)", () =
       const pathNwp = "/data/nwp/26082820.024";
       expect(parseTimestamp(pathNwp)).toBe(Date.UTC(2026, 7, 28, 20, 0, 0) + 24 * 3600 * 1000);
 
+      // Satellite and Radar filenames (UTC+8 representation preserved)
+      const pathFy4b = "C012_20261016114500_FY4B.AWX";
+      expect(parseTimestamp(pathFy4b)).toBe(Date.UTC(2026, 9, 16, 11, 45, 0));
+
+      const pathFy2g = "CTT_MLT_OTG_20261016_1000_FY2G.AWX";
+      expect(parseTimestamp(pathFy2g)).toBe(Date.UTC(2026, 9, 16, 10, 0, 0));
+
+      const pathRadar = "Z_OTHE_RADAMCR_20261016040600.BIN.BZ2";
+      expect(parseTimestamp(pathRadar)).toBe(Date.UTC(2026, 9, 16, 4, 6, 0));
+
       // Non-numeric strings (should NOT evaluate as NaN or corrupt numbers)
       expect(parseTimestamp("ECMWF_HR")).toBeNull();
       expect(parseTimestamp("SURFACE_PLOT")).toBeNull();
