@@ -22,6 +22,7 @@
   import { getLayersForWindow } from "../lib/stores/layersCore.js";
   import { parseTimestamp, getReferenceNowMs } from "../utils/timeResolver.js";
   import MultiTrackTimeline from "./timeline/MultiTrackTimeline.svelte";
+  import { t } from "../lib/stores/i18n.svelte.js";
   import {
     isRain12Element,
     isWindowRain12,
@@ -590,7 +591,7 @@
         class="play-btn"
         class:active={playback.isPlaying}
         type="button"
-        title={playback.isPlaying ? "Pause Playback (Space)" : "Start Playback (Space)"}
+        title={playback.isPlaying ? t("timeline.pause") : t("timeline.play")}
         aria-label={playback.isPlaying ? "Pause" : "Play"}
         onclick={togglePlay}
       >
@@ -605,7 +606,7 @@
         id="sl-btn-step-prev"
         class="step-nav-btn"
         type="button"
-        title="Previous Step (Left Arrow)"
+        title={t("timeline.prev")}
         aria-label="Previous step"
         onclick={() => handleStep(-1)}
       >◀</button>
@@ -614,7 +615,7 @@
         id="sl-btn-step-next"
         class="step-nav-btn"
         type="button"
-        title="Next Step (Right Arrow)"
+        title={t("timeline.next")}
         aria-label="Next step"
         onclick={() => handleStep(1)}
       >▶</button>
@@ -624,13 +625,13 @@
         class="step-nav-btn loop-toggle-btn"
         class:active={timeline.loopRange?.active}
         type="button"
-        title={timeline.loopRange?.active ? "Disable Loop Range" : "Enable Loop Range (A/B markers)"}
+        title={timeline.loopRange?.active ? t("timeline.loop.disable") : t("timeline.loop.enable")}
         aria-label="Toggle loop range"
         onclick={toggleLoopRange}
       >🔁</button>
 
       <div class="step-length-control">
-        <label for="sl-select-step-length" class="step-length-label">Step:</label>
+        <label for="sl-select-step-length" class="step-length-label">{t("timeline.step")}:</label>
         <select
           id="sl-select-step-length"
           class="step-length-select"
@@ -644,7 +645,7 @@
       </div>
 
       <div class="playback-speed-control">
-        <label for="sl-select-playback-speed" class="step-length-label">Speed:</label>
+        <label for="sl-select-playback-speed" class="step-length-label">{t("timeline.speed")}:</label>
         <select
           id="sl-select-playback-speed"
           class="step-length-select"
@@ -662,12 +663,12 @@
         id="sl-btn-toggle-multitrack"
         class="multitrack-toggle-btn"
         class:active={timeline.multiTrackExpanded}
-        title={timeline.multiTrackExpanded ? "Collapse Multi-Track DAW View" : "Expand Multi-Track DAW Lanes (§2.3)"}
+        title={timeline.multiTrackExpanded ? t("timeline.multitrack.collapse") : t("timeline.multitrack.expand")}
         onclick={() => {
           timeline.multiTrackExpanded = !timeline.multiTrackExpanded;
         }}
       >
-        {timeline.multiTrackExpanded ? "⤡ Single Strip" : "⤢ DAW Lanes"}
+        {timeline.multiTrackExpanded ? t("timeline.singleStrip") : t("timeline.dawLanes")}
       </button>
     </div>
 

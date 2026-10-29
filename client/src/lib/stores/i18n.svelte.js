@@ -11,6 +11,10 @@ import {
   localizeCategory,
   localizeEntityName,
   CATEGORY_TRANSLATIONS,
+  UI_STRINGS,
+  BADGE_TRANSLATIONS,
+  LEGEND_TITLE_TRANSLATIONS,
+  translateUI,
 } from "./i18nCore.js";
 import { tabsState } from "./tabs.svelte.js";
 import { updateWindowTitle } from "../../ui/tabs/windowTitles.js";
@@ -23,6 +27,10 @@ export {
   localizeCategory,
   localizeEntityName,
   CATEGORY_TRANSLATIONS,
+  UI_STRINGS,
+  BADGE_TRANSLATIONS,
+  LEGEND_TITLE_TRANSLATIONS,
+  translateUI,
 };
 
 let activeLocale = $state(coreGetGlobalLocale());
@@ -63,4 +71,22 @@ export function setGlobalLocale(locale) {
 
 export function toggleGlobalLocale() {
   coreToggleGlobalLocale();
+}
+
+/**
+ * Reactive UI string translator for Svelte 5 templates & $derived expressions.
+ * Automatically tracks `activeLocale`.
+ */
+export function t(key, paramsOrLocale = undefined, explicitLocale = undefined) {
+  let params = undefined;
+  let loc = explicitLocale;
+  if (typeof paramsOrLocale === "string") {
+    loc = paramsOrLocale;
+  } else {
+    params = paramsOrLocale;
+  }
+  if (!loc) {
+    loc = activeLocale;
+  }
+  return translateUI(key, params, loc);
 }

@@ -4,6 +4,7 @@
   import { hexToRgb, rgbToHex } from "../../ui/config/swatchPicker.js";
   import { stopsToCSSGradient } from "../../ui/config/colormapStops.js";
   import { getColormapUsageCounts, rewriteColormapReferences } from "../../ui/config/colormapForm.js";
+  import { t } from "../../lib/stores/i18n.svelte.js";
 
   let { formState } = $props();
 
@@ -216,20 +217,20 @@
       <input
         type="search"
         class="config-input config-search"
-        placeholder="Filter colormaps..."
+        placeholder={t("config.colormaps.filter")}
         bind:value={searchQuery}
       />
       <button
         type="button"
         class="btn btn-primary btn-add-preset"
         onclick={handleCreateColormap}
-      >+ New</button>
+      >{t("config.colormaps.newColormap")}</button>
     </div>
 
     <div class="config-sidebar-list" id="colormap-sidebar-list">
       {#if filteredNames.length === 0}
         <div class="config-empty-state config-empty-state-sidebar">
-          No colormaps found
+          {t("config.colormaps.noMatch")}
         </div>
       {:else}
         {#each filteredNames as name (name)}
@@ -248,8 +249,8 @@
               <span class="sidebar-item-name">{name}</span>
               <div class="sidebar-item-badges">
                 {#if hasError}<span class="badge-error" title="Validation errors">⚠</span>{/if}
-                <span class="sidebar-item-chip">{stops.length} stops</span>
-                {#if count > 0}<span class="sidebar-item-chip usage">{count} used</span>{/if}
+                <span class="sidebar-item-chip">{t("config.colormaps.stopsCount", { count: stops.length })}</span>
+                {#if count > 0}<span class="sidebar-item-chip usage">{t("config.colormaps.usedCount", { count })}</span>{/if}
               </div>
             </div>
             <div class="sidebar-colormap-preview" style:background={grad}></div>
@@ -263,7 +264,7 @@
   <div class="config-detail-pane">
     {#if !activeColormap || !colormaps[activeColormap]}
       <div class="config-empty-state">
-        <p>Select or create a colormap to view details.</p>
+        <p>{t("config.colormaps.emptyDetails")}</p>
       </div>
     {:else}
       <div class="config-detail-content">
@@ -271,7 +272,7 @@
         <div class="config-card">
           <div class="config-card-header card-header-flex">
             <div class="toolbar-group">
-              <label for="input-cmap-name" class="cmap-name-label">Colormap Name:</label>
+              <label for="input-cmap-name" class="cmap-name-label">{t("config.colormaps.name")}</label>
               <input
                 type="text"
                 id="input-cmap-name"
@@ -280,23 +281,23 @@
                 onchange={handleRename}
               />
               {#if usages[activeColormap]}
-                <span class="sidebar-item-chip usage">{usages[activeColormap]} used</span>
+                <span class="sidebar-item-chip usage">{t("config.colormaps.usedCount", { count: usages[activeColormap] })}</span>
               {/if}
             </div>
 
             <div class="toolbar-group">
               <select class="config-select" onchange={handleApplyPreset}>
-                <option value="">Preset Template...</option>
+                <option value="">{t("config.colormaps.presetTemplate")}</option>
                 {#each BUILTIN_COLORMAP_PRESETS as p}
                   <option value={p.name}>{p.name} ({p.stops?.length || 0} stops)</option>
                 {/each}
               </select>
 
-              <button type="button" class="btn" title="Duplicate Colormap" onclick={handleDuplicate}>
-                📋 Duplicate
+              <button type="button" class="btn" title={t("config.presets.duplicate")} onclick={handleDuplicate}>
+                📋 {t("config.presets.duplicate")}
               </button>
-              <button type="button" class="btn btn-danger" title="Delete Colormap" onclick={handleDelete}>
-                🗑️ Delete
+              <button type="button" class="btn btn-danger" title={t("config.presets.delete")} onclick={handleDelete}>
+                🗑️ {t("config.presets.delete")}
               </button>
             </div>
           </div>
@@ -316,7 +317,7 @@
         <!-- Gradient Preview Card -->
         <div class="colormap-gradient-card mt-16">
           <div class="colormap-gradient-header">
-            <h4>Gradient Preview</h4>
+            <h4>{t("config.colormaps.gradientPreview")}</h4>
             <span class="gradient-val-range">{minVal} → {maxVal}</span>
           </div>
           <div class="colormap-gradient-bar" style:background={gradientCSS}></div>
@@ -330,15 +331,15 @@
         <div class="config-card mt-16">
           <div class="config-card-header card-header-flex">
             <div>
-              <h3>Stop Points ({currentStops.length})</h3>
-              <p class="config-card-desc">Define scalar values and corresponding RGBA color transitions.</p>
+              <h3>{t("config.colormaps.stopPointsCount", { count: currentStops.length })}</h3>
+              <p class="config-card-desc">{t("config.colormaps.stopPointsDesc")}</p>
             </div>
             <div class="header-actions">
-              <button type="button" class="btn" title="Reverse Stops" onclick={handleReverseStops}>
-                ⇄ Reverse Colors
+              <button type="button" class="btn" title={t("config.colormaps.reverseColors")} onclick={handleReverseStops}>
+                ⇄ {t("config.colormaps.reverseColors")}
               </button>
-              <button type="button" class="btn btn-primary" title="Add Stop" onclick={handleAddStop}>
-                + Add Stop
+              <button type="button" class="btn btn-primary" title={t("config.colormaps.addStop")} onclick={handleAddStop}>
+                {t("config.colormaps.addStop")}
               </button>
             </div>
           </div>
@@ -348,9 +349,9 @@
               <thead>
                 <tr>
                   <th class="th-num">#</th>
-                  <th class="th-val">Value</th>
-                  <th class="th-color">Color</th>
-                  <th class="th-hex">Hex</th>
+                  <th class="th-val">{t("config.colormaps.colValue")}</th>
+                  <th class="th-color">{t("config.colormaps.colColor")}</th>
+                  <th class="th-hex">{t("config.colormaps.colHex")}</th>
                   <th class="th-action"></th>
                 </tr>
               </thead>

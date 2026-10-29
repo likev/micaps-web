@@ -4,6 +4,7 @@ import { formatElementUnit } from "../../utils/formatters.js";
 import { getWindowById } from "./tabsCore.js";
 import { getLayersForWindow, getCurrentActiveWinId } from "./layersCore.js";
 import { resolveLayerTime } from "../../utils/timeResolver.js";
+import { getGlobalLocale, localizeEntityName, LEGEND_TITLE_TRANSLATIONS } from "./i18nCore.js";
 
 const windowLegends = new Map();
 
@@ -142,7 +143,15 @@ export function buildLegendItems(winOrId, legendsMap = windowLegends, winResolve
       }
     }
 
-    const titleText = item.name || (layers.filter((l) => l.element && l.element.toUpperCase() === element).length > 1 ? layer?.name : null) || element;
+    const locale = getGlobalLocale();
+    let titleText = item.name || (layers.filter((l) => l.element && l.element.toUpperCase() === element).length > 1 ? layer?.name : null) || element;
+    if (locale === "zh") {
+      if (LEGEND_TITLE_TRANSLATIONS[titleText]) {
+        titleText = LEGEND_TITLE_TRANSLATIONS[titleText].zh;
+      } else {
+        titleText = localizeEntityName(titleText, "zh");
+      }
+    }
     const prefix = livePrefix || item.winPrefix || (typeof winId === "string" && winId.match(/win-(\d+)/) ? `W${parseInt(winId.match(/win-(\d+)/)[1], 10) + 1}` : null);
     const displayTitle = prefix ? `[${prefix}] ${titleText}` : titleText;
 

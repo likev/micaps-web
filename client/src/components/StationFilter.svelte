@@ -2,7 +2,7 @@
   import { ensureLayerFilterRules } from "../ui/stationFilterControl.js";
   import { getViewAutoCheckPatch } from "../layers/station/stationFilter.js";
   import { isUpperAirStationLayer, getStationDatasetType } from "../ui/layers/layerDefaults.js";
-  import { getGlobalLocale } from "../lib/stores/i18n.svelte.js";
+  import { getGlobalLocale, t } from "../lib/stores/i18n.svelte.js";
 
   let { layer, onFilterChange = null } = $props();
 
@@ -125,19 +125,19 @@
 
 <div class="config-filter-section">
   <div class="filter-header">
-    <span class="filter-title">Data Filter Rules</span>
+    <span class="filter-title">{t("stationFilter.title")}</span>
     <div class="filter-match">
-      <span>Match:</span>
+      <span>{t("stationFilter.match")}</span>
       <select
         class="sel-filter-global-logic"
         bind:value={logic}
         onchange={update}
         title="ViewOnly: each rule hides only its own element (others still show). AND/OR/Rule-1 hide whole stations."
       >
-        <option value="VIEW">ViewOnly (per-element)</option>
-        <option value="AND">ALL (AND)</option>
-        <option value="OR">ANY (OR)</option>
-        <option value="none">Rule 1 Only</option>
+        <option value="VIEW">{t("stationFilter.viewOnly")}</option>
+        <option value="AND">{t("stationFilter.allAnd")}</option>
+        <option value="OR">{t("stationFilter.anyOr")}</option>
+        <option value="none">{t("stationFilter.rule1Only")}</option>
       </select>
     </div>
   </div>
@@ -230,8 +230,8 @@
   </div>
 
   <div class="filter-actions">
-    <button type="button" class="btn-add-rule" onclick={addRule}>＋ Add Rule</button>
-    <button type="button" class="btn-clear-rules" onclick={clearRules}>Clear All</button>
+    <button type="button" class="btn-add-rule" onclick={addRule}>{t("stationFilter.addRule")}</button>
+    <button type="button" class="btn-clear-rules" onclick={clearRules}>{t("stationFilter.clearAll")}</button>
   </div>
 
   <div class="config-quick-presets" aria-label="Quick station filter presets">

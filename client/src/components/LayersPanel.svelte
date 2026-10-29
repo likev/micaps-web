@@ -14,6 +14,7 @@
   import LayerRow from "./LayerRow.svelte";
   import StatusPanel from "./StatusPanel.svelte";
   import { resolveLayerTime, parseTimestamp, getReferenceNowMs } from "../utils/timeResolver.js";
+  import { t } from "../lib/stores/i18n.svelte.js";
 
   let { winId = null, onLayerAction = null } = $props();
 
@@ -188,7 +189,7 @@
             class:active={panelTab === "layers"}
             onclick={() => (panelTab = "layers")}
           >
-            Layers
+            {t("layers.subtab.layers")}
           </button>
           <button
             type="button"
@@ -199,7 +200,7 @@
             onclick={() => (panelTab = "status")}
             title="Observation Age and Staleness Status (§2.5)"
           >
-            ⏱ Time Status
+            {t("layers.subtab.status")}
           </button>
         </div>
 
@@ -213,12 +214,12 @@
     {#if autoHideStale && hiddenStaleLayers.length > 0}
       <div class="stale-hidden-chip" title="Click to show stale layers">
         <span class="stale-hidden-icon">⚠️</span>
-        <span class="stale-hidden-text">{hiddenStaleLayers.length} layer{hiddenStaleLayers.length > 1 ? "s" : ""} hidden (stale)</span>
+        <span class="stale-hidden-text">{t("layers.staleHidden", { count: hiddenStaleLayers.length, s: hiddenStaleLayers.length > 1 ? "s" : "" })}</span>
         <button
           type="button"
           class="btn-unhide-stale"
           onclick={() => handleToggleAutoHide(false)}
-        >Show</button>
+        >{t("layers.show")}</button>
       </div>
     {/if}
 

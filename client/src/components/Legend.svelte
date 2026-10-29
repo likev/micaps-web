@@ -3,6 +3,7 @@
   import { ui } from "../lib/stores/ui.svelte.js";
   import { buildLegendItems, setSvelteLegendOwner } from "../lib/stores/legendCore.js";
   import { legends, syncLegendState } from "../lib/stores/legend.svelte.js";
+  import { t, getGlobalLocale } from "../lib/stores/i18n.svelte.js";
 
   let { winId = "default", perWindow = false, disabled = false } = $props();
 
@@ -16,9 +17,10 @@
     setSvelteLegendOwner(false);
   });
 
-  // Reactive trigger on legends store mutations
+  // Reactive trigger on legends store mutations and locale
   let items = $derived.by(() => {
     const _ = legends[winId];
+    const _loc = getGlobalLocale();
     return buildLegendItems(winId);
   });
 </script>
@@ -26,7 +28,7 @@
 {#if disabled}
   <!-- per-window legends are rendered inside each window (unshared split) -->
 {:else if !ui.configOpen && items && items.length > 0}
-  <div id={perWindow ? `legend-panel-${winId}` : "legend-panel"} class="legend-panel" role="region" aria-label="Map Legends">
+  <div id={perWindow ? `legend-panel-${winId}` : "legend-panel"} class="legend-panel" role="region" aria-label={t("legend.title")}>
     {#each items as item (item.key || item.layerId || item.element)}
       <div class="legend-item">
         <div class="legend-header">

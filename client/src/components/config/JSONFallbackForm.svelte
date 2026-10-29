@@ -1,6 +1,7 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import { formatCompactJSON } from "../../config/presets.js";
+  import { t } from "../../lib/stores/i18n.svelte.js";
 
   let { formState } = $props();
 
@@ -83,20 +84,20 @@
 
 <div class="config-json-wrapper">
   <div class="config-json-toolbar">
-    <span class="config-json-hint">Direct JSON mode. Changes synchronize across all visual sub-tabs.</span>
+    <span class="config-json-hint">{t("config.json.hint")}</span>
     <button
       id="btn-config-json-format"
       type="button"
       class="btn"
       title="Auto-format and indent JSON"
       onclick={handleFormat}
-    >⚡ Format JSON</button>
+    >{t("config.json.format")}</button>
   </div>
   <textarea
     id="config-json-textarea"
     class="config-editor-textarea"
     spellcheck="false"
-    placeholder="Loading JSON..."
+    placeholder={t("config.json.loading")}
     bind:this={textareaEl}
     bind:value={text}
     oninput={handleInput}

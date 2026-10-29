@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { isFullscreen, toggleFullscreen } from "../ui/fullscreenControl.js";
   import { ui } from "../lib/stores/ui.svelte.js";
+  import { t } from "../lib/stores/i18n.svelte.js";
 
   let inFullscreen = $state(false);
 
@@ -30,8 +31,8 @@
   class="btn-fullscreen-toggle"
   class:is-fullscreen={inFullscreen}
   type="button"
-  aria-label={inFullscreen ? "Exit Fullscreen" : "Toggle Fullscreen"}
-  title={inFullscreen ? "Exit Fullscreen" : "Toggle Fullscreen"}
+  aria-label={inFullscreen ? t("fullscreen.exit") : t("fullscreen.enter")}
+  title={inFullscreen ? t("fullscreen.exit") : t("fullscreen.enter")}
   onclick={handleClick}
 >
   {#if inFullscreen}

@@ -18,6 +18,7 @@
   import { formatStepLabel, isSatelliteGroup } from "../lib/stores/timelineMath.js";
   import { cursorProbeState } from "../lib/stores/cursorProbe.svelte.js";
   import { reapplyLightingCompensation } from "../services/lightingController.js";
+  import { t, getGlobalLocale } from "../lib/stores/i18n.svelte.js";
 
   let { winId = "default", onTimeChange = null, onToggleLighting = null } = $props();
 
@@ -71,6 +72,12 @@
 
   let statusText = $state("Connecting...");
   let statusState = $state("connecting"); // connected | warning | disconnected
+  let displayStatusText = $derived.by(() => {
+    if (statusState === "connecting") return t("status.connecting");
+    if (statusText === "MOCK") return t("status.mock");
+    if (statusText === "OFFLINE") return t("status.offline");
+    return statusText;
+  });
   let pollInterval = null;
   let abortController = null;
 
@@ -140,13 +147,13 @@
 <footer id="status-bar" class="status-bar statebar" aria-label="Status Bar">
   <!-- Left section: nav-status-indicator -->
   <div class="status-bar-left">
-    <div id="nav-status-indicator" class="nav-status status-indicator" title="Backend Server Status: {statusText}">
+    <div id="nav-status-indicator" class="nav-status status-indicator" title="Backend Server Status: {displayStatusText}">
       <span
         class="status-dot"
         class:warning={statusState === "warning"}
         class:disconnected={statusState === "disconnected"}
       ></span>
-      <span id="nav-status-text" class="status-text">{statusText}</span>
+      <span id="nav-status-text" class="status-text">{displayStatusText}</span>
     </div>
   </div>
 
@@ -161,8 +168,8 @@
       aria-checked={app.lightingCompensation}
       aria-label="Toggle Solar Lighting Compensation"
       title={app.lightingCompensation
-        ? "Solar Lighting Compensation: ON (Normalizes sun-angle & slant-path cloud/vapor color differences)"
-        : "Solar Lighting Compensation: OFF (Click to normalize morning/noon/evening & longitude sun-angle differences)"}
+        ? t("status.lightingTitleOn")
+        : t("status.lightingTitleOff")}
       onclick={toggleLightingCompensation}
     >
       <span class="lighting-icon" aria-hidden="true">
@@ -170,7 +177,7 @@
           <path d="M8 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0 1a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"/>
         </svg>
       </span>
-      <span class="lighting-label">Lighting</span>
+      <span class="lighting-label">{t("status.lighting")}</span>
       <span class="toggle-switch-ui" class:on={app.lightingCompensation} aria-hidden="true">
         <span class="toggle-thumb"></span>
       </span>
@@ -190,22 +197,22 @@
     >
       {#if app.historyMode && app.historyDate}
         <span id="status-history-badge" class="history-badge" title="History Mode Cutoff: {app.historyDate} 24:00">
-          HISTORY · {app.historyDate}
+          {t("status.historyBadge", { date: app.historyDate })}
         </span>
       {/if}
       <span class="mode-badge" class:obs-badge={isObs}>
-        {isObs ? "OBSERVATION" : "NWP FORECAST"}
+        {isObs ? t("status.observation") : t("status.nwpForecast")}
       </span>
 
       {#if !isObs}
         <div class="init-time-control">
-          <label for="sl-select-forecast-cycle" class="init-time-label">Init:</label>
+          <label for="sl-select-forecast-cycle" class="init-time-label">{t("status.init")}</label>
           <select
             id="sl-select-forecast-cycle"
             class="init-time-select"
             value={currentCycle}
             onchange={handleCycleChange}
-            title="Select forecast initialization cycle"
+            title={t("status.initTitle")}
           >
             {#if cycles.length === 0}
               <option value="">--</option>
@@ -218,7 +225,7 @@
       {/if}
 
       <div id="sl-time-lead-wrapper">
-        <span class="lead-prefix">{isObs ? "Observation Time: " : "Forecast Lead: "}</span>
+        <span class="lead-prefix">{isObs ? t("status.obsTime") : t("status.forecastLead")}</span>
         <strong id="sl-time-lead-label">
           {isObs ? (activeObsFile ? formatObsTimestamp(activeObsFile) : "--") : formatLeadTime(activePeriod)}
         </strong>
@@ -226,9 +233,9 @@
 
       <div id="sl-time-valid-label" class="valid-label">
         {#if isObs}
-          Real-time Observation (Step: {formatStepLabel(stepLength)})
+          {t("status.realTimeObs", { step: formatStepLabel(stepLength) })}
         {:else if currentCycle}
-          Valid: {formatForecastValidTime(currentCycle, activePeriod)} (Step: {formatStepLabel(stepLength)})
+          {t("status.validStep", { valid: formatForecastValidTime(currentCycle, activePeriod), step: formatStepLabel(stepLength) })}
         {:else}
           --
         {/if}
@@ -236,7 +243,7 @@
     </div>
 
     <!-- Item C: Live Coordinates & Value Probe -->
-    <div id="status-cursor-probe" class="status-cursor-probe" title="Live Cursor Probe (Coordinates & Meteorological Values)">
+    <div id="status-cursor-probe" class="status-cursor-probe" title={t("status.cursorProbe")}>
       <span class="probe-icon" aria-hidden="true">📍</span>
       <span id="status-probe-coords" class="probe-coords">{cursorProbeState.formattedCoords}</span>
       {#if cursorProbeState.metValues}
@@ -256,7 +263,7 @@
       role="switch"
       aria-checked={ui.layersOpen}
       aria-label="Toggle Layers Panel"
-      title={ui.layersOpen ? "Hide Layers Panel" : "Show Layers Panel"}
+      title={t("status.layersTitle")}
       onclick={toggleLayers}
     >
       <span class="layers-icon" aria-hidden="true">
@@ -264,7 +271,7 @@
           <path d="m8 1.5 6 3-6 3-6-3 6-3zm0 5.25L13.5 4 14 4.25v2.5L8 10 2 6.75v-2.5L2.5 4 8 6.75zM2 9.25 2.5 9 8 11.75 13.5 9l.5.25v2.5L8 15l-6-3.25v-2.5z"/>
         </svg>
       </span>
-      <span class="layers-label">Layers</span>
+      <span class="layers-label">{t("status.layers")}</span>
       <span class="toggle-switch-ui" class:on={ui.layersOpen} aria-hidden="true">
         <span class="toggle-thumb"></span>
       </span>

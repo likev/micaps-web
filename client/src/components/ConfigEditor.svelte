@@ -8,13 +8,14 @@
   import SettingsForm from "./config/SettingsForm.svelte";
   import JSONFallbackForm from "./config/JSONFallbackForm.svelte";
   import { focusRestore } from "../actions/focusRestore.js";
+  import { t } from "../lib/stores/i18n.svelte.js";
 
   let { onConfigSaved = null } = $props();
 
   let activeSubtab = $state(ui.activeConfigSubtab || "presets");
   let formState = $state(createFormState(CURRENT_CONFIG || {}));
   let isDirty = $state(false);
-  let statusText = $state("Valid");
+  let statusText = $state("Valid (Saved)");
   let statusClass = $state("valid");
   let statusMsg = $state("");
 
@@ -45,15 +46,15 @@
     const val = formState.getValidation();
     const isValid = val.isValid ?? val.valid ?? true;
     if (!isValid) {
-      statusText = `Invalid (${val.errors.length} err)`;
+      statusText = `${t("config.status.invalid")} (${val.errors.length} err)`;
       statusClass = "error";
       statusMsg = val.errors.map((e) => `${e.path}: ${e.message}`).join("; ");
     } else if (isDirty) {
-      statusText = "Modified (Unsaved)";
+      statusText = t("config.status.modified");
       statusClass = "dirty";
       statusMsg = "You have unsaved changes.";
     } else {
-      statusText = "Valid (Saved)";
+      statusText = t("config.status.saved");
       statusClass = "valid";
       statusMsg = "Configuration is valid and synchronized.";
     }
@@ -149,7 +150,7 @@
   <div id="config-editor-panel" class="config-editor-panel" role="region" aria-label="Configuration Editor" use:focusRestore>
     <div class="config-editor-toolbar">
       <div class="config-editor-title-group">
-        <span class="config-editor-title">⚙ Meteorological Configuration</span>
+        <span class="config-editor-title">{t("config.title")}</span>
         <div class="config-subtab-bar" role="tablist">
           <button
             class="config-subtab-btn"
@@ -158,7 +159,7 @@
             role="tab"
             aria-selected={activeSubtab === "presets"}
             onclick={() => selectSubtab("presets")}
-          >Presets</button>
+          >{t("config.subtab.presets")}</button>
           <button
             class="config-subtab-btn"
             class:active={activeSubtab === "colormaps"}
@@ -166,7 +167,7 @@
             role="tab"
             aria-selected={activeSubtab === "colormaps"}
             onclick={() => selectSubtab("colormaps")}
-          >Colormaps</button>
+          >{t("config.subtab.colormaps")}</button>
           <button
             class="config-subtab-btn"
             class:active={activeSubtab === "settings"}
@@ -174,7 +175,7 @@
             role="tab"
             aria-selected={activeSubtab === "settings"}
             onclick={() => selectSubtab("settings")}
-          >Settings</button>
+          >{t("config.subtab.settings")}</button>
           <button
             class="config-subtab-btn"
             class:active={activeSubtab === "json"}
@@ -182,20 +183,20 @@
             role="tab"
             aria-selected={activeSubtab === "json"}
             onclick={() => selectSubtab("json")}
-          >⟨⟩ JSON</button>
+          >{t("config.subtab.json")}</button>
         </div>
         <span class="config-editor-status {statusClass}">{statusText}</span>
       </div>
 
       <div class="config-editor-actions">
         <button id="btn-config-reload" class="btn" title="Reload pristine configuration" onclick={handleReload}>
-          ↺ Reload
+          {t("config.btn.reload")}
         </button>
         <button id="btn-config-save-apply" class="btn btn-primary" title="Save and apply configuration changes" onclick={handleSaveApply}>
-          ✓ Save & Apply
+          {t("config.btn.saveApply")}
         </button>
         <button id="btn-config-close" class="btn" title="Close Configuration Editor" onclick={handleClose}>
-          ✕ Close
+          {t("config.btn.close")}
         </button>
       </div>
     </div>

@@ -4,7 +4,7 @@
   import { getPaletteCategory, listPaletteFiles } from "../utils/paletteLoader.js";
   import { parseOffset, formatOffset, resolveLayerTime, parseTimestamp, getReferenceNowMs } from "../utils/timeResolver.js";
   import StationFilter from "./StationFilter.svelte";
-  import { localizeEntityName, getGlobalLocale } from "../lib/stores/i18n.svelte.js";
+  import { localizeEntityName, getGlobalLocale, t } from "../lib/stores/i18n.svelte.js";
 
   let {
     layer,
@@ -106,6 +106,28 @@
   let currentLocale = $derived(getGlobalLocale());
   let activeSubtab = $state("");
 
+  const SUBTAB_ZH_MAP = {
+    style: "样式",
+    interval: "间隔",
+    time: "时间",
+    elements: "要素",
+    filter: "过滤",
+    display: "显示",
+    palette: "色标",
+    station: "站点",
+    curves: "曲线",
+    point: "单点与时效",
+    fields: "物理量",
+    transect: "剖面线",
+    features: "地理要素",
+    basemap: "地图投影",
+    general: "常规",
+  };
+
+  function getSubtabLabel(id, defaultLabel) {
+    return currentLocale === "zh" ? (SUBTAB_ZH_MAP[id] || defaultLabel) : defaultLabel;
+  }
+
   let subtabs = $derived.by(() => {
     switch (layer.type) {
       case "contour":
@@ -166,6 +188,18 @@
           { id: "general", label: "General", icon: "⚙" },
           { id: "time", label: "Time", icon: "⏱" },
         ];
+    }
+  });
+
+  $effect(() => {
+    const loc = currentLocale;
+    const sel = typeof document !== "undefined" ? document.getElementById(`sel-basemap-proj-${layer.id}`) : null;
+    if (sel && sel.options) {
+      for (const opt of sel.options) {
+        if (opt.value === "mercator") opt.text = loc === "zh" ? "🗺️ 墨卡托 (2D)" : "🗺️ Mercator (2D)";
+        else if (opt.value === "globe") opt.text = loc === "zh" ? "🌍 三维地球 (3D)" : "🌍 Globe (3D)";
+        else if (opt.value === "vertical-perspective") opt.text = loc === "zh" ? "🪐 垂直透视 (3D)" : "🪐 Perspective (3D)";
+      }
     }
   });
 
@@ -242,8 +276,8 @@
       type="button"
       class="btn-config"
       class:open={expanded}
-      title="Configure Layer"
-      aria-label="Configure Layer"
+      title={t("layers.expand")}
+      aria-label={t("layers.expand")}
       onclick={(e) => {
         e.stopPropagation();
         if (onToggleExpanded) onToggleExpanded();
@@ -281,7 +315,7 @@
             onclick={() => (activeSubtab = tab.id)}
           >
             {#if tab.icon}<span class="subtab-icon">{tab.icon}</span>{/if}
-            <span class="subtab-title">{tab.label}</span>
+            <span class="subtab-title">{getSubtabLabel(tab.id, tab.label)}</span>
             {#if tab.id === "time" && resolvedStatus?.isDesync}
               <span class="subtab-dot dot-blue" title="Desynced">●</span>
             {:else if tab.id === "time" && resolvedStatus?.isHardStale}
@@ -303,7 +337,7 @@
                 checked={layer.config?.showLine !== false}
                 onchange={(e) => handleConfigChange("showLine", e.target.checked)}
               />
-              <span>Contour Lines</span>
+              <span>{t("layers.contourLines")}</span>
             </label>
             <label>
               <input
@@ -312,7 +346,7 @@
                 checked={Boolean(layer.config?.showFill)}
                 onchange={(e) => handleConfigChange("showFill", e.target.checked)}
               />
-              <span>Color Fill</span>
+              <span>{t("layers.colorFill")}</span>
             </label>
           </div>
 
@@ -324,7 +358,7 @@
                 checked={Boolean(layer.config?.showRaster)}
                 onchange={(e) => handleConfigChange("showRaster", e.target.checked)}
               />
-              <span>Raster Shading</span>
+              <span>{t("layers.rasterShading")}</span>
             </label>
             <label>
               <input
@@ -333,12 +367,12 @@
                 checked={layer.config?.showLabels !== false}
                 onchange={(e) => handleConfigChange("showLabels", e.target.checked)}
               />
-              <span>Labels</span>
+              <span>{t("layers.labels")}</span>
             </label>
           </div>
 
           <div class="config-row">
-            <span>Opacity:</span>
+            <span>{t("layers.opacity")}</span>
             <input
               type="range"
               class="slider-fill-opacity"
@@ -352,7 +386,7 @@
 
           <div class="config-row config-row-wrap">
             <label class="inline-control">
-              <span>Line color</span>
+              <span>{t("layers.lineColor")}</span>
               <input
                 type="color"
                 class="color-picker-line"
@@ -361,18 +395,18 @@
               />
             </label>
             <label class="inline-control">
-              <span>Width</span>
+              <span>{t("layers.width")}</span>
               <input type="number" min="0.5" max="10" step="0.5" value={layer.config?.lineWidth ?? 2} onchange={(e) => handleNumberChange("lineWidth", e)} />
             </label>
             <label class="inline-control">
-              <span>Label</span>
+              <span>{t("layers.label")}</span>
               <input type="number" min="9" max="24" step="1" value={layer.config?.labelSize ?? 13} onchange={(e) => handleNumberChange("labelSize", e)} />
             </label>
           </div>
 
           <div class="config-row config-row-wrap">
             <label class="inline-control wide-control">
-              <span>Bold values</span>
+              <span>{t("layers.boldValues")}</span>
               <input
                 type="text"
                 value={(layer.config?.boldValues || []).join(", ")}
@@ -381,7 +415,7 @@
               />
             </label>
             <label class="inline-control">
-              <span>Bold px</span>
+              <span>{t("layers.boldPx")}</span>
               <input type="number" min="1" max="12" step="0.5" value={layer.config?.boldLineWidth ?? 4} onchange={(e) => handleNumberChange("boldLineWidth", e)} />
             </label>
           </div>
@@ -389,31 +423,31 @@
           <div class="config-row">
             <label>
               <input type="checkbox" checked={layer.config?.smooth !== false} onchange={(e) => handleConfigChange("smooth", e.target.checked)} />
-              <span>Smooth Contour Lines</span>
+              <span>{t("layers.smoothLines")}</span>
             </label>
           </div>
 
           {#if isWind}
             <div class="config-row">
-              <label><input type="checkbox" checked={layer.config?.showWind !== false} onchange={(e) => handleConfigChange("showWind", e.target.checked)} /> Wind Streamlines</label>
-              <label><input type="checkbox" checked={Boolean(layer.config?.showBarbs)} onchange={(e) => handleConfigChange("showBarbs", e.target.checked)} /> Wind Barbs</label>
+              <label><input type="checkbox" checked={layer.config?.showWind !== false} onchange={(e) => handleConfigChange("showWind", e.target.checked)} /> {t("layers.windStreamlines")}</label>
+              <label><input type="checkbox" checked={Boolean(layer.config?.showBarbs)} onchange={(e) => handleConfigChange("showBarbs", e.target.checked)} /> {t("layers.windBarbs")}</label>
             </div>
           {/if}
         </div>
 
         <div class="config-subtab-pane" class:active={currentSubtab === "interval"} role="tabpanel">
           <div class="config-row config-row-wrap interval-editor">
-            <span>Interval</span>
-            <input class="input-interval-start" type="number" step="any" placeholder="Start" value={layer.config?.interval?.start ?? ""} onchange={handleIntervalChange} />
-            <input class="input-interval-step" type="number" step="any" placeholder="Step" value={layer.config?.interval?.step ?? ""} onchange={handleIntervalChange} />
-            <input class="input-interval-end" type="number" step="any" placeholder="End" value={layer.config?.interval?.end ?? ""} onchange={handleIntervalChange} />
-            <button type="button" class="btn-inline" onclick={clearIntervalConfig}>Auto</button>
+            <span>{t("layers.interval")}</span>
+            <input class="input-interval-start" type="number" step="any" placeholder={t("layers.start")} value={layer.config?.interval?.start ?? ""} onchange={handleIntervalChange} />
+            <input class="input-interval-step" type="number" step="any" placeholder={t("layers.step")} value={layer.config?.interval?.step ?? ""} onchange={handleIntervalChange} />
+            <input class="input-interval-end" type="number" step="any" placeholder={t("layers.end")} value={layer.config?.interval?.end ?? ""} onchange={handleIntervalChange} />
+            <button type="button" class="btn-inline" onclick={clearIntervalConfig}>{t("layers.auto")}</button>
           </div>
 
           <div class="config-row palette-row">
-            <label for="sel-palette-{layer.id}">🎨 Palette</label>
+            <label for="sel-palette-{layer.id}">{t("layers.palette")}</label>
             <select id="sel-palette-{layer.id}" class="sel-palette" value={currentPaletteValue} onchange={(e) => handleConfigChange("palettePath", e.target.value || null)}>
-              <option value="">Built-in default</option>
+              <option value="">{t("layers.builtinDefault")}</option>
               {#each paletteOptions as palette}
                 <option value={palette.path}>{palette.name.replace(/\.xml$/i, "")}</option>
               {/each}
@@ -433,7 +467,7 @@
                   checked={layer.config?.showTemp !== false}
                   onchange={(e) => handleConfigChange("showTemp", e.target.checked)}
                 />
-                <span class="lbl-temp">Temperature</span>
+                <span class="lbl-temp">{t("layers.temperature")}</span>
               </label>
               <label for="chk-show-dewpoint-{layer.id}">
                 <input
@@ -444,7 +478,7 @@
                   checked={layer.config?.showDewpoint !== false}
                   onchange={(e) => handleConfigChange("showDewpoint", e.target.checked)}
                 />
-                <span class="lbl-dew">Dew Point</span>
+                <span class="lbl-dew">{t("layers.dewPoint")}</span>
               </label>
             </div>
 
@@ -458,7 +492,7 @@
                   checked={layer.config?.showWind !== false}
                   onchange={(e) => handleConfigChange("showWind", e.target.checked)}
                 />
-                <span class="lbl-wind">Wind Barbs</span>
+                <span class="lbl-wind">{t("layers.windBarbs")}</span>
               </label>
               <label for="chk-show-pressure-{layer.id}">
                 <input
@@ -469,19 +503,25 @@
                   checked={isUpperStation ? layer.config?.showPressure !== false : Boolean(layer.config?.showPressure)}
                   onchange={(e) => handleConfigChange("showPressure", e.target.checked)}
                 />
-                <span class="lbl-press">{isUpperStation ? "Height" : "Pressure"}</span>
+                <span class="lbl-press">
+                  {#if currentLocale === "zh"}
+                    {isUpperStation ? t("layers.height") : t("layers.pressure")}
+                  {:else}
+                    {isUpperStation ? "Height" : "Pressure"}
+                  {/if}
+                </span>
               </label>
             </div>
 
             <div class="config-row config-row-wrap">
-              <label for="chk-show-dtd-{layer.id}"><input type="checkbox" id="chk-show-dtd-{layer.id}" class="chk-show-dtd" class:lbl-dtd={true} checked={Boolean(layer.config?.showDTD)} onchange={(e) => handleConfigChange("showDTD", e.target.checked)} /> <span class="lbl-dtd">T−Td</span></label>
+              <label for="chk-show-dtd-{layer.id}"><input type="checkbox" id="chk-show-dtd-{layer.id}" class="chk-show-dtd" class:lbl-dtd={true} checked={Boolean(layer.config?.showDTD)} onchange={(e) => handleConfigChange("showDTD", e.target.checked)} /> <span class="lbl-dtd">{currentLocale === "zh" ? t("layers.dtd") : "T−Td"}</span></label>
               {#if !isUpperStation}
-                <label for="chk-show-cloud-{layer.id}"><input type="checkbox" id="chk-show-cloud-{layer.id}" class="chk-show-cloud" class:lbl-cloud={true} checked={Boolean(layer.config?.showCloud)} onchange={(e) => handleConfigChange("showCloud", e.target.checked)} /> <span class="lbl-cloud">Cloud</span></label>
-                <label for="chk-show-weather-{layer.id}"><input type="checkbox" id="chk-show-weather-{layer.id}" class="chk-show-weather" class:lbl-weather={true} checked={Boolean(layer.config?.showWeather)} onchange={(e) => handleConfigChange("showWeather", e.target.checked)} /> <span class="lbl-weather">Weather</span></label>
-                <label for="chk-show-vis-{layer.id}"><input type="checkbox" id="chk-show-vis-{layer.id}" class="chk-show-vis" class:lbl-vis={true} checked={Boolean(layer.config?.showVisibility)} onchange={(e) => handleConfigChange("showVisibility", e.target.checked)} /> <span class="lbl-vis">Visibility</span></label>
-                <label for="chk-show-rain6-{layer.id}"><input type="checkbox" id="chk-show-rain6-{layer.id}" class="chk-show-rain6" class:lbl-rain6={true} checked={Boolean(layer.config?.showRain6)} onchange={(e) => handleConfigChange("showRain6", e.target.checked)} /> <span class="lbl-rain6">Rain 6h</span></label>
+                <label for="chk-show-cloud-{layer.id}"><input type="checkbox" id="chk-show-cloud-{layer.id}" class="chk-show-cloud" class:lbl-cloud={true} checked={Boolean(layer.config?.showCloud)} onchange={(e) => handleConfigChange("showCloud", e.target.checked)} /> <span class="lbl-cloud">{t("layers.cloud")}</span></label>
+                <label for="chk-show-weather-{layer.id}"><input type="checkbox" id="chk-show-weather-{layer.id}" class="chk-show-weather" class:lbl-weather={true} checked={Boolean(layer.config?.showWeather)} onchange={(e) => handleConfigChange("showWeather", e.target.checked)} /> <span class="lbl-weather">{t("layers.weather")}</span></label>
+                <label for="chk-show-vis-{layer.id}"><input type="checkbox" id="chk-show-vis-{layer.id}" class="chk-show-vis" class:lbl-vis={true} checked={Boolean(layer.config?.showVisibility)} onchange={(e) => handleConfigChange("showVisibility", e.target.checked)} /> <span class="lbl-vis">{t("layers.visibility")}</span></label>
+                <label for="chk-show-rain6-{layer.id}"><input type="checkbox" id="chk-show-rain6-{layer.id}" class="chk-show-rain6" class:lbl-rain6={true} checked={Boolean(layer.config?.showRain6)} onchange={(e) => handleConfigChange("showRain6", e.target.checked)} /> <span class="lbl-rain6">{t("layers.rain6")}</span></label>
               {/if}
-              <label for="chk-show-streamlines-{layer.id}"><input type="checkbox" id="chk-show-streamlines-{layer.id}" class="chk-show-streamlines" class:lbl-streamlines={true} checked={Boolean(layer.config?.showStreamlines)} onchange={(e) => handleConfigChange("showStreamlines", e.target.checked)} /> <span>Streamlines</span></label>
+              <label for="chk-show-streamlines-{layer.id}"><input type="checkbox" id="chk-show-streamlines-{layer.id}" class="chk-show-streamlines" class:lbl-streamlines={true} checked={Boolean(layer.config?.showStreamlines)} onchange={(e) => handleConfigChange("showStreamlines", e.target.checked)} /> <span>{t("layers.streamlines")}</span></label>
             </div>
           {:else if stationType === "snow_depth"}
             <div class="config-row">
@@ -494,7 +534,7 @@
                   checked={layer.config?.showSnowDepth !== false}
                   onchange={(e) => handleConfigChange("showSnowDepth", e.target.checked)}
                 />
-                <span class="lbl-snow-depth">Snow Depth</span>
+                <span class="lbl-snow-depth">{t("layers.snowDepth")}</span>
               </label>
             </div>
           {:else if stationType === "pres_change_3h"}
@@ -510,7 +550,7 @@
                     handleConfigPatch({ showPressDiff3h: e.target.checked, showPressureChange: e.target.checked, showTendency: e.target.checked });
                   }}
                 />
-                <span class="lbl-press">3h Pressure Change</span>
+                <span class="lbl-press">{t("layers.pressChange3h")}</span>
               </label>
             </div>
           {:else if stationType === "pres_change_24h"}
@@ -526,7 +566,7 @@
                     handleConfigPatch({ showPressDiff24h: e.target.checked, showPressureChange: e.target.checked, showTendency: e.target.checked });
                   }}
                 />
-                <span class="lbl-press">24h Pressure Change</span>
+                <span class="lbl-press">{t("layers.pressChange24h")}</span>
               </label>
             </div>
           {:else if stationType === "visibility"}
@@ -540,7 +580,7 @@
                   checked={layer.config?.showVisibility !== false}
                   onchange={(e) => handleConfigChange("showVisibility", e.target.checked)}
                 />
-                <span class="lbl-vis">Visibility</span>
+                <span class="lbl-vis">{t("layers.visibility")}</span>
               </label>
             </div>
           {:else if stationType === "amv"}
@@ -554,7 +594,7 @@
                   checked={layer.config?.showWind !== false}
                   onchange={(e) => handleConfigChange("showWind", e.target.checked)}
                 />
-                <span class="lbl-wind">Wind Barbs</span>
+                <span class="lbl-wind">{t("layers.windBarbs")}</span>
               </label>
               <label for="chk-show-streamlines-{layer.id}">
                 <input
@@ -565,7 +605,7 @@
                   checked={Boolean(layer.config?.showStreamlines)}
                   onchange={(e) => handleConfigChange("showStreamlines", e.target.checked)}
                 />
-                <span>Streamlines</span>
+                <span>{t("layers.streamlines")}</span>
               </label>
             </div>
           {:else if stationType === "tlogp"}
@@ -578,14 +618,14 @@
                   checked={layer.config?.showStationId !== false}
                   onchange={(e) => handleConfigChange("showStationId", e.target.checked)}
                 />
-                <span class="lbl-station-id">Station ID</span>
+                <span class="lbl-station-id">{currentLocale === "zh" ? t("layers.stationId") : "Station ID"}</span>
               </label>
             </div>
           {/if}
 
           {#if stationType !== "tlogp" && layer.element !== "TLOGP" && !(layer.path && layer.path.includes("TLOGP")) && !(layer.id && layer.id.includes("tlogp"))}
             <div class="config-row wind-contour-row">
-              <label for="sel-station-contour-{layer.id}">Add Contour Layer</label>
+              <label for="sel-station-contour-{layer.id}">{t("layers.addContour")}</label>
               <select id="sel-station-contour-{layer.id}" class="sel-contour-element" bind:value={layer._contourElement}>
                 {#if isUpperStation}
                   <option value="HGT">Geopotential Height (HGT)</option>
@@ -642,7 +682,7 @@
                   handleAction("addContour", { value: layer._contourElement || defaultElement });
                 }}
               >
-                ＋ Add
+                {t("layers.add")}
               </button>
             </div>
           {/if}
@@ -666,7 +706,7 @@
                 checked={layer.config?.showWind !== false}
                 onchange={(e) => handleConfigChange("showWind", e.target.checked)}
               />
-              <span>Wind Streamlines</span>
+              <span>{currentLocale === "zh" ? t("layers.windStreamlines") : "Wind Streamlines"}</span>
             </label>
             <label>
               <input
@@ -675,30 +715,30 @@
                 checked={Boolean(layer.config?.showBarbs)}
                 onchange={(e) => handleConfigChange("showBarbs", e.target.checked)}
               />
-              <span>Wind Barbs</span>
+              <span>{currentLocale === "zh" ? t("layers.windBarbs") : "Wind Barbs"}</span>
             </label>
           </div>
           <div class="config-row">
             <label>
               <input type="checkbox" class="chk-show-raster" checked={Boolean(layer.config?.showRaster)} onchange={(e) => handleConfigChange("showRaster", e.target.checked)} />
-              <span>Wind Magnitude Raster</span>
+              <span>{currentLocale === "zh" ? t("layers.windRaster") : "Wind Magnitude Raster"}</span>
             </label>
           </div>
           <div class="config-row wind-contour-row">
-            <label for="sel-wind-contour-{layer.id}">Add Contour Layer</label>
+            <label for="sel-wind-contour-{layer.id}">{currentLocale === "zh" ? t("layers.addContour") : "Add Contour Layer"}</label>
             <select id="sel-wind-contour-{layer.id}" class="sel-contour-element" bind:value={layer._contourElement}>
               <option value="VOR">Relative Vorticity (VOR)</option>
               <option value="DIV">Divergence (DIV)</option>
             </select>
-            <button type="button" class="btn-inline" onclick={() => handleAction("addContour", { value: layer._contourElement || "VOR" })}>＋ Add</button>
+            <button type="button" class="btn-inline" onclick={() => handleAction("addContour", { value: layer._contourElement || "VOR" })}>{t("layers.add")}</button>
           </div>
         </div>
 
         <div class="config-subtab-pane" class:active={currentSubtab === "palette"} role="tabpanel">
           <div class="config-row palette-row">
-            <label for="sel-wind-palette-{layer.id}">🎨 Palette</label>
+            <label for="sel-wind-palette-{layer.id}">{t("layers.palette")}</label>
             <select id="sel-wind-palette-{layer.id}" class="sel-palette" value={currentPaletteValue} onchange={(e) => handleConfigChange("palettePath", e.target.value || null)}>
-              <option value="">Built-in default</option>
+              <option value="">{t("layers.builtinDefault")}</option>
               {#each paletteOptions as palette}
                 <option value={palette.path}>{palette.name.replace(/\.xml$/i, "")}</option>
               {/each}
@@ -708,7 +748,7 @@
       {:else if layer.type === "tlogp"}
         <div class="config-subtab-pane" class:active={currentSubtab === "station"} role="tabpanel">
           <div class="profile-section">
-            <strong>📍 Station Selection</strong>
+            <strong>📍 {t("layers.stationSelection")}</strong>
             <div class="profile-controls">
               <input class="input-tlogp-station" value={layer.config?.stationId || layer.stationId || "58362"} placeholder="5-digit station" onchange={(e) => handleConfigChange("stationId", e.target.value)} />
               <select class="sel-tlogp-quick-station" value={layer.config?.stationId || "58362"} onchange={(e) => handleConfigChange("stationId", e.target.value)}>
@@ -721,27 +761,27 @@
             </div>
           </div>
           <div class="profile-controls">
-            <span>Parcel origin</span>
+            <span>{t("layers.parcelOrigin")}</span>
             <select class="sel-tlogp-parcel-level" value={layer.config?.parcelLevel || "surface"} onchange={(e) => handleConfigChange("parcelLevel", e.target.value)}>
-              <option value="surface">Surface</option>
+              <option value="surface">{t("layers.surface")}</option>
               <option value="925">925 hPa</option>
               <option value="850">850 hPa</option>
               <option value="700">700 hPa</option>
-              <option value="custom">Custom</option>
+              <option value="custom">{t("layers.custom")}</option>
             </select>
           </div>
         </div>
 
         <div class="config-subtab-pane" class:active={currentSubtab === "curves"} role="tabpanel">
           <div class="config-grid-2col">
-            {#each [["showTemp", "Temperature"], ["showDewpoint", "Dew Point"], ["showWind", "Wind Barbs"], ["showParcel", "Parcel"], ["showDryAdiabats", "Dry Adiabats"], ["showMoistAdiabats", "Moist Adiabats"], ["showMixingRatio", "Mixing Ratio"], ["showIndices", "Indices"]] as [field, label]}
+            {#each [["showTemp", t("layers.temperature")], ["showDewpoint", t("layers.dewPoint")], ["showWind", t("layers.windBarbs")], ["showParcel", "Parcel"], ["showDryAdiabats", t("layers.dryAdiabats")], ["showMoistAdiabats", t("layers.moistAdiabats")], ["showMixingRatio", t("layers.mixingRatio")], ["showIndices", t("layers.indices")]] as [field, label]}
               <label><input type="checkbox" checked={layer.config?.[field] !== false} onchange={(e) => handleConfigChange(field, e.target.checked)} /> {label}</label>
             {/each}
           </div>
         </div>
       {:else if layer.type === "timeheight"}
         <div class="config-subtab-pane" class:active={currentSubtab === "point"} role="tabpanel">
-          <div class="profile-section"><strong>📍 Cross-section Point</strong></div>
+          <div class="profile-section"><strong>📍 {t("layers.crossSectionPoint")}</strong></div>
           <div class="profile-controls">
             <label>Lon <input type="number" step="0.25" value={layer.config?.lon ?? 121.5} onchange={(e) => handleNumberChange("lon", e)} /></label>
             <label>Lat <input type="number" step="0.25" value={layer.config?.lat ?? 31.4} onchange={(e) => handleNumberChange("lat", e)} /></label>
@@ -759,14 +799,14 @@
 
         <div class="config-subtab-pane" class:active={currentSubtab === "fields"} role="tabpanel">
           <div class="config-grid-2col">
-            {#each [["showRH", "RH Fill"], ["showTemp", "Temperature"], ["showVVel", "VVEL"], ["showWind", "Wind Barbs"], ["showGridPointMarker", "Map Marker"]] as [field, label]}
+            {#each [["showRH", t("layers.rhFill")], ["showTemp", t("layers.temperature")], ["showVVel", t("layers.vvel")], ["showWind", t("layers.windBarbs")], ["showGridPointMarker", t("layers.mapMarker")]] as [field, label]}
               <label><input type="checkbox" checked={layer.config?.[field] !== false} onchange={(e) => handleConfigChange(field, e.target.checked)} /> {label}</label>
             {/each}
           </div>
         </div>
       {:else if layer.type === "lineheight"}
         <div class="config-subtab-pane" class:active={currentSubtab === "transect"} role="tabpanel">
-          <div class="profile-section"><strong>📏 Transect A → B</strong></div>
+          <div class="profile-section"><strong>📏 {t("layers.transectAB")}</strong></div>
           <div class="profile-controls profile-coordinates">
             <label>A Lon <input type="number" step="0.25" value={layer.config?.lon0 ?? 115} onchange={(e) => handleNumberChange("lon0", e)} /></label>
             <label>A Lat <input type="number" step="0.25" value={layer.config?.lat0 ?? 28} onchange={(e) => handleNumberChange("lat0", e)} /></label>
@@ -775,24 +815,24 @@
           </div>
           <div class="profile-controls">
             <label>N <select value={layer.config?.npoints ?? 41} onchange={(e) => handleConfigChange("npoints", parseInt(e.target.value, 10))}>{#each [11, 21, 41, 61, 81] as n}<option value={n}>{n}</option>{/each}</select></label>
-            <button type="button" class="btn-inline" onclick={() => handleAction("config", { value: { lon0: layer.config?.lon0 ?? 115, lat0: layer.config?.lat0 ?? 28, lon1: layer.config?.lon1 ?? 125, lat1: layer.config?.lat1 ?? 38, npoints: layer.config?.npoints ?? 41 } })}>Apply</button>
-            <button type="button" class="btn-inline" onclick={() => handleAction("aux", { value: "drawLine" })}>✏ Draw</button>
-            <button type="button" class="btn-inline" onclick={() => handleAction("aux", { value: "setA" })}>Set A</button>
-            <button type="button" class="btn-inline" onclick={() => handleAction("aux", { value: "setB" })}>Set B</button>
-            <button type="button" class="btn-inline" onclick={() => handleConfigChange("flipDirection", !layer.config?.flipDirection)}>⇄ Flip</button>
+            <button type="button" class="btn-inline" onclick={() => handleAction("config", { value: { lon0: layer.config?.lon0 ?? 115, lat0: layer.config?.lat0 ?? 28, lon1: layer.config?.lon1 ?? 125, lat1: layer.config?.lat1 ?? 38, npoints: layer.config?.npoints ?? 41 } })}>{t("layers.apply")}</button>
+            <button type="button" class="btn-inline" onclick={() => handleAction("aux", { value: "drawLine" })}>{t("layers.draw")}</button>
+            <button type="button" class="btn-inline" onclick={() => handleAction("aux", { value: "setA" })}>{t("layers.setA")}</button>
+            <button type="button" class="btn-inline" onclick={() => handleAction("aux", { value: "setB" })}>{t("layers.setB")}</button>
+            <button type="button" class="btn-inline" onclick={() => handleConfigChange("flipDirection", !layer.config?.flipDirection)}>{t("layers.flip")}</button>
           </div>
         </div>
 
         <div class="config-subtab-pane" class:active={currentSubtab === "fields"} role="tabpanel">
           <div class="config-grid-2col">
-            {#each [["showRH", "RH Fill"], ["showTemp", "Temperature"], ["showVVel", "VVEL"], ["showWind", "Wind Barbs"]] as [field, label]}
+            {#each [["showRH", t("layers.rhFill")], ["showTemp", t("layers.temperature")], ["showVVel", t("layers.vvel")], ["showWind", t("layers.windBarbs")]] as [field, label]}
               <label><input type="checkbox" checked={layer.config?.[field] !== false} onchange={(e) => handleConfigChange(field, e.target.checked)} /> {label}</label>
             {/each}
           </div>
         </div>
       {:else if layer.type === "hovmoller"}
         <div class="config-subtab-pane" class:active={currentSubtab === "transect"} role="tabpanel">
-          <div class="profile-section"><strong>📏 Hovmöller Transect A → B</strong></div>
+          <div class="profile-section"><strong>📏 Hovmöller {t("layers.transectAB")}</strong></div>
           <div class="profile-controls profile-coordinates">
             <label>A Lon <input type="number" step="0.25" value={layer.config?.lon0 ?? 115} onchange={(e) => handleNumberChange("lon0", e)} /></label>
             <label>A Lat <input type="number" step="0.25" value={layer.config?.lat0 ?? 28} onchange={(e) => handleNumberChange("lat0", e)} /></label>
@@ -807,17 +847,17 @@
             <label>Step <input type="number" value={layer.config?.stepHours ?? 12} onchange={(e) => handleNumberChange("stepHours", e)} /></label>
           </div>
           <div class="profile-controls">
-            <button type="button" class="btn-inline" onclick={() => handleConfigChange("axisSwap", layer.config?.axisSwap === "time-x" ? "dist-x" : "time-x")}>⇄ Swap axes</button>
-            <button type="button" class="btn-inline" onclick={() => handleConfigChange("timeDir", layer.config?.timeDir === "rev" ? "fwd" : "rev")}>⇄ Reverse time</button>
-            <button type="button" class="btn-inline" onclick={() => handleAction("aux", { value: "drawLine" })}>✏ Draw</button>
-            <button type="button" class="btn-inline" onclick={() => handleAction("aux", { value: "setA" })}>Set A</button>
-            <button type="button" class="btn-inline" onclick={() => handleAction("aux", { value: "setB" })}>Set B</button>
+            <button type="button" class="btn-inline" onclick={() => handleConfigChange("axisSwap", layer.config?.axisSwap === "time-x" ? "dist-x" : "time-x")}>{t("layers.swapAxes")}</button>
+            <button type="button" class="btn-inline" onclick={() => handleConfigChange("timeDir", layer.config?.timeDir === "rev" ? "fwd" : "rev")}>{t("layers.reverseTime")}</button>
+            <button type="button" class="btn-inline" onclick={() => handleAction("aux", { value: "drawLine" })}>{t("layers.draw")}</button>
+            <button type="button" class="btn-inline" onclick={() => handleAction("aux", { value: "setA" })}>{t("layers.setA")}</button>
+            <button type="button" class="btn-inline" onclick={() => handleAction("aux", { value: "setB" })}>{t("layers.setB")}</button>
           </div>
         </div>
 
         <div class="config-subtab-pane" class:active={currentSubtab === "fields"} role="tabpanel">
           <div class="config-grid-2col">
-            {#each [["showRH", "RH Fill"], ["showTemp", "Temperature"], ["showVVel", "VVEL"], ["showWind", "Wind Barbs"]] as [field, label]}
+            {#each [["showRH", t("layers.rhFill")], ["showTemp", t("layers.temperature")], ["showVVel", t("layers.vvel")], ["showWind", t("layers.windBarbs")]] as [field, label]}
               <label><input type="checkbox" checked={layer.config?.[field] !== false} onchange={(e) => handleConfigChange(field, e.target.checked)} /> {label}</label>
             {/each}
           </div>
@@ -866,7 +906,7 @@
 
         <div class="config-subtab-pane" class:active={currentSubtab === "basemap"} role="tabpanel">
           <div class="config-row" style="margin-top: 4px;">
-            <label for="sel-basemap-proj-{layer.id}" class="select-label">🌐 Projection:</label>
+            <label for="sel-basemap-proj-{layer.id}" class="select-label">{t("layers.proj.label")}</label>
             <select
               id="sel-basemap-proj-{layer.id}"
               class="sel-basemap-proj"
@@ -887,7 +927,7 @@
           </div>
           {#if layer.config?.opacity !== undefined}
             <div class="config-row">
-              <span>Opacity:</span>
+              <span>{t("layers.opacity")}</span>
               <input
                 type="range"
                 class="slider-fill-opacity"
@@ -906,7 +946,7 @@
         <div class="config-subtab-pane" class:active={currentSubtab === "time"} role="tabpanel">
           <div class="config-time-section">
             <div class="time-section-header">
-              <span class="section-title">⏱ Observation Time & Matching</span>
+              <span class="section-title">{t("layers.obsTimeMatching")}</span>
               {#if resolvedStatus && resolvedStatus.actualTimeZ && resolvedStatus.actualTimeZ !== "--:--Z"}
                 <span
                   class="resolved-pill"
@@ -923,7 +963,7 @@
 
             <div class="config-row config-row-wrap">
               <label class="inline-control">
-                <span>Policy</span>
+                <span>{t("layers.policy")}</span>
                 <select
                   class="sel-time-policy"
                   value={layer.policy || layer.config?.policy || "nearest"}
@@ -933,15 +973,15 @@
                   }}
                   title="Time matching policy per §2.2"
                 >
-                  <option value="nearest">Nearest (closest sample either side)</option>
-                  <option value="latest-at">Latest-at (causal: sample ≤ T)</option>
-                  <option value="hold">Hold (keep showing until superseded)</option>
-                  <option value="interpolate">Interpolate (smooth fields)</option>
+                  <option value="nearest">{t("layers.policy.nearest")}</option>
+                  <option value="latest-at">{t("layers.policy.latestAt")}</option>
+                  <option value="hold">{t("layers.policy.hold")}</option>
+                  <option value="interpolate">{t("layers.policy.interpolate")}</option>
                 </select>
               </label>
 
               <label class="inline-control">
-                <span>Tolerance</span>
+                <span>{t("layers.tolerance")}</span>
                 <select
                   class="sel-time-tolerance"
                   value={String(layer.tolerance ?? layer.config?.tolerance ?? "default")}
@@ -969,7 +1009,7 @@
 
             <div class="config-row config-row-wrap offset-row">
               <label class="inline-control wide-control">
-                <span>Time Offset (Desync)</span>
+                <span>{t("layers.timeOffset")}</span>
                 <input
                   type="text"
                   class="input-time-offset"
@@ -986,7 +1026,7 @@
               <div class="offset-quick-buttons">
                 <button type="button" class="btn-offset-preset" onclick={() => { handleConfigChange("offset", -30); layer.offset = -30; }}>−30m</button>
                 <button type="button" class="btn-offset-preset" onclick={() => { handleConfigChange("offset", -60); layer.offset = -60; }}>−1h</button>
-                <button type="button" class="btn-offset-preset" onclick={() => { handleConfigChange("offset", 0); layer.offset = 0; }}>Sync (0)</button>
+                <button type="button" class="btn-offset-preset" onclick={() => { handleConfigChange("offset", 0); layer.offset = 0; }}>{t("layers.sync0")}</button>
               </div>
             </div>
           </div>

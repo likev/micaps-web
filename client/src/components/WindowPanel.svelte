@@ -4,6 +4,7 @@
   import { getLayersForWindow } from "../lib/stores/layersCore.js";
   import { resolveAllLayersForStatus, parseTimestamp, getReferenceNowMs } from "../utils/timeResolver.js";
   import { getGlobalLocale, localizeEntityName, splitBilingualString } from "../lib/stores/i18nCore.js";
+  import { t } from "../lib/stores/i18n.svelte.js";
 
   let {
     win,
@@ -122,7 +123,7 @@
             type="button"
             id={`win-pin-${win.tabId || 1}-${win.uid ?? win.winIdx}`}
             class="win-btn-action win-btn-pin"
-            title="Pin as permanent independent tab (Alt+P)"
+            title={t("tabs.pin")}
             aria-label="Pin as permanent tab"
             onclick={(e) => {
               e.stopPropagation();
@@ -149,7 +150,7 @@
         id={win.maxBtnId || `win-max-${win.tabId || 1}-${win.uid ?? win.winIdx}`}
         class="win-btn-max"
         class:active={isMaximizedPreview}
-        title={isMaximizedPreview ? "Return to Split Grid (F4)" : "Maximize Window Preview (F4)"}
+        title={isMaximizedPreview ? (getGlobalLocale() === "zh" ? "返回多窗分割 (F4)" : "Return to Split Grid (F4)") : t("window.expand")}
         aria-label="Maximize Window"
         onclick={(e) => {
           e.stopPropagation();

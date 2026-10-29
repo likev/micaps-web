@@ -2,6 +2,7 @@
   import { ui } from "../lib/stores/ui.svelte.js";
   import { tabsState } from "../lib/stores/tabs.svelte.js";
   import { isProfilePanelWindow, isSurfaceWindow, isUpperAirWindow } from "../lib/services/appWorkflow.js";
+  import { t, getGlobalLocale } from "../lib/stores/i18n.svelte.js";
 
   let {
     tabs = tabsState.tabs,
@@ -262,6 +263,48 @@
       dropAfter = false;
     }
   }
+
+  function formatContrastBadge(item) {
+    const modeRaw = autoAllocation && autoAllocation !== "none" ? autoAllocation : String(item?.allocMode || "contrast");
+    if (getGlobalLocale() === "zh") {
+      const modeMap = {
+        none: "空白",
+        time: isObs ? "多时次对比" : "多起报对比",
+        init: "多起报对比",
+        step: "多时效对比",
+        level: "多层级对比",
+        model: "多模式对比",
+        contrast: "对比",
+      };
+      const localizedMode = modeMap[modeRaw.toLowerCase()] || modeRaw.toUpperCase();
+      return `⊞ ${layout !== "1x1" ? `${layout} 分割` : "分割"} · ${localizedMode}`;
+    }
+    return `⊞ ${layout !== "1x1" ? layout : "Split"} · ${modeRaw.toUpperCase()}`;
+  }
+
+  $effect(() => {
+    const loc = getGlobalLocale();
+    if (typeof document === "undefined") return;
+    const sel = document.getElementById("sel-auto-alloc");
+    if (!sel || !sel.options) return;
+    if (loc === "zh") {
+      for (const opt of sel.options) {
+        if (opt.value === "none") opt.text = "空白 (无)";
+        else if (opt.value === "time") opt.text = isObs ? "多时次对比" : "多起报对比";
+        else if (opt.value === "step") opt.text = "多时效对比";
+        else if (opt.value === "level") opt.text = "多层级对比";
+        else if (opt.value === "model") opt.text = "多模式对比";
+      }
+    } else {
+      for (const opt of sel.options) {
+        if (opt.value === "none") opt.text = "none";
+        else if (opt.value === "time") opt.text = isObs ? "multi-time-contrast" : "multi-init-contrast";
+        else if (opt.value === "step") opt.text = "multi-step-contrast";
+        else if (opt.value === "level") opt.text = "multi-level-contrast";
+        else if (opt.value === "model") opt.text = "multi-model-contrast";
+      }
+    }
+  });
 </script>
 
 <div id="tabs-bar" class="tabs-bar" role="tablist" aria-label="Workstation Tabs and Layout">
@@ -282,7 +325,7 @@
           id="contrast-group-badge"
           title="Active Split Auto-Contrast Group"
         >
-          ⊞ {layout !== "1x1" ? layout : "Split"} · {autoAllocation && autoAllocation !== "none" ? autoAllocation.toUpperCase() : String(item.allocMode || "CONTRAST").toUpperCase()}
+          {formatContrastBadge(item)}
         </span>
       {/if}
       <div
@@ -297,8 +340,8 @@
         aria-selected={(item.winIdx ?? idx) === activeWinIdx && !ui.configOpen}
         tabindex="0"
         title={item.isAutoAllocated && !item.isPinned
-          ? `Auto-allocated contrast slot (${item.allocBadgeText || item.allocMode || "contrast"}). Click 📌 to keep permanently.`
-          : "Drag to rearrange"}
+          ? t("tabs.autoAllocSlot", { mode: item.allocBadgeText || item.allocMode || "contrast" })
+          : t("tabs.dragHint")}
         draggable="true"
         ondragstart={(e) => handleDragStart(e, idx)}
         ondragover={(e) => handleDragOver(e, idx)}
@@ -316,7 +359,7 @@
         <span class="tab-label" id={item.labelId || `tab-label-${item.uid ?? item.winIdx ?? idx}`}>
           {(() => {
             const raw = item.title ? String(item.title).replace(/^W\d+:\s*/, "") : "";
-            return raw ? `W${(item.winIdx ?? idx) + 1}: ${raw}` : `Tab ${(item.winIdx ?? idx) + 1}`;
+            return raw ? `W${(item.winIdx ?? idx) + 1}: ${raw}` : t("tabs.tab", { index: (item.winIdx ?? idx) + 1 });
           })()}
         </span>
         {#if item.isAutoAllocated && !item.isPinned && onPinWin}
@@ -324,7 +367,7 @@
             type="button"
             id={`tab-pin-${item.uid ?? item.winIdx ?? idx}`}
             class="tab-pin-btn"
-            title="Pin as permanent independent tab (Alt+P)"
+            title={t("tabs.pin")}
             aria-label="Pin Tab"
             onclick={(e) => pinItem(e, item)}
           >📌</button>
@@ -334,7 +377,7 @@
             type="button"
             id={item.closeBtnId || `tab-close-${item.uid ?? item.winIdx ?? idx}`}
             class="tab-close-btn"
-            title="Close Tab"
+            title={t("tabs.close")}
             aria-label="Close Tab"
             onclick={(e) => closeItem(e, item, item.winIdx ?? idx)}
           >×</button>
@@ -345,10 +388,10 @@
           type="button"
           id="btn-collapse-contrast-group"
           class="btn-collapse-group"
-          title="Collapse split contrast group and remove auto-allocated tabs (Shift+F4)"
+          title={t("tabs.collapseTitle")}
           aria-label="Collapse Contrast Group"
           onclick={collapseGroup}
-        >✕ Collapse</button>
+        >{t("tabs.collapse")}</button>
       {/if}
     {/each}
     {#if showIndicator && insertP === tabItems.length}
@@ -365,7 +408,7 @@
         onclick={() => (ui.configOpen = true)}
         onkeydown={(e) => e.key === "Enter" && (ui.configOpen = true)}
       >
-        <span class="tab-label">⚙ Config</span>
+        <span class="tab-label">{t("tabs.config")}</span>
         <button
           type="button"
           class="tab-close-btn"
@@ -384,7 +427,7 @@
       id="btn-add-tab"
       type="button"
       class="btn-add-tab"
-      title="Add new tab"
+      title={t("tabs.newTab")}
       aria-label="Add new tab"
       onclick={addItem}
     >+</button>
@@ -396,7 +439,7 @@
         class="btn-restore-preview"
         title="Return to {layout} split grid (F4)"
         onclick={() => onRestorePreview && onRestorePreview()}
-      >⊞ Return to {layout} Split</button>
+      >{t("tabs.returnToSplit", { layout })}</button>
     {/if}
   </div>
 
@@ -405,7 +448,7 @@
       class="auto-alloc-container"
       title={allocTitle}
     >
-      <label for="sel-auto-alloc" class="alloc-label">Alloc:</label>
+      <label for="sel-auto-alloc" class="alloc-label">{t("tabs.alloc")}</label>
       <select
         id="sel-auto-alloc"
         data-testid="sel-auto-alloc"
@@ -432,7 +475,7 @@
       </select>
     </div>
 
-    <label for="btn-layout-select" class="layout-label">Layout:</label>
+    <label for="btn-layout-select" class="layout-label">{t("tabs.layout")}</label>
     <select
       id="btn-layout-select"
       data-testid="btn-layout-select"
@@ -442,10 +485,10 @@
       title="Map window layout"
       onchange={(e) => setLayout(e.currentTarget.value)}
     >
-      <option id="btn-layout-1" value="1x1">⊟ Tabs</option>
-      <option id="btn-layout-2" value="1x2">◫ 2-Split</option>
-      <option id="btn-layout-4" value="2x2">⊞ 4-Split</option>
-      <option id="btn-layout-6" value="2x3">▦ 6-Split</option>
+      <option id="btn-layout-1" value="1x1">{t("tabs.layout.tabs")}</option>
+      <option id="btn-layout-2" value="1x2">{t("tabs.layout.2split")}</option>
+      <option id="btn-layout-4" value="2x2">{t("tabs.layout.4split")}</option>
+      <option id="btn-layout-6" value="2x3">{t("tabs.layout.6split")}</option>
     </select>
   </div>
 
@@ -457,11 +500,11 @@
     class:hidden={layout === "1x1"}
     aria-pressed={syncMap ? "true" : "false"}
     title={syncMap
-      ? "Camera sync enabled across windows (Click to toggle off)"
-      : "Camera sync disabled (Click to toggle on)"}
+      ? t("tabs.syncTitleOn")
+      : t("tabs.syncTitleOff")}
     onclick={() => onToggleSync && onToggleSync()}
   >
-    {syncMap ? "Sync 🔗" : "Sync ✕"}
+    {syncMap ? t("tabs.syncOn") : t("tabs.syncOff")}
   </button>
 </div>
 

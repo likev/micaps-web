@@ -1,5 +1,6 @@
 // tlogpPanel.js - Dockable / floating thermodynamic sounding subwindow UI
 import { TLogPCanvasRenderer } from "./tlogpCanvas.js";
+import { translateUI, subscribeLocale } from "../../lib/stores/i18nCore.js";
 
 export const DEFAULT_TLOGP_WIDTH = 620;
 export const DEFAULT_TLOGP_HEIGHT = 568;
@@ -26,8 +27,13 @@ export class TLogPPanel {
     this.height = DEFAULT_TLOGP_HEIGHT;
     this.aspectRatio = TLOGP_ASPECT_RATIO;
     this.resizeObserver = null;
+    this.unsubLocale = null;
 
     this._initDOM();
+
+    this.unsubLocale = subscribeLocale((loc) => {
+      this._updateLocale(loc);
+    });
   }
 
   _initDOM() {
@@ -66,6 +72,7 @@ export class TLogPPanel {
       <div class="tlogp-header" style="padding: 8px 12px; background: #161b22; border-bottom: 1px solid #30363d; display: flex; align-items: center; justify-content: space-between; cursor: move; user-select: none; flex-shrink: 0;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span class="tlogp-stn-badge" style="background: #238636; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">58362</span>
+          <span class="tlogp-header-title" style="font-weight: 600; font-size: 12px; color: #e6edf3;">${translateUI("profile.tlogp")}</span>
           <span class="tlogp-stn-name" style="color: #f0f6fc; font-size: 13px; font-weight: 600;">上海/宝山 (Shanghai)</span>
           <span class="tlogp-stn-meta" style="color: #8b949e; font-size: 11px;">(31.39°N, 121.44°E, 5.5m)</span>
         </div>
@@ -82,13 +89,13 @@ export class TLogPPanel {
         <!-- Parcel Level Selector Toolbar -->
         <div class="tlogp-toolbar" style="padding: 6px 12px; background: #0d1117; border-bottom: 1px solid #21262d; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; flex-shrink: 0;">
           <div style="display: flex; align-items: center; gap: 4px;">
-            <span style="color: #8b949e; font-size: 11px; font-weight: 600; margin-right: 4px;">🔺 Parcel Origin:</span>
+            <span class="tlogp-parcel-origin-label" style="color: #8b949e; font-size: 11px; font-weight: 600; margin-right: 4px;">🔺 ${translateUI("layers.parcelOrigin")}:</span>
             <div class="tlogp-parcel-btns" style="display: flex; gap: 2px;">
-              <button class="tlogp-btn-level active" data-level="surface" style="height: 22px; padding: 0 8px; font-size: 11px; font-weight: 600; border-radius: 4px; border: 1px solid #388bfd; background: #1f6feb; color: #fff; cursor: pointer;">Surface</button>
+              <button class="tlogp-btn-level active" data-level="surface" style="height: 22px; padding: 0 8px; font-size: 11px; font-weight: 600; border-radius: 4px; border: 1px solid #388bfd; background: #1f6feb; color: #fff; cursor: pointer;">${translateUI("layers.surface")}</button>
               <button class="tlogp-btn-level" data-level="925" style="height: 22px; padding: 0 8px; font-size: 11px; font-weight: 600; border-radius: 4px; border: 1px solid #30363d; background: #21262d; color: #c9d1d9; cursor: pointer;">925</button>
               <button class="tlogp-btn-level" data-level="850" style="height: 22px; padding: 0 8px; font-size: 11px; font-weight: 600; border-radius: 4px; border: 1px solid #30363d; background: #21262d; color: #c9d1d9; cursor: pointer;">850</button>
               <button class="tlogp-btn-level" data-level="700" style="height: 22px; padding: 0 8px; font-size: 11px; font-weight: 600; border-radius: 4px; border: 1px solid #30363d; background: #21262d; color: #c9d1d9; cursor: pointer;">700</button>
-              <button class="tlogp-btn-level" data-level="custom" style="height: 22px; padding: 0 8px; font-size: 11px; font-weight: 600; border-radius: 4px; border: 1px solid #30363d; background: #21262d; color: #c9d1d9; cursor: pointer;">Custom</button>
+              <button class="tlogp-btn-level" data-level="custom" style="height: 22px; padding: 0 8px; font-size: 11px; font-weight: 600; border-radius: 4px; border: 1px solid #30363d; background: #21262d; color: #c9d1d9; cursor: pointer;">${translateUI("layers.custom")}</button>
             </div>
           </div>
           <div class="tlogp-parcel-summary" style="font-size: 11px; color: #e3b341; font-weight: 600;">
@@ -582,7 +589,23 @@ export class TLogPPanel {
     a.click();
   }
 
+  _updateLocale(loc) {
+    if (!this.container) return;
+    const titleEl = this.container.querySelector(".tlogp-header-title");
+    if (titleEl) titleEl.textContent = translateUI("profile.tlogp", {}, loc);
+    const originLabel = this.container.querySelector(".tlogp-parcel-origin-label");
+    if (originLabel) originLabel.textContent = `🔺 ${translateUI("layers.parcelOrigin", {}, loc)}:`;
+    const btnSurface = this.container.querySelector('.tlogp-btn-level[data-level="surface"]');
+    if (btnSurface) btnSurface.textContent = translateUI("layers.surface", {}, loc);
+    const btnCustom = this.container.querySelector('.tlogp-btn-level[data-level="custom"]');
+    if (btnCustom) btnCustom.textContent = translateUI("layers.custom", {}, loc);
+  }
+
   destroy() {
+    if (this.unsubLocale) {
+      this.unsubLocale();
+      this.unsubLocale = null;
+    }
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
       this.resizeObserver = null;

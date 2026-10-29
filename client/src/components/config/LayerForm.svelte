@@ -1,6 +1,6 @@
 <script>
   import { MET_LINE_COLORS, getRecommendedLineColor } from "../../ui/config/colorPresets.js";
-  import { getGlobalLocale } from "../../lib/stores/i18n.svelte.js";
+  import { getGlobalLocale, t } from "../../lib/stores/i18n.svelte.js";
 
   let { layer, availableColormaps = [], onUpdate = null, onDuplicate = null, onDelete = null } = $props();
 
@@ -49,10 +49,10 @@
     </div>
     <div class="header-actions">
       {#if onDuplicate}
-        <button type="button" class="btn" title="Duplicate Layer" onclick={onDuplicate}>📋 Copy</button>
+        <button type="button" class="btn" title={t("config.presets.duplicateLayer")} onclick={onDuplicate}>{t("config.layer.copy")}</button>
       {/if}
       {#if onDelete}
-        <button type="button" class="btn btn-danger" title="Delete Layer" onclick={onDelete}>🗑️ Remove</button>
+        <button type="button" class="btn btn-danger" title={t("config.presets.removeLayer")} onclick={onDelete}>{t("config.layer.remove")}</button>
       {/if}
     </div>
   </div>
@@ -60,20 +60,20 @@
   <div class="layer-editor-grid">
     <!-- Row 1: Type & Name -->
     <label class="config-field">
-      <span class="config-label">Layer Type</span>
+      <span class="config-label">{t("config.layer.type")}</span>
       <select
         class="config-select"
         value={layer.type || "contour"}
         onchange={(e) => mutateField("type", e.target.value)}
       >
-        {#each LAYER_TYPES as t}
-          <option value={t.value}>{currentLocale === "zh" ? t.zh : t.en}</option>
+        {#each LAYER_TYPES as lt}
+          <option value={lt.value}>{currentLocale === "zh" ? lt.zh : lt.en}</option>
         {/each}
       </select>
     </label>
 
     <label class="config-field">
-      <span class="config-label">Display Name</span>
+      <span class="config-label">{t("config.layer.name")}</span>
       <input
         type="text"
         class="config-input"
@@ -85,7 +85,7 @@
 
     <!-- Row 2: Model & Element -->
     <label class="config-field">
-      <span class="config-label">Model / Data Source</span>
+      <span class="config-label">{t("config.layer.model")}</span>
       <input
         type="text"
         class="config-input"
@@ -102,7 +102,7 @@
     </label>
 
     <label class="config-field">
-      <span class="config-label">Element</span>
+      <span class="config-label">{t("config.layer.element")}</span>
       <input
         type="text"
         class="config-input"
@@ -120,7 +120,7 @@
 
     <!-- Row 3: Level & Colormap -->
     <label class="config-field">
-      <span class="config-label">Pressure Level (hPa)</span>
+      <span class="config-label">{t("config.layer.level")}</span>
       <input
         type="number"
         class="config-input"
@@ -132,20 +132,20 @@
 
     {#if layer.type === "contour"}
       <label class="config-field">
-        <span class="config-label">Colormap</span>
+        <span class="config-label">{t("config.layer.colormap")}</span>
         <select
           class="config-select"
           value={layer.render?.colormap || ""}
           onchange={(e) => mutateRender("colormap", e.target.value || null)}
         >
-          <option value="">(None / Default)</option>
+          <option value="">{t("config.layer.noneDefault")}</option>
           {#each availableColormaps as c}
             <option value={c}>{c}</option>
           {/each}
         </select>
       </label>
       <label class="config-field">
-        <span class="config-label">XML Palette Path (optional)</span>
+        <span class="config-label">{t("config.layer.palettePath")}</span>
         <input
           type="text"
           class="config-input"
@@ -158,7 +158,7 @@
 
     {#if layer.type === "wind"}
       <label class="config-field">
-        <span class="config-label">XML Palette Path (optional)</span>
+        <span class="config-label">{t("config.layer.palettePath")}</span>
         <input
           type="text"
           class="config-input"
@@ -172,7 +172,7 @@
 
   <!-- Type Specific Options -->
   {#if layer.type === "contour"}
-    <div class="layer-section-title">Contour & Shading Options</div>
+    <div class="layer-section-title">{t("config.layer.contourShading")}</div>
     <div class="layer-options-row">
       <label class="config-checkbox-label">
         <input
@@ -180,7 +180,7 @@
           checked={layer.render?.showLine !== false}
           onchange={(e) => mutateRender("showLine", e.target.checked)}
         />
-        <span>Show Isolines (等值线)</span>
+        <span>{t("config.layer.showIsolines")}</span>
       </label>
 
       {#if layer.render?.showLine !== false}
@@ -194,7 +194,7 @@
               mutateRender("lineColor", e.target.value);
             }}
           />
-          <span class="meta-sub-label">Line Color</span>
+          <span class="meta-sub-label">{t("config.layer.lineColor")}</span>
         </div>
       {/if}
 
@@ -204,7 +204,7 @@
           checked={layer.render?.showFill !== false}
           onchange={(e) => mutateRender("showFill", e.target.checked)}
         />
-        <span>Show Isobands (填充色斑)</span>
+        <span>{t("config.layer.showIsobands")}</span>
       </label>
 
       <label class="config-checkbox-label">
@@ -213,11 +213,11 @@
           checked={Boolean(layer.render?.showRaster)}
           onchange={(e) => mutateRender("showRaster", e.target.checked)}
         />
-        <span>Raster Mode</span>
+        <span>{t("config.layer.rasterMode")}</span>
       </label>
     </div>
   {:else if layer.type === "wind"}
-    <div class="layer-section-title">Wind Vector Options</div>
+    <div class="layer-section-title">{t("config.layer.windOptions")}</div>
     <div class="layer-options-row">
       <label class="config-checkbox-label">
         <input
@@ -225,7 +225,7 @@
           checked={layer.config?.showWind !== false}
           onchange={(e) => mutateConfig("showWind", e.target.checked)}
         />
-        <span>Streamlines (流线动画)</span>
+        <span>{t("config.layer.streamlines")}</span>
       </label>
 
       <label class="config-checkbox-label">
@@ -234,11 +234,11 @@
           checked={Boolean(layer.config?.showBarbs)}
           onchange={(e) => mutateConfig("showBarbs", e.target.checked)}
         />
-        <span>Wind Barbs (风羽)</span>
+        <span>{t("config.layer.windBarbs")}</span>
       </label>
     </div>
   {:else if layer.type === "station"}
-    <div class="layer-section-title">Station Plotting Elements</div>
+    <div class="layer-section-title">{t("config.layer.stationElements")}</div>
     <div class="layer-options-row">
       <label class="config-checkbox-label">
         <input
@@ -246,7 +246,7 @@
           checked={layer.config?.showTemp !== false}
           onchange={(e) => mutateConfig("showTemp", e.target.checked)}
         />
-        <span>Temperature</span>
+        <span>{t("config.layer.temperature")}</span>
       </label>
       <label class="config-checkbox-label">
         <input
@@ -254,7 +254,7 @@
           checked={layer.config?.showDewpoint !== false}
           onchange={(e) => mutateConfig("showDewpoint", e.target.checked)}
         />
-        <span>Dew Point</span>
+        <span>{t("config.layer.dewPoint")}</span>
       </label>
       <label class="config-checkbox-label">
         <input
@@ -262,7 +262,7 @@
           checked={layer.config?.showWind !== false}
           onchange={(e) => mutateConfig("showWind", e.target.checked)}
         />
-        <span>Wind Barb</span>
+        <span>{t("config.layer.windBarb")}</span>
       </label>
       <label class="config-checkbox-label">
         <input
@@ -270,7 +270,7 @@
           checked={layer.config?.showPressure !== false}
           onchange={(e) => mutateConfig("showPressure", e.target.checked)}
         />
-        <span>Pressure / Height</span>
+        <span>{t("config.layer.pressureHeight")}</span>
       </label>
     </div>
   {/if}

@@ -2,6 +2,7 @@
 import { HovmollerCanvasRenderer } from "./hovmollerCanvas.js";
 import { PROFILE_LEVELS, SUPPORTED_STEPS } from "./lineUtils.js";
 import { DEFAULT_MODELS } from "../../lib/stores/tabsCore.js";
+import { translateUI, subscribeLocale } from "../../lib/stores/i18nCore.js";
 
 export const DEFAULT_HOV_WIDTH = 680;
 export const DEFAULT_HOV_HEIGHT = 520;
@@ -33,7 +34,15 @@ export class HovmollerPanel {
     this.span = { start: this.options.startHour, end: this.options.endHour, step: this.options.stepHours };
     this.axisSwap = this.options.axisSwap; this.timeDir = this.options.timeDir;
     this.activeCycle = null; this.availableCycles = [];
+    this.unsubLocale = null;
     this._initDOM();
+
+    this.unsubLocale = subscribeLocale((loc) => {
+      if (this.container) {
+        const titleEl = this.container.querySelector(".hov-header-title");
+        if (titleEl) titleEl.textContent = translateUI("profile.hovmoller", {}, loc);
+      }
+    });
   }
   _formatTimeDirLabel(dir = this.timeDir) {
     const s = Number.isFinite(Number(this.span?.start)) ? Number(this.span.start) : (this.options.startHour ?? 0);
@@ -58,7 +67,7 @@ export class HovmollerPanel {
       <div class="hov-panel-header" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#161b22;border-bottom:1px solid #30363d;cursor:move;user-select:none;flex-shrink:0;">
         <div style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:12px;color:#e6edf3;">
           <span class="hov-header-model" style="background:#8250df;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:0.5px;">${this.model}</span>
-          <span class="hov-header-title">Time-Line Hovmoller</span>
+          <span class="hov-header-title">${translateUI("profile.hovmoller")}</span>
           <span class="hov-header-meta" style="font-size:11px;color:#8b949e;font-weight:400;"></span>
         </div>
         <div style="display:flex;align-items:center;gap:4px;">
@@ -534,6 +543,10 @@ export class HovmollerPanel {
   }
   exportPNG() { return this.canvasRenderer?.exportPNG(`EC_Hovmoller_${this.activeCycle || "latest"}_${this.level}hPa.png`); }
   destroy() {
+    if (this.unsubLocale) {
+      this.unsubLocale();
+      this.unsubLocale = null;
+    }
     if (this.container?.parentNode) this.container.parentNode.removeChild(this.container);
     this.container = null;
   }

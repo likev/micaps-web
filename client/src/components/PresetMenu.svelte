@@ -2,7 +2,7 @@
   import { onMount, tick } from "svelte";
   import { PRESET_GROUPS, isDivider } from "../config/presets.js";
   import { isPresetPinned, togglePinPreset, addRecentPreset } from "../lib/stores/presetFavorites.svelte.js";
-  import { getGlobalLocale, localizeCategory, localizeEntityName } from "../lib/stores/i18n.svelte.js";
+  import { getGlobalLocale, localizeCategory, localizeEntityName, t, BADGE_TRANSLATIONS } from "../lib/stores/i18n.svelte.js";
 
   let {
     presetGroups = [],
@@ -166,37 +166,31 @@
       return `${lvl} hPa`;
     }
 
-    // 2. Single-level presets (hasLevel === false)
-    if (preset.category?.includes("Derived") ? "Diag" : null) return "Diag";
-    if (cat.includes("DERIVED")) return "Diag";
-    if (cat.includes("TLOGP")) return "Sounding";
-    if (cat.includes("TIME-HEIGHT") || cat.includes("LINE-HEIGHT") || cat.includes("TIME-DISTANCE")) return "Profile";
+    let rawBadge = "Sfc";
+    if (preset.category?.includes("Derived") ? "Diag" : null) rawBadge = "Diag";
+    else if (cat.includes("DERIVED")) rawBadge = "Diag";
+    else if (cat.includes("TLOGP")) rawBadge = "Sounding";
+    else if (cat.includes("TIME-HEIGHT") || cat.includes("LINE-HEIGHT") || cat.includes("TIME-DISTANCE")) rawBadge = "Profile";
+    else if (firstPath.match(/\b(C\d{3})\b/)) rawBadge = firstPath.match(/\b(C\d{3})\b/)[1];
+    else if (id.includes("SAT-") || cat.includes("SATELLITE") || firstPath.startsWith("SATELLITE/")) {
+      if (firstPath.includes("DUST")) rawBadge = "RGB";
+      else if (firstPath.includes("CTT")) rawBadge = "CTT";
+      else if (firstPath.includes("QPE")) rawBadge = "Sat QPE";
+      else rawBadge = "Sat";
+    } else if (firstPath.includes("LIGHTNING") || id.includes("LIGHTNING")) rawBadge = "Ltng";
+    else if (firstPath.includes("WIND_PROFILER") || id.includes("WIND-PROFILER") || id.includes("WIND_PROFILER")) rawBadge = "Prof";
+    else if (firstPath.startsWith("SWAN_PRODUCT/") || id.includes("SWAN") || firstPath.includes("RADAR")) rawBadge = "Radar";
+    else if (firstPath.includes("TROPOPAUSE") || id.includes("TROPOPAUSE")) rawBadge = "Trop";
+    else if (firstPath.includes("ZERO_DEGREE") || id.includes("0C-HEIGHT")) rawBadge = "0°C";
+    else if (firstPath.includes("100M") || id.includes("100M")) rawBadge = "100m";
+    else if (firstPath.includes("CAPE") || firstPath.includes("CIN") || firstPath.includes("TCWV") || firstPath.includes("PWAT") || firstPath.includes("K_INDEX") || firstPath.includes("SWEAT") || firstPath.includes("HELICITY")) {
+      rawBadge = "Col";
+    } else if (preset.isObservation && cat.includes("UPPER")) rawBadge = "Obs";
 
-    // Satellite single-channel or L2 products
-    const chMatch = firstPath.match(/\b(C\d{3})\b/);
-    if (chMatch) return chMatch[1];
-    if (id.includes("SAT-") || cat.includes("SATELLITE") || firstPath.startsWith("SATELLITE/")) {
-      if (firstPath.includes("DUST")) return "RGB";
-      if (firstPath.includes("CTT")) return "CTT";
-      if (firstPath.includes("QPE")) return "Sat QPE";
-      return "Sat";
+    if (currentLocale === "zh" && BADGE_TRANSLATIONS[rawBadge]) {
+      return BADGE_TRANSLATIONS[rawBadge].zh;
     }
-
-    // Radar, Lightning & Wind Profiler
-    if (firstPath.includes("LIGHTNING") || id.includes("LIGHTNING")) return "Ltng";
-    if (firstPath.includes("WIND_PROFILER") || id.includes("WIND-PROFILER") || id.includes("WIND_PROFILER")) return "Prof";
-    if (firstPath.startsWith("SWAN_PRODUCT/") || id.includes("SWAN") || firstPath.includes("RADAR")) return "Radar";
-
-    // Non-surface single-level NWP fields
-    if (firstPath.includes("TROPOPAUSE") || id.includes("TROPOPAUSE")) return "Trop";
-    if (firstPath.includes("ZERO_DEGREE") || id.includes("0C-HEIGHT")) return "0°C";
-    if (firstPath.includes("100M") || id.includes("100M")) return "100m";
-    if (firstPath.includes("CAPE") || firstPath.includes("CIN") || firstPath.includes("TCWV") || firstPath.includes("PWAT") || firstPath.includes("K_INDEX") || firstPath.includes("SWEAT") || firstPath.includes("HELICITY")) {
-      return "Col";
-    }
-
-    if (preset.isObservation && cat.includes("UPPER")) return "Obs";
-    return "Sfc";
+    return rawBadge;
   }
 
   export function open() {
@@ -426,10 +420,10 @@
     onclick={toggleMenu}
     aria-haspopup="menu"
     aria-expanded={isOpen}
-    title="Open categorized presets menu"
+    title={t("nav.presets.title")}
   >
     <span class="preset-trigger-icon">📊</span>
-    <span class="preset-trigger-label">Presets</span>
+    <span class="preset-trigger-label">{t("nav.presets")}</span>
     <span class="preset-trigger-arrow" class:rotated={isOpen}>▾</span>
   </button>
 
@@ -442,7 +436,7 @@
       aria-label="Preset Categories"
     >
       {#if categories.length === 0}
-        <div class="preset-menu-empty">No presets available</div>
+        <div class="preset-menu-empty">{t("nav.presets.empty")}</div>
       {:else}
         {#each categories as cat, idx}
           <div
@@ -507,8 +501,8 @@
               type="button"
               class="btn-pin-preset"
               class:pinned={isPresetPinned(preset.id)}
-              title={isPresetPinned(preset.id) ? "Unpin preset" : "Pin to quick bar"}
-              aria-label={isPresetPinned(preset.id) ? "Unpin preset" : "Pin preset"}
+              title={isPresetPinned(preset.id) ? t("nav.presets.unpin") : t("nav.presets.pin")}
+              aria-label={isPresetPinned(preset.id) ? t("nav.presets.unpin") : t("nav.presets.pin")}
               onclick={(e) => {
                 e.stopPropagation();
                 togglePinPreset(preset.id);

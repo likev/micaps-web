@@ -1,6 +1,7 @@
 // lineHeightPanel.js - Group 1 floating section window (distance x pressure, one lead)
 import { LineHeightCanvasRenderer } from "./lineHeightCanvas.js";
 import { DEFAULT_MODELS } from "../../lib/stores/tabsCore.js";
+import { translateUI, subscribeLocale } from "../../lib/stores/i18nCore.js";
 
 export const DEFAULT_LH_WIDTH = 680;
 export const DEFAULT_LH_HEIGHT = 520;
@@ -26,7 +27,15 @@ export class LineHeightPanel {
     this.model = this.options.model || "ECMWF_HR";
     this.activeCycle = null; this.availableCycles = [];
     this.effectiveLead = null;
+    this.unsubLocale = null;
     this._initDOM();
+
+    this.unsubLocale = subscribeLocale((loc) => {
+      if (this.container) {
+        const titleEl = this.container.querySelector(".lh-header-title");
+        if (titleEl) titleEl.textContent = translateUI("profile.lineHeight", {}, loc);
+      }
+    });
   }
   _initDOM() {
     if (typeof document === "undefined" || typeof document.getElementById !== "function") return;
@@ -44,7 +53,7 @@ export class LineHeightPanel {
       <div class="lh-panel-header" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#161b22;border-bottom:1px solid #30363d;cursor:move;user-select:none;flex-shrink:0;">
         <div style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:12px;color:#e6edf3;">
           <span class="lh-header-model" style="background:#9a6700;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:0.5px;">${this.model}</span>
-          <span class="lh-header-title">Line-Height Cross-Section</span>
+          <span class="lh-header-title">${translateUI("profile.lineHeight")}</span>
           <span class="lh-header-lead" style="font-size:11px;color:#e3b341;font-weight:600;"></span>
           <span class="lh-header-line" style="font-size:11px;color:#8b949e;font-weight:400;"></span>
         </div>
@@ -398,6 +407,10 @@ export class LineHeightPanel {
     return this.canvasRenderer?.exportPNG(`EC_LineHeight_${this.activeCycle || "latest"}_+${this.effectiveLead ?? 0}h.png`);
   }
   destroy() {
+    if (this.unsubLocale) {
+      this.unsubLocale();
+      this.unsubLocale = null;
+    }
     if (this.container?.parentNode) this.container.parentNode.removeChild(this.container);
     this.container = null;
   }

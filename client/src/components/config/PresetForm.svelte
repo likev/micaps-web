@@ -2,6 +2,7 @@
   import { onDestroy } from "svelte";
   import { isDivider } from "../../config/presets.js";
   import { clonePresetGroup, cloneLayer, insertDivider, deleteDivider, moveEntry } from "../../ui/config/formState.js";
+  import { t } from "../../lib/stores/i18n.svelte.js";
   import LayerForm from "./LayerForm.svelte";
 
   let { formState } = $props();
@@ -216,29 +217,29 @@
       <input
         type="search"
         class="config-input config-search"
-        placeholder="Filter presets..."
+        placeholder={t("config.presets.filter")}
         bind:value={searchQuery}
       />
       <div class="sidebar-header-btns">
         <button
           type="button"
           class="btn btn-primary"
-          title="Add new preset group"
+          title={t("config.presets.addPresetTitle")}
           onclick={handleAddPreset}
-        >+ Preset</button>
+        >{t("config.presets.addPreset")}</button>
         <button
           type="button"
           class="btn"
-          title="Add category divider"
+          title={t("config.presets.addDividerTitle")}
           onclick={handleAddDivider}
-        >+ Div</button>
+        >{t("config.presets.addDivider")}</button>
       </div>
     </div>
 
     <div class="config-sidebar-list" id="presets-sidebar-mount">
       {#if filteredPresets.length === 0}
         <div class="config-empty-state config-empty-state-sidebar">
-          No presets match search
+          {t("config.presets.noMatch")}
         </div>
       {:else}
         {#each filteredPresets as item, idx (item.id || idx)}
@@ -255,14 +256,14 @@
               <button
                 type="button"
                 class="btn-sidebar-action btn-move-up"
-                title="Move up"
+                title={t("config.presets.moveUp")}
                 disabled={realIdx <= 0}
                 onclick={(e) => { e.stopPropagation(); handleMove(realIdx, -1); }}
               >↑</button>
               <button
                 type="button"
                 class="btn-sidebar-action btn-move-down"
-                title="Move down"
+                title={t("config.presets.moveDown")}
                 disabled={realIdx < 0 || realIdx >= presets.length - 1}
                 onclick={(e) => { e.stopPropagation(); handleMove(realIdx, 1); }}
               >↓</button>
@@ -276,18 +277,18 @@
             >
               <div class="sidebar-item-top">
                 <span class="sidebar-item-name">{item.name || item.id}</span>
-                <span class="sidebar-item-chip">{item.layers?.length || 0} layers</span>
+                <span class="sidebar-item-chip">{t("config.presets.layersBadge", { count: item.layers?.length || 0 })}</span>
                 <button
                   type="button"
                   class="btn-sidebar-action btn-move-up"
-                  title="Move up"
+                  title={t("config.presets.moveUp")}
                   disabled={realIdx <= 0}
                   onclick={(e) => { e.stopPropagation(); handleMove(realIdx, -1); }}
                 >↑</button>
                 <button
                   type="button"
                   class="btn-sidebar-action btn-move-down"
-                  title="Move down"
+                  title={t("config.presets.moveDown")}
                   disabled={realIdx < 0 || realIdx >= presets.length - 1}
                   onclick={(e) => { e.stopPropagation(); handleMove(realIdx, 1); }}
                 >↓</button>
@@ -309,9 +310,9 @@
   <div class="config-detail-pane">
     {#if !selectedEntry}
       <div class="config-empty-state">
-        <p>No presets found in configuration.</p>
+        <p>{t("config.presets.empty")}</p>
         <button type="button" class="btn btn-primary mt-12" onclick={handleAddPreset}>
-          + Create your first preset
+          {t("config.presets.createFirst")}
         </button>
       </div>
     {:else if isCurrentDivider}
@@ -319,11 +320,11 @@
       <div class="config-detail-content">
         <div class="config-card">
           <div class="config-card-header">
-            <h3>Category Divider: {selectedEntry.id}</h3>
+            <h3>{t("config.presets.categoryDivider", { id: selectedEntry.id })}</h3>
           </div>
           <div class="config-card-body">
             <div class="config-field">
-              <label class="config-label">Divider Label</label>
+              <label class="config-label">{t("config.presets.dividerLabel")}</label>
               <input
                 type="text"
                 class="config-input"
@@ -338,7 +339,7 @@
                 class="btn btn-danger"
                 onclick={() => handleDeleteDivider(selectedEntry.id)}
               >
-                🗑️ Delete Divider
+                {t("config.presets.deleteDivider")}
               </button>
             </div>
           </div>
@@ -356,10 +357,10 @@
             </div>
             <div class="header-actions">
               <button type="button" class="btn" onclick={handleDuplicatePreset}>
-                📋 Duplicate
+                📋 {t("config.presets.duplicate")}
               </button>
               <button type="button" class="btn btn-danger" onclick={handleDeletePreset}>
-                🗑️ Delete
+                🗑️ {t("config.presets.delete")}
               </button>
             </div>
           </div>
@@ -367,7 +368,7 @@
           <div class="config-card-body">
             <div class="config-form-grid">
               <div class="config-field">
-                <label class="config-label">Display Name</label>
+                <label class="config-label">{t("config.presets.displayName")}</label>
                 <input
                   type="text"
                   class="config-input"
@@ -378,7 +379,7 @@
               </div>
 
               <div class="config-field">
-                <label class="config-label">Category</label>
+                <label class="config-label">{t("config.presets.category")}</label>
                 <input
                   type="text"
                   class="config-input"
@@ -396,7 +397,7 @@
               </div>
 
               <div class="config-field">
-                <label class="config-label">Default Isobaric Level</label>
+                <label class="config-label">{t("config.presets.defaultIsobaricLevel")}</label>
                 <select
                   class="config-select"
                   value={selectedEntry.defaultLevel || 500}
@@ -416,7 +417,7 @@
                     checked={selectedEntry.hasLevel !== false}
                     onchange={(e) => mutateSelectedField("hasLevel", e.target.checked)}
                   />
-                  <span>Has Pressure Levels (multi-level)</span>
+                  <span>{t("config.presets.hasPressureLevels")}</span>
                 </label>
               </div>
             </div>
@@ -427,20 +428,20 @@
         <div class="config-card mt-16">
           <div class="config-card-header card-header-flex">
             <div>
-              <h3>Layers ({selectedEntry.layers?.length || 0})</h3>
-              <p class="config-card-desc">Stacked layers rendered when this preset is loaded.</p>
+              <h3>{t("config.presets.layersCount", { count: selectedEntry.layers?.length || 0 })}</h3>
+              <p class="config-card-desc">{t("config.presets.layersDesc")}</p>
             </div>
             <button type="button" class="btn btn-primary" onclick={handleAddLayer}>
-              + Add Layer
+              {t("config.presets.addLayer")}
             </button>
           </div>
 
           <div class="config-card-body card-body-p12">
             {#if !selectedEntry.layers || selectedEntry.layers.length === 0}
               <div class="config-empty-state empty-p24">
-                <p>No layers in this preset group.</p>
+                <p>{t("config.presets.noLayers")}</p>
                 <button type="button" class="btn btn-primary mt-8" onclick={handleAddLayer}>
-                  + Add first layer
+                  {t("config.presets.addFirstLayer")}
                 </button>
               </div>
             {:else}
@@ -466,13 +467,13 @@
                         <button
                           type="button"
                           class="btn-row-action"
-                          title="Duplicate Layer"
+                          title={t("config.presets.duplicateLayer")}
                           onclick={(e) => { e.stopPropagation(); handleDuplicateLayer(layer); }}
                         >📋</button>
                         <button
                           type="button"
                           class="btn-row-action btn-del"
-                          title="Remove Layer"
+                          title={t("config.presets.removeLayer")}
                           onclick={(e) => { e.stopPropagation(); handleDeleteLayer(layer.id); }}
                         >✕</button>
                         <span class="layer-expand-chevron">{isExpanded ? "▼" : "▶"}</span>

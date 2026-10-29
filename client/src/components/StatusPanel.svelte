@@ -1,5 +1,6 @@
 <script>
   import { resolveAllLayersForStatus, formatOffset, isBasemapLayer, getReferenceNowMs } from "../utils/timeResolver.js";
+  import { t, localizeEntityName } from "../lib/stores/i18n.svelte.js";
 
   let {
     layers = [],
@@ -27,22 +28,22 @@
     <div class="status-counters">
       {#if currentCount > 0}
         <span class="count-pill pill-current" title="{currentCount} layer(s) current within tolerance">
-          <span class="dot">●</span> {currentCount} Current
+          <span class="dot">●</span> {currentCount} {t("layers.status.current")}
         </span>
       {/if}
       {#if desyncCount > 0}
         <span class="count-pill pill-desync" title="{desyncCount} layer(s) intentionally desynced">
-          <span class="dot">◆</span> {desyncCount} Desync
+          <span class="dot">◆</span> {desyncCount} {t("layers.status.desync")}
         </span>
       {/if}
       {#if softStaleCount > 0}
         <span class="count-pill pill-soft-stale" title="{softStaleCount} layer(s) past tolerance">
-          <span class="dot">◐</span> {softStaleCount} Soft Stale
+          <span class="dot">◐</span> {softStaleCount} {t("layers.status.softStale")}
         </span>
       {/if}
       {#if hardStaleCount > 0}
         <span class="count-pill pill-hard-stale" title="{hardStaleCount} layer(s) far past tolerance or gap">
-          <span class="dot">○</span> {hardStaleCount} Stale
+          <span class="dot">○</span> {hardStaleCount} {t("layers.status.stale")}
         </span>
       {/if}
     </div>
@@ -53,32 +54,37 @@
         checked={autoHideStale}
         onchange={(e) => onToggleAutoHide && onToggleAutoHide(e.target.checked)}
       />
-      <span>Auto-hide Stale</span>
+      <span>{t("layers.autoHideStale")}</span>
     </label>
   </div>
 
   {#if autoHideStale && hardStaleCount > 0}
     <div class="stale-hidden-chip-bar" role="status">
       <span class="stale-hidden-chip">
-        ⚠️ {hardStaleCount} layer{hardStaleCount > 1 ? "s" : ""} hidden (stale)
+        ⚠️ {t("layers.staleHidden", { count: hardStaleCount, s: hardStaleCount > 1 ? "s" : "" })}
         <button
           type="button"
           class="btn-unhide-stale"
           onclick={() => onToggleAutoHide && onToggleAutoHide(false)}
-        >Show</button>
+        >{t("layers.show")}</button>
       </span>
     </div>
   {/if}
 
   <div class="status-table">
     <div class="table-header">
-      <span class="col-layer">Layer</span>
-      <span class="col-time">Obs Time</span>
-      <span class="col-age">Age</span>
-      <span class="col-status">Status</span>
+      <span class="col-layer">{t("layers.col.layer")}</span>
+      <span class="col-time">{t("layers.col.time")}</span>
+      <span class="col-age">{t("layers.col.age")}</span>
+      <span class="col-status">{t("layers.col.status")}</span>
     </div>
 
     <div class="table-body">
+      {#if resolvedLayers.length === 0}
+        <div class="status-empty-message" style="padding: 12px; text-align: center; color: var(--text-muted, #8b949e); font-size: 12px;">
+          {t("layers.empty")}
+        </div>
+      {/if}
       {#each resolvedLayers as item (item.layer.id)}
         <div
           class="status-row"
@@ -99,7 +105,7 @@
             {#if item.layer.color}
               <span class="color-dot" style:background-color={item.layer.color}></span>
             {/if}
-            <span class="layer-title" title={item.layer.name}>{item.layer.name}</span>
+            <span class="layer-title" title={localizeEntityName(item.layer)}>{localizeEntityName(item.layer)}</span>
           </div>
 
           <div class="col-time" title="{item.actualTimeStr} (Policy: {item.policy})">
@@ -123,11 +129,11 @@
                 {#if item.isDesync}
                   {formatOffset(item.offsetMinutes)}
                 {:else if item.isHardStale}
-                  Stale
+                  {t("layers.status.stale")}
                 {:else if item.status === 'soft-stale'}
-                  Soft
+                  {t("layers.status.softStale")}
                 {:else}
-                  Current
+                  {t("layers.status.current")}
                 {/if}
               </span>
             </span>

@@ -11,6 +11,7 @@
     getReferenceNowMs,
   } from "../../utils/timeResolver.js";
   import { app } from "../../lib/stores/app.svelte.js";
+  import { t, localizeEntityName } from "../../lib/stores/i18n.svelte.js";
 
   let {
     winId = "default",
@@ -609,9 +610,9 @@
   <!-- Top Master Bar with Playhead Time & Mode -->
   <div class="multitrack-header">
     <div class="header-left">
-      <span class="view-title">MULTI-TRACK DAW TIMELINE</span>
+      <span class="view-title">{t("timeline.mtt.title")}</span>
       <div class="playhead-display">
-        <span class="playhead-label">PLAYHEAD:</span>
+        <span class="playhead-label">{t("timeline.mtt.playhead", { time: "" }).replace(/:\s*$/, "")}:</span>
         <strong class="playhead-time">{formatFullZuluTime(cursorMs)}</strong>
       </div>
     </div>
@@ -627,11 +628,11 @@
         title={app.historyMode ? "Locked to Review Mode in History Mode" : (mode === "live" ? "Switch to Review Mode (scrubbable)" : "Switch to Live Mode (pinned to now)")}
       >
         {#if app.historyMode}
-          <span class="review-icon">⏱</span> HISTORY REVIEW
+          <span class="review-icon">⏱</span> {t("timeline.mtt.historyReview")}
         {:else if mode === "live"}
-          <span class="live-dot">●</span> LIVE (NOWCAST)
+          <span class="live-dot">●</span> {t("timeline.mtt.liveNowcast")}
         {:else}
-          <span class="review-icon">⏱</span> REVIEW MODE
+          <span class="review-icon">⏱</span> {t("timeline.mtt.reviewMode")}
         {/if}
       </button>
 
@@ -643,18 +644,18 @@
           snapToPacemaker = !snapToPacemaker;
           if (timeline) timeline.snapToPacemaker = snapToPacemaker;
         }}
-        title="Snap playhead to pacemaker layer's sample ticks (§2.9). Hold Shift for free scrub."
+        title={t("timeline.mtt.snapTitle")}
       >
-        🧲 SNAP
+        {t("timeline.mtt.snap")}
       </button>
 
       <button
         type="button"
         class="collapse-btn"
         onclick={() => onToggleCollapse && onToggleCollapse()}
-        title="Collapse to Single Strip Ruler"
+        title={t("timeline.mtt.collapseTitle")}
       >
-        ⤡ Single Strip
+        {t("timeline.mtt.collapseBtn")}
       </button>
     </div>
   </div>
@@ -664,8 +665,14 @@
     <!-- Left Labels Column -->
     <div class="track-headers-column">
       <div class="ruler-header-slot">
-        <span class="slot-label">LAYERS CADENCE</span>
+        <span class="slot-label">{t("timeline.mtt.cadence")}</span>
       </div>
+
+      {#if laneData.length === 0}
+        <div class="mtt-empty-lanes" style="padding: 16px; color: var(--text-secondary, #8b949e); font-size: 12px; text-align: center;">
+          {t("timeline.mtt.empty")}
+        </div>
+      {/if}
 
       {#each laneData as lane (lane.layer.id)}
         <div class="track-header-row" class:is-pacemaker={lane.layer.id === pacemakerId}>
@@ -673,7 +680,7 @@
             {#if lane.layer.color}
               <span class="track-color-dot" style:background-color={lane.layer.color}></span>
             {/if}
-            <span class="track-name" title={lane.layer.name}>{lane.layer.name}</span>
+            <span class="track-name" title={localizeEntityName(lane.layer)}>{localizeEntityName(lane.layer)}</span>
           </div>
 
           <div class="track-header-bottom">
@@ -739,7 +746,7 @@
             style:width="{100 - splitPct}%"
             title="NWP Forecast Region (Initialized {formatZuluTime(obsCutoffMs)})"
           >
-            <span class="future-tag">FORECAST / FUTURE</span>
+            <span class="future-tag">{t("timeline.mtt.future")}</span>
           </div>
         {/if}
 
@@ -814,12 +821,12 @@
         class="ctrl-btn play-pause-btn"
         class:is-playing={isPlaying}
         onclick={() => onTogglePlay && onTogglePlay()}
-        title={isPlaying ? "Pause Playback (Space)" : "Start Playback (Space)"}
+        title={isPlaying ? t("timeline.pause") : t("timeline.play")}
       >
         {#if isPlaying}
-          ❚❚ Pause
+          {t("timeline.mtt.pause")}
         {:else}
-          ▶ Play
+          {t("timeline.mtt.play")}
         {/if}
       </button>
 
@@ -827,23 +834,23 @@
         type="button"
         class="ctrl-btn"
         onclick={() => handlePacemakerStep(-1)}
-        title="Step backward by pacemaker sample"
+        title={t("timeline.prev")}
       >
-        ◀◀ Prev
+        {t("timeline.mtt.prev")}
       </button>
 
       <button
         type="button"
         class="ctrl-btn"
         onclick={() => handlePacemakerStep(1)}
-        title="Step forward by pacemaker sample"
+        title={t("timeline.next")}
       >
-        Next ▶▶
+        {t("timeline.mtt.next")}
       </button>
     </div>
 
     <div class="pacemaker-selector">
-      <label for="sel-pacemaker" class="pacemaker-label">Step by (Pacemaker):</label>
+      <label for="sel-pacemaker" class="pacemaker-label">{t("timeline.mtt.pacemaker")}</label>
       <select
         id="sel-pacemaker"
         class="pacemaker-select"
@@ -856,7 +863,7 @@
       >
         {#each laneData as lane}
           <option value={lane.layer.id}>
-            {lane.layer.name} ({lane.cadence} min)
+            {localizeEntityName(lane.layer)} ({lane.cadence} min)
           </option>
         {/each}
       </select>
@@ -868,14 +875,14 @@
         class="loop-toggle-btn"
         class:active={loopActive}
         onclick={toggleLoopRange}
-        title="Toggle loop animation over range (§2.6)"
+        title={loopActive ? t("timeline.loop.disable") : t("timeline.loop.enable")}
       >
-        🔁 Loop Range
+        {t("timeline.mtt.loop")}
       </button>
     </div>
 
     <div class="speed-control">
-      <label for="sel-multitrack-speed" class="speed-label">Speed:</label>
+      <label for="sel-multitrack-speed" class="speed-label">{t("timeline.speed")}:</label>
       <select
         id="sel-multitrack-speed"
         class="speed-select"

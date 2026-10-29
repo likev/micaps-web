@@ -10,7 +10,7 @@
   import { captureScreenshot, handlePrint } from "../utils/screenshot.js";
   import { getPinnedPresetIds, getRecentPresetIds } from "../lib/stores/presetFavorites.svelte.js";
   import { getGlobalTheme, setGlobalTheme, getGlobalProjection, setGlobalProjection } from "../lib/stores/theme.svelte.js";
-  import { getGlobalLocale, setGlobalLocale, localizeEntityName } from "../lib/stores/i18n.svelte.js";
+  import { getGlobalLocale, setGlobalLocale, localizeEntityName, t } from "../lib/stores/i18n.svelte.js";
 
   let {
     presetGroups = [],
@@ -162,10 +162,10 @@
     )
   );
 
-  let levelLabel = $derived(isFY4B ? "Channel" : (isMeterHeight ? "Height" : "Level"));
+  let levelLabel = $derived(t(isFY4B ? "nav.channel" : (isMeterHeight ? "nav.height" : "nav.level")));
 
   function formatLevelText(lvl) {
-    if (lvl === null || lvl === undefined || lvl === "") return "None";
+    if (lvl === null || lvl === undefined || lvl === "") return t("nav.none");
     if (isFY4B) {
       return formatFy4bChannel(lvl);
     }
@@ -479,7 +479,7 @@
 
 <header id="navbar" class="navbar">
   <div class="nav-brand">
-    <a href="https://github.com/likev/micaps-web" target="_blank" rel="noopener noreferrer" class="brand-link" title="MICAPS-Web on GitHub (client v1.12.0)">MICAPS-Web</a>
+    <a href="https://github.com/likev/micaps-web" target="_blank" rel="noopener noreferrer" class="brand-link" title="MICAPS-Web on GitHub (client v1.12.1)">MICAPS-Web</a>
     <span class="brand-badge">PRO</span>
   </div>
 
@@ -498,7 +498,7 @@
             type="button"
             class="quick-pill pinned-pill"
             class:active={preset.id === currentPresetId}
-            title="Pinned: {localizeEntityName(preset, currentLocale)}"
+            title={t("nav.presets.pinnedTitle", { name: localizeEntityName(preset, currentLocale) })}
             onclick={() => handlePresetMenuSelect(preset)}
           >
             <span class="pill-star">★</span>
@@ -511,7 +511,7 @@
             type="button"
             class="quick-pill recent-pill"
             class:active={preset.id === currentPresetId}
-            title="Recent: {localizeEntityName(preset, currentLocale)}"
+            title={t("nav.presets.recentTitle", { name: localizeEntityName(preset, currentLocale) })}
             onclick={() => handlePresetMenuSelect(preset)}
           >
             <span class="pill-recent-icon">🕒</span>
@@ -521,15 +521,15 @@
       </div>
 
       {#if hasDataLoaded && currentGroup}
-        <div class="preset-active-indicator" title="{currentLocale === 'zh' ? '当前预设' : 'Active Preset'}: {localizeEntityName(currentGroup, currentLocale)}">
+        <div class="preset-active-indicator" title="{t('nav.presets.activeTitle')}: {localizeEntityName(currentGroup, currentLocale)}">
           <span class="active-dot" aria-hidden="true"></span>
-          <span class="active-tag">{currentLocale === 'zh' ? '当前:' : 'Active:'}</span>
+          <span class="active-tag">{t('nav.presets.active')}</span>
           <span class="active-title">{localizeEntityName(currentGroup, currentLocale)}</span>
           <button
             type="button"
             class="btn-reload-preset"
             onclick={handleReloadClick}
-            title="{currentLocale === 'zh' ? '重新加载' : 'Reload'} {localizeEntityName(currentGroup, currentLocale)}"
+            title="{t('nav.presets.reload')} {localizeEntityName(currentGroup, currentLocale)}"
             aria-label="Reload Preset"
           >
             ↻
@@ -549,10 +549,10 @@
           aria-haspopup="true"
           aria-expanded={isLayoutMenuOpen}
           onclick={toggleLayoutMenu}
-          title="Window Layout and Multi-Window Auto-Allocation"
+          title={t("nav.layout.title")}
         >
           <span class="layout-icon">⊞</span>
-          <span class="layout-label-text">Layout</span>
+          <span class="layout-label-text">{t("nav.layout")}</span>
           <span class="dropdown-caret">▾</span>
         </button>
 
@@ -566,7 +566,7 @@
                 onclick={() => handleLayoutSelect("1x1", "none")}
               >
                 <span class="layout-item-icon">⊟</span>
-                <span class="layout-item-label">1x1 (Tabs)</span>
+                <span class="layout-item-label">{t("nav.layout.1x1")}</span>
               </button>
             </div>
 
@@ -590,7 +590,7 @@
                   }}
                 >
                   <span class="layout-item-icon">{item.icon}</span>
-                  <span class="layout-item-label">{item.label}</span>
+                  <span class="layout-item-label">{t("nav.layout." + item.key)}</span>
                   <span class="submenu-arrow">▸</span>
                 </button>
                 {#if hoveredLayoutSubmenu === item.key}
@@ -601,7 +601,7 @@
                       class:selected={layout === item.key && autoAllocation === "none"}
                       onclick={() => handleLayoutSelect(item.key, "none")}
                     >
-                      <span>Empty (none)</span>
+                      <span>{t("nav.alloc.none")}</span>
                     </button>
                     <button
                       type="button"
@@ -609,7 +609,7 @@
                       class:selected={layout === item.key && autoAllocation === "time"}
                       onclick={() => handleLayoutSelect(item.key, "time")}
                     >
-                      <span>{isObs ? "Multi-Time Contrast" : "Multi-Init Contrast"}</span>
+                      <span>{isObs ? t("nav.alloc.multiTime") : t("nav.alloc.multiInit")}</span>
                     </button>
                     <button
                       type="button"
@@ -618,7 +618,7 @@
                       disabled={isObsOrNonNwp}
                       onclick={() => handleLayoutSelect(item.key, "step")}
                     >
-                      <span>Multi-Step Contrast</span>
+                      <span>{t("nav.alloc.multiStep")}</span>
                     </button>
                     <button
                       type="button"
@@ -627,7 +627,7 @@
                       disabled={levelAllocDisabled}
                       onclick={() => handleLayoutSelect(item.key, "level")}
                     >
-                      <span>Multi-Level Contrast</span>
+                      <span>{t("nav.alloc.multiLevel")}</span>
                     </button>
                     <button
                       type="button"
@@ -636,7 +636,7 @@
                       disabled={isObsOrNonNwp}
                       onclick={() => handleLayoutSelect(item.key, "model")}
                     >
-                      <span>Multi-Model Contrast</span>
+                      <span>{t("nav.alloc.multiModel")}</span>
                     </button>
                   </div>
                 {/if}
@@ -655,7 +655,7 @@
         tabindex="-1"
         aria-hidden="true"
       >
-        <option value="">{currentLocale === "zh" ? "-- 预设组合图 --" : "-- Presets --"}</option>
+        <option value="">{t("nav.presets.defaultOption")}</option>
         {#each effectivePresetGroups as group}
           {#if isDivider(group)}
             <option disabled value="">──────── {group.label || ""} ────────</option>
@@ -673,7 +673,7 @@
         tabindex="-1"
         aria-hidden="true"
       >
-        <span>Load Data</span>
+        <span>{t("nav.presets.loadData")}</span>
       </button>
     </div>
 
@@ -685,9 +685,9 @@
           class="nav-select"
           value={app.level ?? ""}
           onchange={handleLevelChange}
-          title="Select {levelLabel} for focused window"
+          title={t("nav.level.selectTitle", { label: levelLabel })}
         >
-          <option value="">None</option>
+          <option value="">{t("nav.none")}</option>
           {#each activeLevels as lvl}
             <option value={lvl}>{formatLevelText(lvl)}</option>
           {/each}
@@ -697,13 +697,13 @@
 
     {#if isNwpData}
       <div class="nav-control-group nav-tag-capsule">
-        <label for="select-nav-model">Model:</label>
+        <label for="select-nav-model">{t("nav.model")}:</label>
         <select
           id="select-nav-model"
           class="nav-select"
           value={currentModel}
           onchange={handleModelChange}
-          title="Select NWP forecast model"
+          title={t("nav.model.selectTitle")}
         >
           {#each availableModels as mdl}
             <option value={mdl}>{mdl}</option>
@@ -721,11 +721,11 @@
         id="btn-history-mode"
         class="btn btn-history-toggle"
         class:active={app.historyMode}
-        title={app.historyMode ? "History Mode active. Click to switch to Latest (live)." : "Switch to History Mode"}
+        title={app.historyMode ? t("nav.mode.historyActive") : t("nav.mode.historySwitch")}
         onclick={toggleHistoryMode}
       >
         <span class="history-icon" aria-hidden="true">⏱</span>
-        <span>{app.historyMode ? "History" : "Latest"}</span>
+        <span>{app.historyMode ? t("nav.mode.history") : t("nav.mode.latest")}</span>
       </button>
 
       {#if app.historyMode}
@@ -735,13 +735,13 @@
           class="input-history-date"
           value={selectedHistoryDate}
           onchange={handleHistoryDateInput}
-          title="Select historical target date (YYYY-MM-DD)"
+          title={t("nav.mode.historyDate")}
         />
         <button
           type="button"
           id="btn-history-exit"
           class="btn btn-history-exit"
-          title="Exit History Mode and return to Latest"
+          title={t("nav.mode.historyExit")}
           onclick={exitHistoryMode}
           aria-label="Exit History Mode"
         >
@@ -759,7 +759,7 @@
         aria-label="Application Menu"
         aria-haspopup="true"
         aria-expanded={isMenuOpen}
-        title="Application Menu (Print, Screenshot, Help, Config)"
+        title={t("nav.menu.title")}
         onclick={toggleMenu}
       >
         <span class="hamburger-icon" aria-hidden="true">☰</span>
@@ -780,7 +780,7 @@
             onclick={handlePrintAction}
           >
             <span class="menu-item-icon">🖨</span>
-            <span class="menu-item-label">Print</span>
+            <span class="menu-item-label">{t("nav.menu.print")}</span>
           </button>
 
           <button
@@ -791,7 +791,7 @@
             onclick={handleScreenshotAction}
           >
             <span class="menu-item-icon">📷</span>
-            <span class="menu-item-label">Screenshot</span>
+            <span class="menu-item-label">{t("nav.menu.screenshot")}</span>
           </button>
 
           <button
@@ -802,7 +802,7 @@
             onclick={handleHelpAction}
           >
             <span class="menu-item-icon">❓</span>
-            <span class="menu-item-label">Help</span>
+            <span class="menu-item-label">{t("nav.menu.help")}</span>
           </button>
 
           <button
@@ -810,18 +810,18 @@
             id="menu-item-command-palette"
             class="nav-menu-item"
             role="menuitem"
-            title="Open Command Palette (Ctrl+K or /)"
+            title={t("nav.menu.commandPaletteTitle")}
             onclick={handleCommandPaletteAction}
           >
             <span class="menu-item-icon">🔍</span>
-            <span class="menu-item-label">Command Palette</span>
+            <span class="menu-item-label">{t("nav.menu.commandPalette")}</span>
             <span class="menu-shortcut">Ctrl+K</span>
           </button>
 
           <div class="menu-divider" role="separator"></div>
 
           <!-- Theme Scheme Switcher -->
-          <div class="menu-section-header">Theme / Scheme</div>
+          <div class="menu-section-header">{t("nav.menu.theme")}</div>
           <button
             type="button"
             id="menu-item-theme-light"
@@ -831,7 +831,7 @@
             onclick={() => { setGlobalTheme("light"); isMenuOpen = false; }}
           >
             <span class="menu-item-icon">☀️</span>
-            <span class="menu-item-label">Light (Paper)</span>
+            <span class="menu-item-label">{t("nav.menu.theme.light")}</span>
             {#if currentTheme === "light"}<span class="menu-check">✓</span>{/if}
           </button>
 
@@ -844,7 +844,7 @@
             onclick={() => { setGlobalTheme("dark"); isMenuOpen = false; }}
           >
             <span class="menu-item-icon">🌙</span>
-            <span class="menu-item-label">Dark (Ink)</span>
+            <span class="menu-item-label">{t("nav.menu.theme.dark")}</span>
             {#if currentTheme === "dark"}<span class="menu-check">✓</span>{/if}
           </button>
 
@@ -857,14 +857,14 @@
             onclick={() => { setGlobalTheme("brutalism"); isMenuOpen = false; }}
           >
             <span class="menu-item-icon">🟨</span>
-            <span class="menu-item-label">Brutalism</span>
+            <span class="menu-item-label">{t("nav.menu.theme.brutalism")}</span>
             {#if currentTheme === "brutalism"}<span class="menu-check">✓</span>{/if}
           </button>
 
           <div class="menu-divider" role="separator"></div>
 
           <!-- Projection Switcher -->
-          <div class="menu-section-header">Map Projection</div>
+          <div class="menu-section-header">{t("nav.menu.projection")}</div>
           <button
             type="button"
             id="menu-item-proj-mercator"
@@ -874,7 +874,7 @@
             onclick={() => { setGlobalProjection("mercator"); isMenuOpen = false; }}
           >
             <span class="menu-item-icon">🗺️</span>
-            <span class="menu-item-label">Mercator</span>
+            <span class="menu-item-label">{t("nav.menu.projection.mercator")}</span>
             {#if currentProjection === "mercator"}<span class="menu-check">✓</span>{/if}
           </button>
 
@@ -887,7 +887,7 @@
             onclick={() => { setGlobalProjection("globe"); isMenuOpen = false; }}
           >
             <span class="menu-item-icon">🌐</span>
-            <span class="menu-item-label">Globe</span>
+            <span class="menu-item-label">{t("nav.menu.projection.globe")}</span>
             {#if currentProjection === "globe"}<span class="menu-check">✓</span>{/if}
           </button>
 
@@ -900,19 +900,20 @@
             onclick={() => { setGlobalProjection("vertical-perspective"); isMenuOpen = false; }}
           >
             <span class="menu-item-icon">🪐</span>
-            <span class="menu-item-label">Vertical Perspective</span>
+            <span class="menu-item-label">{t("nav.menu.projection.perspective")}</span>
             {#if currentProjection === "vertical-perspective"}<span class="menu-check">✓</span>{/if}
           </button>
 
           <div class="menu-divider" role="separator"></div>
 
           <div class="menu-group-label" role="presentation">
-            {currentLocale === "zh" ? "语言 / Language" : "Language"}
+            {t("nav.menu.language")}
           </div>
 
           <button
             type="button"
             id="menu-item-lang-en"
+            data-testid="btn-lang-en"
             class="nav-menu-item"
             class:selected={currentLocale === "en"}
             role="menuitem"
@@ -926,6 +927,7 @@
           <button
             type="button"
             id="menu-item-lang-zh"
+            data-testid="btn-lang-zh"
             class="nav-menu-item"
             class:selected={currentLocale === "zh"}
             role="menuitem"
@@ -944,11 +946,11 @@
             data-testid="menu-item-config"
             class="nav-menu-item"
             role="menuitem"
-            title="Open Configuration Editor Tab"
+            title={t("nav.menu.configTitle")}
             onclick={handleConfigItemClick}
           >
             <span class="menu-item-icon">⚙</span>
-            <span class="menu-item-label">Config</span>
+            <span class="menu-item-label">{t("nav.menu.config")}</span>
           </button>
         </div>
       {:else}
@@ -959,10 +961,10 @@
           class="visually-hidden"
           tabindex="-1"
           aria-hidden="true"
-          title="Open Configuration Editor Tab"
+          title={t("nav.menu.configTitle")}
           onclick={handleConfigClick}
         >
-          Config
+          {t("nav.menu.config")}
         </button>
       {/if}
     </div>

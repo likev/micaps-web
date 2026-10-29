@@ -2,6 +2,7 @@
 import { TimeHeightCanvasRenderer } from "./timeHeightCanvas.js";
 import { SUPPORTED_STEPS } from "./timeHeightLoader.js";
 import { DEFAULT_MODELS } from "../../lib/stores/tabsCore.js";
+import { translateUI, subscribeLocale } from "../../lib/stores/i18nCore.js";
 
 export const DEFAULT_TH_WIDTH = 680;
 export const DEFAULT_TH_HEIGHT = 520;
@@ -58,8 +59,16 @@ export class TimeHeightPanel {
     this.endHour = this.options.endHour !== undefined ? this.options.endHour : 144;
     this.stepHours = this.options.stepHours !== undefined ? this.options.stepHours : 12;
     this.resizeObserver = null;
+    this.unsubLocale = null;
 
     this._initDOM();
+
+    this.unsubLocale = subscribeLocale((loc) => {
+      if (this.container) {
+        const titleEl = this.container.querySelector(".th-header-title");
+        if (titleEl) titleEl.textContent = translateUI("profile.timeHeight", {}, loc);
+      }
+    });
   }
 
   _formatDirectionLabel(dir = this.timeDirection) {
@@ -114,7 +123,7 @@ export class TimeHeightPanel {
       <div class="th-panel-header" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #161b22; border-bottom: 1px solid #30363d; cursor: move; user-select: none; flex-shrink: 0;">
         <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 12px; color: #e6edf3;">
           <span class="th-header-model" style="background: #1f6feb; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px;">${this.model}</span>
-          <span class="th-header-title">Time-Height Cross-Section</span>
+          <span class="th-header-title">${translateUI("profile.timeHeight")}</span>
           <span class="th-header-coords" style="font-size: 11px; color: #8b949e; font-weight: 400;">(${this.activePoint.lon.toFixed(2)}°E, ${this.activePoint.lat.toFixed(2)}°N)</span>
           <span class="th-header-cycle" style="font-size: 11px; color: #3fb950; font-weight: 500;"></span>
         </div>
@@ -768,6 +777,10 @@ export class TimeHeightPanel {
   }
 
   destroy() {
+    if (this.unsubLocale) {
+      this.unsubLocale();
+      this.unsubLocale = null;
+    }
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
       this.resizeObserver = null;

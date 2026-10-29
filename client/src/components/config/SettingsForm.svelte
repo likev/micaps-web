@@ -28,7 +28,7 @@
 
   let basemap = $derived(draft.basemap || {});
   import { setGlobalTheme } from "../../lib/stores/theme.svelte.js";
-  import { getGlobalLocale, setGlobalLocale } from "../../lib/stores/i18n.svelte.js";
+  import { getGlobalLocale, setGlobalLocale, t } from "../../lib/stores/i18n.svelte.js";
 
   let perf = $derived(draft.performance || {});
   let scheme = $derived(draft.theme || basemap.scheme || "dark");
@@ -81,12 +81,12 @@
   <!-- Basemap Settings Card -->
   <div class="config-card">
     <div class="config-card-header">
-      <h3>🗺️ Basemap & Projection</h3>
-      <p class="config-card-desc">Default background tile theme, layer visibility, and coordinate projection.</p>
+      <h3>{t("config.settings.basemapTitle")}</h3>
+      <p class="config-card-desc">{t("config.settings.basemapDesc")}</p>
     </div>
     <div class="config-card-body">
       <div class="config-field-group">
-        <span class="config-label">Theme Scheme</span>
+        <span class="config-label">{t("config.settings.themeScheme")}</span>
         <div class="config-radio-cards" id="settings-basemap-schemes">
           <label class="radio-card" class:selected={scheme === "dark"}>
             <input
@@ -97,8 +97,8 @@
               onchange={() => setScheme("dark")}
             />
             <span class="radio-card-icon">🌙</span>
-            <span class="radio-card-title">Ink</span>
-            <span class="radio-card-sub">Dark</span>
+            <span class="radio-card-title">{locale === "zh" ? "深色" : "Ink"}</span>
+            <span class="radio-card-sub">{locale === "zh" ? "暗夜" : "Dark"}</span>
           </label>
           <label class="radio-card" class:selected={scheme === "light"}>
             <input
@@ -109,8 +109,8 @@
               onchange={() => setScheme("light")}
             />
             <span class="radio-card-icon">☀️</span>
-            <span class="radio-card-title">Paper</span>
-            <span class="radio-card-sub">Light</span>
+            <span class="radio-card-title">{locale === "zh" ? "浅色" : "Paper"}</span>
+            <span class="radio-card-sub">{locale === "zh" ? "纸张" : "Light"}</span>
           </label>
           <label class="radio-card" class:selected={scheme === "brutalism"} title="Brutalism">
             <input
@@ -121,28 +121,28 @@
               onchange={() => setScheme("brutalism")}
             />
             <span class="radio-card-icon">🟨</span>
-            <span class="radio-card-title">Brutal</span>
-            <span class="radio-card-sub">Raw</span>
+            <span class="radio-card-title">{locale === "zh" ? "粗野主义" : "Brutal"}</span>
+            <span class="radio-card-sub">{locale === "zh" ? "原始风格" : "Raw"}</span>
           </label>
         </div>
       </div>
 
       <div class="config-field-group mt-16">
-        <label for="settings-basemap-proj" class="config-label">Map Projection</label>
+        <label for="settings-basemap-proj" class="config-label">{t("config.settings.mapProjection")}</label>
         <select
           id="settings-basemap-proj"
           class="config-select"
           value={projection}
           onchange={(e) => setProjection(e.target.value)}
         >
-          <option value="mercator">🗺️ Mercator (Standard 2D)</option>
-          <option value="globe">🌍 Globe (Spherical 3D)</option>
-          <option value="vertical-perspective">🪐 Vertical Perspective (3D)</option>
+          <option value="mercator">{locale === "zh" ? "🗺️ 墨卡托 (2D)" : "🗺️ Mercator (Standard 2D)"}</option>
+          <option value="globe">{locale === "zh" ? "🌍 三维地球 (3D)" : "🌍 Globe (Spherical 3D)"}</option>
+          <option value="vertical-perspective">{locale === "zh" ? "🪐 垂直透视 (3D)" : "🪐 Vertical Perspective (3D)"}</option>
         </select>
       </div>
 
       <div class="config-field-group mt-16">
-        <span class="config-label">Vector Overlays</span>
+        <span class="config-label">{t("config.settings.vectorOverlays")}</span>
         <div class="config-checkbox-grid">
           <label class="config-checkbox-label">
             <input
@@ -151,7 +151,7 @@
               checked={basemap.showGraticule !== false}
               onchange={(e) => setVectorOverlay("showGraticule", e.target.checked)}
             />
-            <span>10° Lon/Lat Graticule Lines</span>
+            <span>{t("config.settings.graticule")}</span>
           </label>
           <label class="config-checkbox-label">
             <input
@@ -160,7 +160,7 @@
               checked={basemap.showWorld !== false}
               onchange={(e) => setVectorOverlay("showWorld", e.target.checked)}
             />
-            <span>World Country Boundaries</span>
+            <span>{t("config.settings.world")}</span>
           </label>
           <label class="config-checkbox-label">
             <input
@@ -169,7 +169,7 @@
               checked={basemap.showProvinces !== false}
               onchange={(e) => setVectorOverlay("showProvinces", e.target.checked)}
             />
-            <span>Province Boundaries</span>
+            <span>{t("config.settings.provinces")}</span>
           </label>
           <label class="config-checkbox-label">
             <input
@@ -178,7 +178,7 @@
               checked={basemap.showCities !== false}
               onchange={(e) => setVectorOverlay("showCities", e.target.checked)}
             />
-            <span>City / County Boundaries</span>
+            <span>{t("config.settings.cities")}</span>
           </label>
         </div>
       </div>
@@ -188,13 +188,13 @@
   <!-- Performance Budget Card -->
   <div class="config-card mt-16">
     <div class="config-card-header">
-      <h3>⚡ Performance & Contour Budget</h3>
-      <p class="config-card-desc">Controls memory budget and Marching Squares grid cell sampling limits.</p>
+      <h3>{t("config.settings.perfTitle")}</h3>
+      <p class="config-card-desc">{t("config.settings.perfDesc")}</p>
     </div>
     <div class="config-card-body">
       <div class="config-field-group">
         <label for="input-perf-cells" class="config-label">
-          Max Effective Cells (Marching Squares budget)
+          {t("config.settings.cellBudget")}
         </label>
         <div class="cell-budget-row">
           <input
@@ -230,12 +230,12 @@
   <!-- Language Card -->
   <div class="config-card mt-16">
     <div class="config-card-header">
-      <h3>🌐 Language / 语言</h3>
-      <p class="config-card-desc">User interface display language and category localization.</p>
+      <h3>{t("config.settings.languageTitle")}</h3>
+      <p class="config-card-desc">{t("config.settings.languageDesc")}</p>
     </div>
     <div class="config-card-body">
       <div class="config-field-group">
-        <span class="config-label">Display Language</span>
+        <span class="config-label">{t("config.settings.displayLanguage")}</span>
         <div class="config-radio-cards" id="settings-language-options">
           <label class="radio-card" class:selected={locale === "en"}>
             <input
