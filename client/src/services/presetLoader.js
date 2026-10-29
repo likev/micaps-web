@@ -27,6 +27,7 @@ import { analyzeAndRenderSoundingElementContour } from "../layers/soundingAnalys
 import { triggerRasterOverlay } from "../ui/layerActions.js";
 import { updateLegend } from "../ui/legend.js";
 import { filterObsFilesByStep } from "../ui/timeline/timelineMath.js";
+import { getGlobalLocale, localizeEntityName } from "../lib/stores/i18nCore.js";
 
 export function clearAllWeatherLayersFromMap(map, win = null, { resetVisibility = false } = {}) {
   if (!map) return;
@@ -200,13 +201,14 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
         win.derivedContourSnapshots = null;
       }
     }
+    const groupDisplayName = localizeEntityName(group, getGlobalLocale()) || group.name;
     const titleName = group.hasLevel && level !== null
-      ? group.name
+      ? groupDisplayName
         // Rewrite the level prefix ("500 hPa ..." -> "700 hPa ...", space included)
         .replace(/\d+\s*hPa/i, `${level} hPa`)
         // Drop any stale internal catalog-path suffix "(MODEL/ELEMENT/LEVEL)" from display names
         .replace(/\s*\((?:SURFACE|UPPER_AIR)\/[^)]*\)/i, "")
-      : group.name;
+      : groupDisplayName;
     updateWindowTitle(win, titleName);
   }
   if (win && getActiveWindow() === win) {

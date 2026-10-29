@@ -4,6 +4,7 @@
   import { getPaletteCategory, listPaletteFiles } from "../utils/paletteLoader.js";
   import { parseOffset, formatOffset, resolveLayerTime, parseTimestamp, getReferenceNowMs } from "../utils/timeResolver.js";
   import StationFilter from "./StationFilter.svelte";
+  import { localizeEntityName, getGlobalLocale } from "../lib/stores/i18n.svelte.js";
 
   let {
     layer,
@@ -102,6 +103,7 @@
     return () => { active = false; };
   });
 
+  let currentLocale = $derived(getGlobalLocale());
   let activeSubtab = $state("");
 
   let subtabs = $derived.by(() => {
@@ -113,6 +115,12 @@
           { id: "time", label: "Time", icon: "⏱" },
         ];
       case "station":
+        if (stationType === "tlogp") {
+          return [
+            { id: "elements", label: "Elements", icon: "📋" },
+            { id: "time", label: "Time", icon: "⏱" },
+          ];
+        }
         return [
           { id: "elements", label: "Elements", icon: "📋" },
           { id: "filter", label: "Filter", icon: "🔍" },
@@ -151,7 +159,7 @@
       case "pmtiles":
         return [
           { id: "features", label: "Features", icon: "🗺️" },
-          { id: "basemap", label: "Style & Proj", icon: "🌐" },
+          { id: "basemap", label: "Projection", icon: "🌐" },
         ];
       default:
         return [
@@ -210,7 +218,7 @@
       <span class="layer-color-dot" style:background-color={layer.color}></span>
     {/if}
 
-    <span class="layer-name" title={layer.name}>{layer.name}</span>
+    <span class="layer-name" title={localizeEntityName(layer, currentLocale)}>{localizeEntityName(layer, currentLocale)}</span>
 
     {#if resolvedStatus && resolvedStatus.actualTimeZ && resolvedStatus.actualTimeZ !== "--:--Z"}
       <span
@@ -560,9 +568,22 @@
                 <span>Streamlines</span>
               </label>
             </div>
+          {:else if stationType === "tlogp"}
+            <div class="config-row">
+              <label for="chk-show-station-id-{layer.id}">
+                <input
+                  type="checkbox"
+                  id="chk-show-station-id-{layer.id}"
+                  class="chk-show-station-id"
+                  checked={layer.config?.showStationId !== false}
+                  onchange={(e) => handleConfigChange("showStationId", e.target.checked)}
+                />
+                <span class="lbl-station-id">Station ID</span>
+              </label>
+            </div>
           {/if}
 
-          {#if layer.element !== "TLOGP" && !(layer.path && layer.path.includes("TLOGP")) && !(layer.id && layer.id.includes("tlogp"))}
+          {#if stationType !== "tlogp" && layer.element !== "TLOGP" && !(layer.path && layer.path.includes("TLOGP")) && !(layer.id && layer.id.includes("tlogp"))}
             <div class="config-row wind-contour-row">
               <label for="sel-station-contour-{layer.id}">Add Contour Layer</label>
               <select id="sel-station-contour-{layer.id}" class="sel-contour-element" bind:value={layer._contourElement}>
@@ -627,12 +648,14 @@
           {/if}
         </div>
 
-        <div class="config-subtab-pane" class:active={currentSubtab === "filter"} role="tabpanel">
-          <StationFilter
-            {layer}
-            onFilterChange={(filterData) => handleConfigPatch(filterData)}
-          />
-        </div>
+        {#if stationType !== "tlogp"}
+          <div class="config-subtab-pane" class:active={currentSubtab === "filter"} role="tabpanel">
+            <StationFilter
+              {layer}
+              onFilterChange={(filterData) => handleConfigPatch(filterData)}
+            />
+          </div>
+        {/if}
       {:else if layer.type === "wind"}
         <div class="config-subtab-pane" class:active={currentSubtab === "display"} role="tabpanel">
           <div class="config-row">
@@ -809,7 +832,7 @@
                 checked={layer.config?.showGraticule !== false}
                 onchange={(e) => handleConfigChange("showGraticule", e.target.checked)}
               />
-              <span>经纬网 (Graticule)</span>
+              <span>{currentLocale === "zh" ? "经纬网" : "Graticule"}</span>
             </label>
             <label>
               <input
@@ -818,7 +841,7 @@
                 checked={layer.config?.showWorld !== false}
                 onchange={(e) => handleConfigChange("showWorld", e.target.checked)}
               />
-              <span>国界 (World)</span>
+              <span>{currentLocale === "zh" ? "国界" : "World"}</span>
             </label>
             <label>
               <input
@@ -827,7 +850,7 @@
                 checked={layer.config?.showProvinces !== false}
                 onchange={(e) => handleConfigChange("showProvinces", e.target.checked)}
               />
-              <span>省界 (Provinces)</span>
+              <span>{currentLocale === "zh" ? "省界" : "Provinces"}</span>
             </label>
             <label>
               <input
@@ -836,31 +859,17 @@
                 checked={Boolean(layer.config?.showCities)}
                 onchange={(e) => handleConfigChange("showCities", e.target.checked)}
               />
-              <span>城市 (Cities)</span>
+              <span>{currentLocale === "zh" ? "城市" : "Cities"}</span>
             </label>
           </div>
         </div>
 
         <div class="config-subtab-pane" class:active={currentSubtab === "basemap"} role="tabpanel">
           <div class="config-row" style="margin-top: 4px;">
-            <label for="sel-basemap-scheme-{layer.id}" class="select-label">🎨 Scheme:</label>
-            <select
-              id="sel-basemap-scheme-{layer.id}"
-              class="sel-basemap-scheme"
-              value={layer.config?.scheme || "dark"}
-              onchange={(e) => handleConfigChange("scheme", e.target.value)}
-            >
-              <option value="dark">🌙 Ink (Dark)</option>
-              <option value="light">☀️ Paper (Light)</option>
-              <option value="brutalism">⬛ Brutalism (Raw)</option>
-            </select>
-          </div>
-
-          <div class="config-row" style="margin-top: 4px;">
             <label for="sel-basemap-proj-{layer.id}" class="select-label">🌐 Projection:</label>
             <select
               id="sel-basemap-proj-{layer.id}"
-              class="sel-basemap-projection"
+              class="sel-basemap-proj"
               value={layer.config?.projection || "mercator"}
               onchange={(e) => handleConfigChange("projection", e.target.value)}
             >
@@ -1421,7 +1430,12 @@
     color: var(--accent-yellow, #ffd43b);
   }
 
-  .sel-basemap-scheme,
+  .lbl-station-id {
+    font-weight: 500;
+    color: var(--accent-blue, #58a6ff);
+  }
+
+  .sel-basemap-proj,
   .sel-basemap-projection {
     background: var(--bg-secondary, #161b22);
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));

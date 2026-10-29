@@ -1916,9 +1916,19 @@
     }
     if (activeTab && activeTab.autoAllocation && activeTab.autoAllocation !== "none") {
       const curMode = activeTab.autoAllocation;
-      if (isSurfaceGroup(group) && (curMode === "step" || curMode === "level" || curMode === "model")) {
+      const isObs = Boolean(
+        group?.isObservation ||
+        group?.model === "SATELLITE" ||
+        group?.model === "UPPER_AIR" ||
+        group?.model === "SURFACE" ||
+        String(group?.id || "").toLowerCase().includes("swan") ||
+        String(group?.id || "").toLowerCase().includes("radar") ||
+        String(group?.id || "").toLowerCase().includes("sat-")
+      );
+      const hasNoLvl = Boolean(isSurfaceGroup(group) || group?.hasLevel === false);
+      if (hasNoLvl && curMode === "level") {
         activeTab.autoAllocation = "none";
-      } else if (isUpperAirGroup(group) && (curMode === "step" || curMode === "model")) {
+      } else if ((isObs || isSurfaceGroup(group) || isUpperAirGroup(group)) && (curMode === "step" || curMode === "model")) {
         activeTab.autoAllocation = "none";
       }
     }

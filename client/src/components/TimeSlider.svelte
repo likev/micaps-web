@@ -319,12 +319,25 @@
   function pause() {
     playback.isPlaying = false;
     app.isPlaying = false;
-    if (timeline.loopRange) {
-      timeline.loopRange.active = false;
-    }
     if (playTimer) {
       clearInterval(playTimer);
       playTimer = null;
+    }
+  }
+
+  function toggleLoopRange() {
+    ensureLoopRange();
+    timeline.loopRange.active = !timeline.loopRange.active;
+    if (timeline.loopRange.active) {
+      if (timeline.loopRange.start == null || timeline.loopRange.end == null) {
+        if (isObs) {
+          timeline.loopRange.start = 0;
+          timeline.loopRange.end = Math.max(0, obsFiles.length - 1);
+        } else {
+          timeline.loopRange.start = periods[0] ?? 0;
+          timeline.loopRange.end = periods[periods.length - 1] ?? 72;
+        }
+      }
     }
   }
 
@@ -369,7 +382,7 @@
     }
   });
 
-  let isLooping = $derived(Boolean(playback.isPlaying));
+  let isLooping = $derived(Boolean(playback.isPlaying || timeline.loopRange?.active));
   let loopA = $derived(timeline.loopRange?.start ?? null);
   let loopB = $derived(timeline.loopRange?.end ?? null);
   let isLoopActive = $derived(Boolean(timeline.loopRange?.active));
@@ -600,6 +613,16 @@
         aria-label="Next step"
         onclick={() => handleStep(1)}
       >▶</button>
+
+      <button
+        id="sl-btn-toggle-loop"
+        class="step-nav-btn loop-toggle-btn"
+        class:active={timeline.loopRange?.active}
+        type="button"
+        title={timeline.loopRange?.active ? "Disable Loop Range" : "Enable Loop Range (A/B markers)"}
+        aria-label="Toggle loop range"
+        onclick={toggleLoopRange}
+      >🔁</button>
 
       <div class="step-length-control">
         <label for="sl-select-step-length" class="step-length-label">Step:</label>
@@ -860,6 +883,12 @@
     background: var(--bg-hover, #30363d);
     color: var(--text-primary, #ffffff);
     border-color: var(--accent-blue, #58a6ff);
+  }
+
+  .step-nav-btn.active {
+    background: var(--accent-blue, #388bfd);
+    color: #fff;
+    border-color: var(--accent-blue, #388bfd);
   }
 
   .step-length-control,

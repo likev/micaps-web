@@ -340,6 +340,7 @@ export function autoSaveLayerConfig(layer) {
             if (layer.config.showRain6 !== undefined) pLayer.render.showRain6 = layer.config.showRain6;
             if (layer.config.showDTD !== undefined) pLayer.render.showDTD = layer.config.showDTD;
             if (layer.config.showStreamlines !== undefined) pLayer.render.showStreamlines = layer.config.showStreamlines;
+            if (layer.config.showStationId !== undefined) pLayer.render.showStationId = layer.config.showStationId;
             if (pLayer.config) Object.assign(pLayer.config, pLayer.render);
 
             // Station filter rules & logic

@@ -212,7 +212,7 @@ describe("UI Clean Redesign: Layer Config Grouping with Subtabs", () => {
     expect(pmtilesBlock).toContain('class="config-subtab-pane" class:active={currentSubtab === "features"}');
     expect(pmtilesBlock).toContain('class="config-subtab-pane" class:active={currentSubtab === "basemap"}');
     expect(pmtilesBlock).toContain('class="chk-pmtiles-graticule"');
-    expect(pmtilesBlock).toContain('class="sel-basemap-scheme"');
+    expect(pmtilesBlock).toContain('class="sel-basemap-proj"');
   });
 
   test("Non-pmtiles layers have a dedicated Time subtab for observation time matching & offset", () => {

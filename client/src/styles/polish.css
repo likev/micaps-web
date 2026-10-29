@@ -262,11 +262,11 @@ html, body {
 #app .btn-fullscreen-toggle:hover { box-shadow: var(--shadow-3); }
 
 /* Modals / palette */
-#app :is(.config-editor-modal, .help-modal-content, .cmd-palette-modal) {
+#app :is(.config-editor-modal, .config-editor-panel, .help-modal-content, .help-modal-dialog, .cmd-palette-modal) {
   border-radius: 14px;
   box-shadow: var(--shadow-3);
 }
-#app :is(.help-modal-overlay, .cmd-palette-overlay, .config-editor-overlay) {
+#app :is(.help-modal-overlay, .cmd-palette-overlay, .cmd-palette-backdrop, .config-editor-overlay) {
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
@@ -383,7 +383,7 @@ html, body {
 [data-theme="brutalism"] #app :is(.window-panel, .tabpanel, [role="tabpanel"]) { background: var(--bg-primary) !important; }
 
 [data-theme="brutalism"] #app :is(.panel, .legend-panel, .layer-row, .layer-item, .layer-config, .config-card, .radio-card,
-  .config-editor-modal, .help-modal-content, .cmd-palette-modal, .nav-dropdown-menu, .nav-layout-menu,
+  .config-editor-modal, .config-editor-panel, .help-modal-content, .help-modal-dialog, .cmd-palette-modal, .nav-dropdown-menu, .nav-layout-menu,
   .preset-dropdown, .preset-submenu, .layout-submenu, .tooltip, .status-cursor-probe) {
   background: var(--bg-panel) !important;
   color: #111 !important;
@@ -392,10 +392,10 @@ html, body {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
-[data-theme="brutalism"] #app :is(.panel, .config-editor-modal, .help-modal-content, .cmd-palette-modal) { box-shadow: var(--shadow-3); }
+[data-theme="brutalism"] #app :is(.panel, .config-editor-modal, .config-editor-panel, .help-modal-content, .help-modal-dialog, .cmd-palette-modal) { box-shadow: var(--shadow-3); }
 [data-theme="brutalism"] #app :is(.layer-row, .layer-item, .layer-config) { box-shadow: none; }
 [data-theme="brutalism"] #app .layer-row:hover { background: #fff6bf !important; border-color: #111 !important; }
-[data-theme="brutalism"] #app :is(.help-modal-overlay, .cmd-palette-overlay, .config-editor-overlay) {
+[data-theme="brutalism"] #app :is(.help-modal-overlay, .cmd-palette-overlay, .cmd-palette-backdrop, .config-editor-overlay) {
   background: rgba(17, 17, 17, 0.55);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -496,7 +496,7 @@ html, body {
 
 /* Status bar */
 [data-theme="brutalism"] #app :is(.status-bar, #status-bar) { font-family: var(--font-mono); font-weight: 700; color: #111; }
-[data-theme="brutalism"] #app .status-text, [data-theme="brutalism"] #app .valid-label, [data-theme="brutalism"] #app .lead-prefix { color: #111; }
+[data-theme="brutalism"] #app :is(.status-text, .valid-label, .lead-prefix, #sl-time-lead-label, .probe-coords) { color: #111 !important; }
 [data-theme="brutalism"] #app .toggle-state-pill { color: #111; }
 
 /* Inputs */

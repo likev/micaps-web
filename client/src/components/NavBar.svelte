@@ -10,6 +10,7 @@
   import { captureScreenshot, handlePrint } from "../utils/screenshot.js";
   import { getPinnedPresetIds, getRecentPresetIds } from "../lib/stores/presetFavorites.svelte.js";
   import { getGlobalTheme, setGlobalTheme, getGlobalProjection, setGlobalProjection } from "../lib/stores/theme.svelte.js";
+  import { getGlobalLocale, setGlobalLocale, localizeEntityName } from "../lib/stores/i18n.svelte.js";
 
   let {
     presetGroups = [],
@@ -232,6 +233,8 @@
     "ECMWF_HR"
   );
 
+  let currentLocale = $derived(getGlobalLocale());
+
   let isSurface = $derived(Boolean(
     activeWin?.model === "SURFACE" ||
     activeWin?.model === "SURFACE_PLOT" ||
@@ -245,6 +248,22 @@
   ));
   let isObs = $derived(Boolean(
     !isNwpData && (isSurface || isUpperAir || activeWin?.isObservation || currentGroup?.isObservation)
+  ));
+  let levelAllocDisabled = $derived(Boolean(
+    isSurface ||
+    (currentGroup ? currentGroup.hasLevel === false : (activeWin ? activeWin.hasLevel === false : false))
+  ));
+  let isObsOrNonNwp = $derived(Boolean(
+    isObs ||
+    isSurface ||
+    isUpperAir ||
+    activeWin?.isObservation ||
+    currentGroup?.isObservation ||
+    activeWin?.model === "SATELLITE" ||
+    currentGroup?.model === "SATELLITE" ||
+    String(currentGroup?.id || "").toLowerCase().includes("swan") ||
+    String(currentGroup?.id || "").toLowerCase().includes("radar") ||
+    String(currentGroup?.id || "").toLowerCase().includes("sat-")
   ));
 
   let isLayoutMenuOpen = $state(false);
@@ -479,11 +498,11 @@
             type="button"
             class="quick-pill pinned-pill"
             class:active={preset.id === currentPresetId}
-            title="Pinned: {preset.name}"
+            title="Pinned: {localizeEntityName(preset, currentLocale)}"
             onclick={() => handlePresetMenuSelect(preset)}
           >
             <span class="pill-star">★</span>
-            <span class="pill-name">{preset.shortName || preset.name}</span>
+            <span class="pill-name">{localizeEntityName(preset, currentLocale) || preset.shortName || preset.name}</span>
           </button>
         {/each}
 
@@ -492,25 +511,25 @@
             type="button"
             class="quick-pill recent-pill"
             class:active={preset.id === currentPresetId}
-            title="Recent: {preset.name}"
+            title="Recent: {localizeEntityName(preset, currentLocale)}"
             onclick={() => handlePresetMenuSelect(preset)}
           >
             <span class="pill-recent-icon">🕒</span>
-            <span class="pill-name">{preset.shortName || preset.name}</span>
+            <span class="pill-name">{localizeEntityName(preset, currentLocale) || preset.shortName || preset.name}</span>
           </button>
         {/each}
       </div>
 
       {#if hasDataLoaded && currentGroup}
-        <div class="preset-active-indicator" title="Active Preset: {currentGroup.name}">
+        <div class="preset-active-indicator" title="{currentLocale === 'zh' ? '当前预设' : 'Active Preset'}: {localizeEntityName(currentGroup, currentLocale)}">
           <span class="active-dot" aria-hidden="true"></span>
-          <span class="active-tag">Active:</span>
-          <span class="active-title">{currentGroup.name}</span>
+          <span class="active-tag">{currentLocale === 'zh' ? '当前:' : 'Active:'}</span>
+          <span class="active-title">{localizeEntityName(currentGroup, currentLocale)}</span>
           <button
             type="button"
             class="btn-reload-preset"
             onclick={handleReloadClick}
-            title="Reload {currentGroup.name} data"
+            title="{currentLocale === 'zh' ? '重新加载' : 'Reload'} {localizeEntityName(currentGroup, currentLocale)}"
             aria-label="Reload Preset"
           >
             ↻
@@ -596,7 +615,7 @@
                       type="button"
                       class="layout-sub-item-btn"
                       class:selected={layout === item.key && autoAllocation === "step"}
-                      disabled={isSurface || isUpperAir}
+                      disabled={isObsOrNonNwp}
                       onclick={() => handleLayoutSelect(item.key, "step")}
                     >
                       <span>Multi-Step Contrast</span>
@@ -605,7 +624,7 @@
                       type="button"
                       class="layout-sub-item-btn"
                       class:selected={layout === item.key && autoAllocation === "level"}
-                      disabled={isSurface}
+                      disabled={levelAllocDisabled}
                       onclick={() => handleLayoutSelect(item.key, "level")}
                     >
                       <span>Multi-Level Contrast</span>
@@ -614,7 +633,7 @@
                       type="button"
                       class="layout-sub-item-btn"
                       class:selected={layout === item.key && autoAllocation === "model"}
-                      disabled={isSurface || isUpperAir}
+                      disabled={isObsOrNonNwp}
                       onclick={() => handleLayoutSelect(item.key, "model")}
                     >
                       <span>Multi-Model Contrast</span>
@@ -636,12 +655,12 @@
         tabindex="-1"
         aria-hidden="true"
       >
-        <option value="">-- Presets / 组合图 --</option>
+        <option value="">{currentLocale === "zh" ? "-- 预设组合图 --" : "-- Presets --"}</option>
         {#each effectivePresetGroups as group}
           {#if isDivider(group)}
             <option disabled value="">──────── {group.label || ""} ────────</option>
           {:else}
-            <option value={group.id}>{group.name}</option>
+            <option value={group.id}>{localizeEntityName(group, currentLocale)}</option>
           {/if}
         {/each}
       </select>
@@ -883,6 +902,38 @@
             <span class="menu-item-icon">🪐</span>
             <span class="menu-item-label">Vertical Perspective</span>
             {#if currentProjection === "vertical-perspective"}<span class="menu-check">✓</span>{/if}
+          </button>
+
+          <div class="menu-divider" role="separator"></div>
+
+          <div class="menu-group-label" role="presentation">
+            {currentLocale === "zh" ? "语言 / Language" : "Language"}
+          </div>
+
+          <button
+            type="button"
+            id="menu-item-lang-en"
+            class="nav-menu-item"
+            class:selected={currentLocale === "en"}
+            role="menuitem"
+            onclick={() => { setGlobalLocale("en"); isMenuOpen = false; }}
+          >
+            <span class="menu-item-icon">🇺🇸</span>
+            <span class="menu-item-label">English</span>
+            {#if currentLocale === "en"}<span class="menu-check">✓</span>{/if}
+          </button>
+
+          <button
+            type="button"
+            id="menu-item-lang-zh"
+            class="nav-menu-item"
+            class:selected={currentLocale === "zh"}
+            role="menuitem"
+            onclick={() => { setGlobalLocale("zh"); isMenuOpen = false; }}
+          >
+            <span class="menu-item-icon">🇨🇳</span>
+            <span class="menu-item-label">中文 (简体)</span>
+            {#if currentLocale === "zh"}<span class="menu-check">✓</span>{/if}
           </button>
 
           <div class="menu-divider" role="separator"></div>

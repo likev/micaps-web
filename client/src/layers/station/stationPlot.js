@@ -144,6 +144,15 @@ export function renderStationPlotToCanvas(ctx, p, cx, cy, cfg = {}, scale = 1.0,
     ctx.fillText(text, x, y);
   }
 
+  // Station ID (e.g. for TLOGP sounding stations)
+  const isTlogpStation = String(cfg?.element || "").toUpperCase() === "TLOGP" || String(cfg?.path || "").toUpperCase().includes("TLOGP") || String(cfg?.layerId || "").toLowerCase().includes("tlogp");
+  const showStationId = cfg?.showStationId !== undefined ? Boolean(cfg.showStationId) : isTlogpStation;
+  const stationIdText = p?.station_id != null ? String(p.station_id).trim() : (p?.id != null ? String(p.id).trim() : "");
+
+  if (showStationId && stationIdText) {
+    drawPlotText(stationIdText, cx + 6 * scale, cy - 8 * scale, "ppp", "left");
+  }
+
   // 3. TT (Temperature) - Top-Left
   if (showTemp && isAllowed("TT") && allowField("TT") && tt) {
     drawPlotText(tt, cx - 8 * scale, cy - 12 * scale, "tt", "right");

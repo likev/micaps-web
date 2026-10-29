@@ -281,45 +281,75 @@ function getRenderOptions(dataPath) {
   return { colormap: "TMP", showFill: true, showLine: true, lineWidth: 1.5, lineColor: "#58a6ff" };
 }
 
-function getCategory(item) {
+function getCategoryInfo(item) {
   const p = item.dataPath;
   if (p.startsWith("SATELLITE/")) {
-    return "气象卫星遥感 (Satellite Remote Sensing)";
+    return { zh: "气象卫星遥感", en: "Satellite Remote Sensing" };
   }
   if (p.startsWith("SWAN_PRODUCT/") || p.includes("LIGHTNING") || p.includes("UPDRAFT_HELICITY") || (p.includes("DCAPE") && p.startsWith("GRAPES_3KM")) || p.includes("RADAR_COMBINATION_REFLECTIVITY")) {
-    return "强对流与短临 (Severe Convective & Nowcasting)";
+    return { zh: "强对流与短临", en: "Severe Convective & Nowcasting" };
   }
   if (p.startsWith("NWFD_SCMOC")) {
-    return "智能网格预报 (National Gridded Guidance)";
+    return { zh: "智能网格预报", en: "National Gridded Guidance" };
   }
   if (p.startsWith("SURFACE/") || p.startsWith("MARINE/") || p.startsWith("WIND_PROFILER/")) {
-    return "高密地面与海洋观测 (High-Density Observations)";
+    return { zh: "高密地面与海洋观测", en: "High-Density Observations" };
   }
   if (p.startsWith("ECMWF_HR/") || p.startsWith("GRAPES_GFS/") || p.startsWith("GRAPES_3KM/")) {
-    return "数值预报高影响要素 (High-Impact NWP Fields)";
+    return { zh: "数值预报高影响要素", en: "High-Impact NWP Fields" };
   }
   if (p.startsWith("CLDAS/")) {
-    return "实况融合 (Land Surface Reanalysis)";
+    return { zh: "实况融合", en: "Land Surface Reanalysis" };
   }
   if (p.startsWith("ECMWF_ENSEMBLE_PRODUCT/")) {
-    return "集合预报与概率 (Ensemble & Probability)";
+    return { zh: "集合预报与概率", en: "Ensemble & Probability" };
   }
   if (p.startsWith("FORECAST_PRODUCT/")) {
-    return "预报员指导 (Forecaster Guidance)";
+    return { zh: "预报员指导", en: "Forecaster Guidance" };
   }
-  return "Other Presets";
+  return { zh: "其他预报", en: "Other Presets" };
 }
+
+// Retain all existing non-generated presets from origin/main
+const existingNonGenerated = config.presets.filter((p) => {
+  if (!p || p.divider) return true;
+  return !p.id?.startsWith("preset-");
+});
+
+// Index existing paths and IDs for deduplication (§Issue 12)
+const existingPaths = new Set();
+const existingIds = new Set();
+for (const p of existingNonGenerated) {
+  if (!p || p.divider) continue;
+  if (p.id) existingIds.add(p.id);
+  for (const l of p.layers || []) {
+    if (l.path) existingPaths.add(l.path);
+    if (l.dataPath) existingPaths.add(l.dataPath);
+    if (l.model && l.element) existingPaths.add(`${l.model}/${l.element}`);
+  }
+}
+
+const seenPaths = new Set(existingPaths);
+seenPaths.add("ECMWF_HR/PVORT");
+seenPaths.add("SATELLITE/FY4B/L1/CHINA");
+seenPaths.add("SATELLITE/FY4B/L1/DISK");
+
+const seenIds = new Set(existingIds);
 
 const newPresets = [];
 
 // 1. Grouped PVORT Preset
 newPresets.push({
   category: "数值预报高影响要素 (High-Impact NWP Fields)",
+  category_en: "High-Impact NWP Fields",
+  category_zh: "数值预报高影响要素",
   hasLevel: true,
   defaultLevel: 500,
   levels: [10, 20, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 1000],
   id: "preset-ecmwf_pvort",
-  name: "位涡多层分析 (10-1000hPa) / ECMWF Potential Vorticity (PVORT)",
+  name: "ECMWF Potential Vorticity (PVORT 10-1000hPa)",
+  name_en: "ECMWF Potential Vorticity (PVORT 10-1000hPa)",
+  name_zh: "位涡多层分析 (10-1000hPa)",
   layers: [
     {
       id: "layer-ecmwf_pvort",
@@ -339,15 +369,20 @@ newPresets.push({
     },
   ],
 });
+seenIds.add("preset-ecmwf_pvort");
 
 // 2. Grouped FY-4B CHINA Preset (15 channels)
 newPresets.push({
   category: "气象卫星遥感 (Satellite Remote Sensing)",
+  category_en: "Satellite Remote Sensing",
+  category_zh: "气象卫星遥感",
   hasLevel: true,
   defaultLevel: 12,
   levels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
   id: "preset-fy4b_china_grouped",
-  name: "风云四号B星中国区 (FY-4B CHINA 15通道) / FY-4B CHINA Multi-Channel",
+  name: "FY-4B CHINA Multi-Channel (15 Channels)",
+  name_en: "FY-4B CHINA Multi-Channel (15 Channels)",
+  name_zh: "风云四号B星中国区 (15通道)",
   isObservation: true,
   layers: [
     {
@@ -367,15 +402,20 @@ newPresets.push({
     },
   ],
 });
+seenIds.add("preset-fy4b_china_grouped");
 
 // 3. Grouped FY-4B DISK Preset (15 channels)
 newPresets.push({
   category: "气象卫星遥感 (Satellite Remote Sensing)",
+  category_en: "Satellite Remote Sensing",
+  category_zh: "气象卫星遥感",
   hasLevel: true,
   defaultLevel: 12,
   levels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
   id: "preset-fy4b_disk_grouped",
-  name: "风云四号B星全圆盘 (FY-4B DISK 15通道) / FY-4B DISK Multi-Channel",
+  name: "FY-4B DISK Multi-Channel (15 Channels)",
+  name_en: "FY-4B DISK Multi-Channel (15 Channels)",
+  name_zh: "风云四号B星全圆盘 (15通道)",
   isObservation: true,
   layers: [
     {
@@ -395,6 +435,7 @@ newPresets.push({
     },
   ],
 });
+seenIds.add("preset-fy4b_disk_grouped");
 
 // Filter to active Tier 1, Tier 2, and Tier 3 datasets
 const targetItems = manifest.filter((item) => (item.tier === 1 || item.tier === 2 || item.tier === 3));
@@ -409,13 +450,21 @@ for (const item of targetItems) {
     continue;
   }
 
-  const category = getCategory(item);
+  const presetId = `preset-${item.id}`;
+  const layerId = `layer-${item.id}`;
+
+  if (seenIds.has(presetId) || seenPaths.has(item.dataPath)) {
+    continue;
+  }
+  seenPaths.add(item.dataPath);
+  seenIds.add(presetId);
+
+  const catInfo = getCategoryInfo(item);
   const parts = item.dataPath.split("/");
   const model = parts[0];
   const element = parts.slice(1).join("/");
-  const displayName = `${item.name_zh} / ${item.name_en}`;
-  const presetId = `preset-${item.id}`;
-  const layerId = `layer-${item.id}`;
+  const name_en = item.name_en || item.name_zh;
+  const name_zh = item.name_zh || item.name_en;
 
   let layerType = "contour";
   let hasLevel = false;
@@ -528,7 +577,9 @@ for (const item of targetItems) {
 
   const layerDef = {
     id: layerId,
-    name: displayName,
+    name: name_en,
+    name_en,
+    name_zh,
     type: layerType,
     model,
     element,
@@ -543,10 +594,14 @@ for (const item of targetItems) {
   if (hasLevel) layerDef.level = defaultLevel;
 
   const presetDef = {
-    category,
+    category: `${catInfo.zh} (${catInfo.en})`,
+    category_en: catInfo.en,
+    category_zh: catInfo.zh,
     hasLevel,
     id: presetId,
-    name: displayName,
+    name: name_en,
+    name_en,
+    name_zh,
     isObservation,
     layers: [layerDef],
   };
@@ -558,12 +613,6 @@ for (const item of targetItems) {
 
   newPresets.push(presetDef);
 }
-
-// Retain all existing non-generated presets from origin/main
-const existingNonGenerated = config.presets.filter((p) => {
-  if (!p || p.divider) return true;
-  return !p.id?.startsWith("preset-");
-});
 
 config.presets = [...existingNonGenerated, ...newPresets];
 

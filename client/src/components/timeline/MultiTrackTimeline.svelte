@@ -908,8 +908,8 @@
     justify-content: space-between;
     align-items: center;
     padding: 6px 16px;
-    background: rgba(0, 0, 0, 0.35);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--bg-secondary, rgba(0, 0, 0, 0.35));
+    border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
   }
 
   .header-left {
@@ -1029,8 +1029,8 @@
   .track-headers-column {
     width: 220px;
     flex-shrink: 0;
-    background: rgba(13, 17, 23, 0.95);
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--bg-secondary, rgba(13, 17, 23, 0.95));
+    border-right: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
     display: flex;
     flex-direction: column;
   }
@@ -1040,8 +1040,8 @@
     display: flex;
     align-items: center;
     padding: 0 10px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+    background: var(--bg-hover, rgba(0, 0, 0, 0.2));
   }
 
   .slot-label {
@@ -1132,8 +1132,8 @@
   .time-ruler {
     height: 26px;
     position: relative;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(0, 0, 0, 0.25);
+    border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+    background: var(--bg-hover, rgba(0, 0, 0, 0.25));
   }
 
   .ruler-tick {
@@ -1288,7 +1288,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 6px 16px;
-    background: rgba(0, 0, 0, 0.25);
+    background: var(--bg-secondary, rgba(0, 0, 0, 0.25));
     flex-wrap: wrap;
     gap: 12px;
   }

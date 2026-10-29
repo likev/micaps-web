@@ -1,13 +1,15 @@
-<script>
   import { onMount, tick } from "svelte";
   import { PRESET_GROUPS, isDivider } from "../config/presets.js";
   import { isPresetPinned, togglePinPreset, addRecentPreset } from "../lib/stores/presetFavorites.svelte.js";
+  import { getGlobalLocale, localizeCategory, localizeEntityName } from "../lib/stores/i18n.svelte.js";
 
   let {
     presetGroups = [],
     activePresetId = "",
     onSelect = null,
   } = $props();
+
+  let currentLocale = $derived(getGlobalLocale());
 
   let effectiveGroups = $derived(
     presetGroups && presetGroups.length > 0 ? presetGroups : PRESET_GROUPS
@@ -124,7 +126,76 @@
   };
 
   function getCategoryIcon(name) {
-    return CATEGORY_ICONS[name] || "📁";
+    if (!name) return "📁";
+    if (CATEGORY_ICONS[name]) return CATEGORY_ICONS[name];
+    const enCat = localizeCategory(name, "en");
+    if (CATEGORY_ICONS[enCat]) return CATEGORY_ICONS[enCat];
+    const zhCat = localizeCategory(name, "zh");
+    if (CATEGORY_ICONS[zhCat]) return CATEGORY_ICONS[zhCat];
+    return "📁";
+  }
+
+  function formatPresetBadge(preset) {
+    if (!preset) return "";
+    if (preset.badge) return preset.badge;
+
+    const id = String(preset.id || "").toUpperCase();
+    const cat = String(preset.category || "").toUpperCase();
+    const layers = Array.isArray(preset.layers) ? preset.layers : [];
+    const firstPath = String(layers[0]?.path || layers[0]?.element || "").toUpperCase();
+
+    // 1. Multi-level presets (hasLevel !== false)
+    if (preset.hasLevel !== false && (preset.defaultLevel != null || preset.hasLevel)) {
+      const lvl = preset.defaultLevel ?? 500;
+      const isFy4b =
+        id.includes("FY4B") ||
+        firstPath.includes("FY4B") ||
+        layers.some((l) => String(l?.path || l?.element || "").toUpperCase().includes("FY4B"));
+      if (isFy4b) {
+        return `C${String(lvl).padStart(3, "0")}`;
+      }
+      const isMeterHeight =
+        id.includes("TDMOSAIC") ||
+        firstPath.includes("TDMOSAIC") ||
+        (Array.isArray(preset.levels) && preset.levels.some((l) => l > 1050)) ||
+        layers.some((l) => String(l?.path || l?.element || "").toUpperCase().includes("TDMOSAIC"));
+      if (isMeterHeight) {
+        return `${lvl} m`;
+      }
+      return `${lvl} hPa`;
+    }
+
+    // 2. Single-level presets (hasLevel === false)
+    if (preset.category?.includes("Derived") ? "Diag" : null) return "Diag";
+    if (cat.includes("DERIVED")) return "Diag";
+    if (cat.includes("TLOGP")) return "Sounding";
+    if (cat.includes("TIME-HEIGHT") || cat.includes("LINE-HEIGHT") || cat.includes("TIME-DISTANCE")) return "Profile";
+
+    // Satellite single-channel or L2 products
+    const chMatch = firstPath.match(/\b(C\d{3})\b/);
+    if (chMatch) return chMatch[1];
+    if (id.includes("SAT-") || cat.includes("SATELLITE") || firstPath.startsWith("SATELLITE/")) {
+      if (firstPath.includes("DUST")) return "RGB";
+      if (firstPath.includes("CTT")) return "CTT";
+      if (firstPath.includes("QPE")) return "Sat QPE";
+      return "Sat";
+    }
+
+    // Radar, Lightning & Wind Profiler
+    if (firstPath.includes("LIGHTNING") || id.includes("LIGHTNING")) return "Ltng";
+    if (firstPath.includes("WIND_PROFILER") || id.includes("WIND-PROFILER") || id.includes("WIND_PROFILER")) return "Prof";
+    if (firstPath.startsWith("SWAN_PRODUCT/") || id.includes("SWAN") || firstPath.includes("RADAR")) return "Radar";
+
+    // Non-surface single-level NWP fields
+    if (firstPath.includes("TROPOPAUSE") || id.includes("TROPOPAUSE")) return "Trop";
+    if (firstPath.includes("ZERO_DEGREE") || id.includes("0C-HEIGHT")) return "0°C";
+    if (firstPath.includes("100M") || id.includes("100M")) return "100m";
+    if (firstPath.includes("CAPE") || firstPath.includes("CIN") || firstPath.includes("TCWV") || firstPath.includes("PWAT") || firstPath.includes("K_INDEX") || firstPath.includes("SWEAT") || firstPath.includes("HELICITY")) {
+      return "Col";
+    }
+
+    if (preset.isObservation && cat.includes("UPPER")) return "Obs";
+    return "Sfc";
   }
 
   export function open() {
@@ -387,7 +458,7 @@
           >
             <div class="category-header">
               <span class="category-icon">{getCategoryIcon(cat.name)}</span>
-              <span class="category-name">{cat.name}</span>
+              <span class="category-name">{localizeCategory(cat.name, currentLocale)}</span>
               <span class="category-count">{cat.presets.length}</span>
               <span class="category-arrow">▸</span>
             </div>
@@ -402,7 +473,7 @@
         class="preset-submenu"
         bind:this={submenuRef}
         role="menu"
-        aria-label={cat.name}
+        aria-label={localizeCategory(cat.name, currentLocale)}
         style="top: {submenuTop}px; left: {submenuLeft}px; max-height: {submenuMaxHeight};"
       >
         {#each cat.presets as preset, pIdx}
@@ -423,16 +494,13 @@
                 handleSelectPreset(preset);
               }
             }}
-            title={preset.name}
+            title={localizeEntityName(preset, currentLocale)}
           >
             <span class="preset-check">{preset.id === activePresetId ? "✓" : ""}</span>
-            <span class="preset-name">{preset.name}</span>
-            {#if preset.badge}
-              <span class="preset-badge">{preset.badge}</span>
-            {:else if preset.hasLevel !== false && (preset.defaultLevel || preset.hasLevel)}
-              <span class="preset-badge">{preset.defaultLevel || 500} hPa</span>
-            {:else if preset.hasLevel === false}
-              <span class="preset-badge">{preset.category?.includes("Derived") ? "Diag" : (preset.isObservation && preset.category?.includes("Upper") ? "Obs" : "Sfc")}</span>
+            <span class="preset-name">{localizeEntityName(preset, currentLocale)}</span>
+            {@const badgeText = formatPresetBadge(preset)}
+            {#if badgeText}
+              <span class="preset-badge">{badgeText}</span>
             {/if}
             <button
               type="button"

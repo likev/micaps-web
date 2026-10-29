@@ -107,9 +107,11 @@
 [data-theme="light"] .collapse-btn,
 [data-theme="light"] .loop-toggle-btn,
 [data-theme="light"] .config-editor-modal,
+[data-theme="light"] .config-editor-panel,
 [data-theme="light"] .config-card,
 [data-theme="light"] .radio-card,
 [data-theme="light"] .help-modal-content,
+[data-theme="light"] .help-modal-dialog,
 [data-theme="light"] .sel-filter-field,
 [data-theme="light"] .sel-filter-op,
 [data-theme="light"] .input-filter-val,
@@ -313,6 +315,13 @@
 }
 [data-theme="light"] .btn-toggle-lighting.active .toggle-switch-ui.on {
   background-color: #d4a72c !important;
+}
+
+[data-theme="light"] #sl-time-lead-label {
+  color: var(--text-primary) !important;
+}
+[data-theme="light"] .probe-coords {
+  color: var(--accent-blue) !important;
 }
 
 [data-theme="light"] .nav-menu-item:hover,

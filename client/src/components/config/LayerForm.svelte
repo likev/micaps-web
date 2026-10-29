@@ -1,16 +1,19 @@
 <script>
   import { MET_LINE_COLORS, getRecommendedLineColor } from "../../ui/config/colorPresets.js";
+  import { getGlobalLocale } from "../../lib/stores/i18n.svelte.js";
 
   let { layer, availableColormaps = [], onUpdate = null, onDuplicate = null, onDelete = null } = $props();
 
+  let currentLocale = $derived(getGlobalLocale());
+
   const LAYER_TYPES = [
-    { value: "contour", label: "Contour / Isobands (等值线/色斑图)" },
-    { value: "wind", label: "Wind Vectors / Streamlines (风场/流线)" },
-    { value: "station", label: "Station Plot (站点填图)" },
-    { value: "pmtiles", label: "Vector Basemap (矢量底图)" },
-    { value: "timeheight", label: "Time-Height Profile (时间-高度剖面)" },
-    { value: "hovmoller", label: "Hovmöller Diagram (纬度-时间剖面)" },
-    { value: "tlogp", label: "T-lnP Sounding Diagram (探空图)" },
+    { value: "contour", en: "Contour / Isobands", zh: "等值线 / 色斑图" },
+    { value: "wind", en: "Wind Vectors / Streamlines", zh: "风场矢量 / 流线" },
+    { value: "station", en: "Station Plot", zh: "站点填图" },
+    { value: "pmtiles", en: "Vector Basemap", zh: "矢量底图" },
+    { value: "timeheight", en: "Time-Height Profile", zh: "时间-高度剖面" },
+    { value: "hovmoller", en: "Hovmöller Diagram", zh: "纬度-时间剖面" },
+    { value: "tlogp", en: "T-lnP Sounding Diagram", zh: "T-lnP 探空图" },
   ];
 
   const COMMON_MODELS = ["ECMWF_HR", "GRAPES_GFS", "SURFACE", "UPPER_AIR"];
@@ -64,7 +67,7 @@
         onchange={(e) => mutateField("type", e.target.value)}
       >
         {#each LAYER_TYPES as t}
-          <option value={t.value}>{t.label}</option>
+          <option value={t.value}>{currentLocale === "zh" ? t.zh : t.en}</option>
         {/each}
       </select>
     </label>

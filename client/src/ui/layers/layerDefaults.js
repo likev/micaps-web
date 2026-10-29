@@ -46,6 +46,7 @@ export function getStationDatasetType(layer) {
   if (str.includes("PRES_CHANGE_24H")) return "pres_change_24h";
   if (str.includes("HORIZONTAL_VISIBILITY") || str.includes("VISIBILITY_1MIN") || str.includes("VIS_1MIN")) return "visibility";
   if (str.includes("AMV")) return "amv";
+  if (str.includes("TLOGP") || str.includes("SOUNDING STATION NETWORK")) return "tlogp";
   if (isUpperAirStationLayer(layer)) return "upper_air";
   return "standard";
 }

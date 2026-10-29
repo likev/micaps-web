@@ -52,27 +52,28 @@ export function formatStepLabel(step) {
   return n < 1 ? `${Math.round(n * 60)}min` : `${n}h`;
 }
 
-/** True when a preset group carries FY-4B / satellite imagery layers. */
+/** True when a preset group carries FY-4B / FY-2G / satellite imagery layers. */
 export function isSatelliteGroup(group) {
   if (!group) return false;
-  if (typeof group === "string") {
-    const s = group.toUpperCase();
-    return s.includes("SATELLITE") || s.includes("FY4") || s.includes("FY-4");
-  }
-  const id = String(group.id || "").toUpperCase();
-  const name = String(group.name || "").toUpperCase();
-  const path = String(group.path || "").toUpperCase();
-  if (id.includes("SATELLITE") || id.includes("FY4") || id.includes("FY-4") ||
-      name.includes("SATELLITE") || name.includes("FY4") || name.includes("FY-4") ||
-      path.includes("SATELLITE") || path.includes("FY4") || path.includes("FY-4")) {
+  const matchSatStr = (val) => /SATELLITE|FY4|FY-4|FY2|FY-2/i.test(String(val || ""));
+  if (typeof group === "string") return matchSatStr(group);
+  if (
+    matchSatStr(group.id) ||
+    matchSatStr(group.name) ||
+    matchSatStr(group.path) ||
+    matchSatStr(group.model) ||
+    matchSatStr(group.category)
+  ) {
     return true;
   }
   const layers = Array.isArray(group.layers) ? group.layers : [];
-  return layers.some((l) =>
-    l?.model === "SATELLITE" ||
-    String(l?.path || "").toUpperCase().includes("FY4") ||
-    String(l?.path || "").toUpperCase().includes("SATELLITE") ||
-    String(l?.element || "").toUpperCase().includes("FY4")
+  return layers.some(
+    (l) =>
+      l?.model === "SATELLITE" ||
+      l?.type === "image" ||
+      matchSatStr(l?.path) ||
+      matchSatStr(l?.element) ||
+      matchSatStr(l?.id)
   );
 }
 

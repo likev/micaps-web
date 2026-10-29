@@ -49,7 +49,24 @@
   let isProfile = $derived(Boolean(activeWindow && isProfilePanelWindow(activeWindow)));
   let isSurface = $derived(Boolean(activeWindow && isSurfaceWindow(activeWindow)));
   let isUpperAir = $derived(Boolean(activeWindow && isUpperAirWindow(activeWindow)));
+  let hasNoLevel = $derived(Boolean(
+    isSurface ||
+    activeWindow?.hasLevel === false ||
+    activeWindow?.activeGroup?.hasLevel === false
+  ));
   let isObs = $derived(Boolean(isSurface || isUpperAir || activeWindow?.isObservation || activeWindow?.activeGroup?.isObservation));
+  let isObsOrNonNwp = $derived(Boolean(
+    isObs ||
+    isSurface ||
+    isUpperAir ||
+    activeWindow?.isObservation ||
+    activeWindow?.activeGroup?.isObservation ||
+    activeWindow?.model === "SATELLITE" ||
+    activeWindow?.activeGroup?.model === "SATELLITE" ||
+    String(activeWindow?.activeGroup?.id || "").toLowerCase().includes("swan") ||
+    String(activeWindow?.activeGroup?.id || "").toLowerCase().includes("radar") ||
+    String(activeWindow?.activeGroup?.id || "").toLowerCase().includes("sat-")
+  ));
   let allocDisabled = $derived(layout !== "1x1" || isProfile);
   let allocTitle = $derived(
     isProfile
@@ -67,6 +84,8 @@
     const cur = typeof autoAllocation === "string" ? autoAllocation : (autoAllocation ? "level" : "none");
     if (isSurface && (cur === "step" || cur === "level" || cur === "model")) return "none";
     if (isUpperAir && (cur === "step" || cur === "model")) return "none";
+    if (hasNoLevel && cur === "level") return "none";
+    if (isObsOrNonNwp && (cur === "step" || cur === "model")) return "none";
     return cur;
   });
 
@@ -399,6 +418,8 @@
           const val = e.currentTarget.value;
           if (isSurface && (val === "step" || val === "level" || val === "model")) return;
           if (isUpperAir && (val === "step" || val === "model")) return;
+          if (hasNoLevel && val === "level") return;
+          if (isObsOrNonNwp && (val === "step" || val === "model")) return;
           if (onSelectAutoAlloc) onSelectAutoAlloc(val);
           else if (onToggleAutoAlloc) onToggleAutoAlloc(val);
         }}
@@ -426,22 +447,22 @@
       <option id="btn-layout-4" value="2x2">⊞ 4-Split</option>
       <option id="btn-layout-6" value="2x3">▦ 6-Split</option>
     </select>
-
-    <button
-      id="btn-sync-toggle"
-      type="button"
-      class="layout-btn"
-      class:active={syncMap}
-      class:hidden={layout === "1x1"}
-      aria-pressed={syncMap ? "true" : "false"}
-      title={syncMap
-        ? "Camera sync enabled across windows (Click to toggle off)"
-        : "Camera sync disabled (Click to toggle on)"}
-      onclick={() => onToggleSync && onToggleSync()}
-    >
-      {syncMap ? "Sync 🔗" : "Sync ✕"}
-    </button>
   </div>
+
+  <button
+    id="btn-sync-toggle"
+    type="button"
+    class="layout-btn"
+    class:active={syncMap}
+    class:hidden={layout === "1x1"}
+    aria-pressed={syncMap ? "true" : "false"}
+    title={syncMap
+      ? "Camera sync enabled across windows (Click to toggle off)"
+      : "Camera sync disabled (Click to toggle on)"}
+    onclick={() => onToggleSync && onToggleSync()}
+  >
+    {syncMap ? "Sync 🔗" : "Sync ✕"}
+  </button>
 </div>
 
 <style>

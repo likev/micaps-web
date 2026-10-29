@@ -3,6 +3,7 @@
   import Legend from "./Legend.svelte";
   import { getLayersForWindow } from "../lib/stores/layersCore.js";
   import { resolveAllLayersForStatus, parseTimestamp, getReferenceNowMs } from "../utils/timeResolver.js";
+  import { getGlobalLocale, localizeEntityName, splitBilingualString } from "../lib/stores/i18nCore.js";
 
   let {
     win,
@@ -50,19 +51,35 @@
 
   let winTitle = $derived.by(() => {
     if (!win) return "";
-    // Strip any stale "Wn: " prefix: the badge already shows Wn, and the
-    // prefix is derived at render time so drag-reorder stays consistent.
+    const locale = getGlobalLocale();
     const stripPrefix = (t) => String(t || "").replace(/^W\d+:\s*/, "");
-    if (win.title) return stripPrefix(win.title);
-    if (win.activeGroup?.name) return stripPrefix(win.activeGroup.name);
-    if (win.model && win.element) {
-      const isUpper = win.model === "UPPER_AIR" || (typeof win.element === "string" && win.element.includes("UPPER"));
-      if (win.isObservation) {
-        return isUpper ? `${win.level || 500} hPa Sounding (${win.model})` : `${win.element} (${win.model})`;
-      }
-      return `${win.level ? `${win.level} hPa ` : ""}${win.element} (${win.model})`;
+    let rawTitle = win.title ? stripPrefix(win.title) : (win.activeGroup ? localizeEntityName(win.activeGroup, locale) : "");
+    if (!rawTitle && win.model && win.element) {
+      rawTitle = `${win.element} (${win.model})`;
     }
-    return `Window ${win.winIdx + 1}`;
+    if (!rawTitle) return `Window ${win.winIdx + 1}`;
+    rawTitle = splitBilingualString(rawTitle, locale);
+
+    const isFy4b =
+      win.model === "SATELLITE" ||
+      /FY4B/i.test(String(win.activeGroup?.id || "")) ||
+      (Array.isArray(win.layers) && win.layers.some((l) => /FY4B/i.test(String(l?.path || l?.element || ""))));
+    const isMeterHeight =
+      /TDMOSAIC/i.test(String(win.activeGroup?.id || "")) ||
+      (Array.isArray(win.levels) && win.levels.some((l) => l > 1050)) ||
+      (Array.isArray(win.layers) && win.layers.some((l) => /TDMOSAIC/i.test(String(l?.path || l?.element || ""))));
+    const isSurface = win.model === "SURFACE" || win.level === 0 || win.activeGroup?.hasLevel === false;
+
+    const levelStr = (!isSurface && win.level != null)
+      ? (isFy4b
+          ? `C${String(win.level).padStart(3, "0")}`
+          : (isMeterHeight ? `${win.level} m` : `${win.level} hPa`))
+      : "";
+
+    if (levelStr && !rawTitle.includes(levelStr) && !rawTitle.includes(String(win.level)) && !rawTitle.toLowerCase().includes("surface")) {
+      rawTitle = `${rawTitle} - ${levelStr}`;
+    }
+    return rawTitle;
   });
 
 </script>
@@ -237,8 +254,8 @@
   }
 
   .win-header:hover {
-    background: rgba(22, 27, 34, 0.95);
-    border-color: rgba(255, 255, 255, 0.22);
+    background: var(--bg-hover, rgba(22, 27, 34, 0.95));
+    border-color: var(--border-color, rgba(255, 255, 255, 0.22));
   }
 
   .window-panel.active .win-header {

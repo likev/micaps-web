@@ -91,7 +91,9 @@
           "type": "contour"
         }
       ],
-      "name": "Surface Synoptic (Plots + SLP Isobars)"
+      "name": "Surface Synoptic (Plots + SLP Isobars)",
+      "name_en": "Surface Synoptic (Plots + SLP Isobars)",
+      "name_zh": "地面综合天气形势 (站点填图与气压线)"
     },
     {
       "category": "Upper-Air Observations",
@@ -132,7 +134,9 @@
           "type": "station"
         }
       ],
-      "name": "500 hPa Upper-Air Sounding"
+      "name": "500 hPa Upper-Air Sounding",
+      "name_en": "500 hPa Upper-Air Sounding",
+      "name_zh": "500 hPa 高空探空综合图"
     },
     {
       "category": "TlogP Observation",
@@ -149,10 +153,7 @@
           "path": "UPPER_AIR/TLOGP",
           "removable": false,
           "render": {
-            "showDewpoint": true,
-            "showPressure": true,
-            "showTemp": true,
-            "showWind": true
+            "showStationId": true
           },
           "type": "station"
         },
@@ -186,7 +187,9 @@
           "visible": true
         }
       ],
-      "name": "T-lnP Sounding Analysis (TlogP)"
+      "name": "T-lnP Sounding Analysis (TlogP)",
+      "name_en": "T-lnP Sounding Analysis (TlogP)",
+      "name_zh": "T-lnP 探空分析图"
     },
     {
       "divider": true,
@@ -280,7 +283,9 @@
           "type": "wind"
         }
       ],
-      "name": "500hPa Composite (HGT + RH + WIND)"
+      "name": "500hPa Composite (HGT + RH + WIND)",
+      "name_en": "500hPa Composite (HGT + RH + WIND)",
+      "name_zh": "500hPa 综合分析 (高度+湿度+风场)"
     },
     {
       "category": "NWP Synoptic Rain",
@@ -327,7 +332,9 @@
           "type": "contour"
         }
       ],
-      "name": "ECMWF Rain12"
+      "name": "ECMWF Rain12",
+      "name_en": "ECMWF Rain12",
+      "name_zh": "ECMWF 12小时降水"
     },
     {
       "category": "NWP Synoptic",
@@ -385,7 +392,9 @@
           "type": "wind"
         }
       ],
-      "name": "850hPa Low-Level Jet (HGT + TMP + WIND)"
+      "name": "850hPa Low-Level Jet (HGT + TMP + WIND)",
+      "name_en": "850hPa Low-Level Jet (HGT + TMP + WIND)",
+      "name_zh": "850hPa 低空急流 (高度+气温+风场)"
     },
     {
       "category": "NWP Synoptic",
@@ -459,7 +468,9 @@
           "type": "wind"
         }
       ],
-      "name": "200hPa Jet Stream (HGT + WIND)"
+      "name": "200hPa Jet Stream (HGT + WIND)",
+      "name_en": "200hPa Jet Stream (HGT + WIND)",
+      "name_zh": "200hPa 高空急流 (高度+风场)"
     },
     {
       "category": "NWP Synoptic",
@@ -489,7 +500,9 @@
           "type": "contour"
         }
       ],
-      "name": "ECMWF Sea Level Pressure (SLP)"
+      "name": "ECMWF Sea Level Pressure (SLP)",
+      "name_en": "ECMWF Sea Level Pressure (SLP)",
+      "name_zh": "ECMWF 海平面气压场"
     },
     {
       "category": "NWP Synoptic",
@@ -518,7 +531,9 @@
           "type": "contour"
         }
       ],
-      "name": "ECMWF 2m Temperature (T2m)"
+      "name": "ECMWF 2m Temperature (T2m)",
+      "name_en": "ECMWF 2m Temperature (T2m)",
+      "name_zh": "ECMWF 2米气温"
     },
     {
       "divider": true,
@@ -582,7 +597,9 @@
           "visible": true
         }
       ],
-      "name": "EC Time-Height Profile (RH+T+VVEL+Wind)"
+      "name": "EC Time-Height Profile (RH+T+VVEL+Wind)",
+      "name_en": "EC Time-Height Profile (RH+T+VVEL+Wind)",
+      "name_zh": "ECMWF 时间-高度剖面 (RH+T+VVEL+Wind)"
     },
     {
       "category": "NWP Line-Height Profile",
@@ -643,7 +660,9 @@
           "visible": true
         }
       ],
-      "name": "EC Line-Height Cross-Section (RH+T+VVEL+Wind)"
+      "name": "EC Line-Height Cross-Section (RH+T+VVEL+Wind)",
+      "name_en": "EC Line-Height Cross-Section (RH+T+VVEL+Wind)",
+      "name_zh": "ECMWF 空间剖面 (RH+T+VVEL+Wind)"
     },
     {
       "category": "NWP Time-Distance Profile",
@@ -696,7 +715,9 @@
           "visible": true
         }
       ],
-      "name": "EC Time-Line Hovmoller (RH+T+VVEL+Wind @ level)"
+      "name": "EC Time-Line Hovmoller (RH+T+VVEL+Wind @ level)",
+      "name_en": "EC Time-Line Hovmoller (RH+T+VVEL+Wind @ level)",
+      "name_zh": "ECMWF 纬度-时间 Hovmöller (RH+T+VVEL+Wind)"
     },
     {
       "divider": true,
@@ -761,7 +782,9 @@
       ],
       "mode": "live",
       "name": "Convective Nowcast (Multi-Cadence)",
-      "pacemaker": "surface-obs-nowcast"
+      "pacemaker": "surface-obs-nowcast",
+      "name_en": "Convective Nowcast (Multi-Cadence)",
+      "name_zh": "强对流短临多频次预警"
     },
     {
       "category": "Multi-Time Recipes",
@@ -801,7 +824,9 @@
       ],
       "mode": "review",
       "name": "Surface Motion Compare (T0 vs T-30m)",
-      "pacemaker": "surface-obs-t0"
+      "pacemaker": "surface-obs-t0",
+      "name_en": "Surface Motion Compare (T0 vs T-30m)",
+      "name_zh": "雷达回波动态外推对比 (T0 vs T-30m)"
     },
     {
       "category": "Derived Diagnostics",
@@ -849,7 +874,9 @@
           "type": "contour"
         }
       ],
-      "name": "NWP Derived Stability & Severe Indices (ECMWF)"
+      "name": "NWP Derived Stability & Severe Indices (ECMWF)",
+      "name_en": "NWP Derived Stability & Severe Indices (ECMWF)",
+      "name_zh": "ECMWF 对流不稳定与强天气指数"
     },
     {
       "category": "Upper-Air Observations",
@@ -885,7 +912,9 @@
           "type": "contour"
         }
       ],
-      "name": "Sounding Derived Multi-Level Analysis"
+      "name": "Sounding Derived Multi-Level Analysis",
+      "name_en": "Sounding Derived Multi-Level Analysis",
+      "name_zh": "探空多层物理量诊断"
     },
     {
       "category": "Upper-Air Observations",
@@ -907,7 +936,9 @@
           "type": "contour"
         }
       ],
-      "name": "Sounding Derived K-Index"
+      "name": "Sounding Derived K-Index",
+      "name_en": "Sounding Derived K-Index",
+      "name_zh": "探空推算 K指数"
     },
     {
       "category": "Upper-Air Observations",
@@ -929,7 +960,9 @@
           "type": "contour"
         }
       ],
-      "name": "Sounding Derived Showalter Index"
+      "name": "Sounding Derived Showalter Index",
+      "name_en": "Sounding Derived Showalter Index",
+      "name_zh": "探空推算 沙氏指数 (SI)"
     },
     {
       "category": "Upper-Air Observations",
@@ -951,7 +984,9 @@
           "type": "contour"
         }
       ],
-      "name": "Sounding Derived Lifted Index"
+      "name": "Sounding Derived Lifted Index",
+      "name_en": "Sounding Derived Lifted Index",
+      "name_zh": "探空推算 抬升指数 (LI)"
     },
     {
       "category": "Upper-Air Observations",
@@ -973,7 +1008,9 @@
           "type": "contour"
         }
       ],
-      "name": "Sounding Derived SWEAT Index"
+      "name": "Sounding Derived SWEAT Index",
+      "name_en": "Sounding Derived SWEAT Index",
+      "name_zh": "探空推算 强天气威胁指数 (SWEAT)"
     },
     {
       "category": "Upper-Air Observations",
@@ -995,7 +1032,9 @@
           "type": "contour"
         }
       ],
-      "name": "Sounding Derived Total Totals TT"
+      "name": "Sounding Derived Total Totals TT",
+      "name_en": "Sounding Derived Total Totals TT",
+      "name_zh": "探空推算 总全指数 (TT)"
     },
     {
       "category": "Upper-Air Observations",
@@ -1018,7 +1057,9 @@
           "type": "contour"
         }
       ],
-      "name": "Sounding Derived Vertical Wind Shear"
+      "name": "Sounding Derived Vertical Wind Shear",
+      "name_en": "Sounding Derived Vertical Wind Shear",
+      "name_zh": "探空推算 垂直风切变"
     },
     {
       "category": "Upper-Air Observations",
@@ -1041,7 +1082,9 @@
           "type": "contour"
         }
       ],
-      "name": "Sounding Derived 1000-500hPa Thickness"
+      "name": "Sounding Derived 1000-500hPa Thickness",
+      "name_en": "Sounding Derived 1000-500hPa Thickness",
+      "name_zh": "探空推算 1000-500hPa 厚度"
     },
     {
       "category": "Upper-Air Observations",
@@ -1064,7 +1107,9 @@
           "type": "contour"
         }
       ],
-      "name": "Sounding Derived T850-500 Difference"
+      "name": "Sounding Derived T850-500 Difference",
+      "name_en": "Sounding Derived T850-500 Difference",
+      "name_zh": "探空推算 850-500hPa 温差"
     },
     {
       "category": "Derived Diagnostics",
@@ -1085,7 +1130,9 @@
           "type": "contour"
         }
       ],
-      "name": "Derived K-Index (ECMWF)"
+      "name": "Derived K-Index (ECMWF)",
+      "name_en": "Derived K-Index (ECMWF)",
+      "name_zh": "ECMWF 推算 K指数"
     },
     {
       "category": "Derived Diagnostics",
@@ -1106,7 +1153,9 @@
           "type": "contour"
         }
       ],
-      "name": "Derived Showalter Index (ECMWF)"
+      "name": "Derived Showalter Index (ECMWF)",
+      "name_en": "Derived Showalter Index (ECMWF)",
+      "name_zh": "ECMWF 推算 沙氏指数 (SI)"
     },
     {
       "category": "Derived Diagnostics",
@@ -1127,7 +1176,9 @@
           "type": "contour"
         }
       ],
-      "name": "Derived Lifted Index (ECMWF)"
+      "name": "Derived Lifted Index (ECMWF)",
+      "name_en": "Derived Lifted Index (ECMWF)",
+      "name_zh": "ECMWF 推算 抬升指数 (LI)"
     },
     {
       "category": "Derived Diagnostics",
@@ -1148,7 +1199,9 @@
           "type": "contour"
         }
       ],
-      "name": "Derived SWEAT Index (ECMWF)"
+      "name": "Derived SWEAT Index (ECMWF)",
+      "name_en": "Derived SWEAT Index (ECMWF)",
+      "name_zh": "ECMWF 推算 强天气威胁指数 (SWEAT)"
     },
     {
       "category": "Derived Diagnostics",
@@ -1169,7 +1222,9 @@
           "type": "contour"
         }
       ],
-      "name": "Derived Total Totals TT (ECMWF)"
+      "name": "Derived Total Totals TT (ECMWF)",
+      "name_en": "Derived Total Totals TT (ECMWF)",
+      "name_zh": "ECMWF 推算 总全指数 (TT)"
     },
     {
       "category": "Derived Diagnostics",
@@ -1191,7 +1246,9 @@
           "type": "contour"
         }
       ],
-      "name": "Derived Vertical Wind Shear (ECMWF)"
+      "name": "Derived Vertical Wind Shear (ECMWF)",
+      "name_en": "Derived Vertical Wind Shear (ECMWF)",
+      "name_zh": "ECMWF 推算 垂直风切变"
     },
     {
       "category": "Derived Diagnostics",
@@ -1213,7 +1270,9 @@
           "type": "contour"
         }
       ],
-      "name": "Derived 1000-500hPa Thickness (ECMWF)"
+      "name": "Derived 1000-500hPa Thickness (ECMWF)",
+      "name_en": "Derived 1000-500hPa Thickness (ECMWF)",
+      "name_zh": "ECMWF 推算 1000-500hPa 厚度"
     },
     {
       "category": "Derived Diagnostics",
@@ -1235,7 +1294,9 @@
           "type": "contour"
         }
       ],
-      "name": "Derived T850-500 Lapse Rate (ECMWF)"
+      "name": "Derived T850-500 Lapse Rate (ECMWF)",
+      "name_en": "Derived T850-500 Lapse Rate (ECMWF)",
+      "name_zh": "ECMWF 推算 850-500hPa 温差"
     },
     {
       "category": "Derived Diagnostics",
@@ -1271,7 +1332,9 @@
           "type": "contour"
         }
       ],
-      "name": "Sounding Derived Multi-Level Analysis"
+      "name": "Sounding Derived Multi-Level Analysis",
+      "name_en": "Sounding Derived Multi-Level Analysis",
+      "name_zh": "探空多层物理量诊断"
     },
     {
       "category": "Derived Diagnostics",
@@ -1293,7 +1356,9 @@
           "type": "contour"
         }
       ],
-      "name": "Sounding Derived K-Index"
+      "name": "Sounding Derived K-Index",
+      "name_en": "Sounding Derived K-Index",
+      "name_zh": "探空推算 K指数"
     },
     {
       "category": "Derived Diagnostics",
@@ -1315,7 +1380,9 @@
           "type": "contour"
         }
       ],
-      "name": "Sounding Derived Showalter Index"
+      "name": "Sounding Derived Showalter Index",
+      "name_en": "Sounding Derived Showalter Index",
+      "name_zh": "探空推算 沙氏指数 (SI)"
     },
     {
       "category": "Derived Diagnostics",
@@ -1337,7 +1404,9 @@
           "type": "contour"
         }
       ],
-      "name": "Sounding Derived Lifted Index"
+      "name": "Sounding Derived Lifted Index",
+      "name_en": "Sounding Derived Lifted Index",
+      "name_zh": "探空推算 抬升指数 (LI)"
     },
     {
       "category": "Derived Diagnostics",
@@ -1359,7 +1428,9 @@
           "type": "contour"
         }
       ],
-      "name": "Sounding Derived SWEAT Index"
+      "name": "Sounding Derived SWEAT Index",
+      "name_en": "Sounding Derived SWEAT Index",
+      "name_zh": "探空推算 强天气威胁指数 (SWEAT)"
     },
     {
       "category": "Derived Diagnostics",
@@ -1381,7 +1452,9 @@
           "type": "contour"
         }
       ],
-      "name": "Sounding Derived Total Totals TT"
+      "name": "Sounding Derived Total Totals TT",
+      "name_en": "Sounding Derived Total Totals TT",
+      "name_zh": "探空推算 总全指数 (TT)"
     },
     {
       "category": "Derived Diagnostics",
@@ -1404,7 +1477,9 @@
           "type": "contour"
         }
       ],
-      "name": "Sounding Derived Vertical Wind Shear"
+      "name": "Sounding Derived Vertical Wind Shear",
+      "name_en": "Sounding Derived Vertical Wind Shear",
+      "name_zh": "探空推算 垂直风切变"
     },
     {
       "category": "Derived Diagnostics",
@@ -1427,7 +1502,9 @@
           "type": "contour"
         }
       ],
-      "name": "Sounding Derived 1000-500hPa Thickness"
+      "name": "Sounding Derived 1000-500hPa Thickness",
+      "name_en": "Sounding Derived 1000-500hPa Thickness",
+      "name_zh": "探空推算 1000-500hPa 厚度"
     },
     {
       "category": "Derived Diagnostics",
@@ -1450,7 +1527,9 @@
           "type": "contour"
         }
       ],
-      "name": "Sounding Derived T850-500 Difference"
+      "name": "Sounding Derived T850-500 Difference",
+      "name_en": "Sounding Derived T850-500 Difference",
+      "name_zh": "探空推算 850-500hPa 温差"
     },
     {
       "category": "Surface Observations",
@@ -1480,7 +1559,9 @@
           "type": "contour"
         }
       ],
-      "name": "Surface Station 24h Temperature Variation"
+      "name": "Surface Station 24h Temperature Variation",
+      "name_en": "Surface Station 24h Temperature Variation",
+      "name_zh": "地面站点 24小时变温"
     },
     {
       "category": "Surface Observations",
@@ -1510,7 +1591,9 @@
           "type": "contour"
         }
       ],
-      "name": "Surface Station 48h Temperature Variation"
+      "name": "Surface Station 48h Temperature Variation",
+      "name_en": "Surface Station 48h Temperature Variation",
+      "name_zh": "地面站点 48小时变温"
     },
     {
       "category": "Surface Observations",
@@ -1540,7 +1623,9 @@
           "type": "contour"
         }
       ],
-      "name": "Surface Station 24h SLP Variation"
+      "name": "Surface Station 24h SLP Variation",
+      "name_en": "Surface Station 24h SLP Variation",
+      "name_zh": "地面站点 24小时变压"
     },
     {
       "category": "Surface Observations",
@@ -1570,7 +1655,9 @@
           "type": "contour"
         }
       ],
-      "name": "Surface Station 48h SLP Variation"
+      "name": "Surface Station 48h SLP Variation",
+      "name_en": "Surface Station 48h SLP Variation",
+      "name_zh": "地面站点 48小时变压"
     },
     {
       "category": "Upper-Air Observations",
@@ -1603,7 +1690,9 @@
           "type": "contour"
         }
       ],
-      "name": "850hPa Sounding 24h Temperature Variation"
+      "name": "850hPa Sounding 24h Temperature Variation",
+      "name_en": "850hPa Sounding 24h Temperature Variation",
+      "name_zh": "850hPa 探空 24小时变温"
     },
     {
       "category": "Upper-Air Observations",
@@ -1636,7 +1725,9 @@
           "type": "contour"
         }
       ],
-      "name": "850hPa Sounding 48h Temperature Variation"
+      "name": "850hPa Sounding 48h Temperature Variation",
+      "name_en": "850hPa Sounding 48h Temperature Variation",
+      "name_zh": "850hPa 探空 48小时变温"
     },
     {
       "category": "Derived Diagnostics",
@@ -1657,7 +1748,9 @@
           "type": "contour"
         }
       ],
-      "name": "ECMWF Surface 24h Temperature Variation"
+      "name": "ECMWF Surface 24h Temperature Variation",
+      "name_en": "ECMWF Surface 24h Temperature Variation",
+      "name_zh": "ECMWF 地面 24小时变温"
     },
     {
       "category": "Derived Diagnostics",
@@ -1678,7 +1771,9 @@
           "type": "contour"
         }
       ],
-      "name": "ECMWF Surface 48h Temperature Variation"
+      "name": "ECMWF Surface 48h Temperature Variation",
+      "name_en": "ECMWF Surface 48h Temperature Variation",
+      "name_zh": "ECMWF 地面 48小时变温"
     },
     {
       "category": "Derived Diagnostics",
@@ -1701,7 +1796,9 @@
           "type": "contour"
         }
       ],
-      "name": "ECMWF 850hPa 24h Temperature Variation"
+      "name": "ECMWF 850hPa 24h Temperature Variation",
+      "name_en": "ECMWF 850hPa 24h Temperature Variation",
+      "name_zh": "ECMWF 850hPa 24小时变温"
     },
     {
       "category": "Derived Diagnostics",
@@ -1724,7 +1821,9 @@
           "type": "contour"
         }
       ],
-      "name": "ECMWF 850hPa 48h Temperature Variation"
+      "name": "ECMWF 850hPa 48h Temperature Variation",
+      "name_en": "ECMWF 850hPa 48h Temperature Variation",
+      "name_zh": "ECMWF 850hPa 48小时变温"
     },
     {
       "category": "Derived Diagnostics",
@@ -1741,7 +1840,9 @@
           "type": "contour"
         }
       ],
-      "name": "ECMWF 24h Sea Level Pressure Variation"
+      "name": "ECMWF 24h Sea Level Pressure Variation",
+      "name_en": "ECMWF 24h Sea Level Pressure Variation",
+      "name_zh": "ECMWF 24小时变压"
     },
     {
       "category": "Derived Diagnostics",
@@ -1758,7 +1859,9 @@
           "type": "contour"
         }
       ],
-      "name": "ECMWF 48h Sea Level Pressure Variation"
+      "name": "ECMWF 48h Sea Level Pressure Variation",
+      "name_en": "ECMWF 48h Sea Level Pressure Variation",
+      "name_zh": "ECMWF 48小时变压"
     },
     {
       "category": "Derived Diagnostics",
@@ -1780,7 +1883,9 @@
           "type": "contour"
         }
       ],
-      "name": "Surface Station 24h Temperature Variation"
+      "name": "Surface Station 24h Temperature Variation",
+      "name_en": "Surface Station 24h Temperature Variation",
+      "name_zh": "地面站点 24小时变温"
     },
     {
       "category": "Derived Diagnostics",
@@ -1802,7 +1907,9 @@
           "type": "contour"
         }
       ],
-      "name": "Surface Station 24h SLP Variation"
+      "name": "Surface Station 24h SLP Variation",
+      "name_en": "Surface Station 24h SLP Variation",
+      "name_zh": "地面站点 24小时变压"
     },
     {
       "category": "Derived Diagnostics",
@@ -1824,7 +1931,9 @@
           "type": "contour"
         }
       ],
-      "name": "Surface Station 48h Temperature Variation"
+      "name": "Surface Station 48h Temperature Variation",
+      "name_en": "Surface Station 48h Temperature Variation",
+      "name_zh": "地面站点 48小时变温"
     },
     {
       "category": "Derived Diagnostics",
@@ -1846,7 +1955,9 @@
           "type": "contour"
         }
       ],
-      "name": "Surface Station 48h SLP Variation"
+      "name": "Surface Station 48h SLP Variation",
+      "name_en": "Surface Station 48h SLP Variation",
+      "name_zh": "地面站点 48小时变压"
     },
     {
       "category": "Derived Diagnostics",
@@ -1870,7 +1981,9 @@
         }
       ],
       "level": 850,
-      "name": "850hPa Sounding 24h Temperature Variation"
+      "name": "850hPa Sounding 24h Temperature Variation",
+      "name_en": "850hPa Sounding 24h Temperature Variation",
+      "name_zh": "850hPa 探空 24小时变温"
     },
     {
       "category": "Derived Diagnostics",
@@ -1894,7 +2007,9 @@
         }
       ],
       "level": 850,
-      "name": "850hPa Sounding 48h Temperature Variation"
+      "name": "850hPa Sounding 48h Temperature Variation",
+      "name_en": "850hPa Sounding 48h Temperature Variation",
+      "name_zh": "850hPa 探空 48小时变温"
     },
     {
       "category": "Multi-Time Recipes",
@@ -1938,7 +2053,9 @@
           "type": "contour"
         }
       ],
-      "name": "Surface 24h Synoptic Variation (T-var + SLP-var)"
+      "name": "Surface 24h Synoptic Variation (T-var + SLP-var)",
+      "name_en": "Surface 24h Synoptic Variation (T-var + SLP-var)",
+      "name_zh": "地面 24小时综合变压变温"
     },
     {
       "category": "Multi-Time Recipes",
@@ -1982,7 +2099,9 @@
           "type": "contour"
         }
       ],
-      "name": "Surface 48h Synoptic Variation (T-var + SLP-var)"
+      "name": "Surface 48h Synoptic Variation (T-var + SLP-var)",
+      "name_en": "Surface 48h Synoptic Variation (T-var + SLP-var)",
+      "name_zh": "地面 48小时综合变压变温"
     },
     {
       "category": "Multi-Time Recipes",
@@ -2017,7 +2136,9 @@
           "type": "contour"
         }
       ],
-      "name": "NWP 24h Synoptic Variation (ECMWF 850 T-var + SLP-var)"
+      "name": "NWP 24h Synoptic Variation (ECMWF 850 T-var + SLP-var)",
+      "name_en": "NWP 24h Synoptic Variation (ECMWF 850 T-var + SLP-var)",
+      "name_zh": "数值预报 24小时综合变压变温 (ECMWF 850)"
     },
     {
       "category": "Multi-Time Recipes",
@@ -2052,29 +2173,16 @@
           "type": "contour"
         }
       ],
-      "name": "NWP 48h Synoptic Variation (ECMWF 850 T-var + SLP-var)"
+      "name": "NWP 48h Synoptic Variation (ECMWF 850 T-var + SLP-var)",
+      "name_en": "NWP 48h Synoptic Variation (ECMWF 850 T-var + SLP-var)",
+      "name_zh": "数值预报 48小时综合变压变温 (ECMWF 850)"
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
-      "defaultLevel": 500,
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": true,
-      "id": "preset-ecmwf_pvort",
-      "layers": [
-        {
-          "element": "PVORT",
-          "id": "layer-ecmwf_pvort",
-          "level": 500,
-          "model": "ECMWF_HR",
-          "name": "ECMWF PVORT (10-1000hPa)",
-          "path": "ECMWF_HR/PVORT",
-          "render": {
-            "colormap": "HELICITY",
-            "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
-        }
-      ],
+      "defaultLevel": 500,
       "levels": [
         10,
         20,
@@ -2096,69 +2204,81 @@
         950,
         1000
       ],
-      "name": "位涡多层分析 (10-1000hPa) / ECMWF Potential Vorticity (PVORT)"
+      "id": "preset-ecmwf_pvort",
+      "name": "ECMWF Potential Vorticity (PVORT 10-1000hPa)",
+      "name_en": "ECMWF Potential Vorticity (PVORT 10-1000hPa)",
+      "name_zh": "位涡多层分析 (10-1000hPa)",
+      "layers": [
+        {
+          "id": "layer-ecmwf_pvort",
+          "name": "ECMWF PVORT (10-1000hPa)",
+          "type": "contour",
+          "model": "ECMWF_HR",
+          "element": "PVORT",
+          "path": "ECMWF_HR/PVORT",
+          "level": 500,
+          "render": {
+            "colormap": "HELICITY",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
+            "lineColor": "#58a6ff"
+          }
+        }
+      ]
     },
     {
       "category": "气象卫星遥感 (Satellite Remote Sensing)",
-      "defaultLevel": 12,
+      "category_en": "Satellite Remote Sensing",
+      "category_zh": "气象卫星遥感",
       "hasLevel": true,
+      "defaultLevel": 12,
+      "levels": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
       "id": "preset-fy4b_china_grouped",
+      "name": "FY-4B CHINA Multi-Channel (15 Channels)",
+      "name_en": "FY-4B CHINA Multi-Channel (15 Channels)",
+      "name_zh": "风云四号B星中国区 (15通道)",
       "isObservation": true,
       "layers": [
         {
-          "element": "FY4B/L1/CHINA",
           "id": "layer-fy4b_china_grouped",
-          "level": 12,
-          "model": "SATELLITE",
           "name": "FY-4B CHINA (15 Channels)",
+          "type": "contour",
+          "model": "SATELLITE",
+          "element": "FY4B/L1/CHINA",
           "path": "SATELLITE/FY4B/L1/CHINA",
+          "level": 12,
           "render": {
-            "colormap": "IR_TEMP"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "IR_TEMP",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "levels": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12,
-        13,
-        14,
-        15
-      ],
-      "name": "风云四号B星中国区 (FY-4B CHINA 15通道) / FY-4B CHINA Multi-Channel"
+      ]
     },
     {
       "category": "气象卫星遥感 (Satellite Remote Sensing)",
-      "defaultLevel": 12,
+      "category_en": "Satellite Remote Sensing",
+      "category_zh": "气象卫星遥感",
       "hasLevel": true,
-      "id": "preset-fy4b_disk_grouped",
-      "isObservation": true,
-      "layers": [
-        {
-          "element": "FY4B/L1/DISK",
-          "id": "layer-fy4b_disk_grouped",
-          "level": 12,
-          "model": "SATELLITE",
-          "name": "FY-4B DISK (15 Channels)",
-          "path": "SATELLITE/FY4B/L1/DISK",
-          "render": {
-            "colormap": "IR_TEMP"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
-        }
-      ],
+      "defaultLevel": 12,
       "levels": [
         1,
         2,
@@ -2176,1867 +2296,2699 @@
         14,
         15
       ],
-      "name": "风云四号B星全圆盘 (FY-4B DISK 15通道) / FY-4B DISK Multi-Channel"
+      "id": "preset-fy4b_disk_grouped",
+      "name": "FY-4B DISK Multi-Channel (15 Channels)",
+      "name_en": "FY-4B DISK Multi-Channel (15 Channels)",
+      "name_zh": "风云四号B星全圆盘 (15通道)",
+      "isObservation": true,
+      "layers": [
+        {
+          "id": "layer-fy4b_disk_grouped",
+          "name": "FY-4B DISK (15 Channels)",
+          "type": "contour",
+          "model": "SATELLITE",
+          "element": "FY4B/L1/DISK",
+          "path": "SATELLITE/FY4B/L1/DISK",
+          "level": 12,
+          "render": {
+            "colormap": "IR_TEMP",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
+        }
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_cape",
+      "name": "CAPE",
+      "name_en": "CAPE",
+      "name_zh": "对流有效位能",
       "isObservation": false,
       "layers": [
         {
-          "element": "CAPE",
           "id": "layer-ecmwf_hr_cape",
+          "name": "CAPE",
+          "name_en": "CAPE",
+          "name_zh": "对流有效位能",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "对流有效位能 / CAPE",
+          "element": "CAPE",
           "path": "ECMWF_HR/CAPE",
           "render": {
             "colormap": "CAPE",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#e3b341"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "对流有效位能 / CAPE"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_cape_shear",
+      "name": "CAPE Shear",
+      "name_en": "CAPE Shear",
+      "name_zh": "CAPE切变",
       "isObservation": false,
       "layers": [
         {
-          "element": "CAPE_SHEAR",
           "id": "layer-ecmwf_hr_cape_shear",
+          "name": "CAPE Shear",
+          "name_en": "CAPE Shear",
+          "name_zh": "CAPE切变",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "CAPE切变 / CAPE Shear",
+          "element": "CAPE_SHEAR",
           "path": "ECMWF_HR/CAPE_SHEAR",
           "render": {
             "colormap": "CAPE",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#e3b341"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "CAPE切变 / CAPE Shear"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_gust3h",
+      "name": "10m Wind Gust (3h Max)",
+      "name_en": "10m Wind Gust (3h Max)",
+      "name_zh": "3小时10米最大阵风",
       "isObservation": false,
       "layers": [
         {
-          "element": "10_METRE_WIND_GUST_IN_THE_LAST_3_HOURS",
           "id": "layer-ecmwf_hr_gust3h",
+          "name": "10m Wind Gust (3h Max)",
+          "name_en": "10m Wind Gust (3h Max)",
+          "name_zh": "3小时10米最大阵风",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "3小时10米最大阵风 / 10m Wind Gust (3h Max)",
+          "element": "10_METRE_WIND_GUST_IN_THE_LAST_3_HOURS",
           "path": "ECMWF_HR/10_METRE_WIND_GUST_IN_THE_LAST_3_HOURS",
           "render": {
             "colormap": "WIND",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "3小时10米最大阵风 / 10m Wind Gust (3h Max)"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_gust6h",
+      "name": "10m Wind Gust (6h Max)",
+      "name_en": "10m Wind Gust (6h Max)",
+      "name_zh": "6小时10米最大阵风",
       "isObservation": false,
       "layers": [
         {
-          "element": "10_METRE_WIND_GUST_IN_THE_LAST_6_HOURS",
           "id": "layer-ecmwf_hr_gust6h",
+          "name": "10m Wind Gust (6h Max)",
+          "name_en": "10m Wind Gust (6h Max)",
+          "name_zh": "6小时10米最大阵风",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "6小时10米最大阵风 / 10m Wind Gust (6h Max)",
+          "element": "10_METRE_WIND_GUST_IN_THE_LAST_6_HOURS",
           "path": "ECMWF_HR/10_METRE_WIND_GUST_IN_THE_LAST_6_HOURS",
           "render": {
             "colormap": "WIND",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "6小时10米最大阵风 / 10m Wind Gust (6h Max)"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_fzra03",
+      "name": "Freezing Rain (3h)",
+      "name_en": "Freezing Rain (3h)",
+      "name_zh": "3小时冻雨",
       "isObservation": false,
       "layers": [
         {
-          "element": "FREEZING_RAIN03",
           "id": "layer-ecmwf_hr_fzra03",
+          "name": "Freezing Rain (3h)",
+          "name_en": "Freezing Rain (3h)",
+          "name_zh": "3小时冻雨",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "3小时冻雨 / Freezing Rain (3h)",
+          "element": "FREEZING_RAIN03",
           "path": "ECMWF_HR/FREEZING_RAIN03",
-          "renderRef": "contour-6",
-          "type": "contour"
+          "render": {
+            "colormap": "RAIN",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "3小时冻雨 / Freezing Rain (3h)"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_fzra06",
+      "name": "Freezing Rain (6h)",
+      "name_en": "Freezing Rain (6h)",
+      "name_zh": "6小时冻雨",
       "isObservation": false,
       "layers": [
         {
-          "element": "FREEZING_RAIN06",
           "id": "layer-ecmwf_hr_fzra06",
+          "name": "Freezing Rain (6h)",
+          "name_en": "Freezing Rain (6h)",
+          "name_zh": "6小时冻雨",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "6小时冻雨 / Freezing Rain (6h)",
+          "element": "FREEZING_RAIN06",
           "path": "ECMWF_HR/FREEZING_RAIN06",
-          "renderRef": "contour-6",
-          "type": "contour"
+          "render": {
+            "colormap": "RAIN",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "6小时冻雨 / Freezing Rain (6h)"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_fzra12",
+      "name": "Freezing Rain (12h)",
+      "name_en": "Freezing Rain (12h)",
+      "name_zh": "12小时冻雨",
       "isObservation": false,
       "layers": [
         {
-          "element": "FREEZING_RAIN12",
           "id": "layer-ecmwf_hr_fzra12",
+          "name": "Freezing Rain (12h)",
+          "name_en": "Freezing Rain (12h)",
+          "name_zh": "12小时冻雨",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "12小时冻雨 / Freezing Rain (12h)",
+          "element": "FREEZING_RAIN12",
           "path": "ECMWF_HR/FREEZING_RAIN12",
-          "renderRef": "contour-6",
-          "type": "contour"
+          "render": {
+            "colormap": "RAIN",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "12小时冻雨 / Freezing Rain (12h)"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_fzra24",
+      "name": "Freezing Rain (24h)",
+      "name_en": "Freezing Rain (24h)",
+      "name_zh": "24小时冻雨",
       "isObservation": false,
       "layers": [
         {
-          "element": "FREEZING_RAIN24",
           "id": "layer-ecmwf_hr_fzra24",
+          "name": "Freezing Rain (24h)",
+          "name_en": "Freezing Rain (24h)",
+          "name_zh": "24小时冻雨",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "24小时冻雨 / Freezing Rain (24h)",
+          "element": "FREEZING_RAIN24",
           "path": "ECMWF_HR/FREEZING_RAIN24",
-          "renderRef": "contour-6",
-          "type": "contour"
+          "render": {
+            "colormap": "RAIN",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "24小时冻雨 / Freezing Rain (24h)"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_fzra",
+      "name": "Freezing Rain Rate",
+      "name_en": "Freezing Rain Rate",
+      "name_zh": "冻雨降水量",
       "isObservation": false,
       "layers": [
         {
-          "element": "FZRA",
           "id": "layer-ecmwf_hr_fzra",
+          "name": "Freezing Rain Rate",
+          "name_en": "Freezing Rain Rate",
+          "name_zh": "冻雨降水量",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "冻雨降水量 / Freezing Rain Rate",
+          "element": "FZRA",
           "path": "ECMWF_HR/FZRA",
           "render": {
             "colormap": "TMP",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "冻雨降水量 / Freezing Rain Rate"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_precip_type",
+      "name": "Precipitation Type",
+      "name_en": "Precipitation Type",
+      "name_zh": "降水相态",
       "isObservation": false,
       "layers": [
         {
-          "element": "PRECIPITATION_TYPE",
           "id": "layer-ecmwf_hr_precip_type",
+          "name": "Precipitation Type",
+          "name_en": "Precipitation Type",
+          "name_zh": "降水相态",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "降水相态 / Precipitation Type",
+          "element": "PRECIPITATION_TYPE",
           "path": "ECMWF_HR/PRECIPITATION_TYPE",
           "render": {
-            "colormap": "PRECIP_TYPE"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "PRECIP_TYPE",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "降水相态 / Precipitation Type"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_asnow",
+      "name": "Snow Accumulation",
+      "name_en": "Snow Accumulation",
+      "name_zh": "累计降雪量",
       "isObservation": false,
       "layers": [
         {
-          "element": "ASNOW",
           "id": "layer-ecmwf_hr_asnow",
+          "name": "Snow Accumulation",
+          "name_en": "Snow Accumulation",
+          "name_zh": "累计降雪量",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "累计降雪量 / Snow Accumulation",
+          "element": "ASNOW",
           "path": "ECMWF_HR/ASNOW",
-          "renderRef": "contour-5",
-          "type": "contour"
+          "render": {
+            "colormap": "SNOW",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "累计降雪量 / Snow Accumulation"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_snod",
+      "name": "Snow Depth",
+      "name_en": "Snow Depth",
+      "name_zh": "积雪深度",
       "isObservation": false,
       "layers": [
         {
-          "element": "SNOD",
           "id": "layer-ecmwf_hr_snod",
+          "name": "Snow Depth",
+          "name_en": "Snow Depth",
+          "name_zh": "积雪深度",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "积雪深度 / Snow Depth",
+          "element": "SNOD",
           "path": "ECMWF_HR/SNOD",
-          "renderRef": "contour-5",
-          "type": "contour"
+          "render": {
+            "colormap": "SNOW",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "积雪深度 / Snow Depth"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_snow03",
+      "name": "Snow (3h)",
+      "name_en": "Snow (3h)",
+      "name_zh": "3小时降雪",
       "isObservation": false,
       "layers": [
         {
-          "element": "SNOW03",
           "id": "layer-ecmwf_hr_snow03",
+          "name": "Snow (3h)",
+          "name_en": "Snow (3h)",
+          "name_zh": "3小时降雪",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "3小时降雪 / Snow (3h)",
+          "element": "SNOW03",
           "path": "ECMWF_HR/SNOW03",
-          "renderRef": "contour-5",
-          "type": "contour"
+          "render": {
+            "colormap": "SNOW",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "3小时降雪 / Snow (3h)"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_snow06",
+      "name": "Snow (6h)",
+      "name_en": "Snow (6h)",
+      "name_zh": "6小时降雪",
       "isObservation": false,
       "layers": [
         {
-          "element": "SNOW06",
           "id": "layer-ecmwf_hr_snow06",
+          "name": "Snow (6h)",
+          "name_en": "Snow (6h)",
+          "name_zh": "6小时降雪",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "6小时降雪 / Snow (6h)",
+          "element": "SNOW06",
           "path": "ECMWF_HR/SNOW06",
-          "renderRef": "contour-5",
-          "type": "contour"
+          "render": {
+            "colormap": "SNOW",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "6小时降雪 / Snow (6h)"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_snow12",
+      "name": "Snow (12h)",
+      "name_en": "Snow (12h)",
+      "name_zh": "12小时降雪",
       "isObservation": false,
       "layers": [
         {
-          "element": "SNOW12",
           "id": "layer-ecmwf_hr_snow12",
+          "name": "Snow (12h)",
+          "name_en": "Snow (12h)",
+          "name_zh": "12小时降雪",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "12小时降雪 / Snow (12h)",
+          "element": "SNOW12",
           "path": "ECMWF_HR/SNOW12",
-          "renderRef": "contour-5",
-          "type": "contour"
+          "render": {
+            "colormap": "SNOW",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "12小时降雪 / Snow (12h)"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_snow24",
+      "name": "Snow (24h)",
+      "name_en": "Snow (24h)",
+      "name_zh": "24小时降雪",
       "isObservation": false,
       "layers": [
         {
-          "element": "SNOW24",
           "id": "layer-ecmwf_hr_snow24",
+          "name": "Snow (24h)",
+          "name_en": "Snow (24h)",
+          "name_zh": "24小时降雪",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "24小时降雪 / Snow (24h)",
+          "element": "SNOW24",
           "path": "ECMWF_HR/SNOW24",
-          "renderRef": "contour-5",
-          "type": "contour"
+          "render": {
+            "colormap": "SNOW",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "24小时降雪 / Snow (24h)"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_sden",
+      "name": "Snow Density",
+      "name_en": "Snow Density",
+      "name_zh": "雪密度",
       "isObservation": false,
       "layers": [
         {
-          "element": "SDEN",
           "id": "layer-ecmwf_hr_sden",
+          "name": "Snow Density",
+          "name_en": "Snow Density",
+          "name_zh": "雪密度",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "雪密度 / Snow Density",
+          "element": "SDEN",
           "path": "ECMWF_HR/SDEN",
           "render": {
             "colormap": "TMP",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "雪密度 / Snow Density"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_swe",
+      "name": "Snow Water Equivalent",
+      "name_en": "Snow Water Equivalent",
+      "name_zh": "雪水当量",
       "isObservation": false,
       "layers": [
         {
-          "element": "WATER_EQUIVALENT_OF_ACCUMULATED_SNOW_DEPTH",
           "id": "layer-ecmwf_hr_swe",
+          "name": "Snow Water Equivalent",
+          "name_en": "Snow Water Equivalent",
+          "name_zh": "雪水当量",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "雪水当量 / Snow Water Equivalent",
+          "element": "WATER_EQUIVALENT_OF_ACCUMULATED_SNOW_DEPTH",
           "path": "ECMWF_HR/WATER_EQUIVALENT_OF_ACCUMULATED_SNOW_DEPTH",
-          "renderRef": "contour-5",
-          "type": "contour"
+          "render": {
+            "colormap": "SNOW",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "雪水当量 / Snow Water Equivalent"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_zero_degree_level",
+      "name": "Freezing Level (0°C)",
+      "name_en": "Freezing Level (0°C)",
+      "name_zh": "零度层高度",
       "isObservation": false,
       "layers": [
         {
-          "element": "ZERO_DEGREE_LEVEL",
           "id": "layer-ecmwf_hr_zero_degree_level",
+          "name": "Freezing Level (0°C)",
+          "name_en": "Freezing Level (0°C)",
+          "name_zh": "零度层高度",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "零度层高度 / Freezing Level (0°C)",
+          "element": "ZERO_DEGREE_LEVEL",
           "path": "ECMWF_HR/ZERO_DEGREE_LEVEL",
           "render": {
             "colormap": "TMP",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "零度层高度 / Freezing Level (0°C)"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_wind_100m",
+      "name": "100m Wind Field",
+      "name_en": "100m Wind Field",
+      "name_zh": "100米风场",
       "isObservation": false,
       "layers": [
         {
-          "element": "WIND_100M",
           "id": "layer-ecmwf_hr_wind_100m",
+          "name": "100m Wind Field",
+          "name_en": "100m Wind Field",
+          "name_zh": "100米风场",
+          "type": "wind",
           "model": "ECMWF_HR",
-          "name": "100米风场 / 100m Wind Field",
+          "element": "WIND_100M",
           "path": "ECMWF_HR/WIND_100M",
-          "renderRef": "wind-1",
-          "type": "wind"
+          "render": {
+            "colormap": "WIND",
+            "showWind": false,
+            "showBarbs": true,
+            "showRaster": false,
+            "keepWind": true
+          }
         }
-      ],
-      "name": "100米风场 / 100m Wind Field"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_ugrd_100m",
+      "name": "100m U-Wind",
+      "name_en": "100m U-Wind",
+      "name_zh": "100米U分量",
       "isObservation": false,
       "layers": [
         {
-          "element": "UGRD_100M",
           "id": "layer-ecmwf_hr_ugrd_100m",
+          "name": "100m U-Wind",
+          "name_en": "100m U-Wind",
+          "name_zh": "100米U分量",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "100米U分量 / 100m U-Wind",
+          "element": "UGRD_100M",
           "path": "ECMWF_HR/UGRD_100M",
           "render": {
             "colormap": "WIND",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "100米U分量 / 100m U-Wind"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_vgrd_100m",
+      "name": "100m V-Wind",
+      "name_en": "100m V-Wind",
+      "name_zh": "100米V分量",
       "isObservation": false,
       "layers": [
         {
-          "element": "VGRD_100M",
           "id": "layer-ecmwf_hr_vgrd_100m",
+          "name": "100m V-Wind",
+          "name_en": "100m V-Wind",
+          "name_zh": "100米V分量",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "100米V分量 / 100m V-Wind",
+          "element": "VGRD_100M",
           "path": "ECMWF_HR/VGRD_100M",
           "render": {
             "colormap": "WIND",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "100米V分量 / 100m V-Wind"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_sst",
+      "name": "Sea Surface Temperature",
+      "name_en": "Sea Surface Temperature",
+      "name_zh": "海表温度(SST)",
       "isObservation": false,
       "layers": [
         {
-          "element": "SST",
           "id": "layer-ecmwf_hr_sst",
+          "name": "Sea Surface Temperature",
+          "name_en": "Sea Surface Temperature",
+          "name_zh": "海表温度(SST)",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "海表温度(SST) / Sea Surface Temperature",
+          "element": "SST",
           "path": "ECMWF_HR/SST",
           "render": {
             "colormap": "SST",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "海表温度(SST) / Sea Surface Temperature"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_tcwv",
+      "name": "Total Column Water Vapor",
+      "name_en": "Total Column Water Vapor",
+      "name_zh": "整层水汽总量(TCWV)",
       "isObservation": false,
       "layers": [
         {
-          "element": "TCWV",
           "id": "layer-ecmwf_hr_tcwv",
+          "name": "Total Column Water Vapor",
+          "name_en": "Total Column Water Vapor",
+          "name_zh": "整层水汽总量(TCWV)",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "整层水汽总量(TCWV) / Total Column Water Vapor",
+          "element": "TCWV",
           "path": "ECMWF_HR/TCWV",
           "render": {
             "colormap": "TCWV",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "整层水汽总量(TCWV) / Total Column Water Vapor"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_tcw",
+      "name": "Total Column Water",
+      "name_en": "Total Column Water",
+      "name_zh": "整层总含水量(TCW)",
       "isObservation": false,
       "layers": [
         {
-          "element": "TCW",
           "id": "layer-ecmwf_hr_tcw",
+          "name": "Total Column Water",
+          "name_en": "Total Column Water",
+          "name_zh": "整层总含水量(TCW)",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "整层总含水量(TCW) / Total Column Water",
+          "element": "TCW",
           "path": "ECMWF_HR/TCW",
           "render": {
             "colormap": "TCWV",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "整层总含水量(TCW) / Total Column Water"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_tcdc",
+      "name": "Total Cloud Cover",
+      "name_en": "Total Cloud Cover",
+      "name_zh": "总云量(TCDC)",
       "isObservation": false,
       "layers": [
         {
-          "element": "TCDC",
           "id": "layer-ecmwf_hr_tcdc",
+          "name": "Total Cloud Cover",
+          "name_en": "Total Cloud Cover",
+          "name_zh": "总云量(TCDC)",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "总云量(TCDC) / Total Cloud Cover",
+          "element": "TCDC",
           "path": "ECMWF_HR/TCDC",
           "render": {
             "colormap": "TMP",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "总云量(TCDC) / Total Cloud Cover"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-ecmwf_hr_lcdc",
+      "name": "Low Cloud Cover",
+      "name_en": "Low Cloud Cover",
+      "name_zh": "低云量(LCDC)",
       "isObservation": false,
       "layers": [
         {
-          "element": "LCDC",
           "id": "layer-ecmwf_hr_lcdc",
+          "name": "Low Cloud Cover",
+          "name_en": "Low Cloud Cover",
+          "name_zh": "低云量(LCDC)",
+          "type": "contour",
           "model": "ECMWF_HR",
-          "name": "低云量(LCDC) / Low Cloud Cover",
+          "element": "LCDC",
           "path": "ECMWF_HR/LCDC",
           "render": {
             "colormap": "TMP",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "低云量(LCDC) / Low Cloud Cover"
+      ]
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
+      "category_en": "Severe Convective & Nowcasting",
+      "category_zh": "强对流与短临",
       "hasLevel": false,
       "id": "preset-grapes_3km_uh",
+      "name": "Updraft Helicity (0-5km)",
+      "name_en": "Updraft Helicity (0-5km)",
+      "name_zh": "0-5km上升螺旋度",
       "isObservation": false,
       "layers": [
         {
-          "element": "UPDRAFT_HELICITY/5000M_ABOVE_GROUND",
           "id": "layer-grapes_3km_uh",
+          "name": "Updraft Helicity (0-5km)",
+          "name_en": "Updraft Helicity (0-5km)",
+          "name_zh": "0-5km上升螺旋度",
+          "type": "contour",
           "model": "GRAPES_3KM",
-          "name": "0-5km上升螺旋度 / Updraft Helicity (0-5km)",
+          "element": "UPDRAFT_HELICITY/5000M_ABOVE_GROUND",
           "path": "GRAPES_3KM/UPDRAFT_HELICITY/5000M_ABOVE_GROUND",
           "render": {
             "colormap": "HELICITY",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#3fb950"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "0-5km上升螺旋度 / Updraft Helicity (0-5km)"
+      ]
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
+      "category_en": "Severe Convective & Nowcasting",
+      "category_zh": "强对流与短临",
       "hasLevel": false,
       "id": "preset-grapes_3km_dcape",
+      "name": "DCAPE",
+      "name_en": "DCAPE",
+      "name_zh": "下沉对流有效位能",
       "isObservation": false,
       "layers": [
         {
-          "element": "DCAPE",
           "id": "layer-grapes_3km_dcape",
+          "name": "DCAPE",
+          "name_en": "DCAPE",
+          "name_zh": "下沉对流有效位能",
+          "type": "contour",
           "model": "GRAPES_3KM",
-          "name": "下沉对流有效位能 / DCAPE",
+          "element": "DCAPE",
           "path": "GRAPES_3KM/DCAPE",
           "render": {
             "colormap": "CAPE",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#e3b341"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "下沉对流有效位能 / DCAPE"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_3km_shear600m",
+      "name": "Vertical Shear (600m)",
+      "name_en": "Vertical Shear (600m)",
+      "name_zh": "600m垂直风切变",
       "isObservation": false,
       "layers": [
         {
-          "element": "MAX_VERTICAL_SPEED_SHEAR/600M_ABOVE_GROUND",
           "id": "layer-grapes_3km_shear600m",
+          "name": "Vertical Shear (600m)",
+          "name_en": "Vertical Shear (600m)",
+          "name_zh": "600m垂直风切变",
+          "type": "contour",
           "model": "GRAPES_3KM",
-          "name": "600m垂直风切变 / Vertical Shear (600m)",
+          "element": "MAX_VERTICAL_SPEED_SHEAR/600M_ABOVE_GROUND",
           "path": "GRAPES_3KM/MAX_VERTICAL_SPEED_SHEAR/600M_ABOVE_GROUND",
           "render": {
             "colormap": "WIND",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "600m垂直风切变 / Vertical Shear (600m)"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_3km_shear_angle600m",
+      "name": "Shear Angle (600m)",
+      "name_en": "Shear Angle (600m)",
+      "name_zh": "600m垂直风切变角",
       "isObservation": false,
       "layers": [
         {
-          "element": "MAX_VERTICAL_SPEED_SHEAR_ANGLE/600M_ABOVE_GROUND",
           "id": "layer-grapes_3km_shear_angle600m",
+          "name": "Shear Angle (600m)",
+          "name_en": "Shear Angle (600m)",
+          "name_zh": "600m垂直风切变角",
+          "type": "contour",
           "model": "GRAPES_3KM",
-          "name": "600m垂直风切变角 / Shear Angle (600m)",
+          "element": "MAX_VERTICAL_SPEED_SHEAR_ANGLE/600M_ABOVE_GROUND",
           "path": "GRAPES_3KM/MAX_VERTICAL_SPEED_SHEAR_ANGLE/600M_ABOVE_GROUND",
           "render": {
             "colormap": "WIND",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "600m垂直风切变角 / Shear Angle (600m)"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_3km_max_wind10m",
+      "name": "Max Wind (10m)",
+      "name_en": "Max Wind (10m)",
+      "name_zh": "10m最大风速",
       "isObservation": false,
       "layers": [
         {
-          "element": "MAX_WIND/10M_ABOVE_GROUND",
           "id": "layer-grapes_3km_max_wind10m",
+          "name": "Max Wind (10m)",
+          "name_en": "Max Wind (10m)",
+          "name_zh": "10m最大风速",
+          "type": "contour",
           "model": "GRAPES_3KM",
-          "name": "10m最大风速 / Max Wind (10m)",
+          "element": "MAX_WIND/10M_ABOVE_GROUND",
           "path": "GRAPES_3KM/MAX_WIND/10M_ABOVE_GROUND",
           "render": {
             "colormap": "WIND",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "10m最大风速 / Max Wind (10m)"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_3km_max_ugrd10m",
+      "name": "Max U-Wind (10m)",
+      "name_en": "Max U-Wind (10m)",
+      "name_zh": "10m最大U风",
       "isObservation": false,
       "layers": [
         {
-          "element": "MAX_UGRD/10M_ABOVE_GROUND",
           "id": "layer-grapes_3km_max_ugrd10m",
+          "name": "Max U-Wind (10m)",
+          "name_en": "Max U-Wind (10m)",
+          "name_zh": "10m最大U风",
+          "type": "contour",
           "model": "GRAPES_3KM",
-          "name": "10m最大U风 / Max U-Wind (10m)",
+          "element": "MAX_UGRD/10M_ABOVE_GROUND",
           "path": "GRAPES_3KM/MAX_UGRD/10M_ABOVE_GROUND",
           "render": {
             "colormap": "WIND",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "10m最大U风 / Max U-Wind (10m)"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_3km_max_vgrd10m",
+      "name": "Max V-Wind (10m)",
+      "name_en": "Max V-Wind (10m)",
+      "name_zh": "10m最大V风",
       "isObservation": false,
       "layers": [
         {
-          "element": "MAX_VGRD/10M_ABOVE_GROUND",
           "id": "layer-grapes_3km_max_vgrd10m",
+          "name": "Max V-Wind (10m)",
+          "name_en": "Max V-Wind (10m)",
+          "name_zh": "10m最大V风",
+          "type": "contour",
           "model": "GRAPES_3KM",
-          "name": "10m最大V风 / Max V-Wind (10m)",
+          "element": "MAX_VGRD/10M_ABOVE_GROUND",
           "path": "GRAPES_3KM/MAX_VGRD/10M_ABOVE_GROUND",
           "render": {
             "colormap": "WIND",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "10m最大V风 / Max V-Wind (10m)"
+      ]
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
+      "category_en": "Severe Convective & Nowcasting",
+      "category_zh": "强对流与短临",
       "hasLevel": false,
       "id": "preset-grapes_3km_radar_refl_max",
+      "name": "Radar Refl. Maximum",
+      "name_en": "Radar Refl. Maximum",
+      "name_zh": "雷达组合反射率最大值",
       "isObservation": false,
       "layers": [
         {
-          "element": "RADAR_COMBINATION_REFLECTIVITY/MAXIMUM",
           "id": "layer-grapes_3km_radar_refl_max",
+          "name": "Radar Refl. Maximum",
+          "name_en": "Radar Refl. Maximum",
+          "name_zh": "雷达组合反射率最大值",
+          "type": "contour",
           "model": "GRAPES_3KM",
-          "name": "雷达组合反射率最大值 / Radar Refl. Maximum",
+          "element": "RADAR_COMBINATION_REFLECTIVITY/MAXIMUM",
           "path": "GRAPES_3KM/RADAR_COMBINATION_REFLECTIVITY/MAXIMUM",
           "render": {
-            "colormap": "RADAR"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "RADAR",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "雷达组合反射率最大值 / Radar Refl. Maximum"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_3km_rain01",
+      "name": "RAIN01",
+      "name_en": "RAIN01",
+      "name_zh": "1小时降水",
       "isObservation": false,
       "layers": [
         {
-          "element": "RAIN01",
           "id": "layer-grapes_3km_rain01",
+          "name": "RAIN01",
+          "name_en": "RAIN01",
+          "name_zh": "1小时降水",
+          "type": "contour",
           "model": "GRAPES_3KM",
-          "name": "1小时降水 / RAIN01",
+          "element": "RAIN01",
           "path": "GRAPES_3KM/RAIN01",
-          "renderRef": "contour-6",
-          "type": "contour"
+          "render": {
+            "colormap": "RAIN",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "1小时降水 / RAIN01"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_3km_rain03",
+      "name": "RAIN03",
+      "name_en": "RAIN03",
+      "name_zh": "3小时降水",
       "isObservation": false,
       "layers": [
         {
-          "element": "RAIN03",
           "id": "layer-grapes_3km_rain03",
+          "name": "RAIN03",
+          "name_en": "RAIN03",
+          "name_zh": "3小时降水",
+          "type": "contour",
           "model": "GRAPES_3KM",
-          "name": "3小时降水 / RAIN03",
+          "element": "RAIN03",
           "path": "GRAPES_3KM/RAIN03",
-          "renderRef": "contour-6",
-          "type": "contour"
+          "render": {
+            "colormap": "RAIN",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "3小时降水 / RAIN03"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_3km_rain06",
+      "name": "RAIN06",
+      "name_en": "RAIN06",
+      "name_zh": "6小时降水",
       "isObservation": false,
       "layers": [
         {
-          "element": "RAIN06",
           "id": "layer-grapes_3km_rain06",
+          "name": "RAIN06",
+          "name_en": "RAIN06",
+          "name_zh": "6小时降水",
+          "type": "contour",
           "model": "GRAPES_3KM",
-          "name": "6小时降水 / RAIN06",
+          "element": "RAIN06",
           "path": "GRAPES_3KM/RAIN06",
-          "renderRef": "contour-6",
-          "type": "contour"
+          "render": {
+            "colormap": "RAIN",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "6小时降水 / RAIN06"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_3km_rain12",
+      "name": "RAIN12",
+      "name_en": "RAIN12",
+      "name_zh": "12小时降水",
       "isObservation": false,
       "layers": [
         {
-          "element": "RAIN12",
           "id": "layer-grapes_3km_rain12",
+          "name": "RAIN12",
+          "name_en": "RAIN12",
+          "name_zh": "12小时降水",
+          "type": "contour",
           "model": "GRAPES_3KM",
-          "name": "12小时降水 / RAIN12",
+          "element": "RAIN12",
           "path": "GRAPES_3KM/RAIN12",
-          "renderRef": "contour-6",
-          "type": "contour"
+          "render": {
+            "colormap": "RAIN",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "12小时降水 / RAIN12"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_3km_rain24",
+      "name": "RAIN24",
+      "name_en": "RAIN24",
+      "name_zh": "24小时降水",
       "isObservation": false,
       "layers": [
         {
-          "element": "RAIN24",
           "id": "layer-grapes_3km_rain24",
+          "name": "RAIN24",
+          "name_en": "RAIN24",
+          "name_zh": "24小时降水",
+          "type": "contour",
           "model": "GRAPES_3KM",
-          "name": "24小时降水 / RAIN24",
+          "element": "RAIN24",
           "path": "GRAPES_3KM/RAIN24",
-          "renderRef": "contour-6",
-          "type": "contour"
+          "render": {
+            "colormap": "RAIN",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "24小时降水 / RAIN24"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_3km_snow01",
+      "name": "SNOW01",
+      "name_en": "SNOW01",
+      "name_zh": "1小时降雪",
       "isObservation": false,
       "layers": [
         {
-          "element": "SNOW01",
           "id": "layer-grapes_3km_snow01",
+          "name": "SNOW01",
+          "name_en": "SNOW01",
+          "name_zh": "1小时降雪",
+          "type": "contour",
           "model": "GRAPES_3KM",
-          "name": "1小时降雪 / SNOW01",
+          "element": "SNOW01",
           "path": "GRAPES_3KM/SNOW01",
-          "renderRef": "contour-5",
-          "type": "contour"
+          "render": {
+            "colormap": "SNOW",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "1小时降雪 / SNOW01"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_3km_snow03",
+      "name": "SNOW03",
+      "name_en": "SNOW03",
+      "name_zh": "3小时降雪",
       "isObservation": false,
       "layers": [
         {
-          "element": "SNOW03",
           "id": "layer-grapes_3km_snow03",
+          "name": "SNOW03",
+          "name_en": "SNOW03",
+          "name_zh": "3小时降雪",
+          "type": "contour",
           "model": "GRAPES_3KM",
-          "name": "3小时降雪 / SNOW03",
+          "element": "SNOW03",
           "path": "GRAPES_3KM/SNOW03",
-          "renderRef": "contour-5",
-          "type": "contour"
+          "render": {
+            "colormap": "SNOW",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "3小时降雪 / SNOW03"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_3km_snow06",
+      "name": "SNOW06",
+      "name_en": "SNOW06",
+      "name_zh": "6小时降雪",
       "isObservation": false,
       "layers": [
         {
-          "element": "SNOW06",
           "id": "layer-grapes_3km_snow06",
+          "name": "SNOW06",
+          "name_en": "SNOW06",
+          "name_zh": "6小时降雪",
+          "type": "contour",
           "model": "GRAPES_3KM",
-          "name": "6小时降雪 / SNOW06",
+          "element": "SNOW06",
           "path": "GRAPES_3KM/SNOW06",
-          "renderRef": "contour-5",
-          "type": "contour"
+          "render": {
+            "colormap": "SNOW",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "6小时降雪 / SNOW06"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_3km_snow12",
+      "name": "SNOW12",
+      "name_en": "SNOW12",
+      "name_zh": "12小时降雪",
       "isObservation": false,
       "layers": [
         {
-          "element": "SNOW12",
           "id": "layer-grapes_3km_snow12",
+          "name": "SNOW12",
+          "name_en": "SNOW12",
+          "name_zh": "12小时降雪",
+          "type": "contour",
           "model": "GRAPES_3KM",
-          "name": "12小时降雪 / SNOW12",
+          "element": "SNOW12",
           "path": "GRAPES_3KM/SNOW12",
-          "renderRef": "contour-5",
-          "type": "contour"
+          "render": {
+            "colormap": "SNOW",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "12小时降雪 / SNOW12"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_3km_snow24",
+      "name": "SNOW24",
+      "name_en": "SNOW24",
+      "name_zh": "24小时降雪",
       "isObservation": false,
       "layers": [
         {
-          "element": "SNOW24",
           "id": "layer-grapes_3km_snow24",
+          "name": "SNOW24",
+          "name_en": "SNOW24",
+          "name_zh": "24小时降雪",
+          "type": "contour",
           "model": "GRAPES_3KM",
-          "name": "24小时降雪 / SNOW24",
+          "element": "SNOW24",
           "path": "GRAPES_3KM/SNOW24",
-          "renderRef": "contour-5",
-          "type": "contour"
+          "render": {
+            "colormap": "SNOW",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "24小时降雪 / SNOW24"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_3km_asnow",
+      "name": "ASNOW",
+      "name_en": "ASNOW",
+      "name_zh": "累计降雪",
       "isObservation": false,
       "layers": [
         {
-          "element": "ASNOW",
           "id": "layer-grapes_3km_asnow",
+          "name": "ASNOW",
+          "name_en": "ASNOW",
+          "name_zh": "累计降雪",
+          "type": "contour",
           "model": "GRAPES_3KM",
-          "name": "累计降雪 / ASNOW",
+          "element": "ASNOW",
           "path": "GRAPES_3KM/ASNOW",
-          "renderRef": "contour-5",
-          "type": "contour"
+          "render": {
+            "colormap": "SNOW",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "累计降雪 / ASNOW"
+      ]
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
+      "category_en": "National Gridded Guidance",
+      "category_zh": "智能网格预报",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_hail",
+      "name": "HAIL Alert",
+      "name_en": "HAIL Alert",
+      "name_zh": "冰雹预警",
       "isObservation": false,
       "layers": [
         {
-          "element": "HAIL",
           "id": "layer-nwfd_scmoc_hail",
+          "name": "HAIL Alert",
+          "name_en": "HAIL Alert",
+          "name_zh": "冰雹预警",
+          "type": "contour",
           "model": "NWFD_SCMOC",
-          "name": "冰雹预警 / HAIL Alert",
+          "element": "HAIL",
           "path": "NWFD_SCMOC/HAIL",
           "render": {
-            "colormap": "HAZARDS"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "HAZARDS",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "冰雹预警 / HAIL Alert"
+      ]
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
+      "category_en": "National Gridded Guidance",
+      "category_zh": "智能网格预报",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_fog",
+      "name": "FOG Advisory",
+      "name_en": "FOG Advisory",
+      "name_zh": "大雾预警",
       "isObservation": false,
       "layers": [
         {
-          "element": "FOG",
           "id": "layer-nwfd_scmoc_fog",
+          "name": "FOG Advisory",
+          "name_en": "FOG Advisory",
+          "name_zh": "大雾预警",
+          "type": "contour",
           "model": "NWFD_SCMOC",
-          "name": "大雾预警 / FOG Advisory",
+          "element": "FOG",
           "path": "NWFD_SCMOC/FOG",
           "render": {
-            "colormap": "HAZARDS"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "HAZARDS",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "大雾预警 / FOG Advisory"
+      ]
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
+      "category_en": "National Gridded Guidance",
+      "category_zh": "智能网格预报",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_haze",
+      "name": "HAZE Advisory",
+      "name_en": "HAZE Advisory",
+      "name_zh": "霾预警",
       "isObservation": false,
       "layers": [
         {
-          "element": "HAZE",
           "id": "layer-nwfd_scmoc_haze",
+          "name": "HAZE Advisory",
+          "name_en": "HAZE Advisory",
+          "name_zh": "霾预警",
+          "type": "contour",
           "model": "NWFD_SCMOC",
-          "name": "霾预警 / HAZE Advisory",
+          "element": "HAZE",
           "path": "NWFD_SCMOC/HAZE",
           "render": {
-            "colormap": "HAZARDS"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "HAZARDS",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "霾预警 / HAZE Advisory"
+      ]
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
+      "category_en": "National Gridded Guidance",
+      "category_zh": "智能网格预报",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_heavy_rainfall",
+      "name": "HEAVY_RAINFALL",
+      "name_en": "HEAVY_RAINFALL",
+      "name_zh": "暴雨预警",
       "isObservation": false,
       "layers": [
         {
-          "element": "HEAVY_RAINFALL",
           "id": "layer-nwfd_scmoc_heavy_rainfall",
+          "name": "HEAVY_RAINFALL",
+          "name_en": "HEAVY_RAINFALL",
+          "name_zh": "暴雨预警",
+          "type": "contour",
           "model": "NWFD_SCMOC",
-          "name": "暴雨预警 / HEAVY_RAINFALL",
+          "element": "HEAVY_RAINFALL",
           "path": "NWFD_SCMOC/HEAVY_RAINFALL",
           "render": {
-            "colormap": "HAZARDS"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "HAZARDS",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "暴雨预警 / HEAVY_RAINFALL"
+      ]
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
+      "category_en": "National Gridded Guidance",
+      "category_zh": "智能网格预报",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_sand",
+      "name": "SAND (Dust)",
+      "name_en": "SAND (Dust)",
+      "name_zh": "沙尘预警",
       "isObservation": false,
       "layers": [
         {
-          "element": "SAND",
           "id": "layer-nwfd_scmoc_sand",
+          "name": "SAND (Dust)",
+          "name_en": "SAND (Dust)",
+          "name_zh": "沙尘预警",
+          "type": "contour",
           "model": "NWFD_SCMOC",
-          "name": "沙尘预警 / SAND (Dust)",
+          "element": "SAND",
           "path": "NWFD_SCMOC/SAND",
           "render": {
-            "colormap": "HAZARDS"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "HAZARDS",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "沙尘预警 / SAND (Dust)"
+      ]
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
+      "category_en": "National Gridded Guidance",
+      "category_zh": "智能网格预报",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_thunderstorm",
+      "name": "THUNDERSTORM",
+      "name_en": "THUNDERSTORM",
+      "name_zh": "雷暴预警",
       "isObservation": false,
       "layers": [
         {
-          "element": "THUNDERSTORM",
           "id": "layer-nwfd_scmoc_thunderstorm",
+          "name": "THUNDERSTORM",
+          "name_en": "THUNDERSTORM",
+          "name_zh": "雷暴预警",
+          "type": "contour",
           "model": "NWFD_SCMOC",
-          "name": "雷暴预警 / THUNDERSTORM",
+          "element": "THUNDERSTORM",
           "path": "NWFD_SCMOC/THUNDERSTORM",
           "render": {
-            "colormap": "HAZARDS"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "HAZARDS",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "雷暴预警 / THUNDERSTORM"
+      ]
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
+      "category_en": "National Gridded Guidance",
+      "category_zh": "智能网格预报",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_thunder_wind",
+      "name": "THUNDER_WIND",
+      "name_en": "THUNDER_WIND",
+      "name_zh": "雷暴大风预警",
       "isObservation": false,
       "layers": [
         {
-          "element": "THUNDER_WIND",
           "id": "layer-nwfd_scmoc_thunder_wind",
+          "name": "THUNDER_WIND",
+          "name_en": "THUNDER_WIND",
+          "name_zh": "雷暴大风预警",
+          "type": "wind",
           "model": "NWFD_SCMOC",
-          "name": "雷暴大风预警 / THUNDER_WIND",
+          "element": "THUNDER_WIND",
           "path": "NWFD_SCMOC/THUNDER_WIND",
-          "renderRef": "wind-1",
-          "type": "wind"
+          "render": {
+            "colormap": "WIND",
+            "showWind": false,
+            "showBarbs": true,
+            "showRaster": false,
+            "keepWind": true
+          }
         }
-      ],
-      "name": "雷暴大风预警 / THUNDER_WIND"
+      ]
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
+      "category_en": "National Gridded Guidance",
+      "category_zh": "智能网格预报",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_precip_type",
+      "name": "PRECIPITATION_TYPE",
+      "name_en": "PRECIPITATION_TYPE",
+      "name_zh": "降水相态预报",
       "isObservation": false,
       "layers": [
         {
-          "element": "PRECIPITATION_TYPE",
           "id": "layer-nwfd_scmoc_precip_type",
+          "name": "PRECIPITATION_TYPE",
+          "name_en": "PRECIPITATION_TYPE",
+          "name_zh": "降水相态预报",
+          "type": "contour",
           "model": "NWFD_SCMOC",
-          "name": "降水相态预报 / PRECIPITATION_TYPE",
+          "element": "PRECIPITATION_TYPE",
           "path": "NWFD_SCMOC/PRECIPITATION_TYPE",
           "render": {
-            "colormap": "PRECIP_TYPE"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "PRECIP_TYPE",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "降水相态预报 / PRECIPITATION_TYPE"
+      ]
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
+      "category_en": "National Gridded Guidance",
+      "category_zh": "智能网格预报",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_1h_rain01",
+      "name": "1h Rain Guidance",
+      "name_en": "1h Rain Guidance",
+      "name_zh": "1小时降水指导",
       "isObservation": false,
       "layers": [
         {
-          "element": "RAIN01",
           "id": "layer-nwfd_scmoc_1h_rain01",
+          "name": "1h Rain Guidance",
+          "name_en": "1h Rain Guidance",
+          "name_zh": "1小时降水指导",
+          "type": "contour",
           "model": "NWFD_SCMOC_1H",
-          "name": "1小时降水指导 / 1h Rain Guidance",
+          "element": "RAIN01",
           "path": "NWFD_SCMOC_1H/RAIN01",
-          "renderRef": "contour-6",
-          "type": "contour"
+          "render": {
+            "colormap": "RAIN",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "1小时降水指导 / 1h Rain Guidance"
+      ]
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
+      "category_en": "National Gridded Guidance",
+      "category_zh": "智能网格预报",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_max_tmp_2m",
+      "name": "Max Temperature (2m)",
+      "name_en": "Max Temperature (2m)",
+      "name_zh": "2m日最高气温",
       "isObservation": false,
       "layers": [
         {
-          "element": "MAXIMUM_TEMPERATURE/2M_ABOVE_GROUND",
           "id": "layer-nwfd_scmoc_max_tmp_2m",
+          "name": "Max Temperature (2m)",
+          "name_en": "Max Temperature (2m)",
+          "name_zh": "2m日最高气温",
+          "type": "contour",
           "model": "NWFD_SCMOC",
-          "name": "2m日最高气温 / Max Temperature (2m)",
+          "element": "MAXIMUM_TEMPERATURE/2M_ABOVE_GROUND",
           "path": "NWFD_SCMOC/MAXIMUM_TEMPERATURE/2M_ABOVE_GROUND",
           "render": {
             "colormap": "TMP",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "2m日最高气温 / Max Temperature (2m)"
+      ]
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
+      "category_en": "National Gridded Guidance",
+      "category_zh": "智能网格预报",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_min_tmp_2m",
+      "name": "Min Temperature (2m)",
+      "name_en": "Min Temperature (2m)",
+      "name_zh": "2m日最低气温",
       "isObservation": false,
       "layers": [
         {
-          "element": "MINIMUM_TEMPERATURE/2M_ABOVE_GROUND",
           "id": "layer-nwfd_scmoc_min_tmp_2m",
+          "name": "Min Temperature (2m)",
+          "name_en": "Min Temperature (2m)",
+          "name_zh": "2m日最低气温",
+          "type": "contour",
           "model": "NWFD_SCMOC",
-          "name": "2m日最低气温 / Min Temperature (2m)",
+          "element": "MINIMUM_TEMPERATURE/2M_ABOVE_GROUND",
           "path": "NWFD_SCMOC/MINIMUM_TEMPERATURE/2M_ABOVE_GROUND",
           "render": {
             "colormap": "TMP",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "2m日最低气温 / Min Temperature (2m)"
+      ]
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
+      "category_en": "National Gridded Guidance",
+      "category_zh": "智能网格预报",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_tmp_change_24h_2m",
+      "name": "24h Temp Change (2m)",
+      "name_en": "24h Temp Change (2m)",
+      "name_zh": "2m 24小时变温",
       "isObservation": false,
       "layers": [
         {
-          "element": "TMP_CHANGE_24H/2M_ABOVE_GROUND",
           "id": "layer-nwfd_scmoc_tmp_change_24h_2m",
+          "name": "24h Temp Change (2m)",
+          "name_en": "24h Temp Change (2m)",
+          "name_zh": "2m 24小时变温",
+          "type": "contour",
           "model": "NWFD_SCMOC",
-          "name": "2m 24小时变温 / 24h Temp Change (2m)",
+          "element": "TMP_CHANGE_24H/2M_ABOVE_GROUND",
           "path": "NWFD_SCMOC/TMP_CHANGE_24H/2M_ABOVE_GROUND",
           "render": {
             "colormap": "TMP",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "2m 24小时变温 / 24h Temp Change (2m)"
+      ]
     },
     {
       "category": "智能网格预报 (National Gridded Guidance)",
+      "category_en": "National Gridded Guidance",
+      "category_zh": "智能网格预报",
       "hasLevel": false,
       "id": "preset-nwfd_scmoc_tmp_change_48h_2m",
+      "name": "48h Temp Change (2m)",
+      "name_en": "48h Temp Change (2m)",
+      "name_zh": "2m 48小时变温",
       "isObservation": false,
       "layers": [
         {
-          "element": "TMP_CHANGE_48H/2M_ABOVE_GROUND",
           "id": "layer-nwfd_scmoc_tmp_change_48h_2m",
+          "name": "48h Temp Change (2m)",
+          "name_en": "48h Temp Change (2m)",
+          "name_zh": "2m 48小时变温",
+          "type": "contour",
           "model": "NWFD_SCMOC",
-          "name": "2m 48小时变温 / 48h Temp Change (2m)",
+          "element": "TMP_CHANGE_48H/2M_ABOVE_GROUND",
           "path": "NWFD_SCMOC/TMP_CHANGE_48H/2M_ABOVE_GROUND",
           "render": {
             "colormap": "TMP",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "2m 48小时变温 / 48h Temp Change (2m)"
+      ]
     },
     {
       "category": "实况融合 (Land Surface Reanalysis)",
+      "category_en": "Land Surface Reanalysis",
+      "category_zh": "实况融合",
       "hasLevel": false,
       "id": "preset-cldas_rain01",
+      "name": "1h Merged Rain",
+      "name_en": "1h Merged Rain",
+      "name_zh": "1小时融合降水",
       "isObservation": true,
       "layers": [
         {
-          "element": "RAIN01_BI_DATA_SOURCE",
           "id": "layer-cldas_rain01",
+          "name": "1h Merged Rain",
+          "name_en": "1h Merged Rain",
+          "name_zh": "1小时融合降水",
+          "type": "contour",
           "model": "CLDAS",
-          "name": "1小时融合降水 / 1h Merged Rain",
+          "element": "RAIN01_BI_DATA_SOURCE",
           "path": "CLDAS/RAIN01_BI_DATA_SOURCE",
-          "renderRef": "contour-6",
-          "type": "contour"
+          "render": {
+            "colormap": "RAIN",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "1小时融合降水 / 1h Merged Rain"
+      ]
     },
     {
       "category": "实况融合 (Land Surface Reanalysis)",
+      "category_en": "Land Surface Reanalysis",
+      "category_zh": "实况融合",
       "hasLevel": false,
       "id": "preset-cldas_apcp_10min",
+      "name": "10m Merged Rain",
+      "name_en": "10m Merged Rain",
+      "name_zh": "10分钟融合降水",
       "isObservation": true,
       "layers": [
         {
-          "element": "APCP_10MIN_BI_DATA_SOURCE",
           "id": "layer-cldas_apcp_10min",
+          "name": "10m Merged Rain",
+          "name_en": "10m Merged Rain",
+          "name_zh": "10分钟融合降水",
+          "type": "contour",
           "model": "CLDAS",
-          "name": "10分钟融合降水 / 10m Merged Rain",
+          "element": "APCP_10MIN_BI_DATA_SOURCE",
           "path": "CLDAS/APCP_10MIN_BI_DATA_SOURCE",
-          "renderRef": "contour-6",
-          "type": "contour"
+          "render": {
+            "colormap": "RAIN",
+            "showFill": true,
+            "showLine": false
+          }
         }
-      ],
-      "name": "10分钟融合降水 / 10m Merged Rain"
+      ]
     },
     {
       "category": "实况融合 (Land Surface Reanalysis)",
+      "category_en": "Land Surface Reanalysis",
+      "category_zh": "实况融合",
       "hasLevel": false,
       "id": "preset-cldas_tmp_2m",
+      "name": "2m Temperature",
+      "name_en": "2m Temperature",
+      "name_zh": "2米气温实况融合",
       "isObservation": true,
       "layers": [
         {
-          "element": "TMP/2M_ABOVE_GROUND",
           "id": "layer-cldas_tmp_2m",
+          "name": "2m Temperature",
+          "name_en": "2m Temperature",
+          "name_zh": "2米气温实况融合",
+          "type": "contour",
           "model": "CLDAS",
-          "name": "2米气温实况融合 / 2m Temperature",
+          "element": "TMP/2M_ABOVE_GROUND",
           "path": "CLDAS/TMP/2M_ABOVE_GROUND",
           "render": {
             "colormap": "TMP",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "2米气温实况融合 / 2m Temperature"
+      ]
     },
     {
       "category": "实况融合 (Land Surface Reanalysis)",
+      "category_en": "Land Surface Reanalysis",
+      "category_zh": "实况融合",
       "hasLevel": false,
       "id": "preset-cldas_vis",
+      "name": "Visibility",
+      "name_en": "Visibility",
+      "name_zh": "能见度实况融合",
       "isObservation": true,
       "layers": [
         {
-          "element": "VIS",
           "id": "layer-cldas_vis",
+          "name": "Visibility",
+          "name_en": "Visibility",
+          "name_zh": "能见度实况融合",
+          "type": "contour",
           "model": "CLDAS",
-          "name": "能见度实况融合 / Visibility",
+          "element": "VIS",
           "path": "CLDAS/VIS",
           "render": {
             "colormap": "TMP",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "能见度实况融合 / Visibility"
+      ]
     },
     {
       "category": "实况融合 (Land Surface Reanalysis)",
+      "category_en": "Land Surface Reanalysis",
+      "category_zh": "实况融合",
       "hasLevel": false,
       "id": "preset-cldas_wind_10m",
+      "name": "10m Wind Field",
+      "name_en": "10m Wind Field",
+      "name_zh": "10米风场实况融合",
       "isObservation": true,
       "layers": [
         {
-          "element": "WIND/10M_ABOVE_GROUND",
           "id": "layer-cldas_wind_10m",
+          "name": "10m Wind Field",
+          "name_en": "10m Wind Field",
+          "name_zh": "10米风场实况融合",
+          "type": "wind",
           "model": "CLDAS",
-          "name": "10米风场实况融合 / 10m Wind Field",
+          "element": "WIND/10M_ABOVE_GROUND",
           "path": "CLDAS/WIND/10M_ABOVE_GROUND",
-          "renderRef": "wind-1",
-          "type": "wind"
+          "render": {
+            "colormap": "WIND",
+            "showWind": false,
+            "showBarbs": true,
+            "showRaster": false,
+            "keepWind": true
+          }
         }
-      ],
-      "name": "10米风场实况融合 / 10m Wind Field"
+      ]
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
+      "category_en": "Ensemble & Probability",
+      "category_zh": "集合预报与概率",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_avg_tmp_850",
+      "name": "Ensemble Mean 850hPa TMP",
+      "name_en": "Ensemble Mean 850hPa TMP",
+      "name_zh": "集合平均850hPa气温",
       "isObservation": false,
       "layers": [
         {
-          "element": "AVERAGE/TMP/850",
           "id": "layer-ecmwf_ens_avg_tmp_850",
+          "name": "Ensemble Mean 850hPa TMP",
+          "name_en": "Ensemble Mean 850hPa TMP",
+          "name_zh": "集合平均850hPa气温",
+          "type": "contour",
           "model": "ECMWF_ENSEMBLE_PRODUCT",
-          "name": "集合平均850hPa气温 / Ensemble Mean 850hPa TMP",
+          "element": "AVERAGE/TMP/850",
           "path": "ECMWF_ENSEMBLE_PRODUCT/AVERAGE/TMP/850",
           "render": {
             "colormap": "TMP",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "集合平均850hPa气温 / Ensemble Mean 850hPa TMP"
+      ]
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
+      "category_en": "Ensemble & Probability",
+      "category_zh": "集合预报与概率",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_avg_hgt_500",
+      "name": "Ensemble Mean 500hPa HGT",
+      "name_en": "Ensemble Mean 500hPa HGT",
+      "name_zh": "集合平均500hPa高度",
       "isObservation": false,
       "layers": [
         {
-          "element": "AVERAGE/HGT/500",
           "id": "layer-ecmwf_ens_avg_hgt_500",
+          "name": "Ensemble Mean 500hPa HGT",
+          "name_en": "Ensemble Mean 500hPa HGT",
+          "name_zh": "集合平均500hPa高度",
+          "type": "contour",
           "model": "ECMWF_ENSEMBLE_PRODUCT",
-          "name": "集合平均500hPa高度 / Ensemble Mean 500hPa HGT",
+          "element": "AVERAGE/HGT/500",
           "path": "ECMWF_ENSEMBLE_PRODUCT/AVERAGE/HGT/500",
           "render": {
             "colormap": "TMP",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "集合平均500hPa高度 / Ensemble Mean 500hPa HGT"
+      ]
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
+      "category_en": "Ensemble & Probability",
+      "category_zh": "集合预报与概率",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_avg_rh_850",
+      "name": "Ensemble Mean 850hPa RH",
+      "name_en": "Ensemble Mean 850hPa RH",
+      "name_zh": "集合平均850hPa相对湿度",
       "isObservation": false,
       "layers": [
         {
-          "element": "AVERAGE/RH/850",
           "id": "layer-ecmwf_ens_avg_rh_850",
+          "name": "Ensemble Mean 850hPa RH",
+          "name_en": "Ensemble Mean 850hPa RH",
+          "name_zh": "集合平均850hPa相对湿度",
+          "type": "contour",
           "model": "ECMWF_ENSEMBLE_PRODUCT",
-          "name": "集合平均850hPa相对湿度 / Ensemble Mean 850hPa RH",
+          "element": "AVERAGE/RH/850",
           "path": "ECMWF_ENSEMBLE_PRODUCT/AVERAGE/RH/850",
           "render": {
             "colormap": "TMP",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "集合平均850hPa相对湿度 / Ensemble Mean 850hPa RH"
+      ]
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
+      "category_en": "Ensemble & Probability",
+      "category_zh": "集合预报与概率",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_avg_rh_500",
+      "name": "Ensemble Mean 500hPa RH",
+      "name_en": "Ensemble Mean 500hPa RH",
+      "name_zh": "集合平均500hPa相对湿度",
       "isObservation": false,
       "layers": [
         {
-          "element": "AVERAGE/RH/500",
           "id": "layer-ecmwf_ens_avg_rh_500",
+          "name": "Ensemble Mean 500hPa RH",
+          "name_en": "Ensemble Mean 500hPa RH",
+          "name_zh": "集合平均500hPa相对湿度",
+          "type": "contour",
           "model": "ECMWF_ENSEMBLE_PRODUCT",
-          "name": "集合平均500hPa相对湿度 / Ensemble Mean 500hPa RH",
+          "element": "AVERAGE/RH/500",
           "path": "ECMWF_ENSEMBLE_PRODUCT/AVERAGE/RH/500",
           "render": {
             "colormap": "TMP",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#58a6ff"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "集合平均500hPa相对湿度 / Ensemble Mean 500hPa RH"
+      ]
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
+      "category_en": "Ensemble & Probability",
+      "category_zh": "集合预报与概率",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_avg_tmp_2m",
+      "name": "Ensemble Mean 2m TMP",
+      "name_en": "Ensemble Mean 2m TMP",
+      "name_zh": "集合平均2m气温",
       "isObservation": false,
       "layers": [
         {
-          "element": "AVERAGE/TMP_2M",
           "id": "layer-ecmwf_ens_avg_tmp_2m",
+          "name": "Ensemble Mean 2m TMP",
+          "name_en": "Ensemble Mean 2m TMP",
+          "name_zh": "集合平均2m气温",
+          "type": "contour",
           "model": "ECMWF_ENSEMBLE_PRODUCT",
-          "name": "集合平均2m气温 / Ensemble Mean 2m TMP",
+          "element": "AVERAGE/TMP_2M",
           "path": "ECMWF_ENSEMBLE_PRODUCT/AVERAGE/TMP_2M",
           "render": {
             "colormap": "TMP",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "集合平均2m气温 / Ensemble Mean 2m TMP"
+      ]
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
+      "category_en": "Ensemble & Probability",
+      "category_zh": "集合预报与概率",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_var_tmp_850",
+      "name": "Ensemble Var 850hPa TMP",
+      "name_en": "Ensemble Var 850hPa TMP",
+      "name_zh": "集合方差850hPa气温",
       "isObservation": false,
       "layers": [
         {
-          "element": "VARIANCE/TMP/850",
           "id": "layer-ecmwf_ens_var_tmp_850",
+          "name": "Ensemble Var 850hPa TMP",
+          "name_en": "Ensemble Var 850hPa TMP",
+          "name_zh": "集合方差850hPa气温",
+          "type": "contour",
           "model": "ECMWF_ENSEMBLE_PRODUCT",
-          "name": "集合方差850hPa气温 / Ensemble Var 850hPa TMP",
+          "element": "VARIANCE/TMP/850",
           "path": "ECMWF_ENSEMBLE_PRODUCT/VARIANCE/TMP/850",
           "render": {
             "colormap": "VARIANCE",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "集合方差850hPa气温 / Ensemble Var 850hPa TMP"
+      ]
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
+      "category_en": "Ensemble & Probability",
+      "category_zh": "集合预报与概率",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_var_hgt_500",
+      "name": "Ensemble Var 500hPa HGT",
+      "name_en": "Ensemble Var 500hPa HGT",
+      "name_zh": "集合方差500hPa高度",
       "isObservation": false,
       "layers": [
         {
-          "element": "VARIANCE/HGT/500",
           "id": "layer-ecmwf_ens_var_hgt_500",
+          "name": "Ensemble Var 500hPa HGT",
+          "name_en": "Ensemble Var 500hPa HGT",
+          "name_zh": "集合方差500hPa高度",
+          "type": "contour",
           "model": "ECMWF_ENSEMBLE_PRODUCT",
-          "name": "集合方差500hPa高度 / Ensemble Var 500hPa HGT",
+          "element": "VARIANCE/HGT/500",
           "path": "ECMWF_ENSEMBLE_PRODUCT/VARIANCE/HGT/500",
           "render": {
             "colormap": "VARIANCE",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "集合方差500hPa高度 / Ensemble Var 500hPa HGT"
+      ]
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
+      "category_en": "Ensemble & Probability",
+      "category_zh": "集合预报与概率",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_var_rh_850",
+      "name": "Ensemble Var 850hPa RH",
+      "name_en": "Ensemble Var 850hPa RH",
+      "name_zh": "集合方差850hPa相对湿度",
       "isObservation": false,
       "layers": [
         {
-          "element": "VARIANCE/RH/850",
           "id": "layer-ecmwf_ens_var_rh_850",
+          "name": "Ensemble Var 850hPa RH",
+          "name_en": "Ensemble Var 850hPa RH",
+          "name_zh": "集合方差850hPa相对湿度",
+          "type": "contour",
           "model": "ECMWF_ENSEMBLE_PRODUCT",
-          "name": "集合方差850hPa相对湿度 / Ensemble Var 850hPa RH",
+          "element": "VARIANCE/RH/850",
           "path": "ECMWF_ENSEMBLE_PRODUCT/VARIANCE/RH/850",
           "render": {
             "colormap": "VARIANCE",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "集合方差850hPa相对湿度 / Ensemble Var 850hPa RH"
+      ]
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
+      "category_en": "Ensemble & Probability",
+      "category_zh": "集合预报与概率",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_var_rh_500",
+      "name": "Ensemble Var 500hPa RH",
+      "name_en": "Ensemble Var 500hPa RH",
+      "name_zh": "集合方差500hPa相对湿度",
       "isObservation": false,
       "layers": [
         {
-          "element": "VARIANCE/RH/500",
           "id": "layer-ecmwf_ens_var_rh_500",
+          "name": "Ensemble Var 500hPa RH",
+          "name_en": "Ensemble Var 500hPa RH",
+          "name_zh": "集合方差500hPa相对湿度",
+          "type": "contour",
           "model": "ECMWF_ENSEMBLE_PRODUCT",
-          "name": "集合方差500hPa相对湿度 / Ensemble Var 500hPa RH",
+          "element": "VARIANCE/RH/500",
           "path": "ECMWF_ENSEMBLE_PRODUCT/VARIANCE/RH/500",
           "render": {
             "colormap": "VARIANCE",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "集合方差500hPa相对湿度 / Ensemble Var 500hPa RH"
+      ]
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
+      "category_en": "Ensemble & Probability",
+      "category_zh": "集合预报与概率",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_var_tmp_2m",
+      "name": "Ensemble Var 2m TMP",
+      "name_en": "Ensemble Var 2m TMP",
+      "name_zh": "集合方差2m气温",
       "isObservation": false,
       "layers": [
         {
-          "element": "VARIANCE/TMP_2M",
           "id": "layer-ecmwf_ens_var_tmp_2m",
+          "name": "Ensemble Var 2m TMP",
+          "name_en": "Ensemble Var 2m TMP",
+          "name_zh": "集合方差2m气温",
+          "type": "contour",
           "model": "ECMWF_ENSEMBLE_PRODUCT",
-          "name": "集合方差2m气温 / Ensemble Var 2m TMP",
+          "element": "VARIANCE/TMP_2M",
           "path": "ECMWF_ENSEMBLE_PRODUCT/VARIANCE/TMP_2M",
           "render": {
             "colormap": "VARIANCE",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#f85149"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "集合方差2m气温 / Ensemble Var 2m TMP"
+      ]
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
+      "category_en": "Ensemble & Probability",
+      "category_zh": "集合预报与概率",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_prob_rain24_10",
+      "name": "Rain Prob > 10.0mm",
+      "name_en": "Rain Prob > 10.0mm",
+      "name_zh": "24小时降水>10mm概率",
       "isObservation": false,
       "layers": [
         {
-          "element": "GRID_PROBABILITY/RAIN24/10.0MM",
           "id": "layer-ecmwf_ens_prob_rain24_10",
+          "name": "Rain Prob > 10.0mm",
+          "name_en": "Rain Prob > 10.0mm",
+          "name_zh": "24小时降水>10mm概率",
+          "type": "contour",
           "model": "ECMWF_ENSEMBLE_PRODUCT",
-          "name": "24小时降水>10mm概率 / Rain Prob > 10.0mm",
+          "element": "GRID_PROBABILITY/RAIN24/10.0MM",
           "path": "ECMWF_ENSEMBLE_PRODUCT/GRID_PROBABILITY/RAIN24/10.0MM",
           "render": {
-            "colormap": "PROBABILITY"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "PROBABILITY",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "24小时降水>10mm概率 / Rain Prob > 10.0mm"
+      ]
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
+      "category_en": "Ensemble & Probability",
+      "category_zh": "集合预报与概率",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_prob_rain24_25",
+      "name": "Rain Prob > 25.0mm",
+      "name_en": "Rain Prob > 25.0mm",
+      "name_zh": "24小时降水>25mm概率",
       "isObservation": false,
       "layers": [
         {
-          "element": "GRID_PROBABILITY/RAIN24/25.0MM",
           "id": "layer-ecmwf_ens_prob_rain24_25",
+          "name": "Rain Prob > 25.0mm",
+          "name_en": "Rain Prob > 25.0mm",
+          "name_zh": "24小时降水>25mm概率",
+          "type": "contour",
           "model": "ECMWF_ENSEMBLE_PRODUCT",
-          "name": "24小时降水>25mm概率 / Rain Prob > 25.0mm",
+          "element": "GRID_PROBABILITY/RAIN24/25.0MM",
           "path": "ECMWF_ENSEMBLE_PRODUCT/GRID_PROBABILITY/RAIN24/25.0MM",
           "render": {
-            "colormap": "PROBABILITY"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "PROBABILITY",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "24小时降水>25mm概率 / Rain Prob > 25.0mm"
+      ]
     },
     {
       "category": "集合预报与概率 (Ensemble & Probability)",
+      "category_en": "Ensemble & Probability",
+      "category_zh": "集合预报与概率",
       "hasLevel": false,
       "id": "preset-ecmwf_ens_prob_rain24_100",
+      "name": "Rain Prob > 100.0mm",
+      "name_en": "Rain Prob > 100.0mm",
+      "name_zh": "24小时降水>100mm概率",
       "isObservation": false,
       "layers": [
         {
-          "element": "GRID_PROBABILITY/RAIN24/100.0MM",
           "id": "layer-ecmwf_ens_prob_rain24_100",
+          "name": "Rain Prob > 100.0mm",
+          "name_en": "Rain Prob > 100.0mm",
+          "name_zh": "24小时降水>100mm概率",
+          "type": "contour",
           "model": "ECMWF_ENSEMBLE_PRODUCT",
-          "name": "24小时降水>100mm概率 / Rain Prob > 100.0mm",
+          "element": "GRID_PROBABILITY/RAIN24/100.0MM",
           "path": "ECMWF_ENSEMBLE_PRODUCT/GRID_PROBABILITY/RAIN24/100.0MM",
           "render": {
-            "colormap": "PROBABILITY"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "PROBABILITY",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "24小时降水>100mm概率 / Rain Prob > 100.0mm"
+      ]
     },
     {
       "category": "高密地面与海洋观测 (High-Density Observations)",
+      "category_en": "High-Density Observations",
+      "category_zh": "高密地面与海洋观测",
       "hasLevel": false,
       "id": "preset-surface_plot_all",
+      "name": "PLOT_ALL (>60k AWS)",
+      "name_en": "PLOT_ALL (>60k AWS)",
+      "name_zh": "全网高密地面观测(6万+站)",
       "isObservation": true,
       "layers": [
         {
-          "element": "PLOT_ALL",
           "id": "layer-surface_plot_all",
+          "name": "PLOT_ALL (>60k AWS)",
+          "name_en": "PLOT_ALL (>60k AWS)",
+          "name_zh": "全网高密地面观测(6万+站)",
+          "type": "station",
           "model": "SURFACE",
-          "name": "全网高密地面观测(6万+站) / PLOT_ALL (>60k AWS)",
+          "element": "PLOT_ALL",
           "path": "SURFACE/PLOT_ALL",
-          "renderRef": "station-1",
-          "type": "station"
+          "render": {
+            "showTemp": true,
+            "showDewpoint": true,
+            "showPressure": true,
+            "showWind": true,
+            "showVisibility": true
+          }
         }
-      ],
-      "name": "全网高密地面观测(6万+站) / PLOT_ALL (>60k AWS)"
+      ]
     },
     {
       "category": "高密地面与海洋观测 (High-Density Observations)",
+      "category_en": "High-Density Observations",
+      "category_zh": "高密地面与海洋观测",
       "hasLevel": false,
       "id": "preset-surface_plot_traffic",
+      "name": "PLOT_TRAFFIC (Expressway)",
+      "name_en": "PLOT_TRAFFIC (Expressway)",
+      "name_zh": "高速公路交通气象站",
       "isObservation": true,
       "layers": [
         {
-          "element": "PLOT_TRAFFIC",
           "id": "layer-surface_plot_traffic",
+          "name": "PLOT_TRAFFIC (Expressway)",
+          "name_en": "PLOT_TRAFFIC (Expressway)",
+          "name_zh": "高速公路交通气象站",
+          "type": "station",
           "model": "SURFACE",
-          "name": "高速公路交通气象站 / PLOT_TRAFFIC (Expressway)",
+          "element": "PLOT_TRAFFIC",
           "path": "SURFACE/PLOT_TRAFFIC",
-          "renderRef": "station-1",
-          "type": "station"
+          "render": {
+            "showTemp": true,
+            "showDewpoint": true,
+            "showPressure": true,
+            "showWind": true,
+            "showVisibility": true
+          }
         }
-      ],
-      "name": "高速公路交通气象站 / PLOT_TRAFFIC (Expressway)"
+      ]
     },
     {
       "category": "高密地面与海洋观测 (High-Density Observations)",
+      "category_en": "High-Density Observations",
+      "category_zh": "高密地面与海洋观测",
       "hasLevel": false,
       "id": "preset-surface_plot_traffic_5min",
+      "name": "PLOT_TRAFFIC_5MIN",
+      "name_en": "PLOT_TRAFFIC_5MIN",
+      "name_zh": "高速公路交通站(5分钟)",
       "isObservation": true,
       "layers": [
         {
-          "element": "PLOT_TRAFFIC_5MIN",
           "id": "layer-surface_plot_traffic_5min",
+          "name": "PLOT_TRAFFIC_5MIN",
+          "name_en": "PLOT_TRAFFIC_5MIN",
+          "name_zh": "高速公路交通站(5分钟)",
+          "type": "station",
           "model": "SURFACE",
-          "name": "高速公路交通站(5分钟) / PLOT_TRAFFIC_5MIN",
+          "element": "PLOT_TRAFFIC_5MIN",
           "path": "SURFACE/PLOT_TRAFFIC_5MIN",
-          "renderRef": "station-1",
-          "type": "station"
+          "render": {
+            "showTemp": true,
+            "showDewpoint": true,
+            "showPressure": true,
+            "showWind": true,
+            "showVisibility": true
+          }
         }
-      ],
-      "name": "高速公路交通站(5分钟) / PLOT_TRAFFIC_5MIN"
+      ]
     },
     {
       "category": "高密地面与海洋观测 (High-Density Observations)",
+      "category_en": "High-Density Observations",
+      "category_zh": "高密地面与海洋观测",
       "hasLevel": false,
       "id": "preset-surface_pres_change_3h",
+      "name": "PRES_CHANGE_3H_NATIONAL",
+      "name_en": "PRES_CHANGE_3H_NATIONAL",
+      "name_zh": "全国3小时变压",
       "isObservation": true,
       "layers": [
         {
-          "element": "PRES_CHANGE_3H_NATIONAL",
           "id": "layer-surface_pres_change_3h",
+          "name": "PRES_CHANGE_3H_NATIONAL",
+          "name_en": "PRES_CHANGE_3H_NATIONAL",
+          "name_zh": "全国3小时变压",
+          "type": "station",
           "model": "SURFACE",
-          "name": "全国3小时变压 / PRES_CHANGE_3H_NATIONAL",
+          "element": "PRES_CHANGE_3H_NATIONAL",
           "path": "SURFACE/PRES_CHANGE_3H_NATIONAL",
           "render": {
             "showPressDiff3h": true,
             "showPressureChange": true,
             "showTendency": true,
+            "showTemp": false,
+            "showDewpoint": false,
+            "showPressure": false,
+            "showWind": false,
             "showVisibility": false
-          },
-          "renderRef": "station-2",
-          "type": "station"
+          }
         }
-      ],
-      "name": "全国3小时变压 / PRES_CHANGE_3H_NATIONAL"
+      ]
     },
     {
       "category": "高密地面与海洋观测 (High-Density Observations)",
+      "category_en": "High-Density Observations",
+      "category_zh": "高密地面与海洋观测",
       "hasLevel": false,
       "id": "preset-surface_pres_change_24h",
+      "name": "PRES_CHANGE_24H_NATIONAL",
+      "name_en": "PRES_CHANGE_24H_NATIONAL",
+      "name_zh": "全国24小时变压",
       "isObservation": true,
       "layers": [
         {
-          "element": "PRES_CHANGE_24H_NATIONAL",
           "id": "layer-surface_pres_change_24h",
+          "name": "PRES_CHANGE_24H_NATIONAL",
+          "name_en": "PRES_CHANGE_24H_NATIONAL",
+          "name_zh": "全国24小时变压",
+          "type": "station",
           "model": "SURFACE",
-          "name": "全国24小时变压 / PRES_CHANGE_24H_NATIONAL",
+          "element": "PRES_CHANGE_24H_NATIONAL",
           "path": "SURFACE/PRES_CHANGE_24H_NATIONAL",
           "render": {
             "showPressDiff24h": true,
             "showPressureChange": true,
             "showTendency": true,
+            "showTemp": false,
+            "showDewpoint": false,
+            "showPressure": false,
+            "showWind": false,
             "showVisibility": false
-          },
-          "renderRef": "station-2",
-          "type": "station"
+          }
         }
-      ],
-      "name": "全国24小时变压 / PRES_CHANGE_24H_NATIONAL"
+      ]
     },
     {
       "category": "高密地面与海洋观测 (High-Density Observations)",
+      "category_en": "High-Density Observations",
+      "category_zh": "高密地面与海洋观测",
       "hasLevel": false,
       "id": "preset-surface_vis_1min",
+      "name": "HORIZONTAL_VISIBILITY_1MIN",
+      "name_en": "HORIZONTAL_VISIBILITY_1MIN",
+      "name_zh": "1分钟水平能见度",
       "isObservation": true,
       "layers": [
         {
-          "element": "HORIZONTAL_VISIBILITY_1MIN_ALL_STATION",
           "id": "layer-surface_vis_1min",
+          "name": "HORIZONTAL_VISIBILITY_1MIN",
+          "name_en": "HORIZONTAL_VISIBILITY_1MIN",
+          "name_zh": "1分钟水平能见度",
+          "type": "station",
           "model": "SURFACE",
-          "name": "1分钟水平能见度 / HORIZONTAL_VISIBILITY_1MIN",
+          "element": "HORIZONTAL_VISIBILITY_1MIN_ALL_STATION",
           "path": "SURFACE/HORIZONTAL_VISIBILITY_1MIN_ALL_STATION",
           "render": {
-            "showVisibility": true
-          },
-          "renderRef": "station-2",
-          "type": "station"
+            "showVisibility": true,
+            "showTemp": false,
+            "showDewpoint": false,
+            "showPressure": false,
+            "showWind": false
+          }
         }
-      ],
-      "name": "1分钟水平能见度 / HORIZONTAL_VISIBILITY_1MIN"
+      ]
     },
     {
       "category": "高密地面与海洋观测 (High-Density Observations)",
+      "category_en": "High-Density Observations",
+      "category_zh": "高密地面与海洋观测",
       "hasLevel": false,
       "id": "preset-surface_snow_depth",
+      "name": "SNOW_DEPTH_ALL_STATION",
+      "name_en": "SNOW_DEPTH_ALL_STATION",
+      "name_zh": "全国积雪深度实况",
       "isObservation": true,
       "layers": [
         {
-          "element": "SNOW_DEPTH_ALL_STATION",
           "id": "layer-surface_snow_depth",
+          "name": "SNOW_DEPTH_ALL_STATION",
+          "name_en": "SNOW_DEPTH_ALL_STATION",
+          "name_zh": "全国积雪深度实况",
+          "type": "station",
           "model": "SURFACE",
-          "name": "全国积雪深度实况 / SNOW_DEPTH_ALL_STATION",
+          "element": "SNOW_DEPTH_ALL_STATION",
           "path": "SURFACE/SNOW_DEPTH_ALL_STATION",
           "render": {
             "showSnowDepth": true,
+            "showTemp": false,
+            "showDewpoint": false,
+            "showPressure": false,
+            "showWind": false,
             "showVisibility": false
-          },
-          "renderRef": "station-2",
-          "type": "station"
+          }
         }
-      ],
-      "name": "全国积雪深度实况 / SNOW_DEPTH_ALL_STATION"
+      ]
     },
     {
       "category": "高密地面与海洋观测 (High-Density Observations)",
+      "category_en": "High-Density Observations",
+      "category_zh": "高密地面与海洋观测",
       "hasLevel": false,
       "id": "preset-marine_rocea_1h",
+      "name": "ROCEA_1H (Marine Buoys)",
+      "name_en": "ROCEA_1H (Marine Buoys)",
+      "name_zh": "海洋浮标与海岛站(1小时)",
       "isObservation": true,
       "layers": [
         {
-          "element": "ROCEA_1H",
           "id": "layer-marine_rocea_1h",
+          "name": "ROCEA_1H (Marine Buoys)",
+          "name_en": "ROCEA_1H (Marine Buoys)",
+          "name_zh": "海洋浮标与海岛站(1小时)",
+          "type": "station",
           "model": "MARINE",
-          "name": "海洋浮标与海岛站(1小时) / ROCEA_1H (Marine Buoys)",
+          "element": "ROCEA_1H",
           "path": "MARINE/ROCEA_1H",
-          "renderRef": "station-1",
-          "type": "station"
+          "render": {
+            "showTemp": true,
+            "showDewpoint": true,
+            "showPressure": true,
+            "showWind": true,
+            "showVisibility": true
+          }
         }
-      ],
-      "name": "海洋浮标与海岛站(1小时) / ROCEA_1H (Marine Buoys)"
+      ]
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
+      "category_en": "Severe Convective & Nowcasting",
+      "category_zh": "强对流与短临",
       "hasLevel": false,
       "id": "preset-swan_mcr",
+      "name": "MCR (Composite Refl)",
+      "name_en": "MCR (Composite Refl)",
+      "name_zh": "组合反射率",
       "isObservation": true,
       "layers": [
         {
-          "element": "LOCAL/NCRAD/TDPRODUCT/MCR",
           "id": "layer-swan_mcr",
+          "name": "MCR (Composite Refl)",
+          "name_en": "MCR (Composite Refl)",
+          "name_zh": "组合反射率",
+          "type": "contour",
           "model": "SWAN_PRODUCT",
-          "name": "组合反射率 / MCR (Composite Refl)",
+          "element": "LOCAL/NCRAD/TDPRODUCT/MCR",
           "path": "SWAN_PRODUCT/LOCAL/NCRAD/TDPRODUCT/MCR",
           "render": {
-            "colormap": "RADAR"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "RADAR",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "组合反射率 / MCR (Composite Refl)"
+      ]
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
+      "category_en": "Severe Convective & Nowcasting",
+      "category_zh": "强对流与短临",
       "hasLevel": false,
       "id": "preset-swan_mtop",
+      "name": "MTOP (Echo Tops)",
+      "name_en": "MTOP (Echo Tops)",
+      "name_zh": "回波顶高",
       "isObservation": true,
       "layers": [
         {
-          "element": "LOCAL/NCRAD/TDPRODUCT/MTOP",
           "id": "layer-swan_mtop",
+          "name": "MTOP (Echo Tops)",
+          "name_en": "MTOP (Echo Tops)",
+          "name_zh": "回波顶高",
+          "type": "contour",
           "model": "SWAN_PRODUCT",
-          "name": "回波顶高 / MTOP (Echo Tops)",
+          "element": "LOCAL/NCRAD/TDPRODUCT/MTOP",
           "path": "SWAN_PRODUCT/LOCAL/NCRAD/TDPRODUCT/MTOP",
           "render": {
-            "colormap": "ECHO_TOP"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "ECHO_TOP",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "回波顶高 / MTOP (Echo Tops)"
+      ]
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
+      "category_en": "Severe Convective & Nowcasting",
+      "category_zh": "强对流与短临",
       "hasLevel": false,
       "id": "preset-swan_mvil",
+      "name": "MVIL (Vert. Int. Liquid)",
+      "name_en": "MVIL (Vert. Int. Liquid)",
+      "name_zh": "垂直积分液态含水量",
       "isObservation": true,
       "layers": [
         {
-          "element": "LOCAL/NCRAD/TDPRODUCT/MVIL",
           "id": "layer-swan_mvil",
+          "name": "MVIL (Vert. Int. Liquid)",
+          "name_en": "MVIL (Vert. Int. Liquid)",
+          "name_zh": "垂直积分液态含水量",
+          "type": "contour",
           "model": "SWAN_PRODUCT",
-          "name": "垂直积分液态含水量 / MVIL (Vert. Int. Liquid)",
+          "element": "LOCAL/NCRAD/TDPRODUCT/MVIL",
           "path": "SWAN_PRODUCT/LOCAL/NCRAD/TDPRODUCT/MVIL",
           "render": {
-            "colormap": "VIL"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "VIL",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "垂直积分液态含水量 / MVIL (Vert. Int. Liquid)"
+      ]
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
+      "category_en": "Severe Convective & Nowcasting",
+      "category_zh": "强对流与短临",
       "hasLevel": false,
       "id": "preset-swan_qpe6min",
+      "name": "QPE6MIN",
+      "name_en": "QPE6MIN",
+      "name_zh": "6分钟定量降水估测",
       "isObservation": true,
       "layers": [
         {
-          "element": "LOCAL/NCRAD/TDPRODUCT/QPE6MIN",
           "id": "layer-swan_qpe6min",
+          "name": "QPE6MIN",
+          "name_en": "QPE6MIN",
+          "name_zh": "6分钟定量降水估测",
+          "type": "contour",
           "model": "SWAN_PRODUCT",
-          "name": "6分钟定量降水估测 / QPE6MIN",
+          "element": "LOCAL/NCRAD/TDPRODUCT/QPE6MIN",
           "path": "SWAN_PRODUCT/LOCAL/NCRAD/TDPRODUCT/QPE6MIN",
           "render": {
-            "colormap": "QPE"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "QPE",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "6分钟定量降水估测 / QPE6MIN"
+      ]
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
+      "category_en": "Severe Convective & Nowcasting",
+      "category_zh": "强对流与短临",
       "hasLevel": false,
       "id": "preset-swan_qpe60",
+      "name": "QPE60",
+      "name_en": "QPE60",
+      "name_zh": "1小时定量降水估测",
       "isObservation": true,
       "layers": [
         {
-          "element": "LOCAL/NCRAD/TDPRODUCT/QPE60",
           "id": "layer-swan_qpe60",
+          "name": "QPE60",
+          "name_en": "QPE60",
+          "name_zh": "1小时定量降水估测",
+          "type": "contour",
           "model": "SWAN_PRODUCT",
-          "name": "1小时定量降水估测 / QPE60",
+          "element": "LOCAL/NCRAD/TDPRODUCT/QPE60",
           "path": "SWAN_PRODUCT/LOCAL/NCRAD/TDPRODUCT/QPE60",
           "render": {
-            "colormap": "QPE"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "QPE",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "1小时定量降水估测 / QPE60"
+      ]
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
-      "defaultLevel": 500,
+      "category_en": "Severe Convective & Nowcasting",
+      "category_zh": "强对流与短临",
       "hasLevel": true,
       "id": "preset-swan_tdmosaic",
+      "name": "TDMOSAIC (3D Volume)",
+      "name_en": "TDMOSAIC (3D Volume)",
+      "name_zh": "3D雷达反射率三维拼图",
       "isObservation": true,
       "layers": [
         {
-          "element": "LOCAL/NCRAD/TDMOSAIC",
           "id": "layer-swan_tdmosaic",
-          "level": 500,
+          "name": "TDMOSAIC (3D Volume)",
+          "name_en": "TDMOSAIC (3D Volume)",
+          "name_zh": "3D雷达反射率三维拼图",
+          "type": "contour",
           "model": "SWAN_PRODUCT",
-          "name": "3D雷达反射率三维拼图 / TDMOSAIC (3D Volume)",
+          "element": "LOCAL/NCRAD/TDMOSAIC",
           "path": "SWAN_PRODUCT/LOCAL/NCRAD/TDMOSAIC",
           "render": {
-            "colormap": "RADAR"
+            "colormap": "RADAR",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
           },
-          "renderRef": "contour-4",
-          "type": "contour"
+          "level": 500
         }
       ],
+      "defaultLevel": 500,
       "levels": [
         500,
         1000,
@@ -4059,556 +5011,805 @@
         15500,
         17000,
         19000
-      ],
-      "name": "3D雷达反射率三维拼图 / TDMOSAIC (3D Volume)"
+      ]
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
+      "category_en": "Severe Convective & Nowcasting",
+      "category_zh": "强对流与短临",
       "hasLevel": false,
       "id": "preset-swan_tvs",
+      "name": "TVS (Tornado Vortex Sig)",
+      "name_en": "TVS (Tornado Vortex Sig)",
+      "name_zh": "龙卷涡旋特征",
       "isObservation": true,
       "layers": [
         {
-          "element": "LOCAL/SEVERE_STORM/NOWCASTING/TVS",
-          "eventType": "tvs",
           "id": "layer-swan_tvs",
+          "name": "TVS (Tornado Vortex Sig)",
+          "name_en": "TVS (Tornado Vortex Sig)",
+          "name_zh": "龙卷涡旋特征",
+          "type": "event",
           "model": "SWAN_PRODUCT",
-          "name": "龙卷涡旋特征 / TVS (Tornado Vortex Sig)",
+          "element": "LOCAL/SEVERE_STORM/NOWCASTING/TVS",
           "path": "SWAN_PRODUCT/LOCAL/SEVERE_STORM/NOWCASTING/TVS",
-          "renderRef": "event-1",
-          "type": "event"
+          "render": {
+            "colormap": "TMP",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
+            "lineColor": "#58a6ff"
+          },
+          "eventType": "tvs"
         }
-      ],
-      "name": "龙卷涡旋特征 / TVS (Tornado Vortex Sig)"
+      ]
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
+      "category_en": "Severe Convective & Nowcasting",
+      "category_zh": "强对流与短临",
       "hasLevel": false,
       "id": "preset-swan_hail",
+      "name": "HAIL Warning",
+      "name_en": "HAIL Warning",
+      "name_zh": "冰雹预警",
       "isObservation": true,
       "layers": [
         {
-          "element": "LOCAL/SEVERE_STORM/NOWCASTING/HAIL",
-          "eventType": "hail",
           "id": "layer-swan_hail",
+          "name": "HAIL Warning",
+          "name_en": "HAIL Warning",
+          "name_zh": "冰雹预警",
+          "type": "event",
           "model": "SWAN_PRODUCT",
-          "name": "冰雹预警 / HAIL Warning",
+          "element": "LOCAL/SEVERE_STORM/NOWCASTING/HAIL",
           "path": "SWAN_PRODUCT/LOCAL/SEVERE_STORM/NOWCASTING/HAIL",
-          "renderRef": "event-2",
-          "type": "event"
+          "render": {
+            "colormap": "HAZARDS",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          },
+          "eventType": "hail"
         }
-      ],
-      "name": "冰雹预警 / HAIL Warning"
+      ]
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
+      "category_en": "Severe Convective & Nowcasting",
+      "category_zh": "强对流与短临",
       "hasLevel": false,
       "id": "preset-swan_gale",
+      "name": "GALE Warning",
+      "name_en": "GALE Warning",
+      "name_zh": "雷暴大风预警",
       "isObservation": true,
       "layers": [
         {
-          "element": "LOCAL/SEVERE_STORM/NOWCASTING/GALE",
-          "eventType": "gale",
           "id": "layer-swan_gale",
+          "name": "GALE Warning",
+          "name_en": "GALE Warning",
+          "name_zh": "雷暴大风预警",
+          "type": "event",
           "model": "SWAN_PRODUCT",
-          "name": "雷暴大风预警 / GALE Warning",
+          "element": "LOCAL/SEVERE_STORM/NOWCASTING/GALE",
           "path": "SWAN_PRODUCT/LOCAL/SEVERE_STORM/NOWCASTING/GALE",
-          "renderRef": "event-2",
-          "type": "event"
+          "render": {
+            "colormap": "HAZARDS",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          },
+          "eventType": "gale"
         }
-      ],
-      "name": "雷暴大风预警 / GALE Warning"
+      ]
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
+      "category_en": "Severe Convective & Nowcasting",
+      "category_zh": "强对流与短临",
       "hasLevel": false,
       "id": "preset-swan_ref_fst",
+      "name": "REF_FST (0-2h Extrap.)",
+      "name_en": "REF_FST (0-2h Extrap.)",
+      "name_zh": "0-2小时雷达反射率外推",
       "isObservation": true,
       "layers": [
         {
-          "element": "LOCAL/EXTRAPOLATION_IUM/REF_FST",
           "id": "layer-swan_ref_fst",
+          "name": "REF_FST (0-2h Extrap.)",
+          "name_en": "REF_FST (0-2h Extrap.)",
+          "name_zh": "0-2小时雷达反射率外推",
+          "type": "contour",
           "model": "SWAN_PRODUCT",
-          "name": "0-2小时雷达反射率外推 / REF_FST (0-2h Extrap.)",
+          "element": "LOCAL/EXTRAPOLATION_IUM/REF_FST",
           "path": "SWAN_PRODUCT/LOCAL/EXTRAPOLATION_IUM/REF_FST",
           "render": {
-            "colormap": "RADAR"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "RADAR",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "0-2小时雷达反射率外推 / REF_FST (0-2h Extrap.)"
+      ]
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
+      "category_en": "Severe Convective & Nowcasting",
+      "category_zh": "强对流与短临",
       "hasLevel": false,
       "id": "preset-swan_hail_fst",
+      "name": "HAIL Nowcast (0-2h)",
+      "name_en": "HAIL Nowcast (0-2h)",
+      "name_zh": "0-2小时冰雹临近预警",
       "isObservation": true,
       "layers": [
         {
-          "element": "LOCAL/EXTRAPOLATION_IUM/HAIL",
           "id": "layer-swan_hail_fst",
+          "name": "HAIL Nowcast (0-2h)",
+          "name_en": "HAIL Nowcast (0-2h)",
+          "name_zh": "0-2小时冰雹临近预警",
+          "type": "contour",
           "model": "SWAN_PRODUCT",
-          "name": "0-2小时冰雹临近预警 / HAIL Nowcast (0-2h)",
+          "element": "LOCAL/EXTRAPOLATION_IUM/HAIL",
           "path": "SWAN_PRODUCT/LOCAL/EXTRAPOLATION_IUM/HAIL",
           "render": {
-            "colormap": "HAZARDS"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "HAZARDS",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "0-2小时冰雹临近预警 / HAIL Nowcast (0-2h)"
+      ]
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
+      "category_en": "Severe Convective & Nowcasting",
+      "category_zh": "强对流与短临",
       "hasLevel": false,
       "id": "preset-swan_windy_fst",
+      "name": "WINDY Nowcast (0-2h)",
+      "name_en": "WINDY Nowcast (0-2h)",
+      "name_zh": "0-2小时大风临近预警",
       "isObservation": true,
       "layers": [
         {
-          "element": "LOCAL/EXTRAPOLATION_IUM/WINDY",
           "id": "layer-swan_windy_fst",
+          "name": "WINDY Nowcast (0-2h)",
+          "name_en": "WINDY Nowcast (0-2h)",
+          "name_zh": "0-2小时大风临近预警",
+          "type": "contour",
           "model": "SWAN_PRODUCT",
-          "name": "0-2小时大风临近预警 / WINDY Nowcast (0-2h)",
+          "element": "LOCAL/EXTRAPOLATION_IUM/WINDY",
           "path": "SWAN_PRODUCT/LOCAL/EXTRAPOLATION_IUM/WINDY",
           "render": {
-            "colormap": "HAZARDS"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "HAZARDS",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "0-2小时大风临近预警 / WINDY Nowcast (0-2h)"
+      ]
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
+      "category_en": "Severe Convective & Nowcasting",
+      "category_zh": "强对流与短临",
       "hasLevel": false,
       "id": "preset-swan_qpf_fst",
+      "name": "QPF Nowcast (0-2h)",
+      "name_en": "QPF Nowcast (0-2h)",
+      "name_zh": "0-2小时定量降水外推预报",
       "isObservation": true,
       "layers": [
         {
-          "element": "LOCAL/EXTRAPOLATION_IUM/QPF",
           "id": "layer-swan_qpf_fst",
+          "name": "QPF Nowcast (0-2h)",
+          "name_en": "QPF Nowcast (0-2h)",
+          "name_zh": "0-2小时定量降水外推预报",
+          "type": "contour",
           "model": "SWAN_PRODUCT",
-          "name": "0-2小时定量降水外推预报 / QPF Nowcast (0-2h)",
+          "element": "LOCAL/EXTRAPOLATION_IUM/QPF",
           "path": "SWAN_PRODUCT/LOCAL/EXTRAPOLATION_IUM/QPF",
           "render": {
-            "colormap": "QPE"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "QPE",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "0-2小时定量降水外推预报 / QPF Nowcast (0-2h)"
+      ]
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
+      "category_en": "Severe Convective & Nowcasting",
+      "category_zh": "强对流与短临",
       "hasLevel": false,
       "id": "preset-swan_cotrecwind",
+      "name": "COTRECWIND (TREC Wind)",
+      "name_en": "COTRECWIND (TREC Wind)",
+      "name_zh": "雷达跟踪风场(TREC Wind)",
       "isObservation": true,
       "layers": [
         {
-          "element": "LOCAL/GD/COTRECWIND",
           "id": "layer-swan_cotrecwind",
+          "name": "COTRECWIND (TREC Wind)",
+          "name_en": "COTRECWIND (TREC Wind)",
+          "name_zh": "雷达跟踪风场(TREC Wind)",
+          "type": "wind",
           "model": "SWAN_PRODUCT",
-          "name": "雷达跟踪风场(TREC Wind) / COTRECWIND (TREC Wind)",
+          "element": "LOCAL/GD/COTRECWIND",
           "path": "SWAN_PRODUCT/LOCAL/GD/COTRECWIND",
-          "renderRef": "wind-1",
-          "type": "wind"
+          "render": {
+            "colormap": "WIND",
+            "showWind": false,
+            "showBarbs": true,
+            "showRaster": false,
+            "keepWind": true
+          }
         }
-      ],
-      "name": "雷达跟踪风场(TREC Wind) / COTRECWIND (TREC Wind)"
+      ]
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
+      "category_en": "Severe Convective & Nowcasting",
+      "category_zh": "强对流与短临",
       "hasLevel": false,
       "id": "preset-swan_gd_ref_fst",
+      "name": "GD REF_FST",
+      "name_en": "GD REF_FST",
+      "name_zh": "光流雷达外推反射率",
       "isObservation": true,
       "layers": [
         {
-          "element": "LOCAL/GD/REF_FST",
           "id": "layer-swan_gd_ref_fst",
+          "name": "GD REF_FST",
+          "name_en": "GD REF_FST",
+          "name_zh": "光流雷达外推反射率",
+          "type": "contour",
           "model": "SWAN_PRODUCT",
-          "name": "光流雷达外推反射率 / GD REF_FST",
+          "element": "LOCAL/GD/REF_FST",
           "path": "SWAN_PRODUCT/LOCAL/GD/REF_FST",
           "render": {
-            "colormap": "RADAR"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "RADAR",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "光流雷达外推反射率 / GD REF_FST"
+      ]
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
+      "category_en": "Severe Convective & Nowcasting",
+      "category_zh": "强对流与短临",
       "hasLevel": false,
       "id": "preset-surface_lightning_10min",
+      "name": "LIGHTNING_10MIN",
+      "name_en": "LIGHTNING_10MIN",
+      "name_zh": "10分钟闪电定位",
       "isObservation": true,
       "layers": [
         {
-          "element": "LIGHTNING_10MIN",
-          "eventType": "lightning",
           "id": "layer-surface_lightning_10min",
+          "name": "LIGHTNING_10MIN",
+          "name_en": "LIGHTNING_10MIN",
+          "name_zh": "10分钟闪电定位",
+          "type": "event",
           "model": "SURFACE",
-          "name": "10分钟闪电定位 / LIGHTNING_10MIN",
+          "element": "LIGHTNING_10MIN",
           "path": "SURFACE/LIGHTNING_10MIN",
-          "renderRef": "event-1",
-          "type": "event"
+          "render": {
+            "colormap": "TMP",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
+            "lineColor": "#58a6ff"
+          },
+          "eventType": "lightning"
         }
-      ],
-      "name": "10分钟闪电定位 / LIGHTNING_10MIN"
+      ]
     },
     {
       "category": "强对流与短临 (Severe Convective & Nowcasting)",
+      "category_en": "Severe Convective & Nowcasting",
+      "category_zh": "强对流与短临",
       "hasLevel": false,
       "id": "preset-surface_lightning_1h",
+      "name": "LIGHTNING_1H",
+      "name_en": "LIGHTNING_1H",
+      "name_zh": "1小时闪电定位",
       "isObservation": true,
       "layers": [
         {
-          "element": "LIGHTNING_1H",
-          "eventType": "lightning",
           "id": "layer-surface_lightning_1h",
+          "name": "LIGHTNING_1H",
+          "name_en": "LIGHTNING_1H",
+          "name_zh": "1小时闪电定位",
+          "type": "event",
           "model": "SURFACE",
-          "name": "1小时闪电定位 / LIGHTNING_1H",
+          "element": "LIGHTNING_1H",
           "path": "SURFACE/LIGHTNING_1H",
-          "renderRef": "event-1",
-          "type": "event"
+          "render": {
+            "colormap": "TMP",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
+            "lineColor": "#58a6ff"
+          },
+          "eventType": "lightning"
         }
-      ],
-      "name": "1小时闪电定位 / LIGHTNING_1H"
+      ]
     },
     {
       "category": "高密地面与海洋观测 (High-Density Observations)",
+      "category_en": "High-Density Observations",
+      "category_zh": "高密地面与海洋观测",
       "hasLevel": false,
       "id": "preset-wind_profiler_rad",
+      "name": "WIND_PROFILER/RAD",
+      "name_en": "WIND_PROFILER/RAD",
+      "name_zh": "风廓线雷达径向数据",
       "isObservation": true,
       "layers": [
         {
-          "element": "RAD",
           "id": "layer-wind_profiler_rad",
+          "name": "WIND_PROFILER/RAD",
+          "name_en": "WIND_PROFILER/RAD",
+          "name_zh": "风廓线雷达径向数据",
+          "type": "profiler",
           "model": "WIND_PROFILER",
-          "name": "风廓线雷达径向数据 / WIND_PROFILER/RAD",
+          "element": "RAD",
           "path": "WIND_PROFILER/RAD",
+          "render": {
+            "colormap": "WIND",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
+            "lineColor": "#58a6ff"
+          },
           "product": "RAD",
-          "renderRef": "profiler-1",
-          "stationId": "AH001",
-          "type": "profiler"
+          "stationId": "AH001"
         }
-      ],
-      "name": "风廓线雷达径向数据 / WIND_PROFILER/RAD"
+      ]
     },
     {
       "category": "高密地面与海洋观测 (High-Density Observations)",
+      "category_en": "High-Density Observations",
+      "category_zh": "高密地面与海洋观测",
       "hasLevel": false,
       "id": "preset-wind_profiler_robs",
+      "name": "WIND_PROFILER/ROBS",
+      "name_en": "WIND_PROFILER/ROBS",
+      "name_zh": "风廓线雷达水平风观测",
       "isObservation": true,
       "layers": [
         {
-          "element": "ROBS",
           "id": "layer-wind_profiler_robs",
+          "name": "WIND_PROFILER/ROBS",
+          "name_en": "WIND_PROFILER/ROBS",
+          "name_zh": "风廓线雷达水平风观测",
+          "type": "profiler",
           "model": "WIND_PROFILER",
-          "name": "风廓线雷达水平风观测 / WIND_PROFILER/ROBS",
+          "element": "ROBS",
           "path": "WIND_PROFILER/ROBS",
+          "render": {
+            "colormap": "WIND",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
+            "lineColor": "#58a6ff"
+          },
           "product": "ROBS",
-          "renderRef": "profiler-1",
-          "stationId": "54511",
-          "type": "profiler"
+          "stationId": "54511"
         }
-      ],
-      "name": "风廓线雷达水平风观测 / WIND_PROFILER/ROBS"
+      ]
     },
     {
       "category": "预报员指导 (Forecaster Guidance)",
+      "category_en": "Forecaster Guidance",
+      "category_zh": "预报员指导",
       "hasLevel": false,
       "id": "preset-forecast_nmc_wind",
+      "name": "NMC Forecaster Max Wind",
+      "name_en": "NMC Forecaster Max Wind",
+      "name_zh": "中央气象台指导极大风",
       "isObservation": false,
       "layers": [
         {
-          "element": "NMC/WIND",
           "id": "layer-forecast_nmc_wind",
+          "name": "NMC Forecaster Max Wind",
+          "name_en": "NMC Forecaster Max Wind",
+          "name_zh": "中央气象台指导极大风",
+          "type": "wind",
           "model": "FORECAST_PRODUCT",
-          "name": "中央气象台指导极大风 / NMC Forecaster Max Wind",
+          "element": "NMC/WIND",
           "path": "FORECAST_PRODUCT/NMC/WIND",
-          "renderRef": "wind-1",
-          "type": "wind"
+          "render": {
+            "colormap": "WIND",
+            "showWind": false,
+            "showBarbs": true,
+            "showRaster": false,
+            "keepWind": true
+          }
         }
-      ],
-      "name": "中央气象台指导极大风 / NMC Forecaster Max Wind"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_gfs_cape",
+      "name": "GRAPES_GFS CAPE",
+      "name_en": "GRAPES_GFS CAPE",
+      "name_zh": "GRAPES_GFS对流有效位能",
       "isObservation": false,
       "layers": [
         {
-          "element": "CAPE/SURFACE",
           "id": "layer-grapes_gfs_cape",
+          "name": "GRAPES_GFS CAPE",
+          "name_en": "GRAPES_GFS CAPE",
+          "name_zh": "GRAPES_GFS对流有效位能",
+          "type": "contour",
           "model": "GRAPES_GFS",
-          "name": "GRAPES_GFS对流有效位能 / GRAPES_GFS CAPE",
+          "element": "CAPE/SURFACE",
           "path": "GRAPES_GFS/CAPE/SURFACE",
           "render": {
             "colormap": "CAPE",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#e3b341"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "GRAPES_GFS对流有效位能 / GRAPES_GFS CAPE"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_gfs_cin",
+      "name": "GRAPES_GFS CIN",
+      "name_en": "GRAPES_GFS CIN",
+      "name_zh": "GRAPES_GFS对流抑制能量",
       "isObservation": false,
       "layers": [
         {
-          "element": "CIN/SURFACE",
           "id": "layer-grapes_gfs_cin",
+          "name": "GRAPES_GFS CIN",
+          "name_en": "GRAPES_GFS CIN",
+          "name_zh": "GRAPES_GFS对流抑制能量",
+          "type": "contour",
           "model": "GRAPES_GFS",
-          "name": "GRAPES_GFS对流抑制能量 / GRAPES_GFS CIN",
+          "element": "CIN/SURFACE",
           "path": "GRAPES_GFS/CIN/SURFACE",
           "render": {
             "colormap": "CAPE",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#e3b341"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "GRAPES_GFS对流抑制能量 / GRAPES_GFS CIN"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_gfs_dcape",
+      "name": "GRAPES_GFS DCAPE",
+      "name_en": "GRAPES_GFS DCAPE",
+      "name_zh": "GRAPES_GFS下沉对流有效位能",
       "isObservation": false,
       "layers": [
         {
-          "element": "DCAPE",
           "id": "layer-grapes_gfs_dcape",
+          "name": "GRAPES_GFS DCAPE",
+          "name_en": "GRAPES_GFS DCAPE",
+          "name_zh": "GRAPES_GFS下沉对流有效位能",
+          "type": "contour",
           "model": "GRAPES_GFS",
-          "name": "GRAPES_GFS下沉对流有效位能 / GRAPES_GFS DCAPE",
+          "element": "DCAPE",
           "path": "GRAPES_GFS/DCAPE",
           "render": {
             "colormap": "CAPE",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#e3b341"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "GRAPES_GFS下沉对流有效位能 / GRAPES_GFS DCAPE"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_gfs_sweat",
+      "name": "GRAPES_GFS SWEAT_INDEX",
+      "name_en": "GRAPES_GFS SWEAT_INDEX",
+      "name_zh": "GRAPES_GFS强天气威胁指数",
       "isObservation": false,
       "layers": [
         {
-          "element": "SWEAT_INDEX",
           "id": "layer-grapes_gfs_sweat",
+          "name": "GRAPES_GFS SWEAT_INDEX",
+          "name_en": "GRAPES_GFS SWEAT_INDEX",
+          "name_zh": "GRAPES_GFS强天气威胁指数",
+          "type": "contour",
           "model": "GRAPES_GFS",
-          "name": "GRAPES_GFS强天气威胁指数 / GRAPES_GFS SWEAT_INDEX",
+          "element": "SWEAT_INDEX",
           "path": "GRAPES_GFS/SWEAT_INDEX",
           "render": {
             "colormap": "CAPE",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#e3b341"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "GRAPES_GFS强天气威胁指数 / GRAPES_GFS SWEAT_INDEX"
+      ]
     },
     {
       "category": "数值预报高影响要素 (High-Impact NWP Fields)",
+      "category_en": "High-Impact NWP Fields",
+      "category_zh": "数值预报高影响要素",
       "hasLevel": false,
       "id": "preset-grapes_gfs_k_index",
+      "name": "GRAPES_GFS K_INDEX",
+      "name_en": "GRAPES_GFS K_INDEX",
+      "name_zh": "GRAPES_GFS K指数",
       "isObservation": false,
       "layers": [
         {
-          "element": "K_INDEX",
           "id": "layer-grapes_gfs_k_index",
+          "name": "GRAPES_GFS K_INDEX",
+          "name_en": "GRAPES_GFS K_INDEX",
+          "name_zh": "GRAPES_GFS K指数",
+          "type": "contour",
           "model": "GRAPES_GFS",
-          "name": "GRAPES_GFS K指数 / GRAPES_GFS K_INDEX",
+          "element": "K_INDEX",
           "path": "GRAPES_GFS/K_INDEX",
           "render": {
             "colormap": "CAPE",
+            "showFill": true,
+            "showLine": true,
+            "lineWidth": 1.5,
             "lineColor": "#e3b341"
-          },
-          "renderRef": "contour-3",
-          "type": "contour"
+          }
         }
-      ],
-      "name": "GRAPES_GFS K指数 / GRAPES_GFS K_INDEX"
+      ]
     },
     {
       "category": "气象卫星遥感 (Satellite Remote Sensing)",
+      "category_en": "Satellite Remote Sensing",
+      "category_zh": "气象卫星遥感",
       "hasLevel": false,
       "id": "preset-fy2g_dust",
+      "name": "DUST RGB BMP",
+      "name_en": "DUST RGB BMP",
+      "name_zh": "沙尘真彩监测图",
       "isObservation": true,
       "layers": [
         {
-          "bounds": [45, 5, 155, 55],
-          "element": "FY2G/L2/DUST",
           "id": "layer-fy2g_dust",
+          "name": "DUST RGB BMP",
+          "name_en": "DUST RGB BMP",
+          "name_zh": "沙尘真彩监测图",
+          "type": "image",
           "model": "SATELLITE",
-          "name": "沙尘真彩监测图 / DUST RGB BMP",
+          "element": "FY2G/L2/DUST",
           "path": "SATELLITE/FY2G/L2/DUST",
           "render": {
             "colormap": "DUST",
+            "showRaster": true,
             "showFill": false,
-            "showLine": false,
-            "showRaster": true
+            "showLine": false
           },
-          "type": "image"
+          "bounds": [45, 5, 155, 55]
         }
-      ],
-      "name": "沙尘真彩监测图 / DUST RGB BMP"
+      ]
     },
     {
       "category": "气象卫星遥感 (Satellite Remote Sensing)",
+      "category_en": "Satellite Remote Sensing",
+      "category_zh": "气象卫星遥感",
       "hasLevel": false,
       "id": "preset-fy2g_ctt",
+      "name": "CTT (Cloud Top Temp)",
+      "name_en": "CTT (Cloud Top Temp)",
+      "name_zh": "云顶亮温(CTT)",
       "isObservation": true,
       "layers": [
         {
-          "element": "FY2G/L2/CTT",
           "id": "layer-fy2g_ctt",
+          "name": "CTT (Cloud Top Temp)",
+          "name_en": "CTT (Cloud Top Temp)",
+          "name_zh": "云顶亮温(CTT)",
+          "type": "contour",
           "model": "SATELLITE",
-          "name": "云顶亮温(CTT) / CTT (Cloud Top Temp)",
+          "element": "FY2G/L2/CTT",
           "path": "SATELLITE/FY2G/L2/CTT",
           "render": {
-            "colormap": "CTT"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "CTT",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "云顶亮温(CTT) / CTT (Cloud Top Temp)"
+      ]
     },
     {
       "category": "气象卫星遥感 (Satellite Remote Sensing)",
-      "defaultLevel": 200,
+      "category_en": "Satellite Remote Sensing",
+      "category_zh": "气象卫星遥感",
       "hasLevel": true,
       "id": "preset-fy2g_amv_ir1",
+      "name": "AMV IR1 (Wind Barbs)",
+      "name_en": "AMV IR1 (Wind Barbs)",
+      "name_zh": "云导风IR1",
       "isObservation": true,
       "layers": [
         {
-          "element": "FY2G/L2/AMV/IR1",
           "id": "layer-fy2g_amv_ir1",
-          "level": 200,
+          "name": "AMV IR1 (Wind Barbs)",
+          "name_en": "AMV IR1 (Wind Barbs)",
+          "name_zh": "云导风IR1",
+          "type": "station",
           "model": "SATELLITE",
-          "name": "云导风IR1 / AMV IR1 (Wind Barbs)",
+          "element": "FY2G/L2/AMV/IR1",
           "path": "SATELLITE/FY2G/L2/AMV/IR1",
-          "renderRef": "station-3",
-          "type": "station"
+          "render": {
+            "colormap": "WIND",
+            "showWind": true,
+            "showBarbs": true,
+            "showTemp": false,
+            "showPressure": false,
+            "showVisibility": false
+          },
+          "level": 200
         }
       ],
+      "defaultLevel": 200,
       "levels": [
         200,
         300,
         500,
         700,
         850
-      ],
-      "name": "云导风IR1 / AMV IR1 (Wind Barbs)"
+      ]
     },
     {
       "category": "气象卫星遥感 (Satellite Remote Sensing)",
-      "defaultLevel": 200,
+      "category_en": "Satellite Remote Sensing",
+      "category_zh": "气象卫星遥感",
       "hasLevel": true,
       "id": "preset-fy2g_amv_ir3",
+      "name": "AMV IR3 (Wind Barbs)",
+      "name_en": "AMV IR3 (Wind Barbs)",
+      "name_zh": "云导风IR3",
       "isObservation": true,
       "layers": [
         {
-          "element": "FY2G/L2/AMV/IR3",
           "id": "layer-fy2g_amv_ir3",
-          "level": 200,
+          "name": "AMV IR3 (Wind Barbs)",
+          "name_en": "AMV IR3 (Wind Barbs)",
+          "name_zh": "云导风IR3",
+          "type": "station",
           "model": "SATELLITE",
-          "name": "云导风IR3 / AMV IR3 (Wind Barbs)",
+          "element": "FY2G/L2/AMV/IR3",
           "path": "SATELLITE/FY2G/L2/AMV/IR3",
-          "renderRef": "station-3",
-          "type": "station"
+          "render": {
+            "colormap": "WIND",
+            "showWind": true,
+            "showBarbs": true,
+            "showTemp": false,
+            "showPressure": false,
+            "showVisibility": false
+          },
+          "level": 200
         }
       ],
+      "defaultLevel": 200,
       "levels": [
         200,
         300,
         500,
         700,
         850
-      ],
-      "name": "云导风IR3 / AMV IR3 (Wind Barbs)"
+      ]
     },
     {
       "category": "气象卫星遥感 (Satellite Remote Sensing)",
+      "category_en": "Satellite Remote Sensing",
+      "category_zh": "气象卫星遥感",
       "hasLevel": false,
       "id": "preset-fy2g_qpe001",
+      "name": "QPE001 (1h Sat Rain)",
+      "name_en": "QPE001 (1h Sat Rain)",
+      "name_zh": "1小时卫星降水估测",
       "isObservation": true,
       "layers": [
         {
-          "element": "FY2G/L2/QPE001",
           "id": "layer-fy2g_qpe001",
+          "name": "QPE001 (1h Sat Rain)",
+          "name_en": "QPE001 (1h Sat Rain)",
+          "name_zh": "1小时卫星降水估测",
+          "type": "contour",
           "model": "SATELLITE",
-          "name": "1小时卫星降水估测 / QPE001 (1h Sat Rain)",
+          "element": "FY2G/L2/QPE001",
           "path": "SATELLITE/FY2G/L2/QPE001",
           "render": {
-            "colormap": "QPE"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "QPE",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "1小时卫星降水估测 / QPE001 (1h Sat Rain)"
+      ]
     },
     {
       "category": "气象卫星遥感 (Satellite Remote Sensing)",
+      "category_en": "Satellite Remote Sensing",
+      "category_zh": "气象卫星遥感",
       "hasLevel": false,
       "id": "preset-fy2g_qpe003",
+      "name": "QPE003 (3h Sat Rain)",
+      "name_en": "QPE003 (3h Sat Rain)",
+      "name_zh": "3小时卫星降水估测",
       "isObservation": true,
       "layers": [
         {
-          "element": "FY2G/L2/QPE003",
           "id": "layer-fy2g_qpe003",
+          "name": "QPE003 (3h Sat Rain)",
+          "name_en": "QPE003 (3h Sat Rain)",
+          "name_zh": "3小时卫星降水估测",
+          "type": "contour",
           "model": "SATELLITE",
-          "name": "3小时卫星降水估测 / QPE003 (3h Sat Rain)",
+          "element": "FY2G/L2/QPE003",
           "path": "SATELLITE/FY2G/L2/QPE003",
           "render": {
-            "colormap": "QPE"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "QPE",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "3小时卫星降水估测 / QPE003 (3h Sat Rain)"
+      ]
     },
     {
       "category": "气象卫星遥感 (Satellite Remote Sensing)",
+      "category_en": "Satellite Remote Sensing",
+      "category_zh": "气象卫星遥感",
       "hasLevel": false,
       "id": "preset-fy2g_qpe006",
+      "name": "QPE006 (6h Sat Rain)",
+      "name_en": "QPE006 (6h Sat Rain)",
+      "name_zh": "6小时卫星降水估测",
       "isObservation": true,
       "layers": [
         {
-          "element": "FY2G/L2/QPE006",
           "id": "layer-fy2g_qpe006",
+          "name": "QPE006 (6h Sat Rain)",
+          "name_en": "QPE006 (6h Sat Rain)",
+          "name_zh": "6小时卫星降水估测",
+          "type": "contour",
           "model": "SATELLITE",
-          "name": "6小时卫星降水估测 / QPE006 (6h Sat Rain)",
+          "element": "FY2G/L2/QPE006",
           "path": "SATELLITE/FY2G/L2/QPE006",
           "render": {
-            "colormap": "QPE"
-          },
-          "renderRef": "contour-4",
-          "type": "contour"
+            "colormap": "QPE",
+            "showRaster": true,
+            "showFill": false,
+            "showLine": false
+          }
         }
-      ],
-      "name": "6小时卫星降水估测 / QPE006 (6h Sat Rain)"
+      ]
     }
   ],
   "renderProfiles": {

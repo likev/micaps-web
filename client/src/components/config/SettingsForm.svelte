@@ -28,11 +28,20 @@
 
   let basemap = $derived(draft.basemap || {});
   import { setGlobalTheme } from "../../lib/stores/theme.svelte.js";
+  import { getGlobalLocale, setGlobalLocale } from "../../lib/stores/i18n.svelte.js";
 
   let perf = $derived(draft.performance || {});
   let scheme = $derived(draft.theme || basemap.scheme || "dark");
   let projection = $derived(basemap.projection || "mercator");
+  let locale = $derived(draft.locale || getGlobalLocale());
   let cells = $derived(Number.isFinite(perf.maxEffectiveCells) ? perf.maxEffectiveCells : DEFAULT_MAX_EFFECTIVE_CELLS);
+
+  function setLocale(newLocale) {
+    formState.updateDraft((d) => {
+      d.locale = newLocale;
+    });
+    setGlobalLocale(newLocale);
+  }
 
   function setScheme(newScheme) {
     formState.updateDraft((d) => {
@@ -214,6 +223,45 @@
           Allowed bounds: {MIN_MAX_EFFECTIVE_CELLS.toLocaleString()} – {MAX_MAX_EFFECTIVE_CELLS.toLocaleString()} cells.
           Default: {DEFAULT_MAX_EFFECTIVE_CELLS.toLocaleString()}. Higher values increase contour resolution on fine grids at the cost of CPU/memory.
         </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Language Card -->
+  <div class="config-card mt-16">
+    <div class="config-card-header">
+      <h3>🌐 Language / 语言</h3>
+      <p class="config-card-desc">User interface display language and category localization.</p>
+    </div>
+    <div class="config-card-body">
+      <div class="config-field-group">
+        <span class="config-label">Display Language</span>
+        <div class="config-radio-cards" id="settings-language-options">
+          <label class="radio-card" class:selected={locale === "en"}>
+            <input
+              type="radio"
+              name="app-language"
+              value="en"
+              checked={locale === "en"}
+              onchange={() => setLocale("en")}
+            />
+            <span class="radio-card-icon">🇺🇸</span>
+            <span class="radio-card-title">English</span>
+            <span class="radio-card-sub">EN</span>
+          </label>
+          <label class="radio-card" class:selected={locale === "zh"}>
+            <input
+              type="radio"
+              name="app-language"
+              value="zh"
+              checked={locale === "zh"}
+              onchange={() => setLocale("zh")}
+            />
+            <span class="radio-card-icon">🇨🇳</span>
+            <span class="radio-card-title">中文</span>
+            <span class="radio-card-sub">简体</span>
+          </label>
+        </div>
       </div>
     </div>
   </div>

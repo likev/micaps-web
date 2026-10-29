@@ -10,6 +10,31 @@
     1000, 925, 850, 700, 500, 400, 300, 250, 200, 150, 100, 70, 50, 30, 20, 10,
   ];
 
+  function formatPresetLevel(p) {
+    if (!p || p.defaultLevel == null) return "";
+    const id = String(p.id || "").toUpperCase();
+    const firstPath = String(p.layers?.[0]?.path || "").toUpperCase();
+    if (id.includes("FY4B") || firstPath.includes("FY4B")) {
+      return `C${String(p.defaultLevel).padStart(3, "0")}`;
+    }
+    if (id.includes("TDMOSAIC") || firstPath.includes("TDMOSAIC") || (Array.isArray(p.levels) && p.levels.some((l) => l > 1050))) {
+      return `${p.defaultLevel} m`;
+    }
+    return `${p.defaultLevel} hPa`;
+  }
+
+  function formatLayerLevel(l, p) {
+    if (!l || l.level == null) return "";
+    const path = String(l.path || l.element || p?.id || "").toUpperCase();
+    if (path.includes("FY4B")) {
+      return `C${String(l.level).padStart(3, "0")}`;
+    }
+    if (path.includes("TDMOSAIC") || (Array.isArray(p?.levels) && p.levels.some((lvl) => lvl > 1050))) {
+      return `${l.level}m`;
+    }
+    return `${l.level}hPa`;
+  }
+
   let draft = $state({
     ...formState.getDraft(),
     presets: [...(formState.getDraft()?.presets || [])],
@@ -270,7 +295,7 @@
               <div class="sidebar-item-sub">
                 <span>{item.category || "General"}</span>
                 {#if item.hasLevel !== false && item.defaultLevel}
-                  <span>• {item.defaultLevel} hPa</span>
+                  <span>• {formatPresetLevel(item)}</span>
                 {/if}
               </div>
             </div>
@@ -433,7 +458,7 @@
                         <span class="layer-meta-name">{layer.name || layer.id}</span>
                         <span class="sidebar-item-chip type-{layer.type || 'contour'}">{layer.type || "contour"}</span>
                         <span class="layer-meta-sub">
-                          {layer.model || ""}/{layer.element || ""}{layer.level ? ` (${layer.level}hPa)` : ""}{layer.derivedFrom ? ` [derived: ${layer.derivedFrom}]` : ""}
+                          {layer.model || ""}/{layer.element || ""}{layer.level ? ` (${formatLayerLevel(layer, selectedEntry)})` : ""}{layer.derivedFrom ? ` [derived: ${layer.derivedFrom}]` : ""}
                         </span>
                       </div>
 

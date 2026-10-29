@@ -2,9 +2,11 @@
   import { ensureLayerFilterRules } from "../ui/stationFilterControl.js";
   import { getViewAutoCheckPatch } from "../layers/station/stationFilter.js";
   import { isUpperAirStationLayer, getStationDatasetType } from "../ui/layers/layerDefaults.js";
+  import { getGlobalLocale } from "../lib/stores/i18n.svelte.js";
 
   let { layer, onFilterChange = null } = $props();
 
+  let currentLocale = $derived(getGlobalLocale());
   let currentLayerId = $state(null);
   let rules = $state([]);
   let logic = $state("AND");
@@ -153,32 +155,32 @@
           bind:value={rule.field}
           onchange={update}
         >
-          <option value="none">No Filter</option>
+          <option value="none">{currentLocale === "zh" ? "无过滤" : "No Filter"}</option>
           {#if stationType === "snow_depth"}
-            <option value="SnowDepth">Snow Depth (积雪深度)</option>
+            <option value="SnowDepth">{currentLocale === "zh" ? "积雪深度" : "Snow Depth"}</option>
           {:else if stationType === "pres_change_3h"}
-            <option value="PressDiff3h">3h Pressure Change (3小时变压)</option>
+            <option value="PressDiff3h">{currentLocale === "zh" ? "3小时变压" : "3h Pressure Change"}</option>
           {:else if stationType === "pres_change_24h"}
-            <option value="PressDiff24h">24h Pressure Change (24小时变压)</option>
+            <option value="PressDiff24h">{currentLocale === "zh" ? "24小时变压" : "24h Pressure Change"}</option>
           {:else if stationType === "visibility"}
-            <option value="Visibility">Visibility (能见度)</option>
+            <option value="Visibility">{currentLocale === "zh" ? "能见度" : "Visibility"}</option>
           {:else if stationType === "amv"}
-            <option value="Wind">Wind Speed (风速)</option>
+            <option value="Wind">{currentLocale === "zh" ? "风速" : "Wind Speed"}</option>
           {:else if upper}
-            <option value="Height">Height (位势高度)</option>
-            <option value="TT">Temperature (温度)</option>
-            <option value="Td">Dewpoint (露点)</option>
-            <option value="DTD">T-Td (温度露点差)</option>
-            <option value="Wind">Wind Speed (风速)</option>
+            <option value="Height">{currentLocale === "zh" ? "位势高度" : "Height"}</option>
+            <option value="TT">{currentLocale === "zh" ? "温度" : "Temperature"}</option>
+            <option value="Td">{currentLocale === "zh" ? "露点" : "Dewpoint"}</option>
+            <option value="DTD">{currentLocale === "zh" ? "温度露点差" : "T-Td"}</option>
+            <option value="Wind">{currentLocale === "zh" ? "风速" : "Wind Speed"}</option>
           {:else}
-            <option value="TT">Temperature (气温)</option>
-            <option value="Td">Dewpoint (露点)</option>
-            <option value="SLP">Sea-Level Pressure (气压)</option>
-            <option value="Wind">Wind Speed (风速)</option>
-            <option value="Rain">Rain 1h (降水)</option>
-            <option value="Rain6">Rain 6h (降水)</option>
-            <option value="DTD">T-Td (露点差)</option>
-            <option value="Visibility">Visibility (能见度)</option>
+            <option value="TT">{currentLocale === "zh" ? "气温" : "Temperature"}</option>
+            <option value="Td">{currentLocale === "zh" ? "露点" : "Dewpoint"}</option>
+            <option value="SLP">{currentLocale === "zh" ? "气压" : "Sea-Level Pressure"}</option>
+            <option value="Wind">{currentLocale === "zh" ? "风速" : "Wind Speed"}</option>
+            <option value="Rain">{currentLocale === "zh" ? "1小时降水" : "Rain 1h"}</option>
+            <option value="Rain6">{currentLocale === "zh" ? "6小时降水" : "Rain 6h"}</option>
+            <option value="DTD">{currentLocale === "zh" ? "露点差" : "T-Td"}</option>
+            <option value="Visibility">{currentLocale === "zh" ? "能见度" : "Visibility"}</option>
           {/if}
         </select>
 

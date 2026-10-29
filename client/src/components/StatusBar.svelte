@@ -14,11 +14,32 @@
     formatForecastValidTime,
   } from "../utils/formatters.js";
   import { getWindowById } from "../lib/stores/tabs.svelte.js";
-  import { formatStepLabel } from "../lib/stores/timelineMath.js";
+  import { getLayersForWindow } from "../lib/stores/layers.svelte.js";
+  import { formatStepLabel, isSatelliteGroup } from "../lib/stores/timelineMath.js";
   import { cursorProbeState } from "../lib/stores/cursorProbe.svelte.js";
   import { reapplyLightingCompensation } from "../services/lightingController.js";
 
   let { winId = "default", onTimeChange = null, onToggleLighting = null } = $props();
+
+  let activeWin = $derived(winId ? getWindowById(winId) : null);
+  let winLayers = $derived(winId ? getLayersForWindow(winId) : []);
+  let hasWeatherLayers = $derived(
+    Array.isArray(winLayers) && winLayers.some((l) => l && l.type !== "pmtiles" && !String(l.id || "").startsWith("layer-pmtiles"))
+  );
+  let showTimelineInfo = $derived(
+    Boolean(ui.timelineVisible && !ui.configOpen && (activeWin?.activeGroup || hasWeatherLayers))
+  );
+
+  let isSatellite = $derived.by(() => {
+    if (!activeWin) return false;
+    if (isSatelliteGroup(activeWin.activeGroup)) return true;
+    if (activeWin.model === "SATELLITE") return true;
+    return Array.isArray(winLayers) && winLayers.some((l) =>
+      l?.model === "SATELLITE" ||
+      l?.type === "image" ||
+      /SATELLITE|FY4|FY-4|FY2|FY-2/i.test(String(l?.path || l?.element || l?.id || ""))
+    );
+  });
 
   $effect(() => {
     if (winId && !timelinesByWindow[winId]) {
@@ -130,7 +151,7 @@
   </div>
 
   <!-- Lighting Compensation toggle button: placed immediately left of status-bar-center -->
-  <div class="status-bar-lighting">
+  <div class="status-bar-lighting" class:hidden={!isSatellite || ui.configOpen} hidden={!isSatellite || ui.configOpen}>
     <button
       id="btn-toggle-lighting"
       type="button"
@@ -161,7 +182,12 @@
 
   <!-- Center section: timeline-info -->
   <div class="status-bar-center">
-    <div class="timeline-info" aria-label="Timeline Status">
+    <div
+      class="timeline-info"
+      class:hidden={!showTimelineInfo}
+      hidden={!showTimelineInfo}
+      aria-label="Timeline Status"
+    >
       {#if app.historyMode && app.historyDate}
         <span id="status-history-badge" class="history-badge" title="History Mode Cutoff: {app.historyDate} 24:00">
           HISTORY · {app.historyDate}
@@ -423,6 +449,14 @@
     min-width: 0;
   }
 
+  .timeline-info.hidden {
+    display: none !important;
+  }
+
+  .status-bar-lighting.hidden {
+    display: none !important;
+  }
+
   .history-badge {
     padding: 1px 6px;
     border-radius: 3px;
@@ -488,15 +522,15 @@
   }
 
   .lead-prefix {
-    color: #8b949e;
+    color: var(--text-secondary, #8b949e);
   }
 
   #sl-time-lead-label {
-    color: #e6edf3;
+    color: var(--text-primary, #e6edf3);
   }
 
   .valid-label {
-    color: #8b949e;
+    color: var(--text-secondary, #8b949e);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -527,7 +561,7 @@
   }
 
   .status-text {
-    color: #8b949e;
+    color: var(--text-secondary, #8b949e);
     font-size: 11px;
   }
 
@@ -552,7 +586,7 @@
   }
 
   .probe-coords {
-    color: #79c0ff;
+    color: var(--accent-blue, #58a6ff);
     font-weight: 600;
   }
 

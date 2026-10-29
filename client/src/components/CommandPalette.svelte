@@ -3,6 +3,7 @@
   import { ui } from "../lib/stores/ui.svelte.js";
   import { searchStations, jumpToStation } from "../utils/stationJump.js";
   import { setGlobalTheme, setGlobalProjection } from "../lib/stores/theme.svelte.js";
+  import { getGlobalLocale, setGlobalLocale, localizeEntityName, localizeCategory } from "../lib/stores/i18n.svelte.js";
   import { captureScreenshot, handlePrint } from "../utils/screenshot.js";
   import { isDivider, PRESET_GROUPS } from "../config/presets.js";
   import { mapInstances } from "../lib/stores/tabs.svelte.js";
@@ -20,6 +21,7 @@
   let inputRef = $state(null);
   let resultsContainerRef = $state(null);
 
+  let currentLocale = $derived(getGlobalLocale());
   let effectivePresets = $derived(presetGroups && presetGroups.length > 0 ? presetGroups : PRESET_GROUPS);
 
   const ACTIONS = [
@@ -39,6 +41,8 @@
     { id: "act-proj-mercator", title: "Projection: Mercator (2D)", category: "Projection", icon: "🗺️", execute: () => setGlobalProjection("mercator") },
     { id: "act-proj-globe", title: "Projection: Globe (3D)", category: "Projection", icon: "🌐", execute: () => setGlobalProjection("globe") },
     { id: "act-proj-perspective", title: "Projection: Vertical Perspective", category: "Projection", icon: "🪐", execute: () => setGlobalProjection("vertical-perspective") },
+    { id: "act-lang-en", title: "Language: English", category: "Language", icon: "🇺🇸", execute: () => setGlobalLocale("en") },
+    { id: "act-lang-zh", title: "Language: 中文 (Simplified Chinese)", category: "Language", icon: "🇨🇳", execute: () => setGlobalLocale("zh") },
   ];
 
   let filteredResults = $derived.by(() => {
@@ -55,15 +59,19 @@
     // 2. Presets match
     const validPresets = (effectivePresets || []).filter((g) => g && !isDivider(g));
     for (const p of validPresets) {
-      const nameMatch = p.name && p.name.toLowerCase().includes(q);
-      const catMatch = p.category && p.category.toLowerCase().includes(q);
+      const nameMatch = (p.name && p.name.toLowerCase().includes(q)) ||
+        (p.name_en && p.name_en.toLowerCase().includes(q)) ||
+        (p.name_zh && p.name_zh.toLowerCase().includes(q));
+      const catMatch = (p.category && p.category.toLowerCase().includes(q)) ||
+        (p.category_en && p.category_en.toLowerCase().includes(q)) ||
+        (p.category_zh && p.category_zh.toLowerCase().includes(q));
       const idMatch = p.id && p.id.toLowerCase().includes(q);
       if (!q || nameMatch || catMatch || idMatch) {
         list.push({
           type: "preset",
           id: p.id,
-          title: p.name,
-          subtitle: p.category || "Preset",
+          title: localizeEntityName(p, currentLocale),
+          subtitle: localizeCategory(p.category || (currentLocale === "zh" ? p.category_zh : p.category_en) || "Preset", currentLocale),
           icon: "📊",
           preset: p,
           execute: () => {

@@ -2,6 +2,7 @@
 import { formatObsTimestamp, formatForecastValidTime } from "../../utils/formatters.js";
 import { getActiveTab } from "./tabsStore.js";
 import { DEFAULT_MODELS } from "../../lib/stores/tabsCore.js";
+import { getGlobalLocale, localizeEntityName, splitBilingualString } from "../../lib/stores/i18nCore.js";
 
 let defaultTabResolver = null;
 
@@ -11,11 +12,16 @@ export function setDefaultTabResolver(resolver) {
 
 export function computeFullWindowTitle(win, baseText = null, isModelAlloc = null) {
   if (!win) return "";
-  let base = (baseText !== null && baseText !== undefined) ? baseText : win.baseTitle;
+  const locale = typeof getGlobalLocale === "function" ? getGlobalLocale() : "en";
+  let base = (baseText !== null && baseText !== undefined) ? baseText : null;
   if (!base) {
-    base = win.activeGroup ? win.activeGroup.name : (win.title || "");
+    base = win.activeGroup ? localizeEntityName(win.activeGroup, locale) : (win.baseTitle || win.title || "");
   }
   if (!base) return "";
+  base = splitBilingualString(base, locale);
+  if (win.activeGroup?.hasLevel && win.level != null && /\d+\s*hPa/i.test(base)) {
+    base = base.replace(/\d+\s*hPa/i, `${win.level} hPa`);
+  }
 
   // Strip any stale "Wn: " window prefix so drag-reorder never bakes it in.
   base = String(base).replace(/^W\d+:\s*/, "").trim();

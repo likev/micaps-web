@@ -462,7 +462,22 @@ export function resolveContrastInitiator(tab, baseWin = null) {
 export function computeAllocBadgeText(win, mode, slotIdx = 0) {
   if (!win || !mode || mode === "none") return null;
   if (mode === "level") {
-    return win.level != null ? `${win.level}hPa` : "SFC";
+    if (win.level == null) return "SFC";
+    const isFy4b =
+      win.model === "SATELLITE" ||
+      /FY4B/i.test(String(win.activeGroup?.id || "")) ||
+      (Array.isArray(win.layers) && win.layers.some((l) => /FY4B/i.test(String(l?.path || l?.element || ""))));
+    if (isFy4b) {
+      return `C${String(win.level).padStart(3, "0")}`;
+    }
+    const isMeterHeight =
+      /TDMOSAIC/i.test(String(win.activeGroup?.id || "")) ||
+      (Array.isArray(win.levels) && win.levels.some((l) => l > 1050)) ||
+      (Array.isArray(win.layers) && win.layers.some((l) => /TDMOSAIC/i.test(String(l?.path || l?.element || ""))));
+    if (isMeterHeight) {
+      return `${win.level}m`;
+    }
+    return `${win.level}hPa`;
   }
   if (mode === "model") {
     const raw = String(win.model || "");
