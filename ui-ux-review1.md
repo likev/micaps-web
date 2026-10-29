@@ -7,9 +7,9 @@
 
 ## Executive Summary
 
-This review covers **13 UI/UX issues** identified in the `micaps-web` client:
+This review covers **14 UI/UX issues** identified in the `micaps-web` client:
 - **Part I (Issues 1–7)** addresses the **7 core UI/UX issues** explicitly flagged for review, with exact file/line citations, root-cause analysis, unit-test impact notes, and drop-in code fixes.
-- **Part II (Issues 8–13)** documents **6 additional high-impact UI/UX bugs** uncovered during the full client inspection (unreachable camera-sync button in split mode, wrong `hPa` unit suffixes in window headers, broken Light/Brutalism theme selectors on modals, invalid contrast-mode guards for satellite/radar/single-level presets, duplicate presets in `config.json`, and loop-range markers disappearing when paused).
+- **Part II (Issues 8–14)** documents **7 additional high-impact UI/UX bugs** uncovered during the client inspection and follow-up review (unreachable camera-sync button in split mode, wrong `hPa` unit suffixes in window headers, broken Light/Brutalism theme selectors on modals, invalid contrast-mode guards for satellite/radar/single-level presets, duplicate presets in `config.json`, loop-range markers disappearing when paused, and sparse/missing latest timeline chips on high-frequency observation layers when changing step lengths).
 
 | # | Category | Issue Summary | Primary Files | Severity |
 | :- | :--- | :--- | :--- | :--- |
@@ -26,6 +26,7 @@ This review covers **13 UI/UX issues** identified in the `micaps-web` client:
 | **11** | Contrast Mode | Auto-allocation (`model` / `level` / `step`) is not disabled for Satellite, Radar, and single-level (`hasLevel: false`) presets | `NavBar.svelte:113-132, 599-617`, `TabsBar.svelte:59-70`, `App.svelte:1917-1924` | Medium |
 | **12** | Preset Catalog | 30+ duplicate presets in `client/config.json` due to `gen-presets.mjs` appending `preset-*` duplicates alongside hand-authored IDs | `scripts/gen-presets.mjs:563-568`, `client/config.json` | Medium |
 | **13** | Timeline UX | Loop markers `A`/`B` in `TimeSlider.svelte` are tied to `playback.isPlaying`, preventing loop range adjustment while paused | `TimeSlider.svelte:303, 323, 372, 660, 721` | Low |
+| **14** | Timeline Chips & Step Switching | Too few `.timeline-chip` items for high-cadence layers (e.g., Satellite/Radar) when `Step` is `12h` or `24h`, and the latest chip is hidden when switching to a finer step (e.g., `3h` → `15min`) | `timelineSync.js:312-339`, `timelineMath.js:28-41, 102-226`, `TimeSlider.svelte:228-244`, `timeSliderView.js:275-295`, `weatherLoader.js:122-134`, `presetLoader.js:325-621` | High |
 
 ---
 
@@ -837,7 +838,7 @@ if (showStationId && stationIdText) {
 
 ---
 
-## Part II: Additional UI/UX Issues Found Across the Client (8–13)
+## Part II: Additional UI/UX Issues Found Across the Client (8–14)
 
 ---
 
@@ -1042,3 +1043,227 @@ This creates a Catch-22 for the user:
 #### Fix Suggestion
 - Do not overwrite `timeline.loopRange.active = false` inside `pause()` (`TimeSlider.svelte:322-324`) if the user has customized a loop range (or provide an explicit loop toggle button in `TimeSlider.svelte` matching `MultiTrackTimeline.svelte:866`).
 - Derive `let isLooping = $derived(Boolean(playback.isPlaying || timeline.loopRange?.active));` (`TimeSlider.svelte:372`) so that when a loop range is active, the `A` and `B` handles remain visible and draggable while paused.
+
+---
+
+### Issue 14: Too Few `.timeline-chip` Items for Satellite / High-Cadence Layers When `Step` Is `12h` or `24h`, and Latest Chip Is Not Shown When Changing `Step` (e.g., `3h` → `15min`)
+
+#### Affected Files
+- `client/src/utils/timelineSync.js:312-339` (`syncObservationTimeline` `fetchTree` limit & `.slice(-100)`)
+- `client/src/ui/timeline/timelineMath.js:28-41` (`selectObsChipsWindow`)
+- `client/src/ui/timeline/timelineMath.js:102-226` (`filterObsFilesByStep`)
+- `client/src/components/TimeSlider.svelte:184-245` (`handleStepLengthChange`)
+- `client/src/ui/timeline/timeSliderView.js:275-295` (`setStepLength`)
+- `client/src/services/weatherLoader.js:122-134` (`loadWeatherField` `fetchTree` limit)
+- `client/src/services/presetLoader.js:325, 412, 537, 621` (`loadPresetGroup` `fetchTree` limit)
+- `server/handler/catalog_handler.go:90-107` (MockMode satellite file count)
+
+#### Problem Analysis
+
+Issue 14 consists of **two closely related timeline bugs** affecting satellite (`FY-4B`, `FY-2G`) and other high-cadence observation layers (`SWAN_PRODUCT`, `SURFACE/PLOT_10MIN`, `WIND_PROFILER`, `LIGHTNING`):
+
+---
+
+##### Part A: Why There Are Too Few `.timeline-chip` Items When `Step` Is `12h` or `24h`
+
+1. **Hardcoded `limit = 100` in `fetchTree` and `chronologicalFiles.slice(-100)` Truncates Multi-Day History for Sub-Hourly Products (`client/src/utils/timelineSync.js:312, 328`)**:
+   ```js
+   // client/src/utils/timelineSync.js:312, 326-328
+   const fileEntries = await fetchTree(path, 100, treeOpts);
+   ...
+   const rawFiles = isMockFallback && chronologicalFiles.length < 2
+     ? [...mockObsFiles]
+     : chronologicalFiles.slice(-100);
+   ```
+   - `MAX_OBS_CHIPS` is `10`. For a 3-hourly synoptic dataset (`DEFAULT_MOCK_OBS_FILES`), 100 files spans `300 hours` (`12.5 days`), which easily fills 10 chips at `12h` (`5 days`) and `24h` (`10 days`).
+   - However, high-cadence observation products generate **96 to 288+ files per day**:
+     - **FY-4B Satellite (`SATELLITE/FY4B/L1/CHINA/*`, `DISK/*`, 15m cadence = 96–165 files/day)**: `100` files covers **only 15 to 25 hours (~1 day)**!
+       - At `Step = 12h`, a 25-hour window contains at most **2** files (`00:00` and `12:00`) → **only 2 `.timeline-chip`s** render!
+       - At `Step = 24h`, a 25-hour window contains at most **1–2** files (`00:00`) → **only 1–2 `.timeline-chip`s** render!
+     - **SWAN Radar (`SWAN_PRODUCT/*`, 6m cadence = 240 files/day)**: `100` files covers **only 10 hours** → **only 1–2 chips** at `6h` and **1 chip** at `12h`/`24h`!
+     - **Sub-Hourly Surface / Profiler (`SURFACE/PLOT_10MIN`, `SURFACE/LIGHTNING_10MIN`, `WIND_PROFILER/*`, 5–10m cadence = 144–288 files/day)**: `100` files covers **only 8–16.6 hours** → **only 1–2 chips** at `12h`/`24h`!
+     - **1-Hour Products (`SATELLITE/FY2G/L2/*`, `CLDAS/*`, `SURFACE/PLOT_ALL`, 24 files/day)**: `100` files covers **only 4.1 days** → **only 4 chips** at `24h` and **8 chips** at `12h`!
+     - **Server MockMode (`server/handler/catalog_handler.go:97`)**: Only generates `40` satellite files (`10 hours`), yielding **only 1 chip** at `12h` and `24h`.
+
+2. **Strict `getFileMin(f) === 0` Clock-Grid Filter and Forward-From-Oldest Fallback in `filterObsFilesByStep` (`client/src/ui/timeline/timelineMath.js:188-225`)**:
+   ```js
+   // client/src/ui/timeline/timelineMath.js:190-225
+   if (stepNum === 12) {
+     const standard12 = files.filter((f) => getFileMin(f) === 0 && getFileHour(f) % 12 === 0);
+     if (standard12.length >= 2) return standard12;
+     const synoptic12 = files.filter((f) => (getFileHour(f) === 8 || getFileHour(f) === 20) && getFileMin(f) === 0);
+     if (synoptic12.length >= 2) return synoptic12;
+   }
+
+   if (stepNum === 24) {
+     const standard24 = files.filter((f) => getFileMin(f) === 0 && getFileHour(f) === 0);
+     if (standard24.length >= 2) return standard24;
+     const synoptic24 = files.filter((f) => getFileHour(f) === 8 && getFileMin(f) === 0);
+     if (synoptic24.length >= 2) return synoptic24;
+   }
+
+   const hourlyFiles = files.filter((f) => getFileMin(f) === 0);
+   const candidates = hourlyFiles.length >= 2 ? hourlyFiles : files;
+
+   const filtered = [];
+   let lastTimeMs = 0;
+   const minIntervalMs = stepNum * 3600000 - 60000;
+   for (const file of candidates) {
+     const timeMs = parseTimestamp(file);
+     if (timeMs !== null) {
+       if (lastTimeMs === 0 || Math.abs(timeMs - lastTimeMs) >= minIntervalMs) {
+         filtered.push(file);
+         lastTimeMs = timeMs;
+       }
+     } else {
+       filtered.push(file);
+     }
+   }
+   ```
+   - When a dataset's server archive only spans ~24–48 hours (e.g., `Oct 26 21:00` to `Oct 27 21:00`), there is only **1** `00:00` midnight file in that 24-hour span (`standard24.length === 1 < 2`).
+   - When it falls through to the interval loop (`:211-224`), the loop steps **forward from the oldest file `candidates[0]`**, picking `[Oct 26 21:00, Oct 27 21:00]` (or only `[candidates[0]]` if the span is 23h 45m like `00:00..23:45`), **dropping the latest file** whenever the span is not an exact multiple of `stepNum`!
+   - Even when `standard12` matches `[00:00, 12:00]` on a 24-hour file list (`00:00..23:45`), it returns **only 2 chips** and excludes `23:45` (leaving the rightmost chip 11h 45m behind the latest observation).
+
+---
+
+##### Part B: Why the Latest `.timeline-chip` Does Not Show When Changing `Step` (e.g., from `3h` to `15min`)
+
+Look at the exact execution path when a user loads a satellite layer (default `Step = 3h`) and changes `Step` from `3h` to `15min` (`0.25`):
+
+1. **Initial Load at `Step = 3h` Snaps to the Last `3h`-Aligned Hour (`21:00`), Not the True Latest Scan (`23:45`)**:
+   - Suppose `tl.rawObsFiles` contains 15-minute `FY-4B` scans from `00:00` to **`23:45`**.
+   - On initial load (`defaultStep = 3`), `filterObsFilesByStep(rawObsFiles, 3)` filters for `getFileMin(f) === 0 && getFileHour(f) % 3 === 0`, returning `[00:00, 03:00, 06:00, 09:00, 12:00, 15:00, 18:00, 21:00]`.
+   - The active chip is the rightmost (`3h`-latest) chip: **`21:00`** (`tl.currentObsIdx === tl.obsFiles.length - 1`), even though `tl.rawObsFiles` has **11 newer scans** (`21:15, 21:30, ..., 23:45`).
+
+2. **`handleStepLengthChange` (`TimeSlider.svelte:229-238`) and `setStepLength` (`timeSliderView.js:276-284`) Center `selectObsChipsWindow` Around `curFile` (`21:00`), Slicing Off the Tail (`22:15 .. 23:45`)**:
+   ```js
+   // client/src/components/TimeSlider.svelte:229-238
+   const curFile = obsFiles[tl.currentObsIdx] || "";
+   const allFiltered = filterObsFilesByStep(tl.rawObsFiles, step, tl.isUpperAirMode);
+   let targetFile = curFile;
+   if (allFiltered.length > 0 && curFile && !allFiltered.includes(curFile)) {
+     targetFile = findClosestFile(allFiltered, curFile);
+   }
+   tl.obsFiles = selectObsChipsWindow(allFiltered, targetFile);
+   const newIdx = targetFile ? tl.obsFiles.indexOf(targetFile) : -1;
+   tl.currentObsIdx = newIdx !== -1 ? newIdx : Math.max(0, tl.obsFiles.length - 1);
+   ```
+   And in `selectObsChipsWindow` (`client/src/ui/timeline/timelineMath.js:28-41`):
+   ```js
+   export function selectObsChipsWindow(files, targetFile = "") {
+     if (!Array.isArray(files) || files.length <= MAX_OBS_CHIPS) {
+       return Array.isArray(files) ? [...files] : [];
+     }
+     const idx = targetFile ? files.indexOf(targetFile) : -1;
+     if (idx === -1) {
+       return files.slice(-MAX_OBS_CHIPS);
+     }
+     let start = Math.max(0, idx - Math.floor(MAX_OBS_CHIPS / 2));
+     if (start + MAX_OBS_CHIPS > files.length) {
+       start = files.length - MAX_OBS_CHIPS;
+     }
+     return files.slice(start, start + MAX_OBS_CHIPS);
+   }
+   ```
+   - When the user changes `Step` from `3h` to `15min` (`0.25`):
+     - `curFile` is `"C012_20261027210000_FY4B.AWX"` (`21:00`).
+     - `allFiltered` has 96 files (`00:00` at index `0` through `23:45` at index `95`).
+     - Because `"C012_20261027210000_FY4B.AWX"` (`21:00`) is in `allFiltered` at `idx = 84`, `targetFile` remains `"21:00"`.
+     - `selectObsChipsWindow(allFiltered, "21:00")` computes `start = 84 - 5 = 79` (`19:45`) and returns `allFiltered.slice(79, 89)` = **`[19:45, 20:00, 20:15, 20:30, 20:45, 21:00, 21:15, 21:30, 21:45, 22:00]`**!
+     - **All newer scans from `22:15` through `23:45` (including the latest chip `23:45`) are completely missing from `#sl-timeline-chips`!**
+   - Furthermore, because `TimeSlider.svelte` only renders `tl.obsFiles` (10 chips) and `stepWindowTimeline` (`client/src/lib/services/appWorkflow.js:235`) wraps around `tl.obsFiles.length` (`nextIdx = (tl.currentObsIdx + delta + len) % len`), **the user can never reach `22:15 .. 23:45` even by clicking `▶` (`Next Step`) or pressing Play**!
+
+---
+
+#### Fix Suggestion
+
+##### Step 1: Increase Catalog Tree Fetch & Retention Limit for High-Cadence Observation Datasets (`timelineMath.js`, `timelineSync.js`, `weatherLoader.js`, `presetLoader.js`, `catalog_handler.go`)
+1. Add a helper `getObsTreeLimit(path)` in `client/src/ui/timeline/timelineMath.js` that returns a larger catalog limit for sub-hourly and hourly observation datasets so 10 days of `12h` / `24h` steps are retained:
+   ```js
+   // client/src/ui/timeline/timelineMath.js
+   export function getObsTreeLimit(path = "") {
+     const s = String(path || "").toUpperCase();
+     // 5m / 6m / 10m / 15m products need ~1000-2400 files to span 10 days (10 chips @ 24h step)
+     if (
+       s.includes("SATELLITE") ||
+       s.includes("FY4") ||
+       s.includes("SWAN") ||
+       s.includes("RADAR") ||
+       s.includes("10MIN") ||
+       s.includes("5MIN") ||
+       s.includes("1MIN") ||
+       s.includes("WIND_PROFILER") ||
+       s.includes("LIGHTNING")
+     ) {
+       return 1000;
+     }
+     // 1h products (FY2G, CLDAS, PLOT_ALL) need >= 240 files to span 10 days
+     if (s.includes("FY2") || s.includes("CLDAS") || s.includes("1H") || s.includes("PLOT_ALL")) {
+       return 300;
+     }
+     return 100;
+   }
+   ```
+2. In `client/src/utils/timelineSync.js:312, 328`, `client/src/services/weatherLoader.js:122, 134`, and `client/src/services/presetLoader.js:325, 412, 537, 621`, pass `const treeLimit = getObsTreeLimit(path);` into `fetchTree(path, treeLimit, ...)` and slice `chronologicalFiles.slice(-treeLimit)`.
+3. In `server/handler/catalog_handler.go:95-105` (MockMode for `SATELLITE`), generate enough 15-minute mock files (e.g., `400` files ≈ 4+ days, or respecting `?limit=`) so `12h` and `24h` steps produce multiple chips in mock mode as well.
+
+##### Step 2: Improve `filterObsFilesByStep` When Clock-Grid Matches Are Sparse (`client/src/ui/timeline/timelineMath.js:169-225`)
+When `stepNum >= 6` (especially `12h` or `24h`) on a dataset whose available archive spans only ~1–2 days (or whose scans don't fall on exact `:00` minutes):
+1. Anchor the fallback interval stepper **backward from the latest candidate (`candidates[candidates.length - 1]`)** rather than forward from `candidates[0]`, and reverse the collected array so the latest observation is always preserved:
+   ```js
+   // Backward-anchored interval selection (always includes latest candidate):
+   function stepBackwardByInterval(candidates, stepHours) {
+     if (!Array.isArray(candidates) || candidates.length === 0) return [];
+     const picked = [];
+     let lastTimeMs = 0;
+     const minIntervalMs = stepHours * 3600000 - 60000;
+     for (let i = candidates.length - 1; i >= 0; i--) {
+       const file = candidates[i];
+       const timeMs = parseTimestamp(file);
+       if (timeMs !== null) {
+         if (lastTimeMs === 0 || Math.abs(lastTimeMs - timeMs) >= minIntervalMs) {
+           picked.push(file);
+           lastTimeMs = timeMs;
+         }
+       } else {
+         picked.push(file);
+       }
+     }
+     return picked.reverse();
+   }
+   ```
+2. For non-upper-air observations at `stepNum === 12` or `stepNum === 24`, if the strict clock-grid match (`standard12` / `standard24`) yields fewer chips than `stepBackwardByInterval(candidates, stepNum)` (for example, when a 24-hour window `Oct 26 21:00 .. Oct 27 21:00` only crosses `00:00` once so `standard24` has only 1 file, whereas stepping back 24h from `Oct 27 21:00` yields 2 files `[Oct 26 21:00, Oct 27 21:00]`), or when `standard12` / `standard24` has `< 2` files, use `stepBackwardByInterval` (or append the latest file if needed) so the user gets all available `stepNum`-spaced chips up to the latest scan.
+
+##### Step 3: Always Keep the Latest Chip Visible When Changing `Step` (`TimeSlider.svelte:228-244` & `timeSliderView.js:275-295`)
+In `TimeSlider.svelte:228-244` (`handleStepLengthChange`) and `timeSliderView.js:275-295` (`setStepLength`):
+1. Check whether the user was on the **latest chip** of the previous step before switching (`const wasAtLatest = obsFiles.length === 0 || tl.currentObsIdx >= obsFiles.length - 1;`).
+2. Compute the latest 10-chip window for the new step: `const latestWindow = allFiltered.slice(-MAX_OBS_CHIPS);`.
+3. If `wasAtLatest` is `true` (e.g., the user was on `21:00`, the rightmost chip in `3h` mode, and switched to `15min` where `23:45` is the latest chip), **or** if `targetFile` falls outside `latestWindow` when switching step lengths:
+   - Set `tl.obsFiles = latestWindow` so the **latest chip (`23:45`) is always visible** at the right end of `#sl-timeline-chips`!
+   - If `!wasAtLatest` and `latestWindow.includes(targetFile)`, keep `tl.currentObsIdx = latestWindow.indexOf(targetFile)`; otherwise advance `tl.currentObsIdx` to `tl.obsFiles.length - 1` (the latest chip for the new step).
+
+```js
+// client/src/components/TimeSlider.svelte:228-244
+} else {
+  const wasAtLatest = obsFiles.length === 0 || tl.currentObsIdx >= obsFiles.length - 1;
+  const curFile = obsFiles[tl.currentObsIdx] || "";
+  const allFiltered = filterObsFilesByStep(tl.rawObsFiles, step, tl.isUpperAirMode);
+  let targetFile = curFile;
+  if (wasAtLatest && allFiltered.length > 0) {
+    targetFile = allFiltered[allFiltered.length - 1];
+  } else if (allFiltered.length > 0 && curFile && !allFiltered.includes(curFile)) {
+    targetFile = findClosestFile(allFiltered, curFile);
+  }
+  // Always anchor step-change chips to the latest MAX_OBS_CHIPS window so the
+  // newest observation chip is never cut off when switching (e.g. 3h -> 15min).
+  tl.obsFiles = selectObsChipsWindow(allFiltered);
+  const newIdx = (!wasAtLatest && targetFile) ? tl.obsFiles.indexOf(targetFile) : -1;
+  tl.currentObsIdx = newIdx !== -1 ? newIdx : Math.max(0, tl.obsFiles.length - 1);
+  const file = tl.obsFiles[tl.currentObsIdx];
+  if (win && file) {
+    win.obsTime = file;
+    if (win._obsTimeline) win._obsTimeline.file = file;
+  }
+  if (file) emitTimeChange({ isObs: true, file, stepLength: step, _seq: ++tl.periodStepSeq });
+}
+```

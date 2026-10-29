@@ -26,7 +26,7 @@ import { fetchTree, fetchStationObservations } from "../api/catalogApi.js";
 import { analyzeAndRenderSoundingElementContour } from "../layers/soundingAnalysis.js";
 import { triggerRasterOverlay } from "../ui/layerActions.js";
 import { updateLegend } from "../ui/legend.js";
-import { filterObsFilesByStep } from "../ui/timeline/timelineMath.js";
+import { filterObsFilesByStep, getObsTreeLimit } from "../ui/timeline/timelineMath.js";
 import { getGlobalLocale, localizeEntityName } from "../lib/stores/i18nCore.js";
 
 export function clearAllWeatherLayersFromMap(map, win = null, { resetVisibility = false } = {}) {
@@ -322,7 +322,7 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
             availableFiles = [...win._obsTimeline.files].sort((a, b) => a.localeCompare(b));
           } else {
             try {
-              const entries = await fetchTree(obsPath, 100);
+              const entries = await fetchTree(obsPath, getObsTreeLimit(obsPath));
               if (Array.isArray(entries) && entries.length > 0) {
                 availableFiles = entries.map((e) => e.name).filter(Boolean).sort((a, b) => a.localeCompare(b));
               }
@@ -409,7 +409,7 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
             availableFiles = [...win._obsTimeline.files].sort((a, b) => a.localeCompare(b));
           } else {
             try {
-              const entries = await fetchTree(obsPath, 100);
+              const entries = await fetchTree(obsPath, getObsTreeLimit(obsPath));
               if (Array.isArray(entries) && entries.length > 0) {
                 availableFiles = entries.map((e) => e.name).filter(Boolean).sort((a, b) => a.localeCompare(b));
               }
@@ -534,7 +534,7 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
           availableFiles = [...win._obsTimeline.files].sort((a, b) => a.localeCompare(b));
         } else {
           try {
-            const entries = await fetchTree(obsPath, 100);
+            const entries = await fetchTree(obsPath, getObsTreeLimit(obsPath));
             if (Array.isArray(entries) && entries.length > 0) {
               availableFiles = entries.map((e) => e.name).filter(Boolean).sort((a, b) => a.localeCompare(b));
             }
@@ -618,7 +618,7 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
           availableFiles = [...win._obsTimeline.files].sort((a, b) => a.localeCompare(b));
         } else {
           try {
-            const entries = await fetchTree(tlogpPath, 100);
+            const entries = await fetchTree(tlogpPath, getObsTreeLimit(tlogpPath));
             if (Array.isArray(entries) && entries.length > 0) {
               availableFiles = entries.map((e) => e.name).filter(Boolean).sort((a, b) => a.localeCompare(b));
             }

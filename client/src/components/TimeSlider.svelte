@@ -226,14 +226,19 @@
       }
       emitTimeChange({ period: newPeriod, cycle: currentCycle, stepLength: step, discretePeriods: tl.discretePeriods, _seq: ++tl.periodStepSeq });
     } else {
+      const wasAtLatest = obsFiles.length === 0 || tl.currentObsIdx >= obsFiles.length - 1;
       const curFile = obsFiles[tl.currentObsIdx] || "";
       const allFiltered = filterObsFilesByStep(tl.rawObsFiles, step, tl.isUpperAirMode);
       let targetFile = curFile;
-      if (allFiltered.length > 0 && curFile && !allFiltered.includes(curFile)) {
+      if (wasAtLatest && allFiltered.length > 0) {
+        targetFile = allFiltered[allFiltered.length - 1];
+      } else if (allFiltered.length > 0 && curFile && !allFiltered.includes(curFile)) {
         targetFile = findClosestFile(allFiltered, curFile);
       }
-      tl.obsFiles = selectObsChipsWindow(allFiltered, targetFile);
-      const newIdx = targetFile ? tl.obsFiles.indexOf(targetFile) : -1;
+      // Always anchor step-change chips to the latest MAX_OBS_CHIPS window so the
+      // newest observation chip is never cut off when switching (e.g. 3h -> 15min).
+      tl.obsFiles = selectObsChipsWindow(allFiltered);
+      const newIdx = (!wasAtLatest && targetFile) ? tl.obsFiles.indexOf(targetFile) : -1;
       tl.currentObsIdx = newIdx !== -1 ? newIdx : Math.max(0, tl.obsFiles.length - 1);
       const file = tl.obsFiles[tl.currentObsIdx];
       if (win && file) {

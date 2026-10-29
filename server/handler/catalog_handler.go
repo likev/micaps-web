@@ -92,9 +92,15 @@ func (h *CatalogHandler) TreeHandler(w http.ResponseWriter, r *http.Request) {
 			if strings.Contains(dataPath, "DUST") {
 				ext = ".BMP"
 			}
-			mockSatFiles := make([]map[string]interface{}, 0, 48)
+			satLimit := 400
+			if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+				if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+					satLimit = l
+				}
+			}
+			mockSatFiles := make([]map[string]interface{}, 0, satLimit)
 			t := anchorTime
-			for i := 0; i < 40; i++ {
+			for i := 0; i < satLimit; i++ {
 				fname := t.Format("20060102150405") + ext
 				mockSatFiles = append(mockSatFiles, map[string]interface{}{
 					"name": fname,

@@ -3,7 +3,7 @@ import { setTimelineMode, filterObsFilesByStep } from "../ui/timeSlider.js";
 import { getActiveWindow } from "../ui/tabWindowManager.js";
 import { DEFAULT_MOCK_OBS_FILES } from "../config/presets.js";
 import { parseTimestamp } from "./timeResolver.js";
-import { getObsStepOptions, isSatelliteGroup } from "../ui/timeline/timelineMath.js";
+import { getObsStepOptions, isSatelliteGroup, getObsTreeLimit } from "../ui/timeline/timelineMath.js";
 import { getActiveHistoryDate } from "../store/appState.js";
 
 const forecastCyclesCache = {};
@@ -308,8 +308,9 @@ export async function syncObservationTimeline(path, currentFile = null, winTitle
   }
   const histDate = getActiveHistoryDate();
   const mockObsFiles = histDate ? generateHistoricalMockObsFiles(histDate) : DEFAULT_MOCK_OBS_FILES;
+  const treeLimit = getObsTreeLimit(path);
   try {
-    const fileEntries = await fetchTree(path, 100, treeOpts);
+    const fileEntries = await fetchTree(path, treeLimit, treeOpts);
     if (Array.isArray(fileEntries) && fileEntries.length > 0) {
       let validFiles = fileEntries.filter((f) => f.name && (f.size > 100 || f.size === 0)).map((f) => f.name);
       const hasObsFormat = validFiles.some((f) => parseTimestamp(f) !== null);
@@ -325,7 +326,7 @@ export async function syncObservationTimeline(path, currentFile = null, winTitle
         });
         const rawFiles = isMockFallback && chronologicalFiles.length < 2
           ? [...mockObsFiles]
-          : chronologicalFiles.slice(-100);
+          : chronologicalFiles.slice(-treeLimit);
 
         const filteredFiles = filterObsFilesByStep(rawFiles, stepLength, isUpper);
         const keptFile = !forceLatest ? matchCurrentObsFile(currentFile, filteredFiles, isSatellite) : null;

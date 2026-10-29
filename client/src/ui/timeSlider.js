@@ -7,6 +7,8 @@ export {
   selectObsChipsWindow,
   getPeriodsForStep,
   filterObsFilesByStep,
+  getObsTreeLimit,
+  stepBackwardByInterval,
 } from "./timeline/timelineMath.js";
 
 export {

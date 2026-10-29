@@ -12,6 +12,9 @@ import {
   selectObsChipsWindow,
   getPeriodsForStep,
   filterObsFilesByStep,
+  getObsStepOptions,
+  formatStepLabel,
+  isSatelliteGroup,
 } from "./timelineMath.js";
 import {
   timelineState,
@@ -28,27 +31,19 @@ import {
   updatePlayButtonDisabledState,
 } from "./playbackController.js";
 
-export function updateStepLengthOptions(isUpper, currentStep) {
+export function updateStepLengthOptions(isUpper, currentStep, isSatellite = false) {
   if (typeof document === "undefined" || typeof document.getElementById !== "function") {
-    timelineState.currentStepLength = parseInt(currentStep, 10) || (isUpper ? 12 : 6);
+    timelineState.currentStepLength = parseFloat(currentStep) || (isUpper ? 12 : (timelineState.currentMode === "obs" ? 3 : 6));
     return;
   }
   const selStep = document.getElementById("select-step-length");
   if (!selStep) return;
 
-  const targetOptions = isUpper
-    ? [
-        { value: "12", label: "12h" },
-        { value: "24", label: "24h" },
-        { value: "6", label: "6h" },
-      ]
-    : [
-        { value: "1", label: "1h" },
-        { value: "3", label: "3h" },
-        { value: "6", label: "6h" },
-        { value: "12", label: "12h" },
-        { value: "24", label: "24h" },
-      ];
+  const steps = getObsStepOptions({ isUpper, isSatellite });
+  const targetOptions = steps.map((s) => ({
+    value: String(s),
+    label: formatStepLabel(s),
+  }));
 
   const currentOptsStr = Array.from(selStep.options || []).map((o) => o.value).join(",");
   const targetOptsStr = targetOptions.map((o) => o.value).join(",");
@@ -59,14 +54,18 @@ export function updateStepLengthOptions(isUpper, currentStep) {
       const el = document.createElement("option");
       el.value = opt.value;
       el.textContent = opt.label;
-      selStep.appendChild(el);
+      if (typeof selStep.appendChild === "function") {
+        selStep.appendChild(el);
+      } else if (Array.isArray(selStep.options)) {
+        selStep.options.push(el);
+      }
     });
   }
 
   const validValues = targetOptions.map((o) => o.value);
   const valToSet = validValues.includes(String(currentStep)) ? String(currentStep) : validValues[0];
   selStep.value = valToSet;
-  timelineState.currentStepLength = parseInt(valToSet, 10);
+  timelineState.currentStepLength = parseFloat(valToSet);
 }
 
 export function setTimeSliderVisible(visible = true) {
@@ -188,7 +187,7 @@ export function updateLabels() {
     badge.className = "mode-badge obs-badge";
     const curFile = timelineState.obsFiles[timelineState.currentObsIdx] || "";
     leadWrapper.innerHTML = `Observation Time: <strong id="time-lead-label">${formatObsTimestamp(curFile)}</strong>`;
-    validLabel.textContent = `Real-time Observation (Step: ${timelineState.currentStepLength}h)`;
+    validLabel.textContent = `Real-time Observation (Step: ${formatStepLabel(timelineState.currentStepLength)})`;
   } else {
     // NWP Model Forecast: display init-time select
     if (initWrapper) {
@@ -212,7 +211,7 @@ export function updateLabels() {
     badge.className = "mode-badge";
     const curPeriod = timelineState.discretePeriods[timelineState.currentPeriodIdx];
     leadWrapper.innerHTML = `Forecast Lead: <strong id="time-lead-label">${formatLeadTime(curPeriod)}</strong>`;
-    validLabel.textContent = `Valid: ${formatForecastValidTime(timelineState.currentInitCycle, curPeriod)} (Step: ${timelineState.currentStepLength}h)`;
+    validLabel.textContent = `Valid: ${formatForecastValidTime(timelineState.currentInitCycle, curPeriod)} (Step: ${formatStepLabel(timelineState.currentStepLength)})`;
   }
 }
 
@@ -227,7 +226,7 @@ export function setStepLength(stepVal, triggerCallback = false) {
     } else if (selStep.options && selStep.options.length > 0) {
       selStep.selectedIndex = 0;
       selStep.value = selStep.options[0]?.value || "";
-      timelineState.currentStepLength = parseInt(selStep.value, 10) || timelineState.currentStepLength;
+      timelineState.currentStepLength = parseFloat(selStep.value) || timelineState.currentStepLength;
     } else {
       selStep.value = String(timelineState.currentStepLength);
     }
@@ -273,14 +272,19 @@ export function setStepLength(stepVal, triggerCallback = false) {
       }
     }
   } else {
+    const wasAtLatest = timelineState.obsFiles.length === 0 || timelineState.currentObsIdx >= timelineState.obsFiles.length - 1;
     const curFile = timelineState.obsFiles[timelineState.currentObsIdx] || "";
     const allFiltered = filterObsFilesByStep(timelineState.rawObsFiles, timelineState.currentStepLength, timelineState.isUpperAirMode);
     let targetFile = curFile;
-    if (allFiltered.length > 0 && !allFiltered.includes(curFile) && curFile) {
+    if (wasAtLatest && allFiltered.length > 0) {
+      targetFile = allFiltered[allFiltered.length - 1];
+    } else if (allFiltered.length > 0 && !allFiltered.includes(curFile) && curFile) {
       targetFile = findClosestFile(allFiltered, curFile);
     }
-    timelineState.obsFiles = selectObsChipsWindow(allFiltered, targetFile);
-    let newIdx = timelineState.obsFiles.indexOf(targetFile);
+    // Always anchor step-change chips to the latest MAX_OBS_CHIPS window so the
+    // newest observation chip is never cut off when switching (e.g. 3h -> 15min).
+    timelineState.obsFiles = selectObsChipsWindow(allFiltered);
+    const newIdx = (!wasAtLatest && targetFile) ? timelineState.obsFiles.indexOf(targetFile) : -1;
     timelineState.currentObsIdx = newIdx !== -1 ? newIdx : Math.max(0, timelineState.obsFiles.length - 1);
     updateLabels();
     renderChips();
@@ -312,6 +316,13 @@ export function setTimelineMode(mode, customData = {}) {
     timelineState.isUpperAirMode = false;
   }
 
+  const isSatellite = !timelineState.isUpperAirMode && (
+    isSatelliteGroup(customData.path) ||
+    isSatelliteGroup(customData.winTitle) ||
+    isSatelliteGroup(timelineState.currentWinTitle)
+  );
+  timelineState.isSatellite = isSatellite;
+
   // Set default step length: 12h for upper-air, 3h for surface, 6h for NWP forecast
   let targetStep = customData.stepLength;
   if (!targetStep) {
@@ -323,7 +334,7 @@ export function setTimelineMode(mode, customData = {}) {
   }
 
   timelineState.currentStepLength = targetStep;
-  updateStepLengthOptions(timelineState.isUpperAirMode, timelineState.currentStepLength);
+  updateStepLengthOptions(timelineState.isUpperAirMode, timelineState.currentStepLength, isSatellite);
 
   if (timelineState.currentMode === "obs") {
     if (Array.isArray(customData.files) && customData.files.length > 0) {
@@ -472,7 +483,7 @@ export function initTimeSlider(containerId = "timeslider-container", onTimeChang
   const selStep = document.getElementById("select-step-length");
   if (selStep) {
     selStep.onchange = (e) => {
-      const newStep = parseInt(e.target.value, 10) || 6;
+      const newStep = parseFloat(e.target.value) || (timelineState.currentMode === "obs" ? 3 : 6);
       setStepLength(newStep, true);
     };
   }
@@ -514,6 +525,6 @@ export function initTimeSlider(containerId = "timeslider-container", onTimeChang
   renderChips();
   updateLabels();
   // Re-sync step-length select in case setTimelineMode was called before the DOM was ready
-  updateStepLengthOptions(timelineState.isUpperAirMode, timelineState.currentStepLength);
+  updateStepLengthOptions(timelineState.isUpperAirMode, timelineState.currentStepLength, Boolean(timelineState.isSatellite));
   updatePlayButtonDisabledState();
 }

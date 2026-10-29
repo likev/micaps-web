@@ -1,3 +1,4 @@
+<script>
   import { onMount, tick } from "svelte";
   import { PRESET_GROUPS, isDivider } from "../config/presets.js";
   import { isPresetPinned, togglePinPreset, addRecentPreset } from "../lib/stores/presetFavorites.svelte.js";
@@ -477,6 +478,7 @@
         style="top: {submenuTop}px; left: {submenuLeft}px; max-height: {submenuMaxHeight};"
       >
         {#each cat.presets as preset, pIdx}
+          {@const badgeText = formatPresetBadge(preset)}
           <div
             class="preset-item-btn"
             class:active={preset.id === activePresetId}
@@ -498,7 +500,6 @@
           >
             <span class="preset-check">{preset.id === activePresetId ? "✓" : ""}</span>
             <span class="preset-name">{localizeEntityName(preset, currentLocale)}</span>
-            {@const badgeText = formatPresetBadge(preset)}
             {#if badgeText}
               <span class="preset-badge">{badgeText}</span>
             {/if}

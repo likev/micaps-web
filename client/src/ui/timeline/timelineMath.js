@@ -40,6 +40,33 @@ export function selectObsChipsWindow(files, targetFile = "") {
   return files.slice(start, start + MAX_OBS_CHIPS);
 }
 
+/**
+ * Returns tree limit for catalog queries and retention window so high-cadence
+ * datasets (satellite, radar, 10min surface) retain enough history for 12h/24h steps.
+ */
+export function getObsTreeLimit(path = "") {
+  const s = String(path || "").toUpperCase();
+  // 5m / 6m / 10m / 15m products need ~1000-2400 files to span 10 days (10 chips @ 24h step)
+  if (
+    s.includes("SATELLITE") ||
+    s.includes("FY4") ||
+    s.includes("SWAN") ||
+    s.includes("RADAR") ||
+    s.includes("10MIN") ||
+    s.includes("5MIN") ||
+    s.includes("1MIN") ||
+    s.includes("WIND_PROFILER") ||
+    s.includes("LIGHTNING")
+  ) {
+    return 1000;
+  }
+  // 1h products (FY2G, CLDAS, PLOT_ALL) need >= 240 files to span 10 days
+  if (s.includes("FY2") || s.includes("CLDAS") || s.includes("1H") || s.includes("PLOT_ALL")) {
+    return 300;
+  }
+  return 100;
+}
+
 /** Step options (hours) offered by the step-length select; 0.25 = 15 min (satellite only). */
 export function getObsStepOptions({ isUpper = false, isSatellite = false } = {}) {
   if (isUpper) return [12, 24, 6];
@@ -97,6 +124,30 @@ export function getPeriodsForStep(step = 6) {
     for (let p = stepNum; p <= 120; p += stepNum) periods.push(p);
   }
   return periods;
+}
+
+/**
+ * Step backward by interval from the latest candidate file, preserving the
+ * newest observation and ensuring candidate files spaced by >= stepHours.
+ */
+export function stepBackwardByInterval(candidates, stepHours) {
+  if (!Array.isArray(candidates) || candidates.length === 0) return [];
+  const picked = [];
+  let lastTimeMs = 0;
+  const minIntervalMs = stepHours * 3600000 - 60000;
+  for (let i = candidates.length - 1; i >= 0; i--) {
+    const file = candidates[i];
+    const timeMs = parseTimestamp(file);
+    if (timeMs !== null) {
+      if (lastTimeMs === 0 || Math.abs(lastTimeMs - timeMs) >= minIntervalMs) {
+        picked.push(file);
+        lastTimeMs = timeMs;
+      }
+    } else {
+      picked.push(file);
+    }
+  }
+  return picked.reverse();
 }
 
 export function filterObsFilesByStep(files, stepHours, isUpper = false) {
@@ -185,42 +236,43 @@ export function filterObsFilesByStep(files, stepHours, isUpper = false) {
     if (synoptic6.length >= 2) return synoptic6;
   }
 
-  // 12h interval on the hour: prefer standard clock grid (00, 12),
-  // fallback to surface synoptic 12h (08, 20).
-  if (stepNum === 12) {
-    const standard12 = files.filter((f) => getFileMin(f) === 0 && getFileHour(f) % 12 === 0);
-    if (standard12.length >= 2) return standard12;
-    const synoptic12 = files.filter((f) => (getFileHour(f) === 8 || getFileHour(f) === 20) && getFileMin(f) === 0);
-    if (synoptic12.length >= 2) return synoptic12;
-  }
-
-  // 24h interval on the hour: prefer standard midnight (00:00),
-  // fallback to surface synoptic 24h (08:00).
-  if (stepNum === 24) {
-    const standard24 = files.filter((f) => getFileMin(f) === 0 && getFileHour(f) === 0);
-    if (standard24.length >= 2) return standard24;
-    const synoptic24 = files.filter((f) => getFileHour(f) === 8 && getFileMin(f) === 0);
-    if (synoptic24.length >= 2) return synoptic24;
-  }
-
   // Fallback for general or arbitrary hourly step: always restrict to on-the-hour files
   // when available so sub-hourly data never lands on :30 / :15.
   const hourlyFiles = files.filter((f) => getFileMin(f) === 0);
   const candidates = hourlyFiles.length >= 2 ? hourlyFiles : files;
 
-  const filtered = [];
-  let lastTimeMs = 0;
-  const minIntervalMs = stepNum * 3600000 - 60000;
-  for (const file of candidates) {
-    const timeMs = parseTimestamp(file);
-    if (timeMs !== null) {
-      if (lastTimeMs === 0 || Math.abs(timeMs - lastTimeMs) >= minIntervalMs) {
-        filtered.push(file);
-        lastTimeMs = timeMs;
-      }
-    } else {
-      filtered.push(file);
-    }
+  // 12h interval on the hour: prefer standard clock grid (00, 12),
+  // fallback to surface synoptic 12h (08, 20), or backward-stepped candidates.
+  if (stepNum === 12) {
+    const standard12 = files.filter((f) => getFileMin(f) === 0 && getFileHour(f) % 12 === 0);
+    const synoptic12 = files.filter((f) => (getFileHour(f) === 8 || getFileHour(f) === 20) && getFileMin(f) === 0);
+    const stepped12 = stepBackwardByInterval(candidates, 12);
+    if (standard12.length >= 2 && standard12.length >= stepped12.length) return standard12;
+    if (synoptic12.length >= 2 && synoptic12.length >= stepped12.length) return synoptic12;
+    if (stepped12.length >= 2) return stepped12;
+    if (standard12.length >= 2) return standard12;
+    if (synoptic12.length >= 2) return synoptic12;
+    if (stepped12.length > 0) return stepped12;
+    if (standard12.length > 0) return standard12;
+    if (synoptic12.length > 0) return synoptic12;
   }
-  return filtered.length > 0 ? filtered : [...files];
+
+  // 24h interval on the hour: prefer standard midnight (00:00),
+  // fallback to surface synoptic 24h (08:00), or backward-stepped candidates.
+  if (stepNum === 24) {
+    const standard24 = files.filter((f) => getFileMin(f) === 0 && getFileHour(f) === 0);
+    const synoptic24 = files.filter((f) => getFileHour(f) === 8 && getFileMin(f) === 0);
+    const stepped24 = stepBackwardByInterval(candidates, 24);
+    if (standard24.length >= 2 && standard24.length >= stepped24.length) return standard24;
+    if (synoptic24.length >= 2 && synoptic24.length >= stepped24.length) return synoptic24;
+    if (stepped24.length >= 2) return stepped24;
+    if (standard24.length >= 2) return standard24;
+    if (synoptic24.length >= 2) return synoptic24;
+    if (stepped24.length > 0) return stepped24;
+    if (standard24.length > 0) return standard24;
+    if (synoptic24.length > 0) return synoptic24;
+  }
+
+  const stepped = stepBackwardByInterval(candidates, stepNum);
+  return stepped.length > 0 ? stepped : [...files];
 }

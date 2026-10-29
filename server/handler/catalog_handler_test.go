@@ -194,3 +194,41 @@ func TestCatalogHandler_LatestHandler_HistoryMode(t *testing.T) {
 	}
 }
 
+func TestCatalogHandler_TreeHandler_MockSatelliteLimit(t *testing.T) {
+	h := &handler.CatalogHandler{
+		Client:   nil,
+		MockMode: true,
+	}
+
+	// 1. Default satellite MockMode limit returns 400 files
+	req := httptest.NewRequest("GET", "/api/catalog/tree?path=SATELLITE/FY4B/L1/CHINA/C012", nil)
+	w := httptest.NewRecorder()
+	h.TreeHandler(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", w.Code)
+	}
+	var files []map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &files); err != nil {
+		t.Fatalf("failed to decode JSON response: %v", err)
+	}
+	if len(files) != 400 {
+		t.Errorf("expected 400 default mock satellite files, got %d", len(files))
+	}
+
+	// 2. Explicit limit=1000 returns 1000 files
+	req1000 := httptest.NewRequest("GET", "/api/catalog/tree?path=SATELLITE/FY4B/L1/CHINA/C012&limit=1000", nil)
+	w1000 := httptest.NewRecorder()
+	h.TreeHandler(w1000, req1000)
+	if w1000.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", w1000.Code)
+	}
+	var files1000 []map[string]interface{}
+	if err := json.Unmarshal(w1000.Body.Bytes(), &files1000); err != nil {
+		t.Fatalf("failed to decode JSON response: %v", err)
+	}
+	if len(files1000) != 1000 {
+		t.Errorf("expected 1000 mock satellite files when limit=1000, got %d", len(files1000))
+	}
+}
+
+

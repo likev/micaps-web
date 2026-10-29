@@ -6,6 +6,7 @@ import { flushContourSource } from "../layers/contour/contourMapSync.js";
 import { renderBinaryRaster, renderGridRaster } from "../layers/rasterLayer.js";
 import { renderWindStreamlines, stopWindAnimation, renderGridWindBarbs, removeGridWindBarbs } from "../layers/windLayer.js";
 import { fetchGridData, fetchGridBinaryStream, fetchTree } from "../api/catalogApi.js";
+import { getObsTreeLimit } from "../ui/timeline/timelineMath.js";
 import { updateLegend, removeLegend } from "../ui/legend.js";
 import { appState } from "../store/appState.js";
 import { resolveLatestForecastCycle, syncObservationTimeline } from "../utils/timelineSync.js";
@@ -119,7 +120,8 @@ export async function loadWeatherField(map, model, element, level, period, custo
       availableFiles = customOptions.sampleTimes;
     } else {
       try {
-        let fileEntries = await fetchTree(dataPath, 100, targetLevel);
+        const treeLimit = getObsTreeLimit(dataPath);
+        let fileEntries = await fetchTree(dataPath, treeLimit, targetLevel);
         // If fileEntries are subdirectories representing levels (e.g. 1000, 925, 850, 500, 2M_ABOVE_GROUND, 850-925), dive into the level
         const isLevelDirs =
           fileEntries.length > 0 &&
@@ -131,7 +133,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
           }
           path = dataPath;
           targetLevel = chosenLvl;
-          fileEntries = await fetchTree(dataPath, 100, targetLevel);
+          fileEntries = await fetchTree(dataPath, treeLimit, targetLevel);
         }
         if (Array.isArray(fileEntries)) {
           availableFiles = fileEntries

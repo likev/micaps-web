@@ -31,6 +31,10 @@ export function getLayers(winId = getCurrentActiveWinId()) {
   return layersByWindow[targetId] || coreGetLayersForWindow(targetId) || [];
 }
 
+export function getLayersForWindow(winId) {
+  return getLayers(winId);
+}
+
 export function addLayer(layerDef, winId = getCurrentActiveWinId()) {
   const layer = coreAddOrUpdateLayer(layerDef, winId);
   syncLayersState(winId);
