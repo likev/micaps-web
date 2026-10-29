@@ -14,7 +14,7 @@
     formatForecastValidTime,
   } from "../utils/formatters.js";
   import { getWindowById } from "../lib/stores/tabs.svelte.js";
-  import { getLayersForWindow } from "../lib/stores/layersCore.js";
+  import { getLayersForWindow } from "../lib/stores/layers.svelte.js";
   import { formatStepLabel, isSatelliteGroup } from "../lib/stores/timelineMath.js";
   import { cursorProbeState } from "../lib/stores/cursorProbe.svelte.js";
   import { reapplyLightingCompensation } from "../services/lightingController.js";

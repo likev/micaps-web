@@ -2,7 +2,7 @@
 import { uiState } from "../stores/uiCore.js";
 import { createTimelineState } from "../stores/timelineCore.js";
 import { parseTimestamp } from "../../utils/timeResolver.js";
-import { getGlobalLocale, localizeEntityName } from "../stores/i18nCore.js";
+import { getGlobalLocale } from "../stores/i18nCore.js";
 
 /**
  * Determines whether a preset group requires hiding the forecast timeline
@@ -181,7 +181,7 @@ export function applyPresetToWindow(win, group, overrideLevel = null, timelinesM
   }
   const locName = (getGlobalLocale() === "zh" && groupCopy.name_zh)
     ? groupCopy.name_zh
-    : (groupCopy.name || groupCopy.id);
+    : (groupCopy.name || groupCopy.name_en || groupCopy.id);
   win.title = locName;
   win.baseTitle = locName;
 
