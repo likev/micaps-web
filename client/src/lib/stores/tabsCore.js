@@ -5,6 +5,30 @@ import {
   getRainAccumulationHoursForWindow,
 } from "../../utils/rain12.js";
 export const DEFAULT_LEVELS = [500, 850, 1000, 200, 700, 925, 400, 300, 100];
+export const DEFAULT_SATELLITE_LEVELS = [12, 9, 8, 2, 1, 13, 7, 3, 10, 11, 14, 15, 4, 5, 6];
+
+export function isSatelliteEntity(winOrGroup) {
+  if (!winOrGroup) return false;
+  if (winOrGroup.model === "SATELLITE") return true;
+  if (winOrGroup.activeGroup?.model === "SATELLITE") return true;
+  if (/FY4B|FY-4B|FY2G|FY-2G|SATELLITE/i.test(String(winOrGroup.id || winOrGroup.activeGroup?.id || winOrGroup.category || winOrGroup.name || ""))) return true;
+  const layers = Array.isArray(winOrGroup.layers) ? winOrGroup.layers : (Array.isArray(winOrGroup.activeGroup?.layers) ? winOrGroup.activeGroup.layers : []);
+  return layers.some((l) => l?.model === "SATELLITE" || l?.type === "image" || /FY4B|FY2G|SATELLITE/i.test(String(l?.path || l?.element || l?.id || "")));
+}
+
+export function isMultiChannelSatellite(winOrGroup) {
+  if (!winOrGroup) return false;
+  if (!isSatelliteEntity(winOrGroup)) return false;
+  if (/AMV/i.test(String(winOrGroup.id || winOrGroup.activeGroup?.id || winOrGroup.element || ""))) return false;
+  const levels = winOrGroup.activeGroup?.levels || winOrGroup.levels;
+  if (Array.isArray(levels) && levels.length > 0) {
+    return levels.every((lvl) => typeof lvl === "number" && lvl >= 1 && lvl <= 36);
+  }
+  if (typeof winOrGroup.level === "number" && winOrGroup.level >= 1 && winOrGroup.level <= 36) {
+    return true;
+  }
+  return /FY4/i.test(String(winOrGroup.id || winOrGroup.activeGroup?.id || winOrGroup.element || ""));
+}
 
 export const DEFAULT_MODELS = [
   "ECMWF_HR",
@@ -234,44 +258,76 @@ export async function getEligibleModelsForAllocationAsync(groupOrWin, level = nu
 
 export function stepCycleHours(cycleStr, deltaHours) {
   if (!cycleStr || typeof cycleStr !== "string") return cycleStr;
-  const dotIdx = cycleStr.indexOf(".");
-  const raw = dotIdx !== -1 ? cycleStr.slice(0, dotIdx) : cycleStr;
-  const ext = dotIdx !== -1 ? cycleStr.slice(dotIdx) : "";
-  if (raw.length < 8) return cycleStr;
+  const pad = (n) => String(n).padStart(2, "0");
 
-  let year, month, day, hour, tail = "", is4DigitYear = false;
-  if (raw.length >= 10 && (raw.startsWith("19") || raw.startsWith("20"))) {
-    is4DigitYear = true;
-    year = parseInt(raw.slice(0, 4), 10);
-    month = parseInt(raw.slice(4, 6), 10) - 1;
-    day = parseInt(raw.slice(6, 8), 10);
-    hour = parseInt(raw.slice(8, 10), 10);
-    tail = raw.slice(10);
-  } else if (raw.length >= 8) {
-    const yy = parseInt(raw.slice(0, 2), 10);
-    year = yy < 70 ? 2000 + yy : 1900 + yy;
-    month = parseInt(raw.slice(2, 4), 10) - 1;
-    day = parseInt(raw.slice(4, 6), 10);
-    hour = parseInt(raw.slice(6, 8), 10);
-    tail = raw.slice(8);
-  } else {
-    return cycleStr;
+  let raw = cycleStr;
+  const dotIdx = cycleStr.indexOf(".");
+  if (dotIdx !== -1) {
+    const ext = cycleStr.slice(dotIdx);
+    if (/^\.\d+$/.test(ext)) {
+      raw = cycleStr.slice(0, dotIdx);
+    }
   }
 
-  if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hour)) return cycleStr;
-  const d = new Date(Date.UTC(year, month, day, hour + deltaHours));
-  if (isNaN(d.getTime())) return cycleStr;
+  // 1. Embedded 8+4 underscore: e.g. CTT_MLT_OTG_20261016_1000_FY2G.AWX
+  const mUnderscore = raw.match(/^(.*?)((?:19|20)\d{6})_(\d{4})(.*)$/);
+  if (mUnderscore) {
+    const [, pre, dPart, tPart, post] = mUnderscore;
+    const y = parseInt(dPart.slice(0, 4), 10);
+    const m = parseInt(dPart.slice(4, 6), 10) - 1;
+    const d = parseInt(dPart.slice(6, 8), 10);
+    const h = parseInt(tPart.slice(0, 2), 10);
+    const min = parseInt(tPart.slice(2, 4), 10);
+    const date = new Date(Date.UTC(y, m, d, h, min) + Math.round(deltaHours * 3600 * 1000));
+    const newD = `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}`;
+    const newT = `${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}`;
+    return `${pre}${newD}_${newT}${post}`;
+  }
 
-  const pad = (n) => String(n).padStart(2, "0");
-  const outYYYY = String(d.getUTCFullYear());
-  const outMM = pad(d.getUTCMonth() + 1);
-  const outDD = pad(d.getUTCDate());
-  const outHH = pad(d.getUTCHours());
+  // 2. 14 digits: e.g. C012_20261016114500_FY4B.AWX or 20260918080000
+  const m14 = raw.match(/^(.*?)((?:19|20)\d{12})(.*)$/);
+  if (m14) {
+    const [, pre, ts, post] = m14;
+    const y = parseInt(ts.slice(0, 4), 10);
+    const m = parseInt(ts.slice(4, 6), 10) - 1;
+    const d = parseInt(ts.slice(6, 8), 10);
+    const h = parseInt(ts.slice(8, 10), 10);
+    const min = parseInt(ts.slice(10, 12), 10);
+    const s = parseInt(ts.slice(12, 14), 10);
+    const date = new Date(Date.UTC(y, m, d, h, min, s) + Math.round(deltaHours * 3600 * 1000));
+    const newTs = `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}`;
+    return `${pre}${newTs}${post}`;
+  }
 
-  const stepped = is4DigitYear
-    ? `${outYYYY}${outMM}${outDD}${outHH}${tail}`
-    : `${outYYYY.slice(-2)}${outMM}${outDD}${outHH}${tail}`;
-  return stepped;
+  // 3. 10 digits YYYYMMDDHH: e.g. 2026092608
+  const m10 = raw.match(/^(.*?)((?:19|20)\d{8})(.*)$/);
+  if (m10) {
+    const [, pre, ts, post] = m10;
+    const y = parseInt(ts.slice(0, 4), 10);
+    const m = parseInt(ts.slice(4, 6), 10) - 1;
+    const d = parseInt(ts.slice(6, 8), 10);
+    const h = parseInt(ts.slice(8, 10), 10);
+    const date = new Date(Date.UTC(y, m, d, h) + Math.round(deltaHours * 3600 * 1000));
+    const newTs = `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}${pad(date.getUTCHours())}`;
+    return `${pre}${newTs}${post}`;
+  }
+
+  // 4. 8 digits YYMMDDHH: e.g. 26092608 or 26092608.024
+  const m8 = raw.match(/^(.*?)(\d{8})(.*)$/);
+  if (m8) {
+    const [, pre, ts, post] = m8;
+    const yy = parseInt(ts.slice(0, 2), 10);
+    const y = yy < 70 ? 2000 + yy : 1900 + yy;
+    const m = parseInt(ts.slice(2, 4), 10) - 1;
+    const d = parseInt(ts.slice(4, 6), 10);
+    const h = parseInt(ts.slice(6, 8), 10);
+    const date = new Date(Date.UTC(y, m, d, h) + Math.round(deltaHours * 3600 * 1000));
+    const newYY = String(date.getUTCFullYear()).slice(-2);
+    const newTs = `${newYY}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}${pad(date.getUTCHours())}`;
+    return `${pre}${newTs}${post}`;
+  }
+
+  return cycleStr;
 }
 
 export function createDefaultWindow(winIdx = 0, tabId = 1) {
@@ -463,11 +519,7 @@ export function computeAllocBadgeText(win, mode, slotIdx = 0) {
   if (!win || !mode || mode === "none") return null;
   if (mode === "level") {
     if (win.level == null) return "SFC";
-    const isFy4b =
-      win.model === "SATELLITE" ||
-      /FY4B/i.test(String(win.activeGroup?.id || "")) ||
-      (Array.isArray(win.layers) && win.layers.some((l) => /FY4B/i.test(String(l?.path || l?.element || ""))));
-    if (isFy4b) {
+    if (isMultiChannelSatellite(win)) {
       return `C${String(win.level).padStart(3, "0")}`;
     }
     const isMeterHeight =
@@ -484,28 +536,42 @@ export function computeAllocBadgeText(win, mode, slotIdx = 0) {
     if (!raw) return `M${slotIdx + 1}`;
     return raw.replace(/_HR$|_MR$/, "");
   }
+  const formatObsLabel = (obsTime) => {
+    if (!obsTime) return null;
+    const match14 = String(obsTime).match(/(?:^|[_.-])((?:19|20)\d{12})(?:[_.-]|$)/);
+    const matchUnderscore = String(obsTime).match(/(?:^|[_.-])((?:19|20)\d{6})_(\d{4})(?:[_.-]|$)/);
+    if (match14) {
+      const raw = match14[1];
+      const dd = raw.slice(6, 8);
+      const hh = raw.slice(8, 10);
+      const mm = raw.slice(10, 12);
+      return mm !== "00" ? `${dd}/${hh}:${mm}` : `${dd}/${hh}h`;
+    } else if (matchUnderscore) {
+      const dPart = matchUnderscore[1];
+      const tPart = matchUnderscore[2];
+      const dd = dPart.slice(6, 8);
+      const hh = tPart.slice(0, 2);
+      const mm = tPart.slice(2, 4);
+      return mm !== "00" ? `${dd}/${hh}:${mm}` : `${dd}/${hh}h`;
+    }
+    const digits = String(obsTime).replace(/[^\d]/g, "");
+    if (digits.length >= 8) {
+      const dd = digits.length >= 10 ? digits.slice(6, 8) : digits.slice(4, 6);
+      const hh = digits.length >= 10 ? digits.slice(8, 10) : digits.slice(6, 8);
+      return `${dd}/${hh}h`;
+    }
+    return String(obsTime);
+  };
   if (mode === "step") {
     if (win.isObservation && win.obsTime) {
-      const digits = String(win.obsTime).replace(/[^\d]/g, "");
-      if (digits.length >= 8) {
-        const dd = digits.length >= 10 ? digits.slice(6, 8) : digits.slice(4, 6);
-        const hh = digits.length >= 10 ? digits.slice(8, 10) : digits.slice(6, 8);
-        return `${dd}/${hh}h`;
-      }
-      return String(win.obsTime);
+      return formatObsLabel(win.obsTime);
     }
     const p = Number(win.period ?? 0);
     return `+${String(p).padStart(3, "0")}h`;
   }
   if (mode === "time") {
     if (win.isObservation && win.obsTime) {
-      const digits = String(win.obsTime).replace(/[^\d]/g, "");
-      if (digits.length >= 8) {
-        const dd = digits.length >= 10 ? digits.slice(6, 8) : digits.slice(4, 6);
-        const hh = digits.length >= 10 ? digits.slice(8, 10) : digits.slice(6, 8);
-        return `${dd}/${hh}h`;
-      }
-      return String(win.obsTime);
+      return formatObsLabel(win.obsTime);
     }
     const cyc = String(win.forecastCycle || "").replace(/[^\d]/g, "");
     const p = Number(win.period ?? 0);
@@ -823,11 +889,43 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {
       }
     }
     if (mode === "level") {
-      win.level = DEFAULT_LEVELS[i] ?? 500;
+      let allocatedLevel;
+      const isMultiChanSat = isMultiChannelSatellite(win0);
+
+      if (isMultiChanSat) {
+        const satLevels = Array.isArray(win0.activeGroup?.levels) && win0.activeGroup.levels.length > 0
+          ? win0.activeGroup.levels
+          : (Array.isArray(win0.levels) && win0.levels.length > 0 ? win0.levels : DEFAULT_SATELLITE_LEVELS);
+        const orderedChannels = [
+          ...DEFAULT_SATELLITE_LEVELS.filter((ch) => satLevels.includes(ch)),
+          ...satLevels.filter((ch) => !DEFAULT_SATELLITE_LEVELS.includes(ch)),
+        ];
+        if (i === 0) {
+          allocatedLevel = baseLevel ?? orderedChannels[0] ?? 12;
+        } else {
+          const pool = orderedChannels.filter((ch) => ch !== (baseLevel ?? orderedChannels[0]));
+          allocatedLevel = pool[(i - 1) % pool.length] ?? orderedChannels[i % orderedChannels.length];
+        }
+      } else if (Array.isArray(win0.activeGroup?.levels) && win0.activeGroup.levels.length > 0) {
+        const groupLevels = win0.activeGroup.levels;
+        if (i === 0) {
+          allocatedLevel = baseLevel ?? groupLevels[0];
+        } else {
+          const pool = groupLevels.filter((lvl) => lvl !== (baseLevel ?? groupLevels[0]));
+          allocatedLevel = pool[(i - 1) % pool.length] ?? groupLevels[i % groupLevels.length];
+        }
+      } else {
+        allocatedLevel = DEFAULT_LEVELS[i] ?? 500;
+      }
+
+      win.level = allocatedLevel;
       win.model = baseModel;
       win.period = basePeriod;
       win.forecastCycle = baseCycle;
       win.obsTime = baseObsTime;
+      if (isMultiChanSat && typeof win.obsTime === "string" && /^C\d{3}_/i.test(win.obsTime)) {
+        win.obsTime = `C${String(win.level).padStart(3, "0")}_${win.obsTime.replace(/^C\d{3}_/i, "")}`;
+      }
     } else if (mode === "model") {
       const eligibleModels = getEligibleModelsForAllocation(win0, baseLevel, DEFAULT_MODELS);
       win.model = eligibleModels[i % eligibleModels.length];
@@ -924,7 +1022,21 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {
         win._nwpTimeline = { ...win0._nwpTimeline, stepLength: win.stepLength, cycle: win.forecastCycle };
       }
       if (isObs) {
-        const stepped = stepCycleHours(baseObsTime, -i * stepLen);
+        let stepped = null;
+        const availableFiles = Array.isArray(win0.obsFiles) && win0.obsFiles.length > 0
+          ? win0.obsFiles
+          : (Array.isArray(win0._obsTimeline?.files) && win0._obsTimeline.files.length > 0
+            ? win0._obsTimeline.files
+            : null);
+        if (availableFiles && baseObsTime) {
+          const curIdx = availableFiles.indexOf(baseObsTime);
+          if (curIdx !== -1 && curIdx - i >= 0) {
+            stepped = availableFiles[curIdx - i];
+          }
+        }
+        if (!stepped) {
+          stepped = stepCycleHours(baseObsTime, -i * stepLen);
+        }
         win.obsTime = (typeof baseObsTime === "string" && baseObsTime.endsWith(".000") && !stepped.endsWith(".000"))
           ? `${stepped}.000`
           : stepped;
@@ -960,7 +1072,21 @@ export function applyAutoAllocation(tab, mode = "level", baseWin = null) {
       win.model = baseModel;
       win.level = baseLevel;
       if (isObs) {
-        const stepped = stepCycleHours(baseObsTime, -i * stepLen);
+        let stepped = null;
+        const availableFiles = Array.isArray(win0.obsFiles) && win0.obsFiles.length > 0
+          ? win0.obsFiles
+          : (Array.isArray(win0._obsTimeline?.files) && win0._obsTimeline.files.length > 0
+            ? win0._obsTimeline.files
+            : null);
+        if (availableFiles && baseObsTime) {
+          const curIdx = availableFiles.indexOf(baseObsTime);
+          if (curIdx !== -1 && curIdx - i >= 0) {
+            stepped = availableFiles[curIdx - i];
+          }
+        }
+        if (!stepped) {
+          stepped = stepCycleHours(baseObsTime, -i * stepLen);
+        }
         win.obsTime = (typeof baseObsTime === "string" && baseObsTime.endsWith(".000") && !stepped.endsWith(".000"))
           ? `${stepped}.000`
           : stepped;
@@ -1051,7 +1177,11 @@ export function revertAutoAllocation(tab, baseWin = null) {
   const win0 = (baseWin && typeof baseWin === "object" && baseWin.activeGroup)
     ? baseWin
     : (tab.windows.find((w) => w && w.activeGroup) || (baseWin && typeof baseWin === "object" ? baseWin : null) || tab.windows[tab.activeWinIdx] || tab.windows[0] || {});
-  const baseLevel = isNumericLevelOnly ? baseWin : (win0.level ?? 500);
+  const win0HasNoLevel =
+    win0.hasLevel === false ||
+    win0.activeGroup?.hasLevel === false ||
+    (win0.level == null && win0.activeGroup?.level == null && win0.defaultLevel == null && win0.activeGroup?.defaultLevel == null);
+  const baseLevel = isNumericLevelOnly ? baseWin : (win0HasNoLevel ? null : (win0.level ?? 500));
   const baseModel = win0.model || "ECMWF_HR";
   const baseElement = win0.element || "TMP";
   const basePeriod = win0.period ?? 24;

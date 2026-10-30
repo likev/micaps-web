@@ -3,6 +3,7 @@ import { uiState } from "../stores/uiCore.js";
 import { createTimelineState } from "../stores/timelineCore.js";
 import { parseTimestamp } from "../../utils/timeResolver.js";
 import { getGlobalLocale } from "../stores/i18nCore.js";
+import { isSatelliteGroup } from "../../ui/timeline/timelineMath.js";
 
 /**
  * Determines whether a preset group requires hiding the forecast timeline
@@ -92,11 +93,38 @@ export function isUpperAirGroup(group) {
   return false;
 }
 
+export function isSatelliteWindow(win) {
+  if (!win) return false;
+  if (win.model === "SATELLITE") return true;
+  if (isSatelliteGroup(win.activeGroup)) return true;
+  if (Array.isArray(win.layers)) {
+    return win.layers.some(
+      (l) => l?.model === "SATELLITE" || l?.type === "image" || /SATELLITE|FY4|FY-4|FY2|FY-2/i.test(String(l?.path || l?.element || l?.id || ""))
+    );
+  }
+  if (typeof win.title === "string" && /卫星|Satellite|FY-?4|FY-?2/i.test(win.title)) return true;
+  return false;
+}
+
+export function isRadarWindow(win) {
+  if (!win) return false;
+  if (win.model === "RADAR" || win.model === "SWAN_PRODUCT") return true;
+  if (/RADAR|SWAN/i.test(String(win.activeGroup?.id || win.activeGroup?.model || win.activeGroup?.category || ""))) return true;
+  if (Array.isArray(win.layers)) {
+    return win.layers.some(
+      (l) => l?.model === "RADAR" || l?.model === "SWAN_PRODUCT" || /RADAR|SWAN/i.test(String(l?.path || l?.element || l?.id || ""))
+    );
+  }
+  if (typeof win.title === "string" && /雷达|Radar|SWAN/i.test(win.title)) return true;
+  return false;
+}
+
 export function isSurfaceWindow(win) {
   if (!win) return false;
+  if (isSatelliteWindow(win) || isRadarWindow(win)) return false;
   if (isSurfaceGroup(win.activeGroup)) return true;
   if (win.model === "SURFACE" || win.model === "SURFACE_ANALYSIS") return true;
-  if (win.isObservation && win.activeGroup?.hasLevel === false) return true;
+  if (win.isObservation && (win.activeGroup?.hasLevel === false || win.hasLevel === false)) return true;
   if (Array.isArray(win.layers)) {
     return win.layers.some(
       (l) => l?.model === "SURFACE" || l?.model === "SURFACE_ANALYSIS" || (typeof l?.id === "string" && (l.id.startsWith("surface-obs") || l.id.startsWith("contour-surface-")))
@@ -108,9 +136,10 @@ export function isSurfaceWindow(win) {
 
 export function isUpperAirWindow(win) {
   if (!win) return false;
+  if (isSatelliteWindow(win) || isRadarWindow(win)) return false;
   if (isUpperAirGroup(win.activeGroup)) return true;
   if (win.model === "UPPER_AIR") return true;
-  if (win.isObservation && (win.activeGroup?.hasLevel === true || (win.level !== null && win.level !== undefined && win.level > 0))) return true;
+  if (win.isObservation && (win.activeGroup?.hasLevel === true || win.hasLevel === true || (win.level !== null && win.level !== undefined && win.level > 0))) return true;
   if (Array.isArray(win.layers)) {
     return win.layers.some(
       (l) => l?.model === "UPPER_AIR" || (typeof l?.id === "string" && (l.id.startsWith("upperair-") || l.id.startsWith("contour-sounding-")))

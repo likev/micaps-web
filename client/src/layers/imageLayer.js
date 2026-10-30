@@ -152,7 +152,7 @@ export async function loadImageLayer(map, layer, win = null) {
   const curSeq = (seqStore.get(srcId) || 0) + 1;
   seqStore.set(srcId, curSeq);
 
-  const file = layer.file || targetWin?.obsTime || "latest";
+  const file = targetWin?.obsTime || layer.file || "latest";
   const bounds = layer.bounds || [45.0, 5.0, 155.0, 55.0];
   const coordinates = boundsToCoordinates(bounds);
   const opacity = typeof layer.opacity === "number" ? layer.opacity : 0.85;

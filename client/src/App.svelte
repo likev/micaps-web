@@ -72,6 +72,8 @@
     isUpperAirGroup,
     isSurfaceWindow,
     isUpperAirWindow,
+    isSatelliteWindow,
+    isRadarWindow,
     applyPresetToWindow,
     stepWindowTimeline,
     beginSharedSweep,
@@ -680,11 +682,14 @@
       ? resolveContrastInitiator(activeTab, rawBaseWin)
       : rawBaseWin;
 
+    const isSurf = isSurfaceWindow(baseWin);
+    const isUp = isUpperAirWindow(baseWin);
+
     if (isProfilePanelWindow(baseWin)) {
       activeTab.autoAllocation = "none";
-    } else if (isSurfaceWindow(baseWin) && (activeTab.autoAllocation === "step" || activeTab.autoAllocation === "level" || activeTab.autoAllocation === "model")) {
+    } else if (isSurf && (activeTab.autoAllocation === "step" || activeTab.autoAllocation === "level" || activeTab.autoAllocation === "model")) {
       activeTab.autoAllocation = "none";
-    } else if (isUpperAirWindow(baseWin) && (activeTab.autoAllocation === "step" || activeTab.autoAllocation === "model")) {
+    } else if (isUp && (activeTab.autoAllocation === "step" || activeTab.autoAllocation === "model")) {
       activeTab.autoAllocation = "none";
     }
 
@@ -872,10 +877,21 @@
           groupCopy.defaultLevel = w.level;
           if (Array.isArray(groupCopy.layers)) {
             for (const l of groupCopy.layers) {
-              if (l.model === "UPPER_AIR" || l.type === "contour" || l.type === "wind" || l.type === "station") {
+              if (
+                l.model === "UPPER_AIR" ||
+                l.model === "SATELLITE" ||
+                l.type === "contour" ||
+                l.type === "wind" ||
+                l.type === "station" ||
+                l.type === "image" ||
+                l.type === "radar"
+              ) {
                 if (l.model !== "SURFACE" && l.level !== 0) {
                   l.level = w.level;
                 }
+              }
+              if (isSatelliteWindow(w) && typeof l.file === "string" && /^C\d{3}_/i.test(l.file) && w.level) {
+                l.file = `C${String(w.level).padStart(3, "0")}_${l.file.replace(/^C\d{3}_/i, "")}`;
               }
             }
           }
@@ -1119,6 +1135,7 @@
     }
     const isSurf = isSurfaceWindow(focusedWin);
     const isUp = isUpperAirWindow(focusedWin);
+
     if (isSurf && (mode === "step" || mode === "level" || mode === "model")) {
       activeTab.autoAllocation = "none";
       return;
@@ -1141,6 +1158,7 @@
     }
     const isSurf = isSurfaceWindow(activeWin);
     const isUp = isUpperAirWindow(activeWin);
+
     const defaultMode = isSurf ? "time" : "level";
     const mode = typeof modeOrState === "string" ? modeOrState : (activeTab.autoAllocation === "none" ? defaultMode : "none");
     if (isSurf && (mode === "step" || mode === "level" || mode === "model")) {
@@ -1586,7 +1604,10 @@
       const visible = getVisibleWindows(activeTab);
       const win0 = visible[0] || activeWin;
       const tl0 = win0 ? getOrCreateTimeline(win0.id) : null;
-      const stepLen = payload.stepLength || win0?.stepLength || tl0?.currentStepLength || 12;
+      const isSat0 = isSatelliteWindow(win0);
+      const isRad0 = isRadarWindow(win0);
+      const defaultObsStep = isSat0 ? (win0?.activeGroup?.id?.includes("fy2") ? 1 : 0.25) : (isRad0 ? 0.1 : (isSurfaceWindow(win0) ? 3 : 12));
+      const stepLen = payload.stepLength || win0?.stepLength || tl0?.currentStepLength || defaultObsStep;
       const targetWin = (payload.winId ? getWindowById(payload.winId) : activeWin) || win0;
       const targetPos = Math.max(0, visible.indexOf(targetWin));
       const targetFile = payload.file || targetWin?.obsTime || win0?.obsTime;
@@ -1609,6 +1630,11 @@
         if (win._obsTimeline) {
           win._obsTimeline.file = win.obsTime;
           win._obsTimeline.stepLength = stepLen;
+        }
+        if (win.activeGroup && Array.isArray(win.activeGroup.layers)) {
+          for (const l of win.activeGroup.layers) {
+            l.file = win.obsTime;
+          }
         }
         const tl = getOrCreateTimeline(win.id);
         if (tl) {
@@ -1662,16 +1688,19 @@
       }
 
       if (payload.isObs) {
-        win.obsTime = payload.file;
-        if (!payload.cursorTime && payload.file) {
-          const ts = parseTimestamp(payload.file);
+        const fileForWin = (isSatelliteWindow(win) && typeof payload.file === "string" && /^C\d{3}_/i.test(payload.file) && win.level)
+          ? `C${String(win.level).padStart(3, "0")}_${payload.file.replace(/^C\d{3}_/i, "")}`
+          : payload.file;
+        win.obsTime = fileForWin;
+        if (!payload.cursorTime && fileForWin) {
+          const ts = parseTimestamp(fileForWin);
           if (ts) {
             win.wallClockCursor = ts;
             const tl = getOrCreateTimeline(win.id);
             if (tl) tl.wallClockCursor = ts;
           }
         }
-        if (win._obsTimeline) win._obsTimeline.file = payload.file;
+        if (win._obsTimeline) win._obsTimeline.file = fileForWin;
         if (payload.stepLength) {
           win.stepLength = payload.stepLength;
           if (win._obsTimeline) win._obsTimeline.stepLength = payload.stepLength;
@@ -1692,8 +1721,13 @@
         if (tl) {
           if (payload.stepLength) tl.currentStepLength = payload.stepLength;
           if (Array.isArray(tl.obsFiles)) {
-            const idx = tl.obsFiles.indexOf(payload.file);
+            const idx = tl.obsFiles.indexOf(fileForWin);
             if (idx !== -1) tl.currentObsIdx = idx;
+          }
+        }
+        if (win.activeGroup && Array.isArray(win.activeGroup.layers)) {
+          for (const l of win.activeGroup.layers) {
+            l.file = fileForWin;
           }
         }
         if (map) {

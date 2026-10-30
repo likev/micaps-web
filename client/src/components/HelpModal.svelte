@@ -118,7 +118,7 @@
       </div>
 
       <footer class="help-modal-footer">
-        <span class="system-badge">MICAPS-Web PRO v1.12.1</span>
+        <span class="system-badge">MICAPS-Web PRO v1.12.2</span>
         <button
           type="button"
           class="btn btn-primary"

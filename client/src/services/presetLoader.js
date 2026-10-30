@@ -286,6 +286,15 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
         targetLevel = layer.level || (group.hasLevel ? group.defaultLevel : null);
       }
 
+      if (targetLevel && (layer.model === "SATELLITE" || group.id?.toLowerCase().includes("fy4") || layer.path?.includes("FY4"))) {
+        if (win && typeof win.obsTime === "string" && /^C\d{3}_/i.test(win.obsTime)) {
+          win.obsTime = `C${String(targetLevel).padStart(3, "0")}_${win.obsTime.replace(/^C\d{3}_/i, "")}`;
+        }
+        if (typeof layer.file === "string" && /^C\d{3}_/i.test(layer.file)) {
+          layer.file = `C${String(targetLevel).padStart(3, "0")}_${layer.file.replace(/^C\d{3}_/i, "")}`;
+        }
+      }
+
       if (layer.type === "contour" || layer.type === "wind") {
         const isUpperAirContour = (layer.model === "UPPER_AIR" || (layer.path && layer.path.includes("/api/derived/UPPER_AIR")));
         const stnLayer = group.layers.find((l) => l.type === "station" && (l.model === "UPPER_AIR" || (l.path && l.path.includes("UPPER_AIR"))));
@@ -700,6 +709,9 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
         if (layer.path && (!win?._obsTimeline || freshObsLoad)) {
           const file = await syncObservationTimeline(layer.path, freshObsLoad ? null : (win?.obsTime || layer.file), winTitle, win, { forceLatest: freshObsLoad });
           if (win && file) win.obsTime = file;
+        }
+        if (win?.obsTime) {
+          layer.file = win.obsTime;
         }
         await loadImageLayer(map, layer, win);
       }

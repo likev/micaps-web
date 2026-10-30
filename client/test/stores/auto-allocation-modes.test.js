@@ -8,6 +8,8 @@ import {
   isWindowEmpty,
   DEFAULT_LEVELS,
   DEFAULT_MODELS,
+  DEFAULT_SATELLITE_LEVELS,
+  isSatelliteEntity,
   stepCycleHours,
   getVisibleWindows,
   isModelLayerSupported,
@@ -31,6 +33,8 @@ import {
   isUpperAirGroup,
   isSurfaceWindow,
   isUpperAirWindow,
+  isSatelliteWindow,
+  isRadarWindow,
 } from "../../src/lib/services/appWorkflow.js";
 import { computeFullWindowTitle } from "../../src/ui/tabs/windowTitles.js";
 
@@ -1276,5 +1280,251 @@ describe("Split-Contrast Lifecycle: Grouping, Pruning, Pinning, Adoption & Bug F
     expect(computeAllocBadgeText({ model: "ECMWF_HR" }, "model", 0)).toBe("ECMWF");
     expect(computeAllocBadgeText({ period: 36 }, "step", 1)).toBe("+036h");
     expect(computeAllocBadgeText({ forecastCycle: "26092608", period: 24 }, "time", 0)).toBe("26/08 +024h");
+  });
+
+  describe("Satellite & Radar Split Auto-Allocation (Contrast)", () => {
+    it("distinguishes satellite and radar windows from surface and upper-air windows", () => {
+      const fy4bWin = {
+        id: "w-fy4b",
+        isObservation: true,
+        model: "SATELLITE",
+        level: 12,
+        activeGroup: { id: "preset-fy4b_china_grouped", hasLevel: true, levels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] },
+      };
+      const fy2gWin = {
+        id: "w-fy2g",
+        isObservation: true,
+        model: "SATELLITE",
+        hasLevel: false,
+        activeGroup: { id: "preset-fy2g_ctt", hasLevel: false },
+      };
+      const radarWin = {
+        id: "w-radar",
+        isObservation: true,
+        model: "SWAN_PRODUCT",
+        activeGroup: { id: "swan-tdmosaic", hasLevel: true, levels: [500, 1000, 1500, 2000, 3000, 4000] },
+      };
+      const surfaceWin = {
+        id: "w-surf",
+        isObservation: true,
+        model: "SURFACE",
+        hasLevel: false,
+        activeGroup: { id: "preset-surface-plot", hasLevel: false },
+      };
+      const upperAirWin = {
+        id: "w-up",
+        isObservation: true,
+        model: "UPPER_AIR",
+        level: 500,
+        activeGroup: { id: "preset-upper-air", hasLevel: true },
+      };
+
+      expect(isSatelliteWindow(fy4bWin)).toBe(true);
+      expect(isSurfaceWindow(fy4bWin)).toBe(false);
+      expect(isUpperAirWindow(fy4bWin)).toBe(false);
+
+      expect(isSatelliteWindow(fy2gWin)).toBe(true);
+      expect(isSurfaceWindow(fy2gWin)).toBe(false);
+      expect(isUpperAirWindow(fy2gWin)).toBe(false);
+
+      expect(isRadarWindow(radarWin)).toBe(true);
+      expect(isSurfaceWindow(radarWin)).toBe(false);
+      expect(isUpperAirWindow(radarWin)).toBe(false);
+
+      expect(isSurfaceWindow(surfaceWin)).toBe(true);
+      expect(isSatelliteWindow(surfaceWin)).toBe(false);
+
+      expect(isUpperAirWindow(upperAirWin)).toBe(true);
+      expect(isSatelliteWindow(upperAirWin)).toBe(false);
+    });
+
+    it("Mode 'level' with FY-4B satellite: allocates channels across split-4 and split-6 windows", () => {
+      const tab = createDefaultTab(1);
+      tab.layout = "2x2";
+      const initiator = {
+        ...createDefaultWindow(0, 1),
+        id: "win-fy4b-0",
+        model: "SATELLITE",
+        element: "FY4B/L1/CHINA",
+        level: 12,
+        obsTime: "C012_20261016114500_FY4B.AWX",
+        stepLength: 0.25,
+        activeGroup: {
+          id: "preset-fy4b_china_grouped",
+          hasLevel: true,
+          levels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+          layers: [{ id: "l1", model: "SATELLITE", type: "contour", level: 12 }],
+        },
+      };
+      tab.windows = [initiator];
+      prepareSplitWindows(tab, 4, initiator, isWindowEmpty, true);
+      applyAutoAllocation(tab, "level", initiator);
+
+      expect(tab.windows.map((w) => w.level)).toEqual([12, 9, 8, 2]);
+      expect(tab.windows.map((w) => w.allocBadgeText)).toEqual(["C012", "C009", "C008", "C002"]);
+      expect(tab.windows.map((w) => w.obsTime)).toEqual([
+        "C012_20261016114500_FY4B.AWX",
+        "C009_20261016114500_FY4B.AWX",
+        "C008_20261016114500_FY4B.AWX",
+        "C002_20261016114500_FY4B.AWX",
+      ]);
+
+      // Split 6 (2x3)
+      tab.layout = "2x3";
+      prepareSplitWindows(tab, 6, initiator, isWindowEmpty, true);
+      applyAutoAllocation(tab, "level", initiator);
+      expect(tab.windows.map((w) => w.level)).toEqual([12, 9, 8, 2, 1, 13]);
+      expect(tab.windows.map((w) => w.allocBadgeText)).toEqual(["C012", "C009", "C008", "C002", "C001", "C013"]);
+    });
+
+    it("Mode 'level' with Radar (TDMOSAIC 3D): allocates radar height levels from activeGroup.levels", () => {
+      const tab = createDefaultTab(1);
+      tab.layout = "2x2";
+      const initiator = {
+        ...createDefaultWindow(0, 1),
+        id: "win-radar-0",
+        model: "SWAN_PRODUCT",
+        element: "TDMOSAIC",
+        level: 500,
+        obsTime: "20261016120000.000",
+        activeGroup: {
+          id: "swan-tdmosaic",
+          hasLevel: true,
+          levels: [500, 1000, 1500, 2000, 3000, 4000],
+        },
+      };
+      tab.windows = [initiator];
+      prepareSplitWindows(tab, 4, initiator, isWindowEmpty, true);
+      applyAutoAllocation(tab, "level", initiator);
+
+      expect(tab.windows.map((w) => w.level)).toEqual([500, 1000, 1500, 2000]);
+      expect(tab.windows.map((w) => w.allocBadgeText)).toEqual(["500m", "1000m", "1500m", "2000m"]);
+    });
+
+    it("Mode 'time' with FY-4B satellite: steps reverse chronological timestamps at 15-minute intervals", () => {
+      const tab = createDefaultTab(1);
+      tab.layout = "2x2";
+      const initiator = {
+        ...createDefaultWindow(0, 1),
+        id: "win-fy4b-t0",
+        model: "SATELLITE",
+        element: "FY4B/L1/CHINA",
+        level: 12,
+        stepLength: 0.25,
+        obsTime: "C012_20261016120000_FY4B.AWX",
+        activeGroup: { id: "preset-fy4b_china_grouped", hasLevel: true, isObservation: true },
+      };
+      tab.windows = [initiator];
+      prepareSplitWindows(tab, 4, initiator, isWindowEmpty, true);
+      applyAutoAllocation(tab, "time", initiator);
+
+      expect(tab.windows.map((w) => w.obsTime)).toEqual([
+        "C012_20261016120000_FY4B.AWX",
+        "C012_20261016114500_FY4B.AWX",
+        "C012_20261016113000_FY4B.AWX",
+        "C012_20261016111500_FY4B.AWX",
+      ]);
+      expect(tab.windows.map((w) => w.allocBadgeText)).toEqual([
+        "16/12h",
+        "16/11:45",
+        "16/11:30",
+        "16/11:15",
+      ]);
+    });
+
+    it("Mode 'time' with FY-2G satellite: steps reverse chronological timestamps at 1-hour intervals", () => {
+      const tab = createDefaultTab(1);
+      tab.layout = "2x2";
+      const initiator = {
+        ...createDefaultWindow(0, 1),
+        id: "win-fy2g-t0",
+        model: "SATELLITE",
+        element: "FY2G/L2/CTT",
+        hasLevel: false,
+        stepLength: 1,
+        obsTime: "CTT_MLT_OTG_20261016_1200_FY2G.AWX",
+        activeGroup: { id: "preset-fy2g_ctt", hasLevel: false, isObservation: true },
+      };
+      tab.windows = [initiator];
+      prepareSplitWindows(tab, 4, initiator, isWindowEmpty, true);
+      applyAutoAllocation(tab, "time", initiator);
+
+      expect(tab.windows.map((w) => w.obsTime)).toEqual([
+        "CTT_MLT_OTG_20261016_1200_FY2G.AWX",
+        "CTT_MLT_OTG_20261016_1100_FY2G.AWX",
+        "CTT_MLT_OTG_20261016_1000_FY2G.AWX",
+        "CTT_MLT_OTG_20261016_0900_FY2G.AWX",
+      ]);
+      expect(tab.windows.map((w) => w.allocBadgeText)).toEqual([
+        "16/12h",
+        "16/11h",
+        "16/10h",
+        "16/09h",
+      ]);
+    });
+
+    it("Mode 'time' utilizes available real files from obsFiles or _obsTimeline when present", () => {
+      const tab = createDefaultTab(1);
+      tab.layout = "2x2";
+      const realFiles = [
+        "C012_20261016104500_FY4B.AWX",
+        "C012_20261016110000_FY4B.AWX",
+        "C012_20261016111500_FY4B.AWX",
+        "C012_20261016114500_FY4B.AWX", // Note: 11:30 is missing in real catalog
+        "C012_20261016120000_FY4B.AWX",
+      ];
+      const initiator = {
+        ...createDefaultWindow(0, 1),
+        id: "win-fy4b-real",
+        model: "SATELLITE",
+        obsTime: "C012_20261016120000_FY4B.AWX",
+        obsFiles: realFiles,
+        activeGroup: { id: "preset-fy4b_china_grouped", hasLevel: true, isObservation: true },
+      };
+      tab.windows = [initiator];
+      prepareSplitWindows(tab, 4, initiator, isWindowEmpty, true);
+      applyAutoAllocation(tab, "time", initiator);
+
+      expect(tab.windows.map((w) => w.obsTime)).toEqual([
+        "C012_20261016120000_FY4B.AWX",
+        "C012_20261016114500_FY4B.AWX",
+        "C012_20261016111500_FY4B.AWX",
+        "C012_20261016110000_FY4B.AWX",
+      ]);
+    });
+
+    it("revertAutoAllocation preserves hasLevel: false without coercing level to 500", () => {
+      const tab = createDefaultTab(1);
+      tab.layout = "2x2";
+      const initiator = {
+        ...createDefaultWindow(0, 1),
+        id: "win-fy2g",
+        model: "SATELLITE",
+        hasLevel: false,
+        level: null,
+        obsTime: "CTT_MLT_OTG_20261016_1200_FY2G.AWX",
+        activeGroup: { id: "preset-fy2g_ctt", hasLevel: false },
+      };
+      tab.windows = [initiator];
+      prepareSplitWindows(tab, 4, initiator, isWindowEmpty, true);
+      applyAutoAllocation(tab, "time", initiator);
+
+      revertAutoAllocation(tab, initiator);
+      for (const w of tab.windows) {
+        expect(w.level).toBe(null);
+        expect(w.obsTime).toBe("CTT_MLT_OTG_20261016_1200_FY2G.AWX");
+      }
+    });
+
+    it("stepCycleHours handles complex timestamps and fractional hours", () => {
+      // 15-minute backward step (-0.25h) for FY-4B
+      expect(stepCycleHours("C012_20261016120000_FY4B.AWX", -0.25)).toBe("C012_20261016114500_FY4B.AWX");
+      // Day boundary step backwards across midnight
+      expect(stepCycleHours("C012_20261016001500_FY4B.AWX", -0.5)).toBe("C012_20261015234500_FY4B.AWX");
+      // FY-2G 8+4 format with underscore
+      expect(stepCycleHours("CTT_MLT_OTG_20261016_1200_FY2G.AWX", -1)).toBe("CTT_MLT_OTG_20261016_1100_FY2G.AWX");
+      // Standard 14-digit dot extension
+      expect(stepCycleHours("20261016120000.000", -3)).toBe("20261016090000");
+    });
   });
 });

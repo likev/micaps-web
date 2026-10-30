@@ -50,12 +50,11 @@
   let isProfile = $derived(Boolean(activeWindow && isProfilePanelWindow(activeWindow)));
   let isSurface = $derived(Boolean(activeWindow && isSurfaceWindow(activeWindow)));
   let isUpperAir = $derived(Boolean(activeWindow && isUpperAirWindow(activeWindow)));
+  let isObs = $derived(Boolean(isSurface || isUpperAir || activeWindow?.isObservation || activeWindow?.activeGroup?.isObservation));
   let hasNoLevel = $derived(Boolean(
     isSurface ||
-    activeWindow?.hasLevel === false ||
-    activeWindow?.activeGroup?.hasLevel === false
+    (activeWindow?.activeGroup ? activeWindow.activeGroup.hasLevel === false : (activeWindow ? activeWindow.hasLevel === false : false))
   ));
-  let isObs = $derived(Boolean(isSurface || isUpperAir || activeWindow?.isObservation || activeWindow?.activeGroup?.isObservation));
   let isObsOrNonNwp = $derived(Boolean(
     isObs ||
     isSurface ||
@@ -83,10 +82,10 @@
   let effectiveAlloc = $derived.by(() => {
     if (isProfile) return "none";
     const cur = typeof autoAllocation === "string" ? autoAllocation : (autoAllocation ? "level" : "none");
-    if (isSurface && (cur === "step" || cur === "level" || cur === "model")) return "none";
-    if (isUpperAir && (cur === "step" || cur === "model")) return "none";
     if (hasNoLevel && cur === "level") return "none";
     if (isObsOrNonNwp && (cur === "step" || cur === "model")) return "none";
+    if (isSurface && (cur === "step" || cur === "level" || cur === "model")) return "none";
+    if (isUpperAir && (cur === "step" || cur === "model")) return "none";
     return cur;
   });
 
@@ -459,10 +458,10 @@
         value={effectiveAlloc}
         onchange={(e) => {
           const val = e.currentTarget.value;
-          if (isSurface && (val === "step" || val === "level" || val === "model")) return;
-          if (isUpperAir && (val === "step" || val === "model")) return;
           if (hasNoLevel && val === "level") return;
           if (isObsOrNonNwp && (val === "step" || val === "model")) return;
+          if (isSurface && (val === "step" || val === "level" || val === "model")) return;
+          if (isUpperAir && (val === "step" || val === "model")) return;
           if (onSelectAutoAlloc) onSelectAutoAlloc(val);
           else if (onToggleAutoAlloc) onToggleAutoAlloc(val);
         }}
