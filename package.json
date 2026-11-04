@@ -1,6 +1,6 @@
 {
   "name": "micaps-web",
-  "version": "1.12.2",
+  "version": "1.12.3",
   "private": true,
   "scripts": {
     "test": "cd client && bun test",

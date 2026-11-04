@@ -521,11 +521,12 @@ export function createColorResolver(element = "TMP", colormap = null, zMin = und
   }
   if (palette.length === 1) {
     const [r, g, b, a] = palette[0].color;
-    return (val, out, offset = 0) => {
+    return (val, out = new Uint8ClampedArray(4), offset = 0) => {
       out[offset] = r;
       out[offset + 1] = g;
       out[offset + 2] = b;
       out[offset + 3] = a;
+      return out;
     };
   }
 
@@ -572,7 +573,33 @@ export function createColorResolver(element = "TMP", colormap = null, zMin = und
   const relSpan = (canBeRelative && effMax > effMin) ? (effMax - effMin) : 0;
   const isAlwaysRelative = canBeRelative && relSpan > 0 && (isHGT || isSLP);
 
-  return (val, out, offset = 0) => {
+  const LUT_SIZE = 4096;
+  let lut = null;
+  if (isFixedPhysical && palMax > palMin) {
+    lut = new Uint8ClampedArray(LUT_SIZE * 4);
+    const span = palMax - palMin;
+    for (let k = 0; k < LUT_SIZE; k++) {
+      const v = palMin + (k / (LUT_SIZE - 1)) * span;
+      let r = palette[0].color[0], g = palette[0].color[1], b = palette[0].color[2], a = palette[0].color[3];
+      for (let i = 0; i < palLen - 1; i++) {
+        const c0 = palette[i];
+        const c1 = palette[i + 1];
+        if (v >= c0.val && v <= c1.val) {
+          const denom = c1.val - c0.val;
+          const t = denom > 0 ? (v - c0.val) / denom : 0;
+          r = Math.round(c0.color[0] + t * (c1.color[0] - c0.color[0]));
+          g = Math.round(c0.color[1] + t * (c1.color[1] - c0.color[1]));
+          b = Math.round(c0.color[2] + t * (c1.color[2] - c0.color[2]));
+          a = Math.round(c0.color[3] + t * (c1.color[3] - c0.color[3]));
+          break;
+        }
+      }
+      const o = k * 4;
+      lut[o] = r; lut[o + 1] = g; lut[o + 2] = b; lut[o + 3] = a;
+    }
+  }
+
+  return (val, out = new Uint8ClampedArray(4), offset = 0) => {
     let checkVal = val;
     if (hgtScale && val < 2500) {
       checkVal = val * 10;
@@ -583,17 +610,26 @@ export function createColorResolver(element = "TMP", colormap = null, zMin = und
     if (isFixedPhysical) {
       if (isRain && (checkVal < 0.1 || checkVal < palMin)) {
         out[offset] = 0; out[offset + 1] = 0; out[offset + 2] = 0; out[offset + 3] = 0;
-        return;
+        return out;
       }
       if (checkVal <= palMin) {
         const c = palette[0].color;
         out[offset] = c[0]; out[offset + 1] = c[1]; out[offset + 2] = c[2]; out[offset + 3] = c[3];
-        return;
+        return out;
       }
       if (checkVal >= palMax) {
         const c = palette[palLen - 1].color;
         out[offset] = c[0]; out[offset + 1] = c[1]; out[offset + 2] = c[2]; out[offset + 3] = c[3];
-        return;
+        return out;
+      }
+      if (lut) {
+        const k = Math.min(LUT_SIZE - 1, Math.max(0, Math.floor(((checkVal - palMin) / (palMax - palMin)) * (LUT_SIZE - 1))));
+        const o = k * 4;
+        out[offset] = lut[o];
+        out[offset + 1] = lut[o + 1];
+        out[offset + 2] = lut[o + 2];
+        out[offset + 3] = lut[o + 3];
+        return out;
       }
 
       for (let i = 0; i < palLen - 1; i++) {
@@ -606,12 +642,12 @@ export function createColorResolver(element = "TMP", colormap = null, zMin = und
           out[offset + 1] = Math.round(c0.color[1] + t * (c1.color[1] - c0.color[1]));
           out[offset + 2] = Math.round(c0.color[2] + t * (c1.color[2] - c0.color[2]));
           out[offset + 3] = Math.round(c0.color[3] + t * (c1.color[3] - c0.color[3]));
-          return;
+          return out;
         }
       }
       const c = palette[0].color;
       out[offset] = c[0]; out[offset + 1] = c[1]; out[offset + 2] = c[2]; out[offset + 3] = c[3];
-      return;
+      return out;
     }
 
     if (isAlwaysRelative || (relSpan > 0 && (checkVal < palMin || checkVal > palMax))) {
@@ -626,18 +662,18 @@ export function createColorResolver(element = "TMP", colormap = null, zMin = und
       out[offset + 1] = Math.round(c0[1] + t * (c1[1] - c0[1]));
       out[offset + 2] = Math.round(c0[2] + t * (c1[2] - c0[2]));
       out[offset + 3] = Math.round(c0[3] + t * (c1[3] - c0[3]));
-      return;
+      return out;
     }
 
     if (checkVal <= palMin) {
       const c = palette[0].color;
       out[offset] = c[0]; out[offset + 1] = c[1]; out[offset + 2] = c[2]; out[offset + 3] = c[3];
-      return;
+      return out;
     }
     if (checkVal >= palMax) {
       const c = palette[palLen - 1].color;
       out[offset] = c[0]; out[offset + 1] = c[1]; out[offset + 2] = c[2]; out[offset + 3] = c[3];
-      return;
+      return out;
     }
 
     for (let i = 0; i < palLen - 1; i++) {
@@ -650,11 +686,12 @@ export function createColorResolver(element = "TMP", colormap = null, zMin = und
         out[offset + 1] = Math.round(c0.color[1] + t * (c1.color[1] - c0.color[1]));
         out[offset + 2] = Math.round(c0.color[2] + t * (c1.color[2] - c0.color[2]));
         out[offset + 3] = Math.round(c0.color[3] + t * (c1.color[3] - c0.color[3]));
-        return;
+        return out;
       }
     }
     const c = palette[0].color;
     out[offset] = c[0]; out[offset + 1] = c[1]; out[offset + 2] = c[2]; out[offset + 3] = c[3];
+    return out;
   };
 }
 

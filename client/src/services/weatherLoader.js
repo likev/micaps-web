@@ -59,7 +59,8 @@ export async function loadWeatherField(map, model, element, level, period, custo
     win?.isObservation ||
     model === "SWAN_PRODUCT" ||
     model === "SATELLITE" ||
-    (customOptions?.path && (customOptions.path.includes("SWAN") || customOptions.path.includes("SATELLITE") || customOptions.path.includes("FY4") || customOptions.path.includes("FY2")))
+    model === "CLDAS" ||
+    (customOptions?.path && (customOptions.path.includes("SWAN") || customOptions.path.includes("SATELLITE") || customOptions.path.includes("FY4") || customOptions.path.includes("FY2") || customOptions.path.includes("CLDAS")))
   );
 
   let cycle = win?.forecastCycle;
@@ -121,7 +122,10 @@ export async function loadWeatherField(map, model, element, level, period, custo
     } else {
       try {
         const treeLimit = getObsTreeLimit(dataPath);
-        let fileEntries = await fetchTree(dataPath, treeLimit, targetLevel);
+        const treeOpts = (!isObservationProduct && cycle) ? { cycle } : null;
+        let fileEntries = treeOpts
+          ? await fetchTree(dataPath, treeLimit, targetLevel, treeOpts)
+          : await fetchTree(dataPath, treeLimit, targetLevel);
         // If fileEntries are subdirectories representing levels (e.g. 1000, 925, 850, 500, 2M_ABOVE_GROUND, 850-925), dive into the level
         const isLevelDirs =
           fileEntries.length > 0 &&
@@ -133,7 +137,9 @@ export async function loadWeatherField(map, model, element, level, period, custo
           }
           path = dataPath;
           targetLevel = chosenLvl;
-          fileEntries = await fetchTree(dataPath, treeLimit, targetLevel);
+          fileEntries = treeOpts
+            ? await fetchTree(dataPath, treeLimit, targetLevel, treeOpts)
+            : await fetchTree(dataPath, treeLimit, targetLevel);
         }
         if (Array.isArray(fileEntries)) {
           availableFiles = fileEntries
@@ -178,8 +184,23 @@ export async function loadWeatherField(map, model, element, level, period, custo
     }
   }
 
-  const cycleFiles = (cycle && availableFiles.length > 0) ? availableFiles.filter((f) => f.startsWith(`${cycle}.`)) : [];
-  const candidateFiles = cycleFiles.length > 0 ? cycleFiles : availableFiles;
+  const cycleStr = cycle ? String(cycle) : "";
+  const cycle8 = cycleStr.length === 10 ? cycleStr.slice(2) : cycleStr;
+  const cycle10 = cycleStr.length === 8 ? `20${cycleStr}` : cycleStr;
+  const cycleFiles = (cycleStr && availableFiles.length > 0)
+    ? availableFiles.filter((f) => f.startsWith(`${cycleStr}.`) || f.startsWith(`${cycle8}.`) || f.startsWith(`${cycle10}.`))
+    : [];
+  // When cycle is present, candidateFiles must only contain files from that cycle
+  let candidateFiles = cycleStr ? cycleFiles : availableFiles;
+  const periodsList = (win?.discretePeriods || win?._forecastTimeline?.periods || [period]);
+  const syntheticSampleTimes = cycleStr ? periodsList.map((p) => `${cycle}.${String(p).padStart(3, "0")}`) : [];
+  const cycleTimeSet = new Set(candidateFiles);
+  if (cycleStr) {
+    for (const st of syntheticSampleTimes) {
+      cycleTimeSet.add(st);
+    }
+  }
+  let effectiveSampleTimes = cycleStr ? Array.from(cycleTimeSet).sort() : (candidateFiles.length > 0 ? [...candidateFiles] : []);
 
   let effectivePeriod = period;
   if (effectivePeriod === null || effectivePeriod === undefined || isNaN(Number(effectivePeriod)) || String(effectivePeriod) === "null") {
@@ -285,7 +306,9 @@ export async function loadWeatherField(map, model, element, level, period, custo
             }
           }
         }
-        file = closestFile;
+        if (minDiff <= 6 || hasPolicy) {
+          file = closestFile;
+        }
       }
       const parts = file.split(".");
       if (parts.length > 1 && /^\d+$/.test(parts[1])) {
@@ -307,7 +330,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
       policy,
       tolerance: customOptions?.tolerance || customOptions?.config?.tolerance,
       offset: rawOffset,
-      sampleTimes: candidateFiles.length > 0 ? candidateFiles : undefined,
+      sampleTimes: effectiveSampleTimes.length > 0 ? effectiveSampleTimes : undefined,
     };
     resolved = resolveLayerTime(layerMetaDummy, cursorTime, { forceLatestAt: isLive });
   }
@@ -386,7 +409,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
       policy: customOptions?.policy,
       tolerance: customOptions?.tolerance,
       offset: customOptions?.offset,
-      sampleTimes: candidateFiles.length > 0 ? candidateFiles : customOptions?.sampleTimes,
+      sampleTimes: effectiveSampleTimes.length > 0 ? effectiveSampleTimes : customOptions?.sampleTimes,
       resolved,
       status: resolved.status,
       isSoftStale: resolved.status === "soft-stale",
@@ -455,6 +478,31 @@ export async function loadWeatherField(map, model, element, level, period, custo
     if (win && expectedSeq !== null && expectedSeq !== undefined && win.loadSeq !== expectedSeq) {
       return; // Discard stale in-flight response from fast navigation
     }
+    if (file && effectiveSampleTimes && !effectiveSampleTimes.includes(file)) {
+      effectiveSampleTimes.push(file);
+      effectiveSampleTimes.sort((a, b) => a.localeCompare(b));
+    }
+    const updatedResolved = resolveLayerTime(
+      {
+        id: layerId,
+        model,
+        element,
+        level: targetLevel,
+        cycle,
+        forecastCycle: cycle,
+        period: effectivePeriod,
+        file,
+        policy,
+        tolerance: customOptions?.tolerance || customOptions?.config?.tolerance,
+        offset: rawOffset,
+        sampleTimes: effectiveSampleTimes,
+      },
+      cursorTime,
+      { forceLatestAt: isLive }
+    );
+    if (updatedResolved) {
+      resolved = updatedResolved;
+    }
     let colormap = customOptions?.colormap || element;
     if (model === "SATELLITE" || (path && path.includes("FY4B"))) {
       const chan = Number(targetLevel || (customOptions?.level) || (win?.level));
@@ -470,12 +518,16 @@ export async function loadWeatherField(map, model, element, level, period, custo
     // Restore a previously-chosen XML palette for this layer
     if (savedPalettePath) {
       const paletteKey = `palette:${layerId}`;
+      const pathKey = `palette:${savedPalettePath}`;
       try {
         const { loadXMLPalette } = await import("../utils/paletteLoader.js");
         const { setColormaps, COLORMAPS } = await import("../utils/colormaps.js");
-        const stops = await loadXMLPalette(savedPalettePath);
+        let stops = COLORMAPS[paletteKey] || COLORMAPS[pathKey];
+        if (!stops) {
+          stops = await loadXMLPalette(savedPalettePath);
+        }
         if (stops) {
-          setColormaps({ ...COLORMAPS, [paletteKey]: stops });
+          setColormaps({ ...COLORMAPS, [paletteKey]: stops, [pathKey]: stops });
           if (existingLayer) existingLayer.colormap = paletteKey;
           colormap = paletteKey;
         }
@@ -546,7 +598,7 @@ export async function loadWeatherField(map, model, element, level, period, custo
       policy: customOptions?.policy,
       tolerance: customOptions?.tolerance,
       offset: customOptions?.offset,
-      sampleTimes: candidateFiles.length > 0 ? candidateFiles : customOptions?.sampleTimes,
+      sampleTimes: effectiveSampleTimes.length > 0 ? effectiveSampleTimes : customOptions?.sampleTimes,
       resolved,
       status: resolved.status,
       isSoftStale: resolved.status === "soft-stale",

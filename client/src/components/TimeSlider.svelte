@@ -132,7 +132,12 @@
           tl.currentPeriodIdx = firstValidIdx;
           const targetP = tl.discretePeriods[firstValidIdx];
           app.period = targetP;
-          emitTimeChange({ period: targetP, cycle: currentCycle, _seq: ++tl.periodStepSeq });
+          if (activeWin && Number(activeWin.period) === Number(targetP)) {
+            // Period already assigned on activeWin (e.g. enforceRainMinPeriodOnWindow during preset load);
+            // sync timeline index without triggering redundant load cascade
+          } else {
+            emitTimeChange({ period: targetP, cycle: currentCycle, _seq: ++tl.periodStepSeq });
+          }
         }
       }
     } else if (tl.disabledPeriods && tl.disabledPeriods.length > 0 && !isRainAccum) {

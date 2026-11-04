@@ -41,18 +41,53 @@ export const DEFAULT_TOLERANCES = {
   AWS: 90,
   PLOT_GLOBAL_3H: 180,
   SLP: 180,
+  PRMSL: 360,
+  RAIN01: 60,
+  RAIN03: 180,
   RAIN6: 360,
+  RAIN06: 360,
+  RAIN12: 360,
+  RAIN24: 720,
+  SNOW01: 60,
+  SNOW03: 180,
+  SNOW06: 360,
+  SNOW12: 360,
+  SNOW24: 720,
+  FRZR03: 180,
+  FRZR06: 360,
+  FRZR12: 360,
+  FRZR24: 720,
+  CAPE: 360,
+  CIN: 360,
+  K_INDEX: 360,
+  TCWV: 360,
+  SST: 360,
   UPPER_AIR: 720,
   TLOGP: 720,
   SOUNDING: 720,
   ECMWF_HR: 360,
+  ECMWF: 360,
   GRAPES_GFS: 360,
+  GRAPES: 360,
+  GFS: 360,
+  NCEP: 360,
+  GRAPES_3KM: 180,
+  GRAPES_MESO: 180,
+  SHANGHAI_MR: 180,
+  BEIJING_MR: 180,
+  JAPAN_MR: 360,
+  CMA_GFS: 360,
+  NWFD_SCMOC: 360,
+  ECMWF_ENSEMBLE: 360,
+  ECMWF_ENSEMBLE_PRODUCT: 360,
+  FORECAST_PRODUCT: 360,
   TMP: 360,
   HGT: 360,
   WIND: 360,
   RH: 360,
   VOR: 360,
   DIV: 360,
+  T_ADV: 360,
   DEFAULT: 60,
 };
 
@@ -421,8 +456,16 @@ export function getDefaultToleranceForLayer(layer) {
   const elem = String(layer.element || "").toUpperCase();
   const model = String(layer.model || "").toUpperCase();
   const type = String(layer.type || "").toLowerCase();
+  const isNwp = Boolean(
+    layer.forecastCycle ||
+    layer.cycle ||
+    (!layer.isObservation && layer.period !== undefined) ||
+    ((type === "contour" || type === "wind") && !layer.isObservation && model !== "SURFACE" && model !== "UPPER_AIR" && !model.includes("SWAN") && !model.includes("SATELLITE") && !model.includes("CLDAS"))
+  );
 
-  if (elem.includes("RADAR") || elem.includes("CREF") || model.includes("RADAR")) {
+  // If radar element belongs to an NWP model (e.g. GRAPES_3KM/RADAR_COMBINATION_REFLECTIVITY),
+  // it is a simulated forecast field, NOT an observation radar with a 10m tolerance.
+  if ((elem.includes("RADAR") || elem.includes("CREF") || model.includes("RADAR")) && !isNwp) {
     return DEFAULT_TOLERANCES.RADAR;
   }
   if (elem.includes("SAT") || elem.includes("IR") || elem.includes("VIS") || model.includes("SATELLITE")) {
@@ -430,6 +473,10 @@ export function getDefaultToleranceForLayer(layer) {
   }
   if (elem.includes("TLOGP") || type === "tlogp" || model.includes("UPPER_AIR")) {
     return DEFAULT_TOLERANCES.UPPER_AIR;
+  }
+  // Check element-specific tolerances FIRST before generic SURFACE/station fallback
+  if (DEFAULT_TOLERANCES[elem] !== undefined) {
+    return DEFAULT_TOLERANCES[elem];
   }
   if (elem.includes("SLP") || elem.includes("MSLP")) {
     return DEFAULT_TOLERANCES.SLP;
@@ -440,11 +487,16 @@ export function getDefaultToleranceForLayer(layer) {
   if (model.includes("SURFACE") || type === "station") {
     return DEFAULT_TOLERANCES.SURFACE;
   }
-  if (DEFAULT_TOLERANCES[elem]) {
-    return DEFAULT_TOLERANCES[elem];
-  }
-  if (DEFAULT_TOLERANCES[model]) {
+  if (DEFAULT_TOLERANCES[model] !== undefined) {
     return DEFAULT_TOLERANCES[model];
+  }
+  for (const [key, val] of Object.entries(DEFAULT_TOLERANCES)) {
+    if (key !== "DEFAULT" && (model.includes(key) || elem.includes(key))) {
+      return val;
+    }
+  }
+  if (isNwp) {
+    return 360;
   }
   return DEFAULT_TOLERANCES.DEFAULT;
 }

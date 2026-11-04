@@ -127,6 +127,24 @@ func (h *CatalogHandler) TreeHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		cycleParam := strings.TrimSpace(r.URL.Query().Get("cycle"))
+		if cycleParam == "" {
+			cycleParam = strings.TrimSpace(r.URL.Query().Get("prefix"))
+		}
+		if cycleParam != "" {
+			cBase := strings.TrimSuffix(cycleParam, ".")
+			periods := []int{0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 39, 42, 45, 48, 54, 60, 66, 72, 78, 84, 90, 96, 108, 120, 132, 144, 156, 168, 180, 192, 204, 216, 228, 240}
+			mockFiles := make([]map[string]interface{}, 0, len(periods))
+			for i := len(periods) - 1; i >= 0; i-- {
+				mockFiles = append(mockFiles, map[string]interface{}{
+					"name": fmt.Sprintf("%s.%03d", cBase, periods[i]),
+					"size": 405764,
+				})
+			}
+			json.NewEncoder(w).Encode(mockFiles)
+			return
+		}
+
 		prefix := "260827"
 		if beforeDate != "" {
 			prefix = beforeDate[2:8]
@@ -154,7 +172,19 @@ func (h *CatalogHandler) TreeHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	files, err := db.GetFileList(h.Client, dataPath, limit, beforeDate)
+	cycleParam := strings.TrimSpace(r.URL.Query().Get("cycle"))
+	if cycleParam == "" {
+		cycleParam = strings.TrimSpace(r.URL.Query().Get("prefix"))
+	}
+	opts := make([]string, 0, 2)
+	if beforeDate != "" {
+		opts = append(opts, beforeDate)
+	}
+	if cycleParam != "" {
+		opts = append(opts, "cycle:"+cycleParam)
+	}
+
+	files, err := db.GetFileList(h.Client, dataPath, limit, opts...)
 	if err != nil {
 		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
 		return

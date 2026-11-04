@@ -163,24 +163,32 @@ export function applyPresetToWindow(win, group, overrideLevel = null, timelinesM
   // non-serializable references like MapLibre map instances or DOM nodes)
   // that would cause structuredClone to throw a DataCloneError.
   const groupCopy = JSON.parse(JSON.stringify(group));
+  if (Array.isArray(groupCopy.layers)) {
+    for (const l of groupCopy.layers) {
+      delete l.sampleTimes;
+      delete l.obsFiles;
+    }
+  }
   win.activeGroup = groupCopy;
   win.isObservation = Boolean(groupCopy.isObservation);
   win.forecastCycle = null;
-  if (previousGroupId !== groupCopy.id || !win.stepLength) {
+  if (groupCopy.isObservation) {
+    win.obsTime = null;
+    win._obsTimeline = null;
+    win._obsTimelinePath = null;
+    const isUpper = /upper|tlogp/i.test(groupCopy.id || "") ||
+      (Array.isArray(groupCopy.layers) && groupCopy.layers.some((l) =>
+        l?.model === "UPPER_AIR" || String(l?.path || "").includes("TLOGP") || l?.element === "TLOGP"));
+    if (previousGroupId !== groupCopy.id || !win.stepLength) {
+      win.stepLength = isUpper ? 12 : 3;
+    }
+  } else if (previousGroupId !== groupCopy.id || !win.stepLength) {
     // Observation files belong to a product path/level. Never carry a file
     // from the previous preset into a newly selected surface/upper-air plot.
     win.obsTime = null;
     win._obsTimeline = null;
     win._obsTimelinePath = null;
-    // Set canonical step default: 12h for upper-air, 3h for surface, 6h for NWP
-    if (groupCopy.isObservation) {
-      const isUpper = /upper|tlogp/i.test(groupCopy.id || "") ||
-        (Array.isArray(groupCopy.layers) && groupCopy.layers.some((l) =>
-          l?.model === "UPPER_AIR" || String(l?.path || "").includes("TLOGP") || l?.element === "TLOGP"));
-      win.stepLength = isUpper ? 12 : 3;
-    } else {
-      win.stepLength = isSpecialProfile ? 12 : 6;
-    }
+    win.stepLength = isSpecialProfile ? 12 : 6;
   }
   if (!groupCopy.isObservation) {
     win.model = null;
@@ -198,8 +206,11 @@ export function applyPresetToWindow(win, group, overrideLevel = null, timelinesM
     } else if (typeof window !== "undefined") {
       window.__MICAPS_CURSOR__ = null;
     }
-  } else if (previousGroupId !== groupCopy.id) {
+  } else {
     win.wallClockCursor = null;
+    if (typeof window !== "undefined") {
+      window.__MICAPS_CURSOR__ = null;
+    }
   }
   if (groupCopy.hasLevel === false) {
     win.level = null;

@@ -116,7 +116,7 @@ export function getPrefetchTargets(win, options = {}) {
     const matched = winLayers.find(
       (l) => (l.element === element && l.model === model) || (l.type === "raster" && l.model === model)
     );
-    return Boolean(matched?.config?.showRaster);
+    return Boolean(matched?.config?.showRaster || matched?.render?.showRaster);
   };
 
   const allowed = normalizeDirections(options.directions);
@@ -315,8 +315,7 @@ function collectNwpItems(win, targetPeriod, cycle, hasRasterActive, direction, o
 
         const path = layer.path || (lvl ? `${model}/${element}/${lvl}` : `${model}/${element}`);
         items.push({ type: "grid", path, file, direction, level: lvl, period: targetPeriod });
-
-        if (layer.render?.showRaster || hasRasterActive(element, model)) {
+        if (layer.render?.showRaster || layer.config?.showRaster || hasRasterActive(element, model)) {
           items.push({ type: "binary", path, file, direction, level: lvl, period: targetPeriod });
         }
       }
@@ -332,10 +331,6 @@ function collectNwpItems(win, targetPeriod, cycle, hasRasterActive, direction, o
       ? (lvl ? `${model}/WIND/${lvl}` : `${model}/WIND`)
       : (lvl ? `${model}/${element}/${lvl}` : `${model}/${element}`);
     items.push({ type: "grid", path, file, direction, level: lvl, period: targetPeriod });
-
-    if (hasRasterActive(element, model)) {
-      items.push({ type: "binary", path, file, direction, level: lvl, period: targetPeriod });
-    }
   }
 
   return items;

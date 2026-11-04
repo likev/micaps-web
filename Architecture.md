@@ -1,6 +1,6 @@
-# MICAPS-Web Architecture & Technical Reference (v1.12.2)
+# MICAPS-Web Architecture & Technical Reference (v1.12.3)
 
-This document provides in-depth technical documentation for the architecture, data pipeline, API specifications, build workflows, and directory structure of **MICAPS-Web** (v1.12.2).
+This document provides in-depth technical documentation for the architecture, data pipeline, API specifications, build workflows, and directory structure of **MICAPS-Web** (v1.12.3).
 
 ---
 

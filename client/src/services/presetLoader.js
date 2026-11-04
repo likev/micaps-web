@@ -23,6 +23,7 @@ import { schedulePrefetch } from "./prefetchService.js";
 import { loadPresetGroups, PRESET_GROUPS } from "../config/presets.js";
 import { resolveLayerTime, parseTimestamp, getReferenceNowMs } from "../utils/timeResolver.js";
 import { fetchTree, fetchStationObservations } from "../api/catalogApi.js";
+import { clearDataCache } from "../api/apiClient.js";
 import { analyzeAndRenderSoundingElementContour } from "../layers/soundingAnalysis.js";
 import { triggerRasterOverlay } from "../ui/layerActions.js";
 import { updateLegend } from "../ui/legend.js";
@@ -141,7 +142,10 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
   // the first per-layer sync sets _obsTimeline, so every station layer in this
   // Load uses bypassCache + latest instead of the second layer downgrading via
   // stale cache. Level steps keep _obsTimeline and preserve the selected chip.
-  const freshObsLoad = !isTimeStep && Boolean(group.isObservation) && !win?._obsTimeline && !win?.obsTime;
+  const freshObsLoad = !isTimeStep && Boolean(group.isObservation) && (!win?._obsTimeline || !win?.obsTime);
+  if (freshObsLoad) {
+    clearDataCache();
+  }
 
   // Rewrite derived/station ids to the requested level so Load Data at a
   // non-default level (e.g. 850 preset opened at 700) does not load stale
@@ -323,11 +327,12 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
 
         if (isUpperAirContour && !stnLayer) {
           // Standalone upper-air derived contour layer (no station layer in preset group)
-          const obsPath = layer.path || `UPPER_AIR/${layer.element || "PLOT"}/${targetLevel || 500}`;
+          const rawPath = String(layer.path || "").replace(/^\/?api\/derived\//, "").replace(/^derived\//, "");
+          const obsPath = (rawPath && !rawPath.startsWith("http")) ? rawPath : `UPPER_AIR/${layer.element || "PLOT"}/${targetLevel || 500}`;
           let availableFiles = [];
-          if (Array.isArray(layer.sampleTimes) && layer.sampleTimes.length > 0) {
+          if (!freshObsLoad && Array.isArray(layer.sampleTimes) && layer.sampleTimes.length > 0) {
             availableFiles = [...layer.sampleTimes].sort((a, b) => a.localeCompare(b));
-          } else if (win?._obsTimelinePath === obsPath && Array.isArray(win?._obsTimeline?.files) && win._obsTimeline.files.length > 0) {
+          } else if (!freshObsLoad && win?._obsTimelinePath === obsPath && Array.isArray(win?._obsTimeline?.files) && win._obsTimeline.files.length > 0) {
             availableFiles = [...win._obsTimeline.files].sort((a, b) => a.localeCompare(b));
           } else {
             try {
@@ -410,11 +415,12 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
 
         if (isSurfaceContour && !surfaceStnLayer) {
           // Standalone surface derived contour layer (no station layer in preset group)
-          const obsPath = layer.path || "SURFACE/PLOT_GLOBAL_3H";
+          const rawPath = String(layer.path || "").replace(/^\/?api\/derived\//, "").replace(/^derived\//, "");
+          const obsPath = (rawPath && !rawPath.startsWith("http")) ? rawPath : "SURFACE/PLOT_GLOBAL_3H";
           let availableFiles = [];
-          if (Array.isArray(layer.sampleTimes) && layer.sampleTimes.length > 0) {
+          if (!freshObsLoad && Array.isArray(layer.sampleTimes) && layer.sampleTimes.length > 0) {
             availableFiles = [...layer.sampleTimes].sort((a, b) => a.localeCompare(b));
-          } else if (win?._obsTimelinePath === obsPath && Array.isArray(win?._obsTimeline?.files) && win._obsTimeline.files.length > 0) {
+          } else if (!freshObsLoad && win?._obsTimelinePath === obsPath && Array.isArray(win?._obsTimeline?.files) && win._obsTimeline.files.length > 0) {
             availableFiles = [...win._obsTimeline.files].sort((a, b) => a.localeCompare(b));
           } else {
             try {
@@ -537,9 +543,9 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
 
         // 1. Collect real available files for this specific obsPath
         let availableFiles = [];
-        if (Array.isArray(layer.sampleTimes) && layer.sampleTimes.length > 0) {
+        if (!freshObsLoad && Array.isArray(layer.sampleTimes) && layer.sampleTimes.length > 0) {
           availableFiles = [...layer.sampleTimes].sort((a, b) => a.localeCompare(b));
-        } else if (win?._obsTimelinePath === obsPath && Array.isArray(win?._obsTimeline?.files) && win._obsTimeline.files.length > 0) {
+        } else if (!freshObsLoad && win?._obsTimelinePath === obsPath && Array.isArray(win?._obsTimeline?.files) && win._obsTimeline.files.length > 0) {
           availableFiles = [...win._obsTimeline.files].sort((a, b) => a.localeCompare(b));
         } else {
           try {
@@ -621,9 +627,9 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
       } else if (layer.type === "tlogp") {
         const tlogpPath = layer.path || "UPPER_AIR/TLOGP";
         let availableFiles = [];
-        if (Array.isArray(layer.sampleTimes) && layer.sampleTimes.length > 0) {
+        if (!freshObsLoad && Array.isArray(layer.sampleTimes) && layer.sampleTimes.length > 0) {
           availableFiles = [...layer.sampleTimes].sort((a, b) => a.localeCompare(b));
-        } else if (win?._obsTimelinePath === tlogpPath && Array.isArray(win?._obsTimeline?.files) && win._obsTimeline.files.length > 0) {
+        } else if (!freshObsLoad && win?._obsTimelinePath === tlogpPath && Array.isArray(win?._obsTimeline?.files) && win._obsTimeline.files.length > 0) {
           availableFiles = [...win._obsTimeline.files].sort((a, b) => a.localeCompare(b));
         } else {
           try {
@@ -696,19 +702,31 @@ export async function loadPresetGroup(map, group, period = null, level = null, w
       } else if (layer.type === "event") {
         if (layer.path && (!win?._obsTimeline || freshObsLoad)) {
           const file = await syncObservationTimeline(layer.path, freshObsLoad ? null : (win?.obsTime || layer.file), winTitle, win, { forceLatest: freshObsLoad });
-          if (win && file) win.obsTime = file;
+          if (win && file) {
+            win.obsTime = file;
+            layer.file = file;
+            if (win._obsTimeline?.files) layer.sampleTimes = win._obsTimeline.files;
+          }
         }
         await loadEventLayer(map, layer, win);
       } else if (layer.type === "profiler") {
         if (layer.path && (!win?._obsTimeline || freshObsLoad)) {
           const file = await syncObservationTimeline(layer.path, freshObsLoad ? null : (win?.obsTime || layer.file), winTitle, win, { forceLatest: freshObsLoad });
-          if (win && file) win.obsTime = file;
+          if (win && file) {
+            win.obsTime = file;
+            layer.file = file;
+            if (win._obsTimeline?.files) layer.sampleTimes = win._obsTimeline.files;
+          }
         }
         await loadProfilerLayer(map, layer, win);
       } else if (layer.type === "image") {
         if (layer.path && (!win?._obsTimeline || freshObsLoad)) {
           const file = await syncObservationTimeline(layer.path, freshObsLoad ? null : (win?.obsTime || layer.file), winTitle, win, { forceLatest: freshObsLoad });
-          if (win && file) win.obsTime = file;
+          if (win && file) {
+            win.obsTime = file;
+            layer.file = file;
+            if (win._obsTimeline?.files) layer.sampleTimes = win._obsTimeline.files;
+          }
         }
         if (win?.obsTime) {
           layer.file = win.obsTime;

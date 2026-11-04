@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -161,7 +160,6 @@ func ParseGridData(decompressed []byte) (*model.GridResponse, error) {
 
 // EncodeBinaryStream encodes a 32-byte header followed by raw float32 bytes for zero-copy client streaming
 func EncodeBinaryStream(resp *model.GridResponse) []byte {
-	var buf bytes.Buffer
 	h := resp.Header
 
 	startLon := h.StartLongitude
@@ -175,20 +173,23 @@ func EncodeBinaryStream(resp *model.GridResponse) []byte {
 		endLat = float32(resp.Y[len(resp.Y)-1])
 	}
 
-	// 32-byte Header
-	binary.Write(&buf, binary.LittleEndian, startLon)
-	binary.Write(&buf, binary.LittleEndian, endLon)
-	binary.Write(&buf, binary.LittleEndian, startLat)
-	binary.Write(&buf, binary.LittleEndian, endLat)
-	binary.Write(&buf, binary.LittleEndian, h.LongitudeGridNumber)
-	binary.Write(&buf, binary.LittleEndian, h.LatitudeGridNumber)
-	binary.Write(&buf, binary.LittleEndian, resp.Stats.Min)
-	binary.Write(&buf, binary.LittleEndian, resp.Stats.Max)
+	n := len(resp.Values)
+	buf := make([]byte, 32+n*4)
 
-	// Append raw float32 grid values
+	binary.LittleEndian.PutUint32(buf[0:4], math.Float32bits(startLon))
+	binary.LittleEndian.PutUint32(buf[4:8], math.Float32bits(endLon))
+	binary.LittleEndian.PutUint32(buf[8:12], math.Float32bits(startLat))
+	binary.LittleEndian.PutUint32(buf[12:16], math.Float32bits(endLat))
+	binary.LittleEndian.PutUint32(buf[16:20], uint32(h.LongitudeGridNumber))
+	binary.LittleEndian.PutUint32(buf[20:24], uint32(h.LatitudeGridNumber))
+	binary.LittleEndian.PutUint32(buf[24:28], math.Float32bits(resp.Stats.Min))
+	binary.LittleEndian.PutUint32(buf[28:32], math.Float32bits(resp.Stats.Max))
+
+	offset := 32
 	for _, val := range resp.Values {
-		binary.Write(&buf, binary.LittleEndian, val)
+		binary.LittleEndian.PutUint32(buf[offset:offset+4], math.Float32bits(val))
+		offset += 4
 	}
 
-	return buf.Bytes()
+	return buf
 }

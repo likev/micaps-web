@@ -204,6 +204,9 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
   const isDescendingLat = slat > elat; // True if data row 0 is North
   const latSpanRaw = topLatRaw - bottomLatRaw || 1;
 
+  const elUpper = String(element || "").toUpperCase();
+  const cmUpper = String(colormap || "").toUpperCase();
+  const isRain = elUpper.includes("RAIN") || elUpper.includes("PRECIP") || cmUpper.includes("RAIN") || cmUpper.includes("PRECIP");
   const resolveColor = createColorResolver(element, colormap, zMin, zMax);
 
   // Precompute X source column lookup table to eliminate 800,000x redundant division, multiplication, and clamp in inner loop
@@ -269,7 +272,7 @@ function renderRasterImage(map, floatValues, nlon, nlat, slon, elon, slat, elat,
         }
       }
 
-      if (val === undefined || val === null || isNaN(val) || val < -9900) {
+      if (val === undefined || val === null || isNaN(val) || val < -9900 || (isRain && val < 0.1)) {
         data[dstIdx + 3] = 0; // Transparent
       } else {
         if (rowLight) val = rowLight.apply(i, val);

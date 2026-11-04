@@ -172,6 +172,11 @@ func candidateDataPaths(dataPath string) []string {
 	}
 	add(dataPath)
 
+	cleanDerived := strings.TrimPrefix(strings.TrimPrefix(dataPath, "api/derived/"), "derived/")
+	if cleanDerived != dataPath {
+		add(cleanDerived)
+	}
+
 	if strings.Contains(dataPath, "TLOGP") {
 		add("UPPER_AIR/TLOGP")
 		add("TLOGP")
@@ -288,15 +293,81 @@ func GetFileList(client *CQLClient, dataPath string, limit int, beforeDate ...st
 	}
 
 	var cutoff string
-	if len(beforeDate) > 0 {
-		cutoff = strings.ReplaceAll(strings.TrimSpace(beforeDate[0]), "-", "")
-		if len(cutoff) > 8 {
-			cutoff = cutoff[:8]
+	var cycleFilter string
+	for _, opt := range beforeDate {
+		if strings.HasPrefix(opt, "cycle:") {
+			cycleFilter = strings.TrimPrefix(opt, "cycle:")
+		} else if cutoff == "" && opt != "" {
+			cutoff = strings.ReplaceAll(strings.TrimSpace(opt), "-", "")
+			if len(cutoff) > 8 {
+				cutoff = cutoff[:8]
+			}
 		}
 	}
 
 	var lastErr error
 	for _, cPath := range candidates {
+		if cycleFilter != "" {
+			cBase := strings.TrimSuffix(cycleFilter, ".")
+			cBase8 := cBase
+			if len(cBase) == 10 && strings.HasPrefix(cBase, "20") {
+				cBase8 = cBase[2:]
+			}
+			cBase10 := cBase
+			if len(cBase) == 8 {
+				cBase10 = "20" + cBase
+			}
+			qCycle := fmt.Sprintf(`SELECT column1, value FROM micapsdataserver.treeview WHERE "dataPath" = '%s' AND column1 >= '%s.' AND column1 <= '%s.999' ORDER BY column1 DESC LIMIT %d`, cPath, cBase8, cBase8, limit)
+			rowsCycle, errCycle := client.Query(qCycle)
+			if errCycle == nil && len(rowsCycle) > 0 {
+				files := make([]model.FileEntry, 0, len(rowsCycle))
+				for _, row := range rowsCycle {
+					name := string(row.Columns["column1"])
+					valBytes := row.Columns["value"]
+					valStr := string(valBytes)
+					var size int64
+					if len(valBytes) > 0 {
+						if s, err := strconv.ParseInt(valStr, 10, 64); err == nil {
+							size = s
+						}
+					}
+					files = append(files, model.FileEntry{Name: name, Size: size})
+				}
+				if len(files) > 0 {
+					sort.Slice(files, func(i, j int) bool {
+						return files[i].Name > files[j].Name
+					})
+					return files, nil
+				}
+			}
+			if cBase10 != cBase8 {
+				qCycle10 := fmt.Sprintf(`SELECT column1, value FROM micapsdataserver.treeview WHERE "dataPath" = '%s' AND column1 >= '%s.' AND column1 <= '%s.999' ORDER BY column1 DESC LIMIT %d`, cPath, cBase10, cBase10, limit)
+				rowsCycle10, errCycle10 := client.Query(qCycle10)
+				if errCycle10 == nil && len(rowsCycle10) > 0 {
+					files := make([]model.FileEntry, 0, len(rowsCycle10))
+					for _, row := range rowsCycle10 {
+						name := string(row.Columns["column1"])
+						valBytes := row.Columns["value"]
+						valStr := string(valBytes)
+						var size int64
+						if len(valBytes) > 0 {
+							if s, err := strconv.ParseInt(valStr, 10, 64); err == nil {
+								size = s
+							}
+						}
+						files = append(files, model.FileEntry{Name: name, Size: size})
+					}
+					if len(files) > 0 {
+						sort.Slice(files, func(i, j int) bool {
+							return files[i].Name > files[j].Name
+						})
+						return files, nil
+					}
+				}
+			}
+			continue
+		}
+
 		var query string
 		var pInfo PathPatternInfo
 		if cutoff != "" {
@@ -352,6 +423,10 @@ func GetFileList(client *CQLClient, dataPath string, limit int, beforeDate ...st
 				return files, nil
 			}
 		}
+	}
+
+	if cycleFilter != "" {
+		return []model.FileEntry{}, nil
 	}
 
 	if lastErr != nil {

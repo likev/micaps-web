@@ -16,6 +16,9 @@ export async function fetchTree(path, limit = 100, optionsOrLevel = {}, levelArg
   let level = levelArg;
   if (typeof optionsOrLevel === "number" || typeof optionsOrLevel === "string") {
     level = optionsOrLevel;
+    if (levelArg && typeof levelArg === "object") {
+      options = levelArg;
+    }
   } else if (optionsOrLevel && typeof optionsOrLevel === "object") {
     options = optionsOrLevel;
     if (options.level !== undefined) {
@@ -29,6 +32,12 @@ export async function fetchTree(path, limit = 100, optionsOrLevel = {}, levelArg
   const date = options.date !== undefined ? options.date : getActiveHistoryDate();
   if (date) {
     params.date = date;
+  }
+  if (options.cycle) {
+    params.cycle = options.cycle;
+  }
+  if (options.prefix) {
+    params.prefix = options.prefix;
   }
   return await fetchJson("/api/catalog/tree", params, options);
 }

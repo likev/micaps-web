@@ -27,20 +27,44 @@
         map.off("move", updateCrosshairProjectedPos);
       } catch {}
     }
+    if (mouseMoveRaf && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(mouseMoveRaf);
+      mouseMoveRaf = null;
+    }
     mapRef = null;
     clearSynchronizedCursor(winId);
     if (onMapDestroyed) onMapDestroyed(map);
   }
 
+  let mouseMoveRaf = null;
+  let pendingLngLat = null;
   function onMapMouseMove(e) {
     if (!e || !e.lngLat) return;
-    const { lng, lat } = e.lngLat;
-    setSynchronizedCursor(winId, lng, lat);
-    const win = getWindowById(winId);
-    updateCursorProbe(lng, lat, win);
+    pendingLngLat = e.lngLat;
+    if (mouseMoveRaf) return;
+    if (typeof requestAnimationFrame === "function") {
+      mouseMoveRaf = requestAnimationFrame(() => {
+        mouseMoveRaf = null;
+        if (!pendingLngLat) return;
+        const { lng, lat } = pendingLngLat;
+        setSynchronizedCursor(winId, lng, lat);
+        const win = getWindowById(winId);
+        updateCursorProbe(lng, lat, win);
+      });
+    } else {
+      const { lng, lat } = pendingLngLat;
+      setSynchronizedCursor(winId, lng, lat);
+      const win = getWindowById(winId);
+      updateCursorProbe(lng, lat, win);
+    }
   }
 
   function onMapMouseLeave() {
+    if (mouseMoveRaf && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(mouseMoveRaf);
+      mouseMoveRaf = null;
+    }
+    pendingLngLat = null;
     clearSynchronizedCursor(winId);
     clearCursorProbe();
   }

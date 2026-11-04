@@ -352,34 +352,39 @@ export function renderContourLayers(map, gridData, element = "TMP", options = {}
   }
 
   if (shouldSmooth && isolineFC.features.length > 0) {
-    isolineFC = smoothLines(isolineFC, smoothIterations, step);
+    const effectiveSmoothIters = (options.showRaster || isolineFC.features.length > 300)
+      ? Math.min(smoothIterations, 1)
+      : smoothIterations;
+    isolineFC = smoothLines(isolineFC, effectiveSmoothIters, step);
   }
 
   const elapsedMs = typeof performance !== "undefined" ? Math.round((performance.now() - t0) * 10) / 10 : 0;
-  const isobandPts = countGeoJSONPoints(isobandFC);
-  const isolinePts = countGeoJSONPoints(isolineFC);
-  const totalPts = isobandPts + isolinePts;
-  const estimatedHeap = estimateHeapMB(isolineFC) + estimateHeapMB(isobandFC);
+  if (typeof options.onStats === "function" || isDebugMemEnabled()) {
+    const isobandPts = countGeoJSONPoints(isobandFC);
+    const isolinePts = countGeoJSONPoints(isolineFC);
+    const totalPts = isobandPts + isolinePts;
+    const estimatedHeap = estimateHeapMB(isolineFC) + estimateHeapMB(isobandFC);
 
-  const stats = {
-    nLon,
-    nLat,
-    totalCells,
-    nCrop: cropIdx?.nCrop ?? totalCells,
-    effectiveCells: croppedData.nCells,
-    step,
-    elapsedMs,
-    isobandPoints: isobandPts,
-    isolinePoints: isolinePts,
-    totalPoints: totalPts,
-    estimatedHeapMB: estimatedHeap,
-  };
+    const stats = {
+      nLon,
+      nLat,
+      totalCells,
+      nCrop: cropIdx?.nCrop ?? totalCells,
+      effectiveCells: croppedData.nCells,
+      step,
+      elapsedMs,
+      isobandPoints: isobandPts,
+      isolinePoints: isolinePts,
+      totalPoints: totalPts,
+      estimatedHeapMB: estimatedHeap,
+    };
 
-  if (typeof options.onStats === "function") {
-    try { options.onStats(stats); } catch {}
-  }
-  if (isDebugMemEnabled()) {
-    console.debug(`[Contour] ${totalCells} cells -> cropped ${stats.nCrop}, step=${step}, ${elapsedMs}ms, ${totalPts} pts, ~${estimatedHeap}MB`);
+    if (typeof options.onStats === "function") {
+      try { options.onStats(stats); } catch {}
+    }
+    if (isDebugMemEnabled()) {
+      console.debug(`[Contour] ${totalCells} cells -> cropped ${stats.nCrop}, step=${step}, ${elapsedMs}ms, ${totalPts} pts, ~${estimatedHeap}MB`);
+    }
   }
 
   updateMapLibreContour(map, isobandFC, isolineFC, { ...options, element, boldValues, smooth: shouldSmooth, smoothIterations });

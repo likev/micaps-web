@@ -113,7 +113,13 @@ function extractCyclesFromFiles(fileEntries) {
 }
 
 export async function resolveForecastCycles(model = "ECMWF_HR", element = "TMP", level = 500, forceRefresh = false) {
-  const elem = (element === "VOR" || element === "DIV") ? "WIND" : element;
+  const elUpper = String(element || "").toUpperCase();
+  const isDerivedDiagnostic = elUpper.includes("VAR") || elUpper.includes("INDEX") || elUpper.includes("TT") ||
+    elUpper.includes("SHEAR") || elUpper.includes("THICKNESS") || elUpper.includes("LIFTED") ||
+    elUpper.includes("SWEAT") || elUpper.includes("SHOWALTER") || elUpper.includes("CAPE") || elUpper.includes("CIN");
+  const elem = (element === "VOR" || element === "DIV")
+    ? "WIND"
+    : (isDerivedDiagnostic ? "TMP" : element);
   const hasLevel = level !== null && level !== undefined && level !== "null" && level !== "undefined" && String(level).trim().toLowerCase() !== "undefined" && String(level).trim().toLowerCase() !== "null" && level !== "";
   const path = hasLevel ? `${model}/${elem}/${level}` : `${model}/${elem}`;
   const shortPath = `${model}/${elem}`;
