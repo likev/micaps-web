@@ -1,11 +1,17 @@
-// formState.js - Config draft store, pub/sub, and pure clone/divider helpers
+// formState.js - Config draft store, pub/sub, dual-document & intra-item fold state
 import { formatCompactJSON } from "../../config/presets.js";
+import { compactConfigForSave } from "../../config/renderProfiles.js";
 import { validateConfig } from "./configSchema.js";
+import {
+  collectItemCollapsibleKeys,
+  foldAllItemKeys,
+  unfoldAllItemKeys,
+  unfoldItemKey,
+} from "./jsonFoldState.js";
+import { rewriteColormapReferences } from "./colormapUtils.js";
 
 /**
- * HTML escaping helper for user-supplied strings to prevent markup injection.
- * @param {*} str
- * @returns {string}
+ * HTML escaping helper for user-supplied strings.
  */
 export function escapeHtml(str) {
   if (str === null || str === undefined) return "";
@@ -25,7 +31,7 @@ export function deepClone(obj) {
     try {
       return structuredClone(obj);
     } catch {
-      // Fallback if structuredClone fails on non-serializable properties
+      // Fallback
     }
   }
   return JSON.parse(JSON.stringify(obj));
@@ -33,25 +39,18 @@ export function deepClone(obj) {
 
 /**
  * Clones a preset group and inserts it directly below the source.
- * Pure function operating on draft.
- * @param {Object} draft - mutable config draft
- * @param {string} sourceId - id of preset to clone
- * @returns {{ ok: boolean, newId?: string, group?: Object, error?: string }}
  */
 export function clonePresetGroup(draft, sourceId) {
   if (!draft || !Array.isArray(draft.presets)) {
     return { ok: false, error: "Invalid draft presets" };
   }
-
   const idx = draft.presets.findIndex((p) => p.id === sourceId && !p.divider);
   if (idx === -1) {
     return { ok: false, error: `Source preset "${sourceId}" not found` };
   }
-
   const source = draft.presets[idx];
   const copy = deepClone(source);
 
-  // Generate unique id: {sourceId}-copy, -copy-2, etc.
   const existingIds = new Set(draft.presets.map((p) => p?.id));
   let baseId = `${sourceId}-copy`;
   let newId = baseId;
@@ -62,38 +61,27 @@ export function clonePresetGroup(draft, sourceId) {
 
   copy.id = newId;
   copy.name = `${source.name || source.id} (Copy)`;
-
-  // Keep layer ids verbatim, force removable: true
   if (Array.isArray(copy.layers)) {
     copy.layers.forEach((l) => {
       l.removable = true;
     });
   }
 
-  // Insert directly below source
   draft.presets.splice(idx + 1, 0, copy);
   return { ok: true, newId, group: copy };
 }
 
 /**
  * Clones a layer within the same preset or to another preset.
- * Pure function operating on draft.
- * @param {Object} draft - mutable config draft
- * @param {string} presetId - source preset id
- * @param {string} layerId - source layer id
- * @param {string} [targetPresetId=presetId] - target preset id
- * @returns {{ ok: boolean, newId?: string, layer?: Object, warning?: string, error?: string }}
  */
 export function cloneLayer(draft, presetId, layerId, targetPresetId = presetId) {
   if (!draft || !Array.isArray(draft.presets)) {
     return { ok: false, error: "Invalid draft presets" };
   }
-
   const srcPreset = draft.presets.find((p) => p.id === presetId && !p.divider);
   if (!srcPreset || !Array.isArray(srcPreset.layers)) {
     return { ok: false, error: `Source preset "${presetId}" not found` };
   }
-
   const srcLayerIdx = srcPreset.layers.findIndex((l) => l.id === layerId);
   if (srcLayerIdx === -1) {
     return { ok: false, error: `Layer "${layerId}" not found in preset "${presetId}"` };
@@ -107,7 +95,6 @@ export function cloneLayer(draft, presetId, layerId, targetPresetId = presetId) 
   const sourceLayer = srcPreset.layers[srcLayerIdx];
   const layerCopy = deepClone(sourceLayer);
 
-  // Generate unique layer id within target preset
   const targetLayerIds = new Set(targetPreset.layers.map((l) => l?.id));
   let baseId = `${layerId}-copy`;
   let newLayerId = baseId;
@@ -122,10 +109,8 @@ export function cloneLayer(draft, presetId, layerId, targetPresetId = presetId) 
 
   let warning = null;
   if (presetId === targetPresetId) {
-    // Same preset: insert directly below source
     srcPreset.layers.splice(srcLayerIdx + 1, 0, layerCopy);
   } else {
-    // Cross-preset: check if derivedFrom sibling exists in target
     const warnings = [];
     if (layerCopy.derivedFrom) {
       const siblingExists = targetPreset.layers.some((l) => l.id === layerCopy.derivedFrom);
@@ -134,14 +119,12 @@ export function cloneLayer(draft, presetId, layerId, targetPresetId = presetId) 
         delete layerCopy.derivedFrom;
       }
     }
-    // Check hasLevel mismatch (plan §3.2.1)
     if (Boolean(srcPreset.hasLevel) !== Boolean(targetPreset.hasLevel)) {
       warnings.push(`hasLevel mismatch: source is ${srcPreset.hasLevel ? "multi-level" : "single-level"}, target is ${targetPreset.hasLevel ? "multi-level" : "single-level"}`);
     }
     if (warnings.length > 0) {
       warning = warnings.join("; ");
     }
-    // Append to target preset
     targetPreset.layers.push(layerCopy);
   }
 
@@ -150,11 +133,6 @@ export function cloneLayer(draft, presetId, layerId, targetPresetId = presetId) 
 
 /**
  * Inserts a visual divider between presets.
- * Pure function operating on draft.
- * @param {Object} draft - mutable config draft
- * @param {number} [index=-1] - insertion index in draft.presets (-1 to append)
- * @param {string} [label=""] - optional section label
- * @returns {{ ok: boolean, newId?: string, divider?: Object, error?: string }}
  */
 export function insertDivider(draft, index = -1, label = "") {
   if (!draft) return { ok: false, error: "Invalid draft" };
@@ -168,10 +146,7 @@ export function insertDivider(draft, index = -1, label = "") {
     newId = `div-${counter}`;
   }
 
-  const divider = {
-    id: newId,
-    divider: true,
-  };
+  const divider = { id: newId, divider: true };
   if (label && typeof label === "string" && label.trim()) {
     divider.label = label.trim();
   }
@@ -186,12 +161,7 @@ export function insertDivider(draft, index = -1, label = "") {
 }
 
 /**
- * Reorders entries (presets or dividers) in draft.presets.
- * Pure function operating on draft.
- * @param {Object} draft - mutable config draft
- * @param {number} fromIndex
- * @param {number} toIndex
- * @returns {{ ok: boolean, error?: string }}
+ * Reorders entries in draft.presets.
  */
 export function moveEntry(draft, fromIndex, toIndex) {
   if (!draft || !Array.isArray(draft.presets)) {
@@ -210,10 +180,6 @@ export function moveEntry(draft, fromIndex, toIndex) {
 
 /**
  * Deletes a divider by its id.
- * Pure function operating on draft.
- * @param {Object} draft - mutable config draft
- * @param {string} id - divider id
- * @returns {{ ok: boolean, error?: string }}
  */
 export function deleteDivider(draft, id) {
   if (!draft || !Array.isArray(draft.presets)) {
@@ -228,13 +194,20 @@ export function deleteDivider(draft, id) {
 }
 
 /**
- * Creates a reactive form state container managing config draft, dirty tracking, and pub/sub.
- * @param {Object} initialConfig - pristine config object from server
+ * Creates reactive form state container managing config & colormap drafts and folding state.
+ * @param {Object} initialConfig
  * @returns {Object} FormState instance
  */
 export function createFormState(initialConfig = {}) {
-  let draft = deepClone(initialConfig);
-  (draft.presets || []).forEach((p) => {
+  let initialCloned = deepClone(initialConfig);
+
+  // Separate colormaps from config
+  let colormapsDraft = deepClone(initialCloned.colormaps || {});
+  let configDraft = deepClone(initialCloned);
+  delete configDraft.colormaps;
+
+  // Clean null levels in layers
+  (configDraft.presets || []).forEach((p) => {
     if (p.divider || !Array.isArray(p.layers)) return;
     p.layers.forEach((l) => {
       if (l.render && l.render.levels === null) {
@@ -242,15 +215,38 @@ export function createFormState(initialConfig = {}) {
       }
     });
   });
-  let lastSavedText = formatCompactJSON(draft);
-  let activeSubTab = "presets";
-  let selectedPresetId = draft.presets?.find((p) => !p.divider)?.id || draft.presets?.[0]?.id || null;
-  let selectedColormapName = Object.keys(draft.colormaps || {})[0] || null;
-  let validation = validateConfig(draft);
 
+  let lastSavedConfigText = formatCompactJSON(configDraft);
+  let lastSavedColormapsText = formatCompactJSON(colormapsDraft);
+
+  let activeDocTab = "config"; // "config" | "colormaps"
+  let unfoldedItemPath = null; // null => all items folded by default!
+  let itemFoldedKeyPaths = new Set();
+  let itemSyntaxErrors = new Map(); // path -> error message
+
+  // Retain legacy subtab & selection tracking for test compatibility
+  let activeSubTab = "presets";
+  let selectedPresetId = configDraft.presets?.find((p) => !p.divider)?.id || configDraft.presets?.[0]?.id || null;
+  let selectedColormapName = Object.keys(colormapsDraft)[0] || null;
+
+  function buildMergedDraft() {
+    return {
+      ...deepClone(configDraft),
+      colormaps: deepClone(colormapsDraft),
+    };
+  }
+
+  let validation = validateConfig(buildMergedDraft());
   const listeners = new Set();
 
   function notify() {
+    state.revision++;
+    state.configDraft = configDraft;
+    state.colormapsDraft = colormapsDraft;
+    state.validation = validation;
+    state.unfoldedItemPath = unfoldedItemPath;
+    state.itemFoldedKeyPaths = itemFoldedKeyPaths;
+    state.activeDocTab = activeDocTab;
     listeners.forEach((fn) => {
       try {
         fn(state);
@@ -260,97 +256,310 @@ export function createFormState(initialConfig = {}) {
     });
   }
 
+  function revalidate() {
+    validation = validateConfig(buildMergedDraft());
+    if (typeof state !== "undefined") state.validation = validation;
+  }
+
   const state = {
-    getDraft() {
-      return draft;
-    },
+    revision: 0,
+    unfoldedItemPath: null,
+    itemFoldedKeyPaths,
+    activeDocTab: "config",
+    configDraft,
+    colormapsDraft,
+    validation,
+    activeSubTab: "presets",
+    selectedPresetId,
+    selectedColormapName,
 
-    setDraft(newDraft) {
-      draft = newDraft;
-      validation = validateConfig(draft);
-      notify();
+    // --- Document Tab State ---
+    getActiveDocTab() {
+      return activeDocTab;
     },
-
-    updateDraft(mutatorFn) {
-      if (typeof mutatorFn === "function") {
-        mutatorFn(draft);
-      }
-      validation = validateConfig(draft);
-      notify();
-    },
-
-    touch() {
-      validation = validateConfig(draft);
-      notify();
-    },
-
-    notifyDirty() {
-      this.touch();
-    },
-
-    getValidation() {
-      return validation;
-    },
-
-    isDirty() {
-      return formatCompactJSON(draft) !== lastSavedText;
-    },
-
-    getLastSavedText() {
-      return lastSavedText;
-    },
-
-    markSaved(savedText = null) {
-      lastSavedText = savedText || formatCompactJSON(draft);
-      validation = validateConfig(draft);
-      notify();
-    },
-
-    reset(newConfig = null) {
-      const cfg = newConfig || initialConfig;
-      draft = deepClone(cfg);
-      lastSavedText = formatCompactJSON(cfg);
-      validation = validateConfig(draft);
-      if (!draft.presets?.some((p) => p.id === selectedPresetId)) {
-        selectedPresetId = draft.presets?.find((p) => !p.divider)?.id || draft.presets?.[0]?.id || null;
-      }
-      if (!draft.colormaps?.[selectedColormapName]) {
-        selectedColormapName = Object.keys(draft.colormaps || {})[0] || null;
-      }
-      notify();
-    },
-
-    getActiveSubTab() {
-      return activeSubTab;
-    },
-
-    setActiveSubTab(tabName) {
-      if (activeSubTab !== tabName) {
-        activeSubTab = tabName;
+    setActiveDocTab(tab) {
+      if (activeDocTab !== tab) {
+        activeDocTab = tab;
+        unfoldedItemPath = null;
+        itemFoldedKeyPaths.clear();
         notify();
       }
     },
 
-    getSelectedPresetId() {
-      return selectedPresetId;
+    // --- Document-Level Folding State ---
+    getUnfoldedItemPath() {
+      return unfoldedItemPath;
+    },
+    unfoldItem(path) {
+      if (unfoldedItemPath !== path) {
+        unfoldedItemPath = path;
+        const val = this.getItemValue(path);
+        itemFoldedKeyPaths = foldAllItemKeys(val);
+        notify();
+      }
+    },
+    foldAll(force = false) {
+      if (unfoldedItemPath !== null) {
+        if (!force && itemSyntaxErrors.has(unfoldedItemPath)) {
+          return false;
+        }
+        unfoldedItemPath = null;
+        itemFoldedKeyPaths = new Set();
+        notify();
+        return true;
+      }
+      return true;
+    },
+    toggleItem(path) {
+      if (unfoldedItemPath === path) {
+        this.foldAll();
+      } else {
+        this.unfoldItem(path);
+      }
     },
 
-    setSelectedPresetId(id) {
-      selectedPresetId = id;
+    renameColormap(oldName, newName) {
+      if (!oldName || !newName) {
+        return { ok: false, error: "Name cannot be empty" };
+      }
+      const trimmed = newName.trim();
+      if (!trimmed) {
+        return { ok: false, error: "Name cannot be empty" };
+      }
+      if (oldName === trimmed) {
+        return { ok: true, name: oldName };
+      }
+      if (colormapsDraft[trimmed]) {
+        return { ok: false, error: `Colormap "${trimmed}" already exists` };
+      }
+      const stops = colormapsDraft[oldName];
+      if (!stops) {
+        return { ok: false, error: `Colormap "${oldName}" not found` };
+      }
+      delete colormapsDraft[oldName];
+      colormapsDraft[trimmed] = stops;
+      rewriteColormapReferences(configDraft, oldName, trimmed);
+      if (unfoldedItemPath === `colormaps.${oldName}`) {
+        unfoldedItemPath = `colormaps.${trimmed}`;
+      }
+      if (selectedColormapName === oldName) {
+        selectedColormapName = trimmed;
+      }
+      revalidate();
+      notify();
+      return { ok: true, name: trimmed };
+    },
+
+    // --- Intra-Item Key Folding State ---
+    getItemFoldedKeyPaths() { return itemFoldedKeyPaths; },
+    foldAllItemKeys() {
+      if (!unfoldedItemPath) return;
+      const val = this.getItemValue(unfoldedItemPath);
+      itemFoldedKeyPaths = foldAllItemKeys(val);
+      notify();
+    },
+    foldAllKeys() { this.foldAllItemKeys(); },
+    unfoldAllItemKeys() {
+      itemFoldedKeyPaths = unfoldAllItemKeys();
+      notify();
+    },
+    unfoldAllKeys() { this.unfoldAllItemKeys(); },
+    unfoldItemKey(targetKeyOrPath) {
+      if (!unfoldedItemPath) return;
+      const val = this.getItemValue(unfoldedItemPath);
+      itemFoldedKeyPaths = unfoldItemKey(val, targetKeyOrPath);
+      notify();
+    },
+    unfoldKey(targetKeyOrPath) { this.unfoldItemKey(targetKeyOrPath); },
+    toggleItemKeyPath(path) {
+      if (itemFoldedKeyPaths.has(path)) itemFoldedKeyPaths.delete(path);
+      else itemFoldedKeyPaths.add(path);
       notify();
     },
 
-    getSelectedColormapName() {
-      return selectedColormapName;
+    // --- Per-Item Value Access ---
+    getItemValue(itemPath) {
+      if (!itemPath) return null;
+      if (itemPath === "basemap") return configDraft.basemap;
+      if (itemPath === "performance") return configDraft.performance;
+      if (itemPath === "theme") return configDraft.theme;
+      if (itemPath === "locale") return configDraft.locale;
+      if (itemPath.startsWith("presets.")) {
+        const idx = parseInt(itemPath.split(".")[1], 10);
+        return configDraft.presets?.[idx] ?? null;
+      }
+      if (itemPath.startsWith("renderProfiles.")) {
+        const key = itemPath.slice("renderProfiles.".length);
+        return configDraft.renderProfiles?.[key] ?? null;
+      }
+      if (itemPath.startsWith("colormaps.")) {
+        const key = itemPath.slice("colormaps.".length);
+        return colormapsDraft[key] ?? null;
+      }
+      return null;
     },
 
-    setSelectedColormapName(name) {
-      selectedColormapName = name;
+    setItemValue(itemPath, newValue) {
+      if (!itemPath) return;
+      if (itemPath === "basemap") {
+        configDraft.basemap = newValue;
+      } else if (itemPath === "performance") {
+        configDraft.performance = newValue;
+      } else if (itemPath === "theme") {
+        configDraft.theme = newValue;
+      } else if (itemPath === "locale") {
+        configDraft.locale = newValue;
+      } else if (itemPath.startsWith("presets.")) {
+        const idx = parseInt(itemPath.split(".")[1], 10);
+        if (configDraft.presets && idx >= 0 && idx < configDraft.presets.length) {
+          configDraft.presets[idx] = newValue;
+        }
+      } else if (itemPath.startsWith("renderProfiles.")) {
+        const key = itemPath.slice("renderProfiles.".length);
+        if (!configDraft.renderProfiles) configDraft.renderProfiles = {};
+        configDraft.renderProfiles[key] = newValue;
+      } else if (itemPath.startsWith("colormaps.")) {
+        const key = itemPath.slice("colormaps.".length);
+        colormapsDraft[key] = newValue;
+      }
+      this.clearItemSyntaxError(itemPath);
+      revalidate();
       notify();
     },
 
+    deleteItem(itemPath) {
+      if (!itemPath) return;
+      if (itemPath.startsWith("presets.")) {
+        const idx = parseInt(itemPath.split(".")[1], 10);
+        if (configDraft.presets && idx >= 0 && idx < configDraft.presets.length) {
+          configDraft.presets.splice(idx, 1);
+        }
+      } else if (itemPath.startsWith("renderProfiles.")) {
+        const key = itemPath.slice("renderProfiles.".length);
+        if (configDraft.renderProfiles) delete configDraft.renderProfiles[key];
+      } else if (itemPath.startsWith("colormaps.")) {
+        const key = itemPath.slice("colormaps.".length);
+        delete colormapsDraft[key];
+      }
+      if (unfoldedItemPath === itemPath) {
+        unfoldedItemPath = null;
+      }
+      revalidate();
+      notify();
+    },
+
+    // --- Syntax & Validation Diagnostics ---
+    setItemSyntaxError(path, errMsg) {
+      itemSyntaxErrors.set(path, errMsg);
+      notify();
+    },
+    clearItemSyntaxError(path) {
+      if (itemSyntaxErrors.has(path)) {
+        itemSyntaxErrors.delete(path);
+        notify();
+      }
+    },
+    getItemSyntaxError(path) {
+      return itemSyntaxErrors.get(path) || null;
+    },
+    hasSyntaxErrors() {
+      return itemSyntaxErrors.size > 0;
+    },
+
+    // --- Backward-Compatible Draft Access ---
+    getDraft() {
+      return buildMergedDraft();
+    },
+    setDraft(newDraft) {
+      const cloned = deepClone(newDraft || {});
+      colormapsDraft = cloned.colormaps || {};
+      configDraft = cloned;
+      delete configDraft.colormaps;
+      revalidate();
+      notify();
+    },
+    updateDraft(mutatorFn) {
+      const merged = buildMergedDraft();
+      if (typeof mutatorFn === "function") {
+        mutatorFn(merged);
+      }
+      colormapsDraft = merged.colormaps || {};
+      configDraft = merged;
+      delete configDraft.colormaps;
+      revalidate();
+      notify();
+    },
+    getConfigDraft() {
+      return configDraft;
+    },
+    getColormapsDraft() {
+      return colormapsDraft;
+    },
+    touch() {
+      revalidate();
+      notify();
+    },
+    notifyDirty() {
+      this.touch();
+    },
+    getValidation() {
+      return validation;
+    },
+    isDirty() {
+      const cfgDirty = formatCompactJSON(configDraft) !== lastSavedConfigText;
+      const cmapDirty = formatCompactJSON(colormapsDraft) !== lastSavedColormapsText;
+      return cfgDirty || cmapDirty;
+    },
+    isConfigDirty() {
+      return formatCompactJSON(configDraft) !== lastSavedConfigText;
+    },
+    isColormapsDirty() {
+      return formatCompactJSON(colormapsDraft) !== lastSavedColormapsText;
+    },
+    getLastSavedText() {
+      return activeDocTab === "colormaps" ? lastSavedColormapsText : lastSavedConfigText;
+    },
+    markSaved() {
+      lastSavedConfigText = formatCompactJSON(configDraft);
+      lastSavedColormapsText = formatCompactJSON(colormapsDraft);
+      itemSyntaxErrors.clear();
+      revalidate();
+      notify();
+    },
+    reset(newConfig = null) {
+      const cfg = deepClone(newConfig || initialConfig);
+      colormapsDraft = cfg.colormaps || {};
+      configDraft = cfg;
+      delete configDraft.colormaps;
+      lastSavedConfigText = formatCompactJSON(configDraft);
+      lastSavedColormapsText = formatCompactJSON(colormapsDraft);
+      unfoldedItemPath = null;
+      itemFoldedKeyPaths.clear();
+      itemSyntaxErrors.clear();
+      revalidate();
+      notify();
+    },
+
+    // Legacy subtab/selection compatibility
+    getActiveSubTab() { return activeSubTab; },
+    setActiveSubTab(tabName) {
+      if (activeSubTab !== tabName) {
+        activeSubTab = tabName;
+        activeDocTab = tabName === "colormaps" ? "colormaps" : "config";
+        notify();
+      }
+    },
+    getSelectedPresetId() { return selectedPresetId; },
+    setSelectedPresetId(id) { selectedPresetId = id; notify(); },
+    getSelectedColormapName() { return selectedColormapName; },
+    setSelectedColormapName(name) { selectedColormapName = name; notify(); },
     subscribe(listener) {
       listeners.add(listener);
+      try {
+        listener(state);
+      } catch (err) {
+        console.error("[FormState] Listener init error:", err);
+      }
       return () => listeners.delete(listener);
     },
   };

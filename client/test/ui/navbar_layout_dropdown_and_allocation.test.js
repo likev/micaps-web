@@ -70,7 +70,6 @@ describe("NavBar Layout Dropdown & Allocation Menu", () => {
 
 describe("Model Catalog Cleanliness: Removal of CMA_GFS / GFS", () => {
   const navBarSrc = readSrcText("components/NavBar.svelte");
-  const layerFormSrc = readSrcText("components/config/LayerForm.svelte");
   const multiTrackSrc = readSrcText("components/timeline/MultiTrackTimeline.svelte");
 
   test("NavBar BASE_NWP_MODELS lists verified models and excludes CMA_GFS and GFS from active array", () => {
@@ -87,11 +86,6 @@ describe("Model Catalog Cleanliness: Removal of CMA_GFS / GFS", () => {
     const baseModelsBlock = navBarSrc.slice(baseModelsStart, baseModelsEnd);
     expect(baseModelsBlock).not.toContain('"CMA_GFS"');
     expect(baseModelsBlock).not.toContain('"GFS"');
-  });
-
-  test("LayerForm COMMON_MODELS replaces CMA_GFS with GRAPES_GFS", () => {
-    expect(layerFormSrc).toContain('"GRAPES_GFS"');
-    expect(layerFormSrc).not.toContain('"CMA_GFS"');
   });
 
   test("MultiTrackTimeline hasForecast checks GRAPES_GFS and not CMA_GFS / GFS", () => {

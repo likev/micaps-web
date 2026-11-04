@@ -214,6 +214,16 @@ export async function loadPresetGroups() {
 
 export function formatCompactJSON(obj) {
   let str = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2);
+  // Collapse primitive arrays onto single horizontal lines (levels, boldValues, bounds, sampleTimes)
+  str = str.replace(/\[\s*\n\s*([0-9eE.+-]+|"[^"\n]*"|true|false|null)(?:,\s*\n\s*([0-9eE.+-]+|"[^"\n]*"|true|false|null))*\s*\n\s*\]/g, (match) => {
+    try {
+      const arr = JSON.parse(match);
+      if (Array.isArray(arr) && arr.every((x) => x === null || typeof x !== "object")) {
+        return "[" + arr.map((x) => JSON.stringify(x)).join(", ") + "]";
+      }
+    } catch {}
+    return match;
+  });
   str = str.replace(/"color":\s*\[\s*(-?\d+),\s*(-?\d+),\s*(-?\d+),\s*(-?\d+)\s*\]/g, '"color": [$1, $2, $3, $4]');
   str = str.replace(/\{\s*"val":\s*(-?[\d.]+),\s*"color":\s*(\[[^\]]+\])\s*\}/g, '{ "val": $1, "color": $2 }');
   return str;

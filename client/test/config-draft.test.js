@@ -9,7 +9,7 @@ import {
   deleteDivider,
   escapeHtml,
 } from "../src/ui/config/formState.js";
-import { rewriteColormapReferences } from "../src/ui/config/colormapForm.js";
+import { rewriteColormapReferences } from "../src/ui/config/colormapUtils.js";
 import { formatCompactJSON } from "../src/config/presets.js";
 
 describe("Config Form State & Draft Helpers (formState.js)", () => {

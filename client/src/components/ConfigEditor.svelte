@@ -3,31 +3,28 @@
   import { ui, showToast } from "../lib/stores/ui.svelte.js";
   import { createFormState } from "../lib/stores/formState.js";
   import { CURRENT_CONFIG, savePresetConfig, onConfigLoaded } from "../config/presets.js";
-  import PresetForm from "./config/PresetForm.svelte";
-  import ColormapForm from "./config/ColormapForm.svelte";
-  import SettingsForm from "./config/SettingsForm.svelte";
-  import JSONFallbackForm from "./config/JSONFallbackForm.svelte";
+  import JsonDocEditor from "./config/JsonDocEditor.svelte";
   import { focusRestore } from "../actions/focusRestore.js";
   import { t } from "../lib/stores/i18n.svelte.js";
 
   let { onConfigSaved = null } = $props();
 
-  let activeSubtab = $state(ui.activeConfigSubtab || "presets");
-  let formState = $state(createFormState(CURRENT_CONFIG || {}));
+  const formState = createFormState(CURRENT_CONFIG || {});
+  let activeDocTab = $state(ui.activeConfigSubtab === "colormaps" ? "colormaps" : "config");
   let isDirty = $state(false);
   let statusText = $state("Valid (Saved)");
   let statusClass = $state("valid");
   let statusMsg = $state("");
 
   $effect(() => {
-    if (ui.activeConfigSubtab && ui.activeConfigSubtab !== activeSubtab) {
-      activeSubtab = ui.activeConfigSubtab;
-      formState.setActiveSubTab(activeSubtab);
-      updateStatus();
+    if (ui.activeConfigSubtab && (ui.activeConfigSubtab === "colormaps" || ui.activeConfigSubtab === "config")) {
+      if (ui.activeConfigSubtab !== activeDocTab) {
+        selectDocTab(ui.activeConfigSubtab);
+      }
     }
   });
 
-  let wasConfigOpen = $state(false);
+  let wasConfigOpen = false;
   $effect(() => {
     if (ui.configOpen && !wasConfigOpen) {
       wasConfigOpen = true;
@@ -43,31 +40,48 @@
   function updateStatus() {
     isDirty = formState.isDirty();
     ui.configDirty = isDirty;
+    const hasSyntax = formState.hasSyntaxErrors();
     const val = formState.getValidation();
-    const isValid = val.isValid ?? val.valid ?? true;
-    if (!isValid) {
+    const isValid = !hasSyntax && (val.isValid ?? val.valid ?? true);
+
+    const cfgDraft = formState.getConfigDraft();
+    const colormapsDraft = formState.getColormapsDraft();
+    const pCount = cfgDraft?.presets?.length || 0;
+    const profCount = Object.keys(cfgDraft?.renderProfiles || {}).length;
+    const cmapCount = Object.keys(colormapsDraft || {}).length;
+    const docSummary = `config.json: ${pCount} presets, ${profCount} renderProfiles | colormaps.json: ${cmapCount} ramps`;
+
+    if (hasSyntax) {
+      statusText = "Syntax Error";
+      statusClass = "error";
+      statusMsg = "JSON syntax error in editor. Fix invalid syntax to enable save.";
+    } else if (!isValid) {
       statusText = `${t("config.status.invalid")} (${val.errors.length} err)`;
       statusClass = "error";
       statusMsg = val.errors.map((e) => `${e.path}: ${e.message}`).join("; ");
     } else if (isDirty) {
       statusText = t("config.status.modified");
       statusClass = "dirty";
-      statusMsg = "You have unsaved changes.";
+      statusMsg = `You have unsaved changes • ${docSummary}`;
     } else {
       statusText = t("config.status.saved");
       statusClass = "valid";
-      statusMsg = "Configuration is valid and synchronized.";
+      statusMsg = `Ready • ${docSummary}`;
     }
   }
 
-  function selectSubtab(tabName) {
-    activeSubtab = tabName;
+  function selectDocTab(tabName) {
+    activeDocTab = tabName;
     ui.activeConfigSubtab = tabName;
-    formState.setActiveSubTab(tabName);
+    formState.setActiveDocTab(tabName);
     updateStatus();
   }
 
   async function handleSaveApply() {
+    if (formState.hasSyntaxErrors()) {
+      showToast("error", "Cannot save configuration: JSON syntax error must be resolved.");
+      return;
+    }
     const val = formState.getValidation();
     const isValid = val.isValid ?? val.valid ?? true;
     if (!isValid) {
@@ -120,9 +134,17 @@
   }
 
   let unsubConfig = null;
+  let revision = $state(0);
   onMount(() => {
     window.addEventListener("beforeunload", beforeUnloadListener);
+    let initial = true;
     const unsub = formState.subscribe(() => {
+      if (initial) {
+        initial = false;
+        updateStatus();
+        return;
+      }
+      revision++;
       updateStatus();
     });
     unsubConfig = onConfigLoaded((cfg) => {
@@ -154,36 +176,24 @@
         <div class="config-subtab-bar" role="tablist">
           <button
             class="config-subtab-btn"
-            class:active={activeSubtab === "presets"}
-            data-tab="presets"
+            class:active={activeDocTab === "config"}
+            data-tab="config"
             role="tab"
-            aria-selected={activeSubtab === "presets"}
-            onclick={() => selectSubtab("presets")}
-          >{t("config.subtab.presets")}</button>
+            aria-selected={activeDocTab === "config"}
+            onclick={() => selectDocTab("config")}
+          >
+            📄 config.json ({revision >= 0 ? (formState.getConfigDraft()?.presets?.length || 0) : 0})
+          </button>
           <button
             class="config-subtab-btn"
-            class:active={activeSubtab === "colormaps"}
+            class:active={activeDocTab === "colormaps"}
             data-tab="colormaps"
             role="tab"
-            aria-selected={activeSubtab === "colormaps"}
-            onclick={() => selectSubtab("colormaps")}
-          >{t("config.subtab.colormaps")}</button>
-          <button
-            class="config-subtab-btn"
-            class:active={activeSubtab === "settings"}
-            data-tab="settings"
-            role="tab"
-            aria-selected={activeSubtab === "settings"}
-            onclick={() => selectSubtab("settings")}
-          >{t("config.subtab.settings")}</button>
-          <button
-            class="config-subtab-btn"
-            class:active={activeSubtab === "json"}
-            data-tab="json"
-            role="tab"
-            aria-selected={activeSubtab === "json"}
-            onclick={() => selectSubtab("json")}
-          >{t("config.subtab.json")}</button>
+            aria-selected={activeDocTab === "colormaps"}
+            onclick={() => selectDocTab("colormaps")}
+          >
+            🎨 colormaps.json ({revision >= 0 ? Object.keys(formState.getColormapsDraft() || {}).length : 0})
+          </button>
         </div>
         <span class="config-editor-status {statusClass}">{statusText}</span>
       </div>
@@ -202,15 +212,7 @@
     </div>
 
     <div id="config-editor-body" class="config-editor-body">
-      {#if activeSubtab === "presets"}
-        <PresetForm {formState} />
-      {:else if activeSubtab === "colormaps"}
-        <ColormapForm {formState} />
-      {:else if activeSubtab === "settings"}
-        <SettingsForm {formState} />
-      {:else if activeSubtab === "json"}
-        <JSONFallbackForm {formState} />
-      {/if}
+      <JsonDocEditor {formState} activeTab={activeDocTab} />
     </div>
 
     <div id="config-editor-msg" class="config-editor-msg" title={statusMsg}>
@@ -282,7 +284,7 @@
 
   .config-subtab-bar {
     display: flex;
-    gap: 2px;
+    gap: 4px;
     background: var(--bg-primary, #0d1117);
     border: 1px solid var(--border-color, #30363d);
     border-radius: 8px;
@@ -306,6 +308,7 @@
     cursor: pointer;
     white-space: nowrap;
     transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    font-family: var(--font-mono, monospace);
   }
 
   .config-subtab-btn:hover {

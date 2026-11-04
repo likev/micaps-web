@@ -23,13 +23,13 @@ describe("Comprehensive Verification of All 13 Issues in ui-ux-review1.md", () =
   const statusBarSrc = readSrc("components/StatusBar.svelte");
   const layerRowSrc = readSrc("components/LayerRow.svelte");
   const presetMenuSrc = readSrc("components/PresetMenu.svelte");
-  const presetFormSrc = readSrc("components/config/PresetForm.svelte");
+  const jsonFoldStateSrc = readSrc("ui/config/jsonFoldState.js");
   const navBarSrc = readSrc("components/NavBar.svelte");
   const tabsBarSrc = readSrc("components/TabsBar.svelte");
   const timeSliderSrc = readSrc("components/TimeSlider.svelte");
   const windowPanelSrc = readSrc("components/WindowPanel.svelte");
   const helpModalSrc = readSrc("components/HelpModal.svelte");
-  const settingsFormSrc = readSrc("components/config/SettingsForm.svelte");
+  const configEditorSrc = readSrc("components/ConfigEditor.svelte");
   const commandPaletteSrc = readSrc("components/CommandPalette.svelte");
   const tokensSrc = readSrc("styles/tokens.css");
   const polishSrc = readSrc("styles/polish.css");
@@ -71,8 +71,8 @@ describe("Comprehensive Verification of All 13 Issues in ui-ux-review1.md", () =
     expect(presetMenuSrc).toContain("C${String(lvl).padStart(3, \"0\")}");
     expect(presetMenuSrc).toContain("${lvl} m");
     expect(presetMenuSrc).toContain("${lvl} hPa");
-    expect(presetFormSrc).toContain("formatPresetLevel");
-    expect(presetFormSrc).toContain("formatLayerLevel");
+    expect(jsonFoldStateSrc).toContain("formatPresetLevel");
+    expect(jsonFoldStateSrc).toContain("formatLayerLevel");
   });
 
   test("Issue 6: Multi-language i18n support toggleable between en and zh", () => {
@@ -100,7 +100,7 @@ describe("Comprehensive Verification of All 13 Issues in ui-ux-review1.md", () =
 
     expect(navBarSrc).toContain('id="menu-item-lang-en"');
     expect(navBarSrc).toContain('id="menu-item-lang-zh"');
-    expect(settingsFormSrc).toContain('id="settings-language-options"');
+    expect(configEditorSrc).toContain('config.json');
     expect(commandPaletteSrc).toContain('id: "act-lang-en"');
     expect(commandPaletteSrc).toContain('id: "act-lang-zh"');
   });

@@ -75,7 +75,7 @@ describe("Item H & Global UI Theme Scheme", () => {
   const tokensCss = readSrcText("styles/tokens.css");
   const polishCss = readSrcText("styles/polish.css");
   const navBarSrc = readSrcText("components/NavBar.svelte");
-  const settingsSrc = readSrcText("components/config/SettingsForm.svelte");
+  const configEditorSrc = readSrcText("components/ConfigEditor.svelte");
 
   test("tokens.css defines dark and light tokens; polish.css defines the Brutalism theme", () => {
     expect(tokensCss).toContain('[data-theme="dark"]');
@@ -111,7 +111,7 @@ describe("Item H & Global UI Theme Scheme", () => {
     expect(getGlobalTheme()).toBe("dark");
   });
 
-  test("NavBar and SettingsForm provide Theme Scheme and Projection switches", () => {
+  test("NavBar and ConfigEditor provide Theme Scheme and Projection switches", () => {
     expect(navBarSrc).toContain('id="menu-item-theme-light"');
     expect(navBarSrc).toContain('id="menu-item-theme-dark"');
     expect(navBarSrc).toContain('id="menu-item-theme-brutalism"');
@@ -119,7 +119,8 @@ describe("Item H & Global UI Theme Scheme", () => {
     expect(navBarSrc).toContain('setGlobalTheme("light")');
     expect(navBarSrc).toContain('setGlobalTheme("brutalism")');
     expect(navBarSrc).toContain('setGlobalProjection');
-    expect(settingsSrc).toContain('Brutalism');
+    expect(navBarSrc).toContain('id="menu-item-theme-brutalism"');
+    expect(configEditorSrc).toContain('config.json');
   });
 
   test("Projection switching persists to localStorage and CURRENT_CONFIG", () => {
