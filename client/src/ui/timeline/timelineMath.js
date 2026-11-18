@@ -67,16 +67,91 @@ export function getObsTreeLimit(path = "") {
   return 100;
 }
 
-/** Step options (hours) offered by the step-length select; 0.25 = 15 min (satellite only). */
-export function getObsStepOptions({ isUpper = false, isSatellite = false } = {}) {
+/** Step options (hours) offered by the step-length select; sub-hourly for satellite/radar/high-cadence. */
+export const OBS_RANGE_WINDOW_OPTIONS = [3, 6, 24, 0];
+
+export function isRadarOrHighCadenceGroup(group) {
+  if (!group) return false;
+  const matchHighStr = (val) =>
+    /SWAN|RADAR|LIGHTNING_10MIN|PLOT_10MIN|PLOT_5MIN|PLOT_TRAFFIC_5MIN|1MIN|APCP_10MIN|WIND_PROFILER/i.test(String(val || ""));
+  if (typeof group === "string") return matchHighStr(group);
+  if (
+    matchHighStr(group.id) ||
+    matchHighStr(group.name) ||
+    matchHighStr(group.path) ||
+    matchHighStr(group.model) ||
+    matchHighStr(group.category)
+  ) {
+    return true;
+  }
+  const layers = Array.isArray(group.layers) ? group.layers : [];
+  return layers.some(
+    (l) =>
+      l?.model === "SWAN_PRODUCT" ||
+      l?.model === "RADAR" ||
+      l?.model === "WIND_PROFILER" ||
+      matchHighStr(l?.path) ||
+      matchHighStr(l?.element) ||
+      matchHighStr(l?.id)
+  );
+}
+
+export function getObsStepOptions({ isUpper = false, isSatellite = false, isRadar = false, isHighCadence = false, path = "" } = {}) {
   if (isUpper) return [12, 24, 6];
-  return isSatellite ? [0.25, 1, 3, 6, 12, 24] : [1, 3, 6, 12, 24];
+  if (isSatellite) return [0.25, 0.5, 1, 3, 6, 12, 24];
+  if (isRadar || isHighCadence || isRadarOrHighCadenceGroup(path)) {
+    if (/10MIN/i.test(String(path || ""))) {
+      return [1 / 6, 0.5, 1, 3, 6, 12, 24];
+    }
+    return [0.1, 0.25, 0.5, 1, 3, 6, 12, 24];
+  }
+  return [1, 3, 6, 12, 24];
 }
 
 export function formatStepLabel(step) {
   const n = parseFloat(step);
   if (!(n > 0)) return "";
   return n < 1 ? `${Math.round(n * 60)}min` : `${n}h`;
+}
+
+/**
+ * Filters observation files to a time range window (in hours) anchored at the latest scan.
+ * Expands backward if activeFile falls earlier than the cutoff. rangeHours <= 0 returns all files.
+ */
+export function filterObsFilesByRangeWindow(files, rangeHours = 6, activeFile = "") {
+  if (!Array.isArray(files) || files.length === 0) return [];
+  const hours = Number(rangeHours);
+  if (!Number.isFinite(hours) || hours <= 0) {
+    return [...files];
+  }
+  const latestMs = parseTimestamp(files[files.length - 1]);
+  if (latestMs === null) {
+    return [...files];
+  }
+  let cutoffMs = latestMs - hours * 3600000;
+  if (activeFile && files.includes(activeFile)) {
+    const activeMs = parseTimestamp(activeFile);
+    if (activeMs !== null && activeMs < cutoffMs) {
+      cutoffMs = activeMs;
+    }
+  }
+  const inWindow = files.filter((f) => {
+    const ts = parseTimestamp(f);
+    return ts === null || ts >= cutoffMs;
+  });
+  return inWindow.length > 0 ? inWindow : [...files];
+}
+
+/**
+ * Determines whether observation timeline should render the continuous scrubbable time slider
+ * instead of discrete 10-chip tabs.
+ */
+export function shouldUseObsTimeSlider({ isObs = false, stepLength = 3, obsViewMode = "auto", chipCount = 0 } = {}) {
+  if (!isObs) return false;
+  if (obsViewMode === "slider") return true;
+  if (obsViewMode === "chips") return false;
+  const step = parseFloat(stepLength);
+  return (Number.isFinite(step) && step > 0 && step < 1) || chipCount > MAX_OBS_CHIPS;
 }
 
 /** True when a preset group carries FY-4B / FY-2G / satellite imagery layers. */
@@ -202,11 +277,14 @@ export function filterObsFilesByStep(files, stepHours, isUpper = false) {
     }
   }
 
-  // Sub-hourly step (e.g. 15 min FY-4B): keep files on the step grid when possible.
+  // Sub-hourly step (e.g. 6 min radar, 10 min lightning, 15 min FY-4B): keep files on the step grid when possible,
+  // otherwise step backward by interval so off-grid scans (e.g. :02, :08, :14) still honor the requested step.
   if (stepNum < 1) {
     const stepMin = Math.max(1, Math.round(stepNum * 60));
     const aligned = files.filter((f) => getFileMin(f) % stepMin === 0);
-    return aligned.length >= 2 ? aligned : [...files];
+    if (aligned.length >= 2) return aligned;
+    const steppedSub = stepBackwardByInterval(files, stepNum);
+    return steppedSub.length >= 2 ? steppedSub : [...files];
   }
 
   // 1h on sub-hourly data (satellite 15 min, radar 6 min): keep the on-the-hour files only.

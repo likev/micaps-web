@@ -18,8 +18,8 @@
   import { tabsState, getVisibleWindows, getWindowById, setMapInstance, getMapInstance, mapInstances } from "./lib/stores/tabs.svelte.js";
   import { syncLayersState, reorderLayers, syncMapLayerOrder, getLayers } from "./lib/stores/layers.svelte.js";
   import { syncLegendState, deleteWindowLegends } from "./lib/stores/legend.svelte.js";
-  import { getOrCreateTimeline, playback, selectObsChipsWindow, filterObsFilesByStep, getPeriodsForStep, timelinesByWindow } from "./lib/stores/timeline.svelte.js";
-  import { getObsStepOptions, isSatelliteGroup } from "./lib/stores/timelineMath.js";
+  import { getOrCreateTimeline, playback, selectObsChipsWindow, filterObsFilesByStep, getPeriodsForStep, syncSliderObsFiles, timelinesByWindow } from "./lib/stores/timeline.svelte.js";
+  import { getObsStepOptions, isSatelliteGroup, isRadarOrHighCadenceGroup } from "./lib/stores/timelineMath.js";
   import { setLiveTimelineResolver, cancelScheduledPrefetch } from "./services/prefetchService.js";
 
   // Feed the prefetch engine the live per-window timeline (not the frozen
@@ -1376,7 +1376,12 @@
         tl.currentMode = "obs";
         tl.isUpperAirMode = Boolean(t.isUpper);
         const defaultStep = tl.isUpperAirMode ? 12 : 3;
-        const validSteps = getObsStepOptions({ isUpper: tl.isUpperAirMode, isSatellite: isSatelliteGroup(groupCopy) });
+        const validSteps = getObsStepOptions({
+          isUpper: tl.isUpperAirMode,
+          isSatellite: isSatelliteGroup(groupCopy),
+          isHighCadence: isRadarOrHighCadenceGroup(groupCopy),
+          path: t.path || groupCopy?.id || "",
+        });
         let step = parseFloat(win.stepLength);
         if (!validSteps.includes(step)) step = parseFloat(t.stepLength);
         if (!validSteps.includes(step)) step = defaultStep;
@@ -1393,6 +1398,7 @@
           const idx = t.file ? tl.obsFiles.indexOf(t.file) : -1;
           tl.currentObsIdx = idx !== -1 ? idx : Math.max(0, tl.obsFiles.length - 1);
           const latest = tl.obsFiles[tl.currentObsIdx];
+          syncSliderObsFiles(tl, filtered, latest);
           if (latest && win.obsTime !== latest) win.obsTime = latest;
           if (latest && win._obsTimeline) win._obsTimeline.file = latest;
         }
@@ -2032,6 +2038,7 @@
           const idx = currentFile ? tl.obsFiles.indexOf(currentFile) : -1;
           tl.currentObsIdx = idx !== -1 ? idx : Math.max(0, tl.obsFiles.length - 1);
           const activeFile = tl.obsFiles[tl.currentObsIdx];
+          syncSliderObsFiles(tl, filtered, activeFile);
           if (activeFile) {
             win.obsTime = activeFile;
             if (win._obsTimeline) win._obsTimeline.file = activeFile;
@@ -2511,6 +2518,7 @@
     onChangeLayout={handleChangeLayout}
     onSelectAutoAlloc={handleSelectAutoAlloc}
     onHistoryChange={handleHistoryChange}
+    onProfileChange={() => handleConfigSaved(CURRENT_CONFIG)}
   />
 
   <TabsBar

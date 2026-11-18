@@ -29,6 +29,8 @@ dist/
 dist-ssr/
 *.zip
 th-cache/
+users/
+server/users/
 
 # Logs & Temporary Files
 *.log

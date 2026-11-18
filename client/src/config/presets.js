@@ -2,6 +2,7 @@
 import { setColormaps } from "../utils/colormaps.js";
 import { expandRenderProfiles, compactConfigForSave } from "./renderProfiles.js";
 import { isUpperAirStationLayer } from "../ui/layers/layerDefaults.js";
+import { getActiveUserId, setUserConfigSource, DEFAULT_USER_ID } from "../lib/stores/userProfileCore.js";
 
 const CONFIG_URL = new URL("./config.json", (typeof document !== "undefined" && document.baseURI) ? document.baseURI : "http://localhost:8088/");
 const COLORMAPS_URL = new URL("./colormaps.json", (typeof document !== "undefined" && document.baseURI) ? document.baseURI : "http://localhost:8088/");
@@ -124,15 +125,34 @@ export function notifyConfigLoaded() {
 }
 
 export async function loadColormaps() {
+  const userId = getActiveUserId();
+  const isCustomUser = Boolean(userId && userId !== DEFAULT_USER_ID);
   try {
-    let response = await fetch(new URL(COLORMAPS_URL.href + "?_t=" + Date.now()), { cache: "no-store" });
-    if (!response.ok) {
-      response = await fetch("/api/colormaps?_t=" + Date.now(), { cache: "no-store" });
+    let response;
+    if (isCustomUser) {
+      response = await fetch(`/api/colormaps?user=${encodeURIComponent(userId)}&_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "X-Micaps-User": userId },
+      });
+      if (!response.ok) {
+        response = await fetch(new URL(COLORMAPS_URL.href + "?_t=" + Date.now()), { cache: "no-store" });
+      }
+    } else {
+      response = await fetch(new URL(COLORMAPS_URL.href + "?_t=" + Date.now()), { cache: "no-store" });
+      if (!response.ok) {
+        response = await fetch("/api/colormaps?_t=" + Date.now(), { cache: "no-store" });
+      }
     }
     if (!response.ok) {
       response = await fetch("/colormaps.json?_t=" + Date.now(), { cache: "no-store" });
     }
     if (response.ok) {
+      const srcHeader = response.headers?.get?.("X-Micaps-Config-Source");
+      if (isCustomUser && (srcHeader === "user" || srcHeader === "system")) {
+        setUserConfigSource(null, srcHeader);
+      } else if (!isCustomUser) {
+        setUserConfigSource(null, "system");
+      }
       const data = await response.json();
       const colormaps = (data && typeof data === "object" && !Array.isArray(data) && data.colormaps) ? data.colormaps : data;
       if (colormaps && typeof colormaps === "object" && !Array.isArray(colormaps) && Object.keys(colormaps).length > 0) {
@@ -147,16 +167,35 @@ export async function loadColormaps() {
 }
 
 export async function loadPresetGroups() {
+  const userId = getActiveUserId();
+  const isCustomUser = Boolean(userId && userId !== DEFAULT_USER_ID);
   const [colormapsRes, configRes] = await Promise.allSettled([
     loadColormaps(),
     (async () => {
-      let response = await fetch(new URL(CONFIG_URL.href + "?_t=" + Date.now()), { cache: "no-store" });
-      if (!response.ok) {
-        // Fallback to /api/config
-        response = await fetch("/api/config?_t=" + Date.now(), { cache: "no-store" });
+      let response;
+      if (isCustomUser) {
+        response = await fetch(`/api/config?user=${encodeURIComponent(userId)}&_t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { "X-Micaps-User": userId },
+        });
+        if (!response.ok) {
+          response = await fetch(new URL(CONFIG_URL.href + "?_t=" + Date.now()), { cache: "no-store" });
+        }
+      } else {
+        response = await fetch(new URL(CONFIG_URL.href + "?_t=" + Date.now()), { cache: "no-store" });
+        if (!response.ok) {
+          // Fallback to /api/config
+          response = await fetch("/api/config?_t=" + Date.now(), { cache: "no-store" });
+        }
       }
       if (!response.ok) {
         throw new Error(`Config request failed (${response.status})`);
+      }
+      const srcHeader = response.headers?.get?.("X-Micaps-Config-Source");
+      if (isCustomUser) {
+        setUserConfigSource(srcHeader === "user" ? "user" : "system");
+      } else {
+        setUserConfigSource("system");
       }
       return response.json();
     })()
@@ -231,24 +270,37 @@ export function formatCompactJSON(obj) {
 
 export async function savePresetConfig(configObj = CURRENT_CONFIG) {
   // colormaps live in colormaps.json; render options shared via renderProfiles.
+  const userId = getActiveUserId();
+  const isCustomUser = Boolean(userId && userId !== DEFAULT_USER_ID);
+  const headers = isCustomUser
+    ? { "Content-Type": "application/json", "X-Micaps-User": userId }
+    : { "Content-Type": "application/json" };
+  const cmUrl = isCustomUser ? `/api/colormaps?user=${encodeURIComponent(userId)}` : "/api/colormaps";
+  const cfgUrl = isCustomUser ? `/api/config?user=${encodeURIComponent(userId)}` : "/api/config";
+
   const hasColormaps = !Array.isArray(configObj) && configObj?.colormaps && typeof configObj.colormaps === "object";
   if (hasColormaps) {
-    const cmRes = await fetch("/api/colormaps", {
+    const cmRes = await fetch(cmUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: formatCompactJSON(configObj.colormaps),
     });
     if (!cmRes.ok) {
       throw new Error(`Failed to save colormaps (${cmRes.status})`);
     }
   }
-  const res = await fetch("/api/config", {
+  const res = await fetch(cfgUrl, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: formatCompactJSON(Array.isArray(configObj) ? configObj : compactConfigForSave(configObj)),
   });
   if (!res.ok) {
     throw new Error(`Failed to save config (${res.status})`);
+  }
+  if (isCustomUser) {
+    setUserConfigSource("user", hasColormaps ? "user" : null);
+  } else {
+    setUserConfigSource("system", hasColormaps ? "system" : null);
   }
   const groups = Array.isArray(configObj) ? configObj : configObj?.presets;
   if (Array.isArray(groups)) {

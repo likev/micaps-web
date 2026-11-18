@@ -3,7 +3,7 @@ import { setTimelineMode, filterObsFilesByStep } from "../ui/timeSlider.js";
 import { getActiveWindow } from "../ui/tabWindowManager.js";
 import { DEFAULT_MOCK_OBS_FILES } from "../config/presets.js";
 import { parseTimestamp } from "./timeResolver.js";
-import { getObsStepOptions, isSatelliteGroup, getObsTreeLimit } from "../ui/timeline/timelineMath.js";
+import { getObsStepOptions, isSatelliteGroup, isRadarOrHighCadenceGroup, getObsTreeLimit } from "../ui/timeline/timelineMath.js";
 import { getActiveHistoryDate } from "../store/appState.js";
 
 const forecastCyclesCache = {};
@@ -287,7 +287,8 @@ export async function syncObservationTimeline(path, currentFile = null, winTitle
   // Same option list the step-length select offers (satellite adds 15 min = 0.25 h);
   // a hand-rolled list here silently reset a valid 15 min step to the default.
   const isSatellite = !isUpper && isSatelliteGroup(path);
-  const validSteps = getObsStepOptions({ isUpper, isSatellite });
+  const isHighCadence = !isUpper && isRadarOrHighCadenceGroup(path);
+  const validSteps = getObsStepOptions({ isUpper, isSatellite, isHighCadence, path });
   let stepLength = (win && win.stepLength && validSteps.includes(parseFloat(win.stepLength))) ? parseFloat(win.stepLength) : defaultStep;
   if (forceLatest) {
     stepLength = defaultStep;

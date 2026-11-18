@@ -3,7 +3,7 @@ import { uiState } from "../stores/uiCore.js";
 import { createTimelineState } from "../stores/timelineCore.js";
 import { parseTimestamp } from "../../utils/timeResolver.js";
 import { getGlobalLocale } from "../stores/i18nCore.js";
-import { isSatelliteGroup } from "../../ui/timeline/timelineMath.js";
+import { isSatelliteGroup, selectObsChipsWindow, filterObsFilesByStep, shouldUseObsTimeSlider } from "../../ui/timeline/timelineMath.js";
 
 /**
  * Determines whether a preset group requires hiding the forecast timeline
@@ -270,6 +270,69 @@ export function stepWindowTimeline(tl, delta) {
   const loopEnd = loopActive ? Math.max(tl.loopRange.start, tl.loopRange.end) : null;
 
   if (tl.currentMode === "obs") {
+    const useSlider = shouldUseObsTimeSlider({
+      isObs: true,
+      stepLength: tl.currentStepLength,
+      obsViewMode: tl.obsViewMode,
+      chipCount: tl.obsFiles?.length || 0,
+    }) && Array.isArray(tl.sliderObsFiles) && tl.sliderObsFiles.length > 0;
+
+    if (useSlider) {
+      const files = tl.sliderObsFiles;
+      const len = files.length;
+      const curFile = tl.sliderObsFiles[tl.currentSliderObsIdx] ?? tl.obsFiles?.[tl.currentObsIdx] ?? "";
+      let curIdx = tl.currentSliderObsIdx;
+      if (typeof curIdx !== "number" || curIdx < 0 || curIdx >= len || (curFile && files[curIdx] !== curFile)) {
+        curIdx = curFile ? files.indexOf(curFile) : len - 1;
+        if (curIdx === -1) curIdx = len - 1;
+      }
+      let nextIdx = (curIdx + delta + len) % len;
+
+      if (loopActive) {
+        let minIdx = -1;
+        let maxIdx = -1;
+        for (let i = 0; i < len; i++) {
+          let inRange = false;
+          if (loopStart > 100000000) {
+            const ts = parseTimestamp(files[i]);
+            inRange = ts !== null && ts >= loopStart && ts <= loopEnd;
+          } else {
+            inRange = i >= loopStart && i <= loopEnd;
+          }
+          if (inRange) {
+            if (minIdx === -1) minIdx = i;
+            maxIdx = i;
+          }
+        }
+        if (minIdx !== -1 && maxIdx !== -1 && minIdx <= maxIdx) {
+          if (delta > 0) {
+            nextIdx = (curIdx < minIdx || curIdx >= maxIdx) ? minIdx : curIdx + 1;
+          } else if (delta < 0) {
+            nextIdx = (curIdx <= minIdx || curIdx > maxIdx) ? maxIdx : curIdx - 1;
+          }
+        }
+      }
+
+      tl.currentSliderObsIdx = nextIdx;
+      const file = files[nextIdx];
+      const allFiltered = Array.isArray(tl.rawObsFiles) && tl.rawObsFiles.length > 0
+        ? filterObsFilesByStep(tl.rawObsFiles, tl.currentStepLength, tl.isUpperAirMode)
+        : files;
+      tl.obsFiles = selectObsChipsWindow(allFiltered, file);
+      const chipIdx = tl.obsFiles.indexOf(file);
+      tl.currentObsIdx = chipIdx !== -1 ? chipIdx : Math.max(0, tl.obsFiles.length - 1);
+      const fileTs = parseTimestamp(file);
+      if (fileTs !== null) {
+        tl.wallClockCursor = fileTs;
+      }
+      return {
+        isObs: true,
+        file,
+        cursorTime: fileTs,
+        _seq: ++tl.periodStepSeq,
+      };
+    }
+
     if (!tl.obsFiles || tl.obsFiles.length === 0) return null;
     const len = tl.obsFiles.length;
     let nextIdx = (tl.currentObsIdx + delta + len) % len;

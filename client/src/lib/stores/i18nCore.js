@@ -1,5 +1,6 @@
 // i18nCore.js - Pure JavaScript internationalization (en/zh) core store and helpers
 import { CURRENT_CONFIG } from "../../config/presets.js";
+import { I18N_EXTRAS } from "./i18nExtras.js";
 
 export const ALLOWED_LOCALES = ["en", "zh"];
 
@@ -550,6 +551,7 @@ export const UI_STRINGS = {
   "profile.timeHeight": { en: "Time-Height Cross-Section", zh: "时间-高度剖面图" },
   "profile.lineHeight": { en: "Line-Height Cross-Section", zh: "空间垂直剖面图" },
   "profile.hovmoller": { en: "Time-Line Hovmoller", zh: "Hovmöller 时空剖面图" },
+  ...I18N_EXTRAS,
 };
 
 export function translateUI(key, paramsOrLocale = {}, maybeLocale = null) {

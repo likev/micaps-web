@@ -16,6 +16,7 @@ import {
   setLoopRange,
   toggleMultiTrack,
   updateLayerResolutions,
+  syncSliderObsFiles,
 } from "./timelineCore.js";
 import {
   selectObsChipsWindow,
@@ -54,6 +55,12 @@ export function goToObsFile(winId, file) {
   if (idx !== -1) {
     tl.currentObsIdx = idx;
   }
+  if (Array.isArray(tl.sliderObsFiles)) {
+    const sIdx = tl.sliderObsFiles.indexOf(file);
+    if (sIdx !== -1) {
+      tl.currentSliderObsIdx = sIdx;
+    }
+  }
 }
 
 export function deleteWindowTimeline(winId) {
@@ -82,5 +89,6 @@ export {
   setLoopRange,
   toggleMultiTrack,
   updateLayerResolutions,
+  syncSliderObsFiles,
 };
 

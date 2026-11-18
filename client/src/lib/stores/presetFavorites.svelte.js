@@ -1,29 +1,24 @@
-// presetFavorites.svelte.js - Pinned favorites and recent presets store
-const PINNED_STORAGE_KEY = "micaps-pinned-presets";
-const RECENT_STORAGE_KEY = "micaps-recent-presets";
-const MAX_RECENTS = 4;
+// presetFavorites.svelte.js - Svelte 5 reactive wrapper around presetFavoritesCore.js
+import {
+  favoritesState,
+  subscribeFavorites,
+  syncFavoritesForUser as coreSyncFavoritesForUser,
+  togglePinPreset as coreTogglePinPreset,
+  addRecentPreset as coreAddRecentPreset,
+  clearRecentPresets as coreClearRecentPresets,
+} from "./presetFavoritesCore.js";
 
-function loadStoredList(key, defaultList = []) {
-  if (typeof localStorage === "undefined") return defaultList;
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch {}
-  return defaultList;
+let pinnedIds = $state([...favoritesState.pinned]);
+let recentIds = $state([...favoritesState.recent]);
+
+subscribeFavorites((state) => {
+  pinnedIds = [...state.pinned];
+  recentIds = [...state.recent];
+});
+
+export function syncFavoritesForUser(userId) {
+  return coreSyncFavoritesForUser(userId);
 }
-
-function saveList(key, list) {
-  if (typeof localStorage === "undefined") return;
-  try {
-    localStorage.setItem(key, JSON.stringify(list));
-  } catch {}
-}
-
-let pinnedIds = $state(loadStoredList(PINNED_STORAGE_KEY, ["surface-obs", "ecmwf-500-hgt-wind"]));
-let recentIds = $state(loadStoredList(RECENT_STORAGE_KEY, []));
 
 export function getPinnedPresetIds() {
   return pinnedIds;
@@ -39,23 +34,13 @@ export function isPresetPinned(presetId) {
 }
 
 export function togglePinPreset(presetId) {
-  if (!presetId) return;
-  if (pinnedIds.includes(presetId)) {
-    pinnedIds = pinnedIds.filter((id) => id !== presetId);
-  } else {
-    pinnedIds = [...pinnedIds, presetId];
-  }
-  saveList(PINNED_STORAGE_KEY, pinnedIds);
+  return coreTogglePinPreset(presetId);
 }
 
 export function addRecentPreset(presetId) {
-  if (!presetId) return;
-  const filtered = recentIds.filter((id) => id !== presetId);
-  recentIds = [presetId, ...filtered].slice(0, MAX_RECENTS);
-  saveList(RECENT_STORAGE_KEY, recentIds);
+  return coreAddRecentPreset(presetId);
 }
 
 export function clearRecentPresets() {
-  recentIds = [];
-  saveList(RECENT_STORAGE_KEY, recentIds);
+  return coreClearRecentPresets();
 }

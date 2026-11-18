@@ -5,13 +5,36 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
 	"micaps-web/config"
 	"micaps-web/filecache"
 )
+
+func systemConfigCandidates() []string {
+	candidates := []string{
+		"client/config.json",
+		"../client/config.json",
+	}
+	if exePath, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exePath)
+		candidates = append(candidates, filepath.Join(exeDir, "client/config.json"))
+	}
+	return candidates
+}
+
+func systemColormapsCandidates() []string {
+	candidates := []string{
+		"client/colormaps.json",
+		"../client/colormaps.json",
+	}
+	if exePath, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exePath)
+		candidates = append(candidates, filepath.Join(exeDir, "client", "colormaps.json"))
+	}
+	return candidates
+}
 
 var startTime = time.Now()
 
@@ -116,38 +139,25 @@ func (h *StaticHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(status)
 }
 
-// ConfigHandler reads or updates config.json
+// ConfigHandler reads or updates config.json (per-user when X-Micaps-User / ?user= is specified)
 func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Micaps-User")
+	w.Header().Set("Access-Control-Expose-Headers", "X-Micaps-Config-Source, X-Micaps-User")
 
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	candidates := []string{
-		"client/config.json",
-		"../client/config.json",
-	}
-	if exePath, err := os.Executable(); err == nil {
-		exeDir := filepath.Dir(exePath)
-		candidates = append(candidates,
-			filepath.Join(exeDir, "client/config.json"),
-		)
+	userID, err := ExtractRequestUserID(r)
+	if err != nil {
+		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+		return
 	}
 
-	var configPath string
-	for _, p := range candidates {
-		if _, err := os.Stat(p); err == nil {
-			configPath = p
-			break
-		}
-	}
-	if configPath == "" {
-		configPath = "client/config.json"
-	}
+	configPath := resolveSystemFilePath(systemConfigCandidates(), "client/config.json")
 
 	if r.Method == http.MethodPost || r.Method == http.MethodPut {
 		var obj any
@@ -156,64 +166,88 @@ func (h *StaticHandler) ConfigHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		formatted, err := json.MarshalIndent(obj, "", "  ")
+		formattedBytes, err := FormatCompactConfigBytes(obj)
 		if err != nil {
 			http.Error(w, `{"error":"Format error: `+err.Error()+`"}`, http.StatusInternalServerError)
 			return
 		}
 
-		str := string(formatted)
-		reColor := regexp.MustCompile(`"color":\s*\[\s*(-?\d+),\s*(-?\d+),\s*(-?\d+),\s*(-?\d+)\s*\]`)
-		str = reColor.ReplaceAllString(str, `"color": [$1, $2, $3, $4]`)
-		reValColor := regexp.MustCompile(`\{\s*"val":\s*(-?[\d.]+),\s*"color":\s*(\[[^\]]+\])\s*\}`)
-		str = reValColor.ReplaceAllString(str, `{ "val": $1, "color": $2 }`)
-
-		// Strictly save to client/config.json
-		targetSavePath := "client/config.json"
-		if _, err := os.Stat("client/config.json"); err != nil {
-			if _, err2 := os.Stat("../client/config.json"); err2 == nil {
-				targetSavePath = "../client/config.json"
+		if userID != "default" {
+			userDir := h.userDirPath(userID)
+			targetUserPath := filepath.Join(userDir, "config.json")
+			if err := writeFileAtomic(targetUserPath, formattedBytes, 0644); err != nil {
+				http.Error(w, `{"error":"Save error: `+err.Error()+`"}`, http.StatusInternalServerError)
+				return
 			}
+			touchUserMetaTimestamp(userDir, userID)
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-Micaps-User", userID)
+			w.Header().Set("X-Micaps-Config-Source", "user")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"status":  "ok",
+				"user":    userID,
+				"source":  "user",
+				"message": "Configuration saved for user " + userID,
+			})
+			return
 		}
-		if err := os.WriteFile(targetSavePath, []byte(str), 0644); err != nil {
+
+		// Strictly save to client/config.json for system default
+		targetSavePath := resolveSystemFilePath(systemConfigCandidates(), "client/config.json")
+		if err := os.WriteFile(targetSavePath, formattedBytes, 0644); err != nil {
 			http.Error(w, `{"error":"Save error: `+err.Error()+`"}`, http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok","message":"Configuration saved successfully to client/config.json"}`))
+		w.Header().Set("X-Micaps-User", "default")
+		w.Header().Set("X-Micaps-Config-Source", "system")
+		w.Write([]byte(`{"status":"ok","user":"default","source":"system","message":"Configuration saved successfully to client/config.json"}`))
 		return
 	}
 
 	// GET
+	if userID != "default" {
+		userConfigPath := filepath.Join(h.userDirPath(userID), "config.json")
+		if data, err := os.ReadFile(userConfigPath); err == nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-Micaps-User", userID)
+			w.Header().Set("X-Micaps-Config-Source", "user")
+			w.Write(data)
+			return
+		}
+	}
+
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		http.Error(w, `{"error":"Could not read config file: `+err.Error()+`"}`, http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Micaps-User", userID)
+	w.Header().Set("X-Micaps-Config-Source", "system")
 	w.Write(data)
 }
 
-// ColormapsHandler reads or updates client/colormaps.json
+// ColormapsHandler reads or updates colormaps.json (per-user when X-Micaps-User / ?user= is specified)
 func (h *StaticHandler) ColormapsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Micaps-User")
+	w.Header().Set("Access-Control-Expose-Headers", "X-Micaps-Config-Source, X-Micaps-User")
 
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	candidates := []string{
-		"client/colormaps.json",
-		"../client/colormaps.json",
+	userID, err := ExtractRequestUserID(r)
+	if err != nil {
+		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+		return
 	}
-	if exePath, err := os.Executable(); err == nil {
-		exeDir := filepath.Dir(exePath)
-		candidates = append(candidates, filepath.Join(exeDir, "client", "colormaps.json"))
-	}
+
+	candidates := systemColormapsCandidates()
 
 	if r.Method == http.MethodPost || r.Method == http.MethodPut {
 		var obj map[string]any
@@ -221,36 +255,60 @@ func (h *StaticHandler) ColormapsHandler(w http.ResponseWriter, r *http.Request)
 			http.Error(w, `{"error":"Invalid JSON: `+err.Error()+`"}`, http.StatusBadRequest)
 			return
 		}
-		formatted, err := json.MarshalIndent(obj, "", "  ")
+		formattedBytes, err := FormatCompactColormapsBytes(obj)
 		if err != nil {
 			http.Error(w, `{"error":"Format error: `+err.Error()+`"}`, http.StatusInternalServerError)
 			return
 		}
-		str := string(formatted)
-		reColor := regexp.MustCompile(`\[\s*(-?\d+),\s*(-?\d+),\s*(-?\d+),\s*(-?\d+)\s*\]`)
-		str = reColor.ReplaceAllString(str, `[$1, $2, $3, $4]`)
-		reValColor := regexp.MustCompile(`\{\s*"color":\s*(\[[^\]]+\]),\s*"val":\s*(-?[\d.]+)\s*\}`)
-		str = reValColor.ReplaceAllString(str, `{ "color": $1, "val": $2 }`)
 
-		targetSavePath := "client/colormaps.json"
-		for _, p := range candidates {
-			if _, err := os.Stat(p); err == nil {
-				targetSavePath = p
-				break
+		if userID != "default" {
+			userDir := h.userDirPath(userID)
+			targetUserPath := filepath.Join(userDir, "colormaps.json")
+			if err := writeFileAtomic(targetUserPath, formattedBytes, 0644); err != nil {
+				http.Error(w, `{"error":"Save error: `+err.Error()+`"}`, http.StatusInternalServerError)
+				return
 			}
+			touchUserMetaTimestamp(userDir, userID)
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-Micaps-User", userID)
+			w.Header().Set("X-Micaps-Config-Source", "user")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"status":  "ok",
+				"user":    userID,
+				"source":  "user",
+				"message": "Colormaps saved for user " + userID,
+			})
+			return
 		}
-		if err := os.WriteFile(targetSavePath, []byte(str+"\n"), 0644); err != nil {
+
+		targetSavePath := resolveSystemFilePath(candidates, "client/colormaps.json")
+		if err := os.WriteFile(targetSavePath, formattedBytes, 0644); err != nil {
 			http.Error(w, `{"error":"Save error: `+err.Error()+`"}`, http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok","message":"Colormaps saved successfully to client/colormaps.json"}`))
+		w.Header().Set("X-Micaps-User", "default")
+		w.Header().Set("X-Micaps-Config-Source", "system")
+		w.Write([]byte(`{"status":"ok","user":"default","source":"system","message":"Colormaps saved successfully to client/colormaps.json"}`))
 		return
+	}
+
+	if userID != "default" {
+		userColormapsPath := filepath.Join(h.userDirPath(userID), "colormaps.json")
+		if data, err := os.ReadFile(userColormapsPath); err == nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-Micaps-User", userID)
+			w.Header().Set("X-Micaps-Config-Source", "user")
+			w.Write(data)
+			return
+		}
 	}
 
 	for _, p := range candidates {
 		if data, err := os.ReadFile(p); err == nil {
 			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-Micaps-User", userID)
+			w.Header().Set("X-Micaps-Config-Source", "system")
 			w.Write(data)
 			return
 		}
@@ -261,17 +319,13 @@ func (h *StaticHandler) ColormapsHandler(w http.ResponseWriter, r *http.Request)
 
 // SPAHandler serves frontend static files with SPA fallback
 func (h *StaticHandler) SPAHandler(w http.ResponseWriter, r *http.Request) {
-	// If requesting /config.json, strictly serve from client/config.json
+	// If requesting /config.json, delegate to ConfigHandler when user-scoped, else serve client/config.json
 	if r.URL.Path == "/config.json" || r.URL.Path == "config.json" {
-		candidates := []string{
-			"client/config.json",
-			"../client/config.json",
+		if r.Header.Get("X-Micaps-User") != "" || r.URL.Query().Get("user") != "" {
+			h.ConfigHandler(w, r)
+			return
 		}
-		if exePath, err := os.Executable(); err == nil {
-			exeDir := filepath.Dir(exePath)
-			candidates = append(candidates, filepath.Join(exeDir, "client", "config.json"))
-		}
-		for _, fp := range candidates {
+		for _, fp := range systemConfigCandidates() {
 			if _, err := os.Stat(fp); err == nil {
 				http.ServeFile(w, r, fp)
 				return
@@ -281,17 +335,13 @@ func (h *StaticHandler) SPAHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If requesting /colormaps.json, strictly serve from client/colormaps.json
+	// If requesting /colormaps.json, delegate to ColormapsHandler when user-scoped, else serve client/colormaps.json
 	if r.URL.Path == "/colormaps.json" || r.URL.Path == "colormaps.json" {
-		candidates := []string{
-			"client/colormaps.json",
-			"../client/colormaps.json",
+		if r.Header.Get("X-Micaps-User") != "" || r.URL.Query().Get("user") != "" {
+			h.ColormapsHandler(w, r)
+			return
 		}
-		if exePath, err := os.Executable(); err == nil {
-			exeDir := filepath.Dir(exePath)
-			candidates = append(candidates, filepath.Join(exeDir, "client", "colormaps.json"))
-		}
-		for _, fp := range candidates {
+		for _, fp := range systemColormapsCandidates() {
 			if _, err := os.Stat(fp); err == nil {
 				http.ServeFile(w, r, fp)
 				return

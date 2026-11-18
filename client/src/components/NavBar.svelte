@@ -7,6 +7,7 @@
   import { DEFAULT_MODELS } from "../lib/stores/tabsCore.js";
   import PresetMenu from "./PresetMenu.svelte";
   import HelpModal from "./HelpModal.svelte";
+  import UserProfileSwitcher from "./UserProfileSwitcher.svelte";
   import { captureScreenshot, handlePrint } from "../utils/screenshot.js";
   import { getPinnedPresetIds, getRecentPresetIds } from "../lib/stores/presetFavorites.svelte.js";
   import { getGlobalTheme, setGlobalTheme, getGlobalProjection, setGlobalProjection } from "../lib/stores/theme.svelte.js";
@@ -29,6 +30,7 @@
     onChangeLayout = null,
     onSelectAutoAlloc = null,
     onHistoryChange = null,
+    onProfileChange = null,
   } = $props();
 
   function getDefaultHistoryDate() {
@@ -479,7 +481,7 @@
 
 <header id="navbar" class="navbar">
   <div class="nav-brand">
-    <a href="https://github.com/likev/micaps-web" target="_blank" rel="noopener noreferrer" class="brand-link" title="MICAPS-Web on GitHub (client v1.12.4)">MICAPS-Web</a>
+    <a href="https://github.com/likev/micaps-web" target="_blank" rel="noopener noreferrer" class="brand-link" title="MICAPS-Web on GitHub (client v1.12.5)">MICAPS-Web</a>
     <span class="brand-badge">PRO</span>
   </div>
 
@@ -714,6 +716,9 @@
   </div>
 
   <div class="nav-controls">
+    <!-- Multi-User Profile Switcher -->
+    <UserProfileSwitcher variant="navbar" onProfileChanged={onProfileChange} />
+
     <!-- History Mode Control Capsule -->
     <div id="nav-history-control" class="nav-control-group nav-history-capsule" class:is-history={app.historyMode}>
       <button

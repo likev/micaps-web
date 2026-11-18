@@ -4,6 +4,7 @@
   import { createFormState } from "../lib/stores/formState.js";
   import { CURRENT_CONFIG, savePresetConfig, onConfigLoaded } from "../config/presets.js";
   import JsonDocEditor from "./config/JsonDocEditor.svelte";
+  import UserProfileSwitcher from "./UserProfileSwitcher.svelte";
   import { focusRestore } from "../actions/focusRestore.js";
   import { t } from "../lib/stores/i18n.svelte.js";
 
@@ -126,6 +127,12 @@
     ui.configOpen = false;
   }
 
+  function handleUserChangedInEditor() {
+    formState.reset(CURRENT_CONFIG || {});
+    updateStatus();
+    if (onConfigSaved) onConfigSaved(CURRENT_CONFIG);
+  }
+
   function beforeUnloadListener(e) {
     if (isDirty) {
       e.preventDefault();
@@ -199,6 +206,11 @@
       </div>
 
       <div class="config-editor-actions">
+        <UserProfileSwitcher
+          variant="config"
+          onProfileChanged={handleUserChangedInEditor}
+          onConfigReset={handleUserChangedInEditor}
+        />
         <button id="btn-config-reload" class="btn" title="Reload pristine configuration" onclick={handleReload}>
           {t("config.btn.reload")}
         </button>

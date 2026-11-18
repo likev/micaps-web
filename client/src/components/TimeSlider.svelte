@@ -6,6 +6,7 @@
     getOrCreateTimeline,
     goToPeriod,
     goToObsFile,
+    syncSliderObsFiles,
     playback,
     timelinesByWindow,
     DEFAULT_PLAYBACK_MS,
@@ -16,12 +17,24 @@
     formatObsTimestamp,
     formatObsChipLabel,
   } from "../utils/formatters.js";
-  import { getPeriodsForStep, filterObsFilesByStep, selectObsChipsWindow, findClosestFile, getObsStepOptions, formatStepLabel, isSatelliteGroup } from "../lib/stores/timelineMath.js";
+  import {
+    getPeriodsForStep,
+    filterObsFilesByStep,
+    filterObsFilesByRangeWindow,
+    selectObsChipsWindow,
+    findClosestFile,
+    getObsStepOptions,
+    formatStepLabel,
+    isSatelliteGroup,
+    isRadarOrHighCadenceGroup,
+    shouldUseObsTimeSlider,
+  } from "../lib/stores/timelineMath.js";
   import { stepWindowTimeline } from "../lib/services/appWorkflow.js";
   import { getWindowById } from "../lib/stores/tabs.svelte.js";
   import { getLayersForWindow } from "../lib/stores/layersCore.js";
   import { parseTimestamp, getReferenceNowMs } from "../utils/timeResolver.js";
   import MultiTrackTimeline from "./timeline/MultiTrackTimeline.svelte";
+  import ObsTimeScrubber from "./timeline/ObsTimeScrubber.svelte";
   import { t } from "../lib/stores/i18n.svelte.js";
   import {
     isRain12Element,
@@ -74,10 +87,21 @@
     if (layers.some((l) => l?.model === "SATELLITE" || String(l?.path || "").includes("FY4B") || String(l?.element || "").includes("FY4B"))) return true;
     return false;
   });
+  let activeObsPath = $derived.by(() => {
+    if (!isObs) return "";
+    const win = getWindowById(winId);
+    const layerPaths = layers.map((l) => l?.path || l?.element || "").filter(Boolean).join(" ");
+    return [win?.activeGroup?.id, win?.activeGroup?.name, win?.title, timeline.currentWinTitle, layerPaths].filter(Boolean).join(" ");
+  });
+  let isHighCadence = $derived.by(() => {
+    if (!isObs || timeline.isUpperAirMode) return false;
+    const win = getWindowById(winId);
+    return isRadarOrHighCadenceGroup(win?.activeGroup) || isRadarOrHighCadenceGroup(activeObsPath);
+  });
   let stepOptions = $derived(
     !isObs && !timeline.isUpperAirMode
       ? [1, 3, 6, 12, 24]
-      : getObsStepOptions({ isUpper: timeline.isUpperAirMode, isSatellite })
+      : getObsStepOptions({ isUpper: timeline.isUpperAirMode, isSatellite, isHighCadence, path: activeObsPath })
   );
   let stepValue = $derived.by(() => {
     const defaultStep = timeline.isUpperAirMode ? 12 : (isObs ? 3 : 6);
@@ -92,7 +116,34 @@
   let periods = $derived(timeline.discretePeriods || []);
   let activePeriod = $derived(periods[timeline.currentPeriodIdx] ?? 0);
   let obsFiles = $derived(timeline.obsFiles || []);
-  let activeObsFile = $derived(obsFiles[timeline.currentObsIdx] || "");
+  let allStepFilteredObs = $derived(
+    isObs ? filterObsFilesByStep(timeline.rawObsFiles || [], timeline.currentStepLength, timeline.isUpperAirMode) : []
+  );
+  let activeObsFile = $derived(
+    isObs ? (timeline.sliderObsFiles?.[timeline.currentSliderObsIdx] || obsFiles[timeline.currentObsIdx] || "") : ""
+  );
+  let sliderObsFiles = $derived(
+    isObs
+      ? (Array.isArray(timeline.sliderObsFiles) && timeline.sliderObsFiles.length > 0
+          ? timeline.sliderObsFiles
+          : filterObsFilesByRangeWindow(allStepFilteredObs, timeline.obsRangeHours ?? 6, activeObsFile))
+      : []
+  );
+  let currentSliderObsIdx = $derived.by(() => {
+    if (!isObs || sliderObsFiles.length === 0) return 0;
+    const idx = activeObsFile ? sliderObsFiles.indexOf(activeObsFile) : -1;
+    if (idx !== -1) return idx;
+    const rawIdx = timeline.currentSliderObsIdx ?? (sliderObsFiles.length - 1);
+    return Math.max(0, Math.min(sliderObsFiles.length - 1, rawIdx));
+  });
+  let isObsSliderMode = $derived(
+    shouldUseObsTimeSlider({
+      isObs,
+      stepLength: timeline.currentStepLength,
+      obsViewMode: timeline.obsViewMode || "auto",
+      chipCount: allStepFilteredObs.length || obsFiles.length,
+    })
+  );
   let cycles = $derived(timeline.forecastCycles || []);
   let currentCycle = $derived(timeline.currentInitCycle || "");
 
@@ -247,12 +298,57 @@
       const newIdx = (!wasAtLatest && targetFile) ? tl.obsFiles.indexOf(targetFile) : -1;
       tl.currentObsIdx = newIdx !== -1 ? newIdx : Math.max(0, tl.obsFiles.length - 1);
       const file = tl.obsFiles[tl.currentObsIdx];
+      syncSliderObsFiles(tl, allFiltered, file || targetFile);
       if (win && file) {
         win.obsTime = file;
         if (win._obsTimeline) win._obsTimeline.file = file;
       }
       if (file) emitTimeChange({ isObs: true, file, stepLength: step, _seq: ++tl.periodStepSeq });
     }
+  }
+
+  function toggleObsViewMode() {
+    const tl = timelinesByWindow[winId] || getOrCreateTimeline(winId);
+    const nextMode = isObsSliderMode ? "chips" : "slider";
+    tl.obsViewMode = nextMode;
+    if (nextMode === "slider") {
+      syncSliderObsFiles(tl, allStepFilteredObs, activeObsFile);
+    }
+  }
+
+  function handleObsRangeChange(hours) {
+    const tl = timelinesByWindow[winId] || getOrCreateTimeline(winId);
+    tl.obsRangeHours = hours;
+    syncSliderObsFiles(tl, allStepFilteredObs, activeObsFile);
+  }
+
+  function handleScrubberSelect(file) {
+    if (!file) return;
+    pause();
+    const tl = timelinesByWindow[winId] || getOrCreateTimeline(winId);
+    const filtered = allStepFilteredObs.length > 0 ? allStepFilteredObs : sliderObsFiles;
+    if (filtered.length > 0) {
+      tl.obsFiles = selectObsChipsWindow(filtered, file);
+    }
+    goToObsFile(winId, file);
+    syncSliderObsFiles(tl, filtered, file);
+    const fileTs = parseTimestamp(file);
+    if (fileTs !== null) tl.wallClockCursor = fileTs;
+    const win = getWindowById(winId);
+    if (win) {
+      win.obsTime = file;
+      if (win._obsTimeline) win._obsTimeline.file = file;
+    }
+    emitTimeChange({ isObs: true, file, cursorTime: fileTs, _seq: ++tl.periodStepSeq });
+  }
+
+  function handleScrubberLoopRangeChange(nextRange) {
+    const tl = timelinesByWindow[winId] || getOrCreateTimeline(winId);
+    tl.loopRange = {
+      ...(tl.loopRange || { active: true, start: null, end: null }),
+      ...nextRange,
+      active: true,
+    };
   }
 
   function handleMultiTrackTimeChange(payload) {
@@ -663,6 +759,19 @@
         </select>
       </div>
 
+      {#if isObs}
+        <button
+          type="button"
+          id="sl-btn-toggle-obs-view"
+          class="multitrack-toggle-btn obs-view-toggle-btn"
+          class:active={isObsSliderMode}
+          title={isObsSliderMode ? t("timeline.view.chips") : t("timeline.view.slider")}
+          onclick={toggleObsViewMode}
+        >
+          {isObsSliderMode ? t("timeline.view.slider") : t("timeline.view.chips")}
+        </button>
+      {/if}
+
       <button
         type="button"
         id="sl-btn-toggle-multitrack"
@@ -681,70 +790,85 @@
       <div
         id="sl-timeline-chips"
         class="timeline-chips"
+        class:obs-scrubber-host={isObs && isObsSliderMode}
         role="tablist"
         aria-label={isObs ? "Observation time steps" : "Forecast lead time steps"}
         ondragover={(e) => e.preventDefault()}
         ondrop={(e) => { e.preventDefault(); handleLineDragEnd(); }}
       >
         {#if isObs}
-          {#each obsFiles as file, idx}
-            {@const isInLoop = isObsInLoop(idx)}
-            {@const isPtA = isObsPointA(idx)}
-            {@const isPtB = isObsPointB(idx)}
-            {#if isLooping && idx === obsLoopStartIdx}
-              <div
-                class="timeline-loop-line timeline-loop-line-a"
-                id="timeline-loop-line-a"
-                data-testid="timeline-loop-line-a"
-                role="separator"
-                aria-label="Loop Start A"
-                title="Loop Start A (Drag to adjust)"
-                draggable="true"
-                onpointerdown={(e) => startDrag(e, 'A')}
-                ondragstart={(e) => handleLineDragStart(e, 'A')}
-                ondragend={handleLineDragEnd}
+          {#if isObsSliderMode}
+            <ObsTimeScrubber
+              files={sliderObsFiles}
+              currentIndex={currentSliderObsIdx}
+              rangeHours={timeline.obsRangeHours ?? 6}
+              totalRawCount={allStepFilteredObs.length}
+              isLooping={isLooping}
+              loopRange={timeline.loopRange}
+              onSelectFile={handleScrubberSelect}
+              onRangeChange={handleObsRangeChange}
+              onLoopRangeChange={handleScrubberLoopRangeChange}
+            />
+          {:else}
+            {#each obsFiles as file, idx}
+              {@const isInLoop = isObsInLoop(idx)}
+              {@const isPtA = isObsPointA(idx)}
+              {@const isPtB = isObsPointB(idx)}
+              {#if isLooping && idx === obsLoopStartIdx}
+                <div
+                  class="timeline-loop-line timeline-loop-line-a"
+                  id="timeline-loop-line-a"
+                  data-testid="timeline-loop-line-a"
+                  role="separator"
+                  aria-label="Loop Start A"
+                  title="Loop Start A (Drag to adjust)"
+                  draggable="true"
+                  onpointerdown={(e) => startDrag(e, 'A')}
+                  ondragstart={(e) => handleLineDragStart(e, 'A')}
+                  ondragend={handleLineDragEnd}
+                >
+                  <div class="loop-line-bar"></div>
+                  <span class="loop-line-badge badge-a">A</span>
+                </div>
+              {/if}
+              <button
+                class="chip-btn"
+                class:active={idx === timeline.currentObsIdx}
+                class:in-loop-range={isInLoop}
+                class:begin-timeline-chip={idx === obsLoopStartIdx}
+                class:end-timeline-chip={idx === obsLoopEndIdx}
+                class:loop-pt-a={isPtA}
+                class:loop-pt-b={isPtB}
+                role="tab"
+                aria-selected={idx === timeline.currentObsIdx}
+                onclick={() => handleChipClick(idx)}
+                ondragover={(e) => handleChipDragOver(e, idx)}
+                data-testid="timeline-chip"
+                data-file={file}
               >
-                <div class="loop-line-bar"></div>
-                <span class="loop-line-badge badge-a">A</span>
-              </div>
-            {/if}
-            <button
-              class="chip-btn"
-              class:active={idx === timeline.currentObsIdx}
-              class:in-loop-range={isInLoop}
-              class:begin-timeline-chip={idx === obsLoopStartIdx}
-              class:end-timeline-chip={idx === obsLoopEndIdx}
-              class:loop-pt-a={isPtA}
-              class:loop-pt-b={isPtB}
-              role="tab"
-              aria-selected={idx === timeline.currentObsIdx}
-              onclick={() => handleChipClick(idx)}
-              ondragover={(e) => handleChipDragOver(e, idx)}
-              data-testid="timeline-chip"
-              data-file={file}
-            >
-              {formatObsChipLabel(file)}
-              {#if isPtA}<span class="chip-loop-tag tag-a">A</span>{/if}
-              {#if isPtB}<span class="chip-loop-tag tag-b">B</span>{/if}
-            </button>
-            {#if isLooping && idx === obsLoopEndIdx}
-              <div
-                class="timeline-loop-line timeline-loop-line-b"
-                id="timeline-loop-line-b"
-                data-testid="timeline-loop-line-b"
-                role="separator"
-                aria-label="Loop End B"
-                title="Loop End B (Drag to adjust)"
-                draggable="true"
-                onpointerdown={(e) => startDrag(e, 'B')}
-                ondragstart={(e) => handleLineDragStart(e, 'B')}
-                ondragend={handleLineDragEnd}
-              >
-                <div class="loop-line-bar"></div>
-                <span class="loop-line-badge badge-b">B</span>
-              </div>
-            {/if}
-          {/each}
+                {formatObsChipLabel(file)}
+                {#if isPtA}<span class="chip-loop-tag tag-a">A</span>{/if}
+                {#if isPtB}<span class="chip-loop-tag tag-b">B</span>{/if}
+              </button>
+              {#if isLooping && idx === obsLoopEndIdx}
+                <div
+                  class="timeline-loop-line timeline-loop-line-b"
+                  id="timeline-loop-line-b"
+                  data-testid="timeline-loop-line-b"
+                  role="separator"
+                  aria-label="Loop End B"
+                  title="Loop End B (Drag to adjust)"
+                  draggable="true"
+                  onpointerdown={(e) => startDrag(e, 'B')}
+                  ondragstart={(e) => handleLineDragStart(e, 'B')}
+                  ondragend={handleLineDragEnd}
+                >
+                  <div class="loop-line-bar"></div>
+                  <span class="loop-line-badge badge-b">B</span>
+                </div>
+              {/if}
+            {/each}
+          {/if}
         {:else}
           {#each periods as p, idx}
             {@const isPeriodDisabled = (isRainAccum && Number(p) < rainAccumHours) ||
@@ -958,6 +1082,12 @@
     border-color: rgba(56, 139, 253, 0.6);
     color: #79c0ff;
     box-shadow: 0 0 8px rgba(56, 139, 253, 0.3);
+  }
+
+  .timeline-chips.obs-scrubber-host {
+    overflow: visible;
+    flex: 1;
+    width: 100%;
   }
 
   .step-length-select:hover,

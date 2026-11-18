@@ -19,9 +19,9 @@ import (
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Range, Authorization, Accept, Origin")
-		w.Header().Set("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, HEAD")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Range, Authorization, Accept, Origin, X-Micaps-User")
+		w.Header().Set("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges, X-Micaps-Config-Source, X-Micaps-User")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
 			return
@@ -96,7 +96,9 @@ func main() {
 	// REST API routes
 	mux.HandleFunc("/api/status", staticH.StatusHandler)
 	mux.HandleFunc("/api/config", staticH.ConfigHandler)
+	mux.HandleFunc("/api/config/reset", staticH.ConfigResetHandler)
 	mux.HandleFunc("/api/colormaps", staticH.ColormapsHandler)
+	mux.HandleFunc("/api/users", staticH.UsersHandler)
 	mux.HandleFunc("/api/catalog/models", catH.ModelsHandler)
 	mux.HandleFunc("/api/catalog/tree", catH.TreeHandler)
 	mux.HandleFunc("/api/catalog/levels", catH.LevelsHandler)

@@ -1,7 +1,12 @@
 // timelineCore.js - Plain-core timeline state and operations
 import { generateDynamicForecastCycles } from "../../utils/timelineSync.js";
 import { DEFAULT_MOCK_OBS_FILES } from "../../config/presets.js";
-import { selectObsChipsWindow, filterObsFilesByStep } from "./timelineMath.js";
+import {
+  selectObsChipsWindow,
+  filterObsFilesByStep,
+  filterObsFilesByRangeWindow,
+  shouldUseObsTimeSlider,
+} from "./timelineMath.js";
 import { parseTimestamp, resolveLayerTime, getReferenceNowMs } from "../../utils/timeResolver.js";
 
 export const DEFAULT_PLAYBACK_MS = 1500;
@@ -13,7 +18,10 @@ export function createTimelineState(winId = "default", overrides = {}) {
   const step = overrides.currentStepLength ?? defaultStep;
   const cycles = overrides.forecastCycles || generateDynamicForecastCycles(null, 10);
   const rawObs = overrides.rawObsFiles || [...DEFAULT_MOCK_OBS_FILES];
-  const obs = selectObsChipsWindow(filterObsFilesByStep(rawObs, step, isUpper));
+  const filteredObs = filterObsFilesByStep(rawObs, step, isUpper);
+  const obs = selectObsChipsWindow(filteredObs);
+  const rangeHours = overrides.obsRangeHours ?? 6;
+  const sliderObs = filterObsFilesByRangeWindow(filteredObs, rangeHours);
 
   // Initial cursor time
   let initialCursor = overrides.wallClockCursor;
@@ -44,6 +52,10 @@ export function createTimelineState(winId = "default", overrides = {}) {
     rawObsFiles: rawObs,
     obsFiles: obs,
     currentObsIdx: Math.max(0, obs.length - 1),
+    obsRangeHours: rangeHours,
+    obsViewMode: overrides.obsViewMode || "auto", // "auto" | "slider" | "chips"
+    sliderObsFiles: overrides.sliderObsFiles || sliderObs,
+    currentSliderObsIdx: overrides.currentSliderObsIdx ?? Math.max(0, sliderObs.length - 1),
     isTickLoading: false,
     disabledPeriods: overrides.disabledPeriods || [],
 
@@ -159,6 +171,19 @@ export function fireTimeChange(payload, winId = null) {
   }
 }
 
+export function syncSliderObsFiles(tl, allFiltered = null, targetFile = null) {
+  if (!tl) return [];
+  const filtered = Array.isArray(allFiltered)
+    ? allFiltered
+    : filterObsFilesByStep(tl.rawObsFiles || [], tl.currentStepLength, tl.isUpperAirMode);
+  const activeFile = targetFile || tl.obsFiles?.[tl.currentObsIdx] || "";
+  const sliderList = filterObsFilesByRangeWindow(filtered, tl.obsRangeHours ?? 6, activeFile);
+  tl.sliderObsFiles = sliderList;
+  const idx = activeFile ? sliderList.indexOf(activeFile) : -1;
+  tl.currentSliderObsIdx = idx !== -1 ? idx : Math.max(0, sliderList.length - 1);
+  return sliderList;
+}
+
 export function getAdjacentTimeSteps(state = timelineState) {
   const {
     currentMode,
@@ -204,8 +229,20 @@ export function getAdjacentTimeSteps(state = timelineState) {
     }
   }
 
-  const prevObsIdx = obsFiles.length > 0 ? (currentObsIdx - 1 + obsFiles.length) % obsFiles.length : -1;
-  const nextObsIdx = obsFiles.length > 0 ? (currentObsIdx + 1) % obsFiles.length : -1;
+  const useSlider = currentMode === "obs" &&
+    shouldUseObsTimeSlider({
+      isObs: true,
+      stepLength: state.currentStepLength,
+      obsViewMode: state.obsViewMode,
+      chipCount: obsFiles?.length || 0,
+    }) &&
+    Array.isArray(state.sliderObsFiles) &&
+    state.sliderObsFiles.length > 0;
+  const activeObsList = useSlider ? state.sliderObsFiles : (obsFiles || []);
+  const activeObsIdx = useSlider ? (state.currentSliderObsIdx ?? 0) : currentObsIdx;
+
+  const prevObsIdx = activeObsList.length > 0 ? (activeObsIdx - 1 + activeObsList.length) % activeObsList.length : -1;
+  const nextObsIdx = activeObsList.length > 0 ? (activeObsIdx + 1) % activeObsList.length : -1;
 
   return {
     mode: currentMode,
@@ -216,9 +253,9 @@ export function getAdjacentTimeSteps(state = timelineState) {
       cycle: currentInitCycle,
     },
     obsFiles: {
-      prev: prevObsIdx !== -1 ? obsFiles[prevObsIdx] : null,
-      current: currentObsIdx !== -1 ? obsFiles[currentObsIdx] : null,
-      next: nextObsIdx !== -1 ? obsFiles[nextObsIdx] : null,
+      prev: prevObsIdx !== -1 ? activeObsList[prevObsIdx] : null,
+      current: activeObsIdx !== -1 ? activeObsList[activeObsIdx] : null,
+      next: nextObsIdx !== -1 ? activeObsList[nextObsIdx] : null,
     },
   };
 }
@@ -233,19 +270,32 @@ export function getAdjacentTimeSteps(state = timelineState) {
  */
 export function getFollowingTimeSteps(state = timelineState, n = 2) {
   if (!state) return [];
-  const obsFiles = Array.isArray(state.obsFiles)
-    ? state.obsFiles
-    : (Array.isArray(state.files)
-      ? state.files
-      : (Array.isArray(state.rawFiles)
-        ? state.rawFiles
-        : (Array.isArray(state._state?.obsFiles)
-          ? state._state.obsFiles
-          : null)));
+  const useSlider = state.currentMode === "obs" &&
+    shouldUseObsTimeSlider({
+      isObs: true,
+      stepLength: state.currentStepLength,
+      obsViewMode: state.obsViewMode,
+      chipCount: state.obsFiles?.length || 0,
+    }) &&
+    Array.isArray(state.sliderObsFiles) &&
+    state.sliderObsFiles.length > 0;
+  const obsFiles = useSlider
+    ? state.sliderObsFiles
+    : (Array.isArray(state.obsFiles)
+      ? state.obsFiles
+      : (Array.isArray(state.files)
+        ? state.files
+        : (Array.isArray(state.rawFiles)
+          ? state.rawFiles
+          : (Array.isArray(state._state?.obsFiles)
+            ? state._state.obsFiles
+            : null))));
   if (!obsFiles || obsFiles.length === 0) {
     return [];
   }
-  let currentObsIdx = typeof state.currentObsIdx === "number" ? state.currentObsIdx : -1;
+  let currentObsIdx = useSlider
+    ? (typeof state.currentSliderObsIdx === "number" ? state.currentSliderObsIdx : -1)
+    : (typeof state.currentObsIdx === "number" ? state.currentObsIdx : -1);
   if (currentObsIdx < 0) {
     const cur = state.file || state.currentFile || state.obsFiles?.current;
     if (cur) currentObsIdx = obsFiles.indexOf(cur);

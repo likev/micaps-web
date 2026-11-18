@@ -30,6 +30,7 @@ type Config struct {
 	THCacheTTL      string `json:"th_cache_ttl"`
 	PrefetchWorkers int    `json:"prefetch_workers"`
 	PrefetchQueue   int    `json:"prefetch_queue"`
+	UsersDir        string `json:"users_dir"`
 }
 
 type xmlAddEntry struct {
@@ -280,6 +281,7 @@ func LoadConfig() *Config {
 		THCacheTTL:      getEnv("TH_CACHE_TTL", "6h"),
 		PrefetchWorkers: getEnvInt("PREFETCH_WORKERS", 3),
 		PrefetchQueue:   getEnvInt("PREFETCH_QUEUE", 64),
+		UsersDir:        getEnv("USERS_DIR", "./users"),
 	}
 
 	fs := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
@@ -295,6 +297,7 @@ func LoadConfig() *Config {
 	thCacheTTLFlag := fs.String("th-cache-ttl", cfg.THCacheTTL, "Disk cache retention TTL (default: 6h)")
 	prefetchWorkersFlag := fs.Int("prefetch-workers", cfg.PrefetchWorkers, "Prefetch worker pool size (default: 3, 0 disables prefetch endpoint)")
 	prefetchQueueFlag := fs.Int("prefetch-queue", cfg.PrefetchQueue, "Prefetch worker bounded queue size (default: 64)")
+	usersDirFlag := fs.String("users-dir", cfg.UsersDir, "Path to per-user configuration directory (default: ./users)")
 
 	if err := fs.Parse(os.Args[1:]); err != nil {
 		if err == flag.ErrHelp {
@@ -330,6 +333,7 @@ func LoadConfig() *Config {
 	cfg.THCacheTTL = *thCacheTTLFlag
 	cfg.PrefetchWorkers = *prefetchWorkersFlag
 	cfg.PrefetchQueue = *prefetchQueueFlag
+	cfg.UsersDir = *usersDirFlag
 
 	// Validate HTTP port
 	portNum, err := strconv.Atoi(cfg.HTTPPort)

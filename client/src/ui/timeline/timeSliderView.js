@@ -15,12 +15,14 @@ import {
   getObsStepOptions,
   formatStepLabel,
   isSatelliteGroup,
+  isRadarOrHighCadenceGroup,
 } from "./timelineMath.js";
 import {
   timelineState,
   fireTimeChange,
   incPeriodStepSeq,
   subscribeTimeline,
+  syncSliderObsFiles,
 } from "./timelineStore.js";
 import {
   DEFAULT_PLAYBACK_MS,
@@ -31,7 +33,7 @@ import {
   updatePlayButtonDisabledState,
 } from "./playbackController.js";
 
-export function updateStepLengthOptions(isUpper, currentStep, isSatellite = false) {
+export function updateStepLengthOptions(isUpper, currentStep, isSatellite = false, extraOpts = {}) {
   if (typeof document === "undefined" || typeof document.getElementById !== "function") {
     timelineState.currentStepLength = parseFloat(currentStep) || (isUpper ? 12 : (timelineState.currentMode === "obs" ? 3 : 6));
     return;
@@ -39,7 +41,12 @@ export function updateStepLengthOptions(isUpper, currentStep, isSatellite = fals
   const selStep = document.getElementById("select-step-length");
   if (!selStep) return;
 
-  const steps = getObsStepOptions({ isUpper, isSatellite });
+  const steps = getObsStepOptions({
+    isUpper,
+    isSatellite,
+    isHighCadence: Boolean(extraOpts.isHighCadence),
+    path: extraOpts.path || "",
+  });
   const targetOptions = steps.map((s) => ({
     value: String(s),
     label: formatStepLabel(s),
@@ -286,6 +293,8 @@ export function setStepLength(stepVal, triggerCallback = false) {
     timelineState.obsFiles = selectObsChipsWindow(allFiltered);
     const newIdx = (!wasAtLatest && targetFile) ? timelineState.obsFiles.indexOf(targetFile) : -1;
     timelineState.currentObsIdx = newIdx !== -1 ? newIdx : Math.max(0, timelineState.obsFiles.length - 1);
+    const chosenFile = timelineState.obsFiles[timelineState.currentObsIdx] || targetFile || "";
+    syncSliderObsFiles(timelineState, allFiltered, chosenFile);
     updateLabels();
     renderChips();
     if (triggerCallback && timelineState.onTimeChangeCallback && timelineState.obsFiles[timelineState.currentObsIdx]) {
@@ -321,6 +330,8 @@ export function setTimelineMode(mode, customData = {}) {
     isSatelliteGroup(customData.winTitle) ||
     isSatelliteGroup(timelineState.currentWinTitle)
   );
+  const activeObsPath = customData.path || customData.winTitle || timelineState.currentWinTitle || "";
+  const isHighCadence = !timelineState.isUpperAirMode && isRadarOrHighCadenceGroup(activeObsPath);
   timelineState.isSatellite = isSatellite;
 
   // Set default step length: 12h for upper-air, 3h for surface, 6h for NWP forecast
@@ -334,7 +345,10 @@ export function setTimelineMode(mode, customData = {}) {
   }
 
   timelineState.currentStepLength = targetStep;
-  updateStepLengthOptions(timelineState.isUpperAirMode, timelineState.currentStepLength, isSatellite);
+  updateStepLengthOptions(timelineState.isUpperAirMode, timelineState.currentStepLength, isSatellite, {
+    isHighCadence,
+    path: activeObsPath,
+  });
 
   if (timelineState.currentMode === "obs") {
     if (Array.isArray(customData.files) && customData.files.length > 0) {
@@ -352,6 +366,7 @@ export function setTimelineMode(mode, customData = {}) {
     } else {
       timelineState.currentObsIdx = Math.max(0, timelineState.obsFiles.length - 1);
     }
+    syncSliderObsFiles(timelineState, allFiltered, timelineState.obsFiles[timelineState.currentObsIdx] || targetFile);
   } else {
     if (Array.isArray(customData.cycles) && customData.cycles.length > 0) {
       timelineState.forecastCycles = customData.cycles;
